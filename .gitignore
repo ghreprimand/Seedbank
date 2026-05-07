@@ -1,0 +1,29 @@
+# Local workflow/tooling state
+.archon/
+
+# Dependencies and build output
+node_modules/
+dist/
+build/
+coverage/
+
+# Environment and local config
+.env
+.env.*
+!.env.example
+
+# Local/private Seedbank data
+private/
+imports/
+exports/
+archives/
+local-archive/
+*.seedbank.local.json
+*.seedbank.export.json
+*.seedbank.backup.json
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
