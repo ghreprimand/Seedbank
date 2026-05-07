@@ -1,6 +1,12 @@
 # Seedbank
 
-Seedbank is a local-first project idea manager for games, apps, tools, experiments, and half-formed sparks that should not disappear into old notes. It is meant to be more than a database of pitches: it should feel like a small creative workspace where ideas can be planted, revisited, crossed with other ideas, and eventually grown into something worth building.
+Seedbank is a local-first project idea manager for games, apps, tools, experiments, and half-formed sparks that should not disappear into old notes.
+
+It is not a general notes app. Seedbank is for people who keep inventing things they might build later and need a better way to preserve, compare, revisit, and grow those ideas over time.
+
+You write down the rough version of an idea, then Seedbank keeps it alive as a structured project entry. The app helps you remember what the idea was, why it seemed promising, what might block it, how it has changed, and whether it is worth developing further.
+
+Seedbank should feel like a small creative workspace where ideas can be planted, revisited, crossed with other ideas, and eventually grown into something worth building.
 
 The core job is simple:
 
@@ -9,6 +15,28 @@ The core job is simple:
 - Categorize ideas by type, mood, scope, platform, jam fit, technical novelty, and personal excitement.
 - Search old ideas by keyword, category, tag, status, or fuzzy memory.
 - Keep an idea's history instead of overwriting it: rough seed, stronger pitch, prototype notes, abandoned version, revived version.
+
+## How It Works
+
+The basic loop is:
+
+1. Capture an idea quickly.
+   Write the rough version before it fades. It can be a sentence, a messy note, a game mechanic, a tool concept, a title, or a half-formed problem.
+
+2. Seedbank saves it as a structured project entry.
+   Each idea can have a pitch, category, stage, tags, notes, risks, tech thoughts, references, related ideas, and personal scores.
+
+3. The idea keeps its history.
+   Instead of overwriting the old version, Seedbank should preserve how the idea changes: first spark, stronger pitch, prototype notes, shelved version, revived version, or shipped project.
+
+4. The archive becomes searchable and useful.
+   Search, filters, tags, stages, and related-idea links help old ideas become findable again when they are relevant.
+
+5. Seedbank helps ideas mature.
+   A rough idea can become a better pitch, a jam candidate, a build plan, a prototype, a shelved reference, or something to combine with another idea.
+
+6. The archive remains yours.
+   Ideas should be stored locally and exported to plain Markdown or JSON, so the user's idea collection can outlive the app.
 
 ## Product Shape
 
