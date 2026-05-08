@@ -1,11 +1,13 @@
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
-import { Search } from 'lucide-react';
+import { Search, ArrowUpDown } from 'lucide-react';
 import QuickCapture from './QuickCapture';
+import ImportExportModal from './ImportExportModal';
 import { useFilterStore } from '@/stores/filters';
 
 export default function Layout() {
   const [isCaptureOpen, setIsCaptureOpen] = useState(false);
+  const [isImportExportOpen, setIsImportExportOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -77,6 +79,13 @@ export default function Layout() {
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsImportExportOpen(true)}
+            title="Import & Export"
+            className="p-2 text-ink-400 hover:text-ink-600 transition-colors rounded-badge hover:bg-ink-50"
+          >
+            <ArrowUpDown className="w-4 h-4" />
+          </button>
           <button 
             onClick={() => setIsCaptureOpen(true)}
             className="bg-clay-500 hover:bg-clay-600 text-paper px-4 py-1.5 rounded-pill text-sm font-medium transition-colors flex items-center gap-2 shadow-card"
@@ -99,6 +108,17 @@ export default function Layout() {
           onSuccess={(id) => {
             setIsCaptureOpen(false);
             navigate(`/idea/${id}`);
+          }}
+        />
+      )}
+
+      {/* Import/Export Modal */}
+      {isImportExportOpen && (
+        <ImportExportModal
+          onClose={() => setIsImportExportOpen(false)}
+          onImported={() => {
+            // Navigate to board to show freshly imported ideas
+            if (location.pathname !== '/') navigate('/');
           }}
         />
       )}

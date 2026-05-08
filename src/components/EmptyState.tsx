@@ -5,9 +5,10 @@ interface EmptyStateProps {
   isFiltered?: boolean;
   onClearFilters?: () => void;
   onPlantSeed?: () => void;
+  onSeedExamples?: () => void;
 }
 
-export default function EmptyState({ isFiltered, onClearFilters, onPlantSeed }: EmptyStateProps) {
+export default function EmptyState({ isFiltered, onClearFilters, onPlantSeed, onSeedExamples }: EmptyStateProps) {
   if (isFiltered) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -44,15 +45,25 @@ export default function EmptyState({ isFiltered, onClearFilters, onPlantSeed }: 
         Every project starts as a seed. Capture a rough idea — a title and a few
         thoughts is all you need. You can grow it later.
       </p>
-      {onPlantSeed && (
-        <button
-          onClick={onPlantSeed}
-          className="bg-clay-500 hover:bg-clay-600 text-paper px-5 py-2 rounded-pill text-sm font-medium transition-colors flex items-center gap-2 shadow-card"
-        >
-          <span className="text-lg">🌱</span>
-          Plant your first seed
-        </button>
-      )}
+      <div className="flex flex-col items-center gap-3">
+        {onPlantSeed && (
+          <button
+            onClick={onPlantSeed}
+            className="bg-clay-500 hover:bg-clay-600 text-paper px-5 py-2 rounded-pill text-sm font-medium transition-colors flex items-center gap-2 shadow-card"
+          >
+            <span className="text-lg">🌱</span>
+            Plant your first seed
+          </button>
+        )}
+        {onSeedExamples && (
+          <button
+            onClick={onSeedExamples}
+            className="text-xs text-ink-400 hover:text-sage-600 transition-colors"
+          >
+            or start with example ideas →
+          </button>
+        )}
+      </div>
     </div>
   );
 }

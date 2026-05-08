@@ -6,6 +6,7 @@ import type { Idea } from '@/lib/types';
 import IdeaCard from '@/components/IdeaCard';
 import FilterBar, { collectTags } from '@/components/FilterBar';
 import EmptyState from '@/components/EmptyState';
+import { seedDatabase } from '@/lib/import';
 
 export default function Board() {
   const navigate = useNavigate();
@@ -67,7 +68,13 @@ export default function Board() {
           <h1 className="text-3xl font-serif font-semibold text-ink-900">The Garden</h1>
           <p className="text-ink-500 text-sm">Your project seed collection.</p>
         </div>
-        <EmptyState onPlantSeed={() => navigate('/idea/new')} />
+        <EmptyState
+          onPlantSeed={() => navigate('/idea/new')}
+          onSeedExamples={async () => {
+            await seedDatabase();
+            loadIdeas();
+          }}
+        />
       </div>
     );
   }

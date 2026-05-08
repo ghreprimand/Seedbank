@@ -7,6 +7,7 @@ import {
   Snowflake,
   Check,
   ChevronDown,
+  Download,
 } from 'lucide-react';
 
 import type { Idea, Stage } from '@/lib/types';
@@ -31,6 +32,7 @@ import ScorePicker from '@/components/ScorePicker';
 import LinkEditor from '@/components/LinkEditor';
 import RelatedIdeasLinker from '@/components/RelatedIdeasLinker';
 import VersionHistory from '@/components/VersionHistory';
+import { exportIdeaAsMarkdown, exportIdeaAsJSON } from '@/lib/export';
 
 /** Auto-save debounce delay in ms */
 const SAVE_DELAY = 800;
@@ -46,6 +48,7 @@ export default function IdeaDetail() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [stageOpen, setStageOpen] = useState(false);
   const [categoryOpen, setCategoryOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
 
   // Keep a ref to the latest idea for the debounced save callback
   const ideaRef = useRef<Idea | null>(null);
@@ -180,6 +183,34 @@ export default function IdeaDetail() {
           </span>
 
           {/* Actions */}
+          <div className="relative">
+            <button
+              onClick={() => setExportOpen(!exportOpen)}
+              title="Export idea"
+              className="p-1.5 text-ink-400 hover:text-sage-600 transition-colors rounded-badge hover:bg-sage-50"
+            >
+              <Download className="w-4 h-4" />
+            </button>
+            {exportOpen && (
+              <>
+                <div className="fixed inset-0 z-20" onClick={() => setExportOpen(false)} />
+                <div className="absolute right-0 top-full mt-1 z-30 bg-paper border border-ink-200 rounded-card shadow-modal p-1 min-w-[160px]">
+                  <button
+                    onClick={() => { exportIdeaAsMarkdown(idea); setExportOpen(false); }}
+                    className="w-full text-left px-3 py-1.5 text-xs text-ink-600 hover:bg-ink-50 rounded-badge transition-colors"
+                  >
+                    Export as Markdown
+                  </button>
+                  <button
+                    onClick={() => { exportIdeaAsJSON(idea); setExportOpen(false); }}
+                    className="w-full text-left px-3 py-1.5 text-xs text-ink-600 hover:bg-ink-50 rounded-badge transition-colors"
+                  >
+                    Export as JSON
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
           <button
             onClick={handleShelve}
             title={idea.stage === 'cold-storage' ? 'Move back to shelved' : 'Move to cold storage'}
