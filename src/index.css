@@ -1,0 +1,91 @@
+@import "tailwindcss";
+
+/*
+ * Seedbank Design Tokens
+ *
+ * Palette from the spec: "soft greens, ink, clay, off-white paper tones"
+ * with warm amber for excitement/energy. Gardening-tool aesthetic —
+ * dense, calm, closer to a writing tool than a SaaS dashboard.
+ */
+
+@theme {
+  /* ── Paper (backgrounds) ─────────────────────────────── */
+  --color-paper:       #faf8f4;
+  --color-paper-warm:  #f4efe5;
+  --color-paper-dim:   #eee9df;
+
+  /* ── Sage / Moss greens (growth, stages) ─────────────── */
+  --color-sage-50:   #f2f5f0;
+  --color-sage-100:  #e0e8dc;
+  --color-sage-200:  #bfd4b7;
+  --color-sage-300:  #97b88c;
+  --color-sage-400:  #739e66;
+  --color-sage-500:  #567d4a;
+  --color-sage-600:  #43623a;
+  --color-sage-700:  #354d2e;
+  --color-sage-800:  #273a22;
+  --color-sage-900:  #1a2717;
+
+  /* ── Ink (text, borders) ─────────────────────────────── */
+  --color-ink-50:   #f5f5f4;
+  --color-ink-100:  #e7e5e2;
+  --color-ink-200:  #ccc9c4;
+  --color-ink-300:  #a8a49e;
+  --color-ink-400:  #857f78;
+  --color-ink-500:  #6b655e;
+  --color-ink-600:  #514c46;
+  --color-ink-700:  #3d3935;
+  --color-ink-800:  #2a2725;
+  --color-ink-900:  #1a1816;
+
+  /* ── Clay / Terracotta (accents, actions, CTA) ───────── */
+  --color-clay-50:   #fdf5f0;
+  --color-clay-100:  #f9e5d6;
+  --color-clay-200:  #f0c9a8;
+  --color-clay-300:  #e5a878;
+  --color-clay-400:  #d4864e;
+  --color-clay-500:  #c06a33;
+  --color-clay-600:  #a05328;
+  --color-clay-700:  #7d4020;
+  --color-clay-800:  #5e3119;
+  --color-clay-900:  #3f2112;
+
+  /* ── Amber (excitement, energy, warmth) ──────────────── */
+  --color-amber-50:   #fefbe8;
+  --color-amber-100:  #fef3c7;
+  --color-amber-200:  #fde68a;
+  --color-amber-300:  #fcd34d;
+  --color-amber-400:  #fbbf24;
+  --color-amber-500:  #f59e0b;
+  --color-amber-600:  #d97706;
+  --color-amber-700:  #b45309;
+  --color-amber-800:  #92400e;
+  --color-amber-900:  #78350f;
+
+  /* ── Frost (cold storage, shelved, muted) ────────────── */
+  --color-frost-50:   #f0f4f8;
+  --color-frost-100:  #dce4ed;
+  --color-frost-200:  #b8c9da;
+  --color-frost-300:  #8fabc4;
+  --color-frost-400:  #6b8dad;
+  --color-frost-500:  #4e7191;
+  --color-frost-600:  #3d5a74;
+  --color-frost-700:  #30465a;
+  --color-frost-800:  #243442;
+  --color-frost-900:  #19242e;
+
+  /* ── Typography ──────────────────────────────────────── */
+  --font-sans:  "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Lora", ui-serif, Georgia, serif;
+  --font-mono:  "JetBrains Mono", ui-monospace, monospace;
+
+  /* ── Shadows (tactile card feel) ─────────────────────── */
+  --shadow-card:    0 1px 3px rgba(26, 24, 22, 0.06), 0 1px 2px rgba(26, 24, 22, 0.04);
+  --shadow-card-hover: 0 4px 12px rgba(26, 24, 22, 0.08), 0 2px 4px rgba(26, 24, 22, 0.04);
+  --shadow-modal:   0 8px 30px rgba(26, 24, 22, 0.12), 0 2px 8px rgba(26, 24, 22, 0.06);
+
+  /* ── Border radii ────────────────────────────────────── */
+  --radius-card: 0.5rem;
+  --radius-badge: 0.25rem;
+  --radius-pill: 9999px;
+}
