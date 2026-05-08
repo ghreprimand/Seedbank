@@ -1,6 +1,6 @@
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
-import { Search, ArrowUpDown } from 'lucide-react';
+import { Search, ArrowUpDown, Compass } from 'lucide-react';
 import QuickCapture from './QuickCapture';
 import ImportExportModal from './ImportExportModal';
 import { useFilterStore } from '@/stores/filters';
@@ -79,6 +79,17 @@ export default function Layout() {
         </div>
 
         <div className="flex items-center gap-3">
+          <Link
+            to="/discover"
+            title="Discover"
+            className={`p-2 transition-colors rounded-badge ${
+              location.pathname === '/discover'
+                ? 'text-sage-600 bg-sage-50'
+                : 'text-ink-400 hover:text-ink-600 hover:bg-ink-50'
+            }`}
+          >
+            <Compass className="w-4 h-4" />
+          </Link>
           <button
             onClick={() => setIsImportExportOpen(true)}
             title="Import & Export"
