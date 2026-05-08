@@ -1,10 +1,43 @@
-import { Outlet, Link, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { Search } from 'lucide-react';
 import QuickCapture from './QuickCapture';
+import { useFilterStore } from '@/stores/filters';
 
 export default function Layout() {
   const [isCaptureOpen, setIsCaptureOpen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const query = useFilterStore((s) => s.query);
+  const setQuery = useFilterStore((s) => s.setQuery);
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  // When the user types in search and they're not on the board, navigate there
+  const handleSearchChange = (value: string) => {
+    setQuery(value);
+    if (location.pathname !== '/') {
+      navigate('/');
+    }
+  };
+
+  // Global keyboard shortcut: "/" focuses search
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (
+        e.key === '/' &&
+        !e.metaKey &&
+        !e.ctrlKey &&
+        document.activeElement?.tagName !== 'INPUT' &&
+        document.activeElement?.tagName !== 'TEXTAREA'
+      ) {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   return (
     <div className="min-h-screen bg-paper text-ink-800 font-sans">
@@ -21,13 +54,25 @@ export default function Layout() {
           {/* Search Input */}
           <div className="relative hidden md:block">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+              <Search className="w-4 h-4" />
             </span>
             <input 
+              ref={searchRef}
               type="text" 
-              placeholder="Search seeds..." 
-              className="pl-9 pr-4 py-1.5 bg-paper-warm border border-ink-200 rounded-pill text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 transition-all w-64"
+              value={query}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              placeholder='Search seeds…  type "/" to focus'
+              className="pl-9 pr-4 py-1.5 bg-paper-warm border border-ink-200 rounded-pill text-sm focus:outline-none focus:ring-2 focus:ring-sage-400 transition-all w-72"
             />
+            {query && (
+              <button
+                onClick={() => setQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-ink-400 hover:text-ink-600 p-0.5"
+                aria-label="Clear search"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+              </button>
+            )}
           </div>
         </div>
 
