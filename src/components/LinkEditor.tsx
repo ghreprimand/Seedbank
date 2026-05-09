@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Plus, ExternalLink } from 'lucide-react';
+import { Plus, X, ExternalLink } from 'lucide-react';
 import type { IdeaLink } from '@/lib/types';
 
 interface LinkEditorProps {
@@ -9,16 +9,15 @@ interface LinkEditorProps {
 
 export default function LinkEditor({ links, onChange }: LinkEditorProps) {
   const [adding, setAdding] = useState(false);
-  const [newUrl, setNewUrl] = useState('');
-  const [newLabel, setNewLabel] = useState('');
+  const [url, setUrl] = useState('');
+  const [label, setLabel] = useState('');
 
   const addLink = () => {
-    const url = newUrl.trim();
-    if (!url) return;
-    const label = newLabel.trim() || url;
-    onChange([...links, { url, label }]);
-    setNewUrl('');
-    setNewLabel('');
+    const trimUrl = url.trim();
+    if (!trimUrl) return;
+    onChange([...links, { url: trimUrl, label: label.trim() || trimUrl }]);
+    setUrl('');
+    setLabel('');
     setAdding(false);
   };
 
@@ -28,71 +27,80 @@ export default function LinkEditor({ links, onChange }: LinkEditorProps) {
 
   return (
     <div>
-      <label className="block text-xs font-medium text-ink-500 uppercase tracking-wider mb-1.5">
+      <label className="block text-[11px] font-medium text-ink-400 uppercase tracking-wider mb-1.5 font-mono">
         Links & References
       </label>
 
       {links.length > 0 && (
-        <ul className="space-y-1 mb-2">
+        <div className="space-y-1.5 mb-3">
           {links.map((link, i) => (
-            <li
+            <div
               key={i}
-              className="flex items-center gap-2 text-sm group"
+              className="flex items-center gap-2 group px-3 py-2 bg-paper-warm border border-ink-100
+                         rounded-card text-sm transition-colors"
             >
               <ExternalLink className="w-3.5 h-3.5 text-ink-300 shrink-0" />
               <a
                 href={link.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-sage-600 hover:text-sage-800 underline underline-offset-2 truncate"
+                className="text-sage-600 hover:text-sage-700 underline underline-offset-2 decoration-sage-200
+                           hover:decoration-sage-400 truncate transition-colors flex-1"
               >
-                {link.label}
+                {link.label || link.url}
               </a>
               <button
                 type="button"
                 onClick={() => removeLink(i)}
-                className="text-ink-300 hover:text-ink-600 opacity-0 group-hover:opacity-100 transition-opacity p-0.5 shrink-0"
+                className="opacity-0 group-hover:opacity-100 text-ink-300 hover:text-red-400
+                           transition-all p-0.5"
+                title="Remove link"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
-            </li>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
 
       {adding ? (
-        <div className="flex flex-col gap-2 p-2 bg-paper-warm border border-ink-200 rounded-badge">
+        <div className="flex flex-col gap-2 p-3 bg-paper-warm border border-ink-100 rounded-card animate-slide-up">
           <input
             autoFocus
             type="url"
-            value={newUrl}
-            onChange={(e) => setNewUrl(e.target.value)}
-            placeholder="https://..."
-            className="w-full px-2 py-1 text-sm bg-paper border border-ink-200 rounded-badge outline-none focus:ring-2 focus:ring-sage-400"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://…"
+            className="w-full px-2.5 py-1.5 text-sm bg-paper border border-ink-100 rounded-badge
+                       outline-none focus:ring-2 focus:ring-sage-400 focus:border-sage-300
+                       transition-all placeholder:text-ink-300"
           />
           <input
             type="text"
-            value={newLabel}
-            onChange={(e) => setNewLabel(e.target.value)}
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
             placeholder="Label (optional)"
-            className="w-full px-2 py-1 text-sm bg-paper border border-ink-200 rounded-badge outline-none focus:ring-2 focus:ring-sage-400"
+            className="w-full px-2.5 py-1.5 text-sm bg-paper border border-ink-100 rounded-badge
+                       outline-none focus:ring-2 focus:ring-sage-400 focus:border-sage-300
+                       transition-all placeholder:text-ink-300"
             onKeyDown={(e) => { if (e.key === 'Enter') addLink(); }}
           />
-          <div className="flex gap-2">
+          <div className="flex gap-2 justify-end">
             <button
               type="button"
-              onClick={() => { setAdding(false); setNewUrl(''); setNewLabel(''); }}
-              className="text-xs text-ink-400 hover:text-ink-600"
+              onClick={() => { setAdding(false); setUrl(''); setLabel(''); }}
+              className="px-2.5 py-1 text-xs text-ink-400 hover:text-ink-600 transition-colors"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={addLink}
-              disabled={!newUrl.trim()}
-              className="text-xs font-medium text-sage-600 hover:text-sage-800 disabled:opacity-40"
+              disabled={!url.trim()}
+              className="px-3 py-1 text-xs font-medium bg-sage-600 hover:bg-sage-700 text-paper
+                         rounded-badge transition-all disabled:opacity-40 active:scale-[0.98]"
             >
-              Add link
+              Add
             </button>
           </div>
         </div>
@@ -100,9 +108,10 @@ export default function LinkEditor({ links, onChange }: LinkEditorProps) {
         <button
           type="button"
           onClick={() => setAdding(true)}
-          className="flex items-center gap-1 text-xs text-ink-400 hover:text-sage-600 transition-colors"
+          className="flex items-center gap-1.5 text-xs text-ink-400 hover:text-sage-600
+                     transition-colors group"
         >
-          <Plus className="w-3.5 h-3.5" />
+          <Plus className="w-3.5 h-3.5 group-hover:rotate-90 transition-transform duration-200" />
           Add link
         </button>
       )}

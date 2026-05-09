@@ -1,10 +1,8 @@
 /**
  * Import/Export modal for archive-level operations.
  *
- * Accessed from the Layout header or Board page.
  * Supports:
- *   - Export archive as JSON
- *   - Export archive as Markdown
+ *   - Export archive as JSON or Markdown
  *   - Import from Seedbank JSON (merge or replace)
  *   - Import from Markdown files
  */
@@ -30,7 +28,6 @@ import {
 
 interface ImportExportModalProps {
   onClose: () => void;
-  /** Called after a successful import so the parent can reload data */
   onImported?: () => void;
 }
 
@@ -45,8 +42,6 @@ export default function ImportExportModal({ onClose, onImported }: ImportExportM
   const [pendingFiles, setPendingFiles] = useState<File[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // ── Export handlers ─────────────────────────────────────
 
   const handleExportJSON = async () => {
     try {
@@ -64,8 +59,6 @@ export default function ImportExportModal({ onClose, onImported }: ImportExportM
     }
   };
 
-  // ── Import handlers ─────────────────────────────────────
-
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -76,7 +69,6 @@ export default function ImportExportModal({ onClose, onImported }: ImportExportM
     const fileArray = Array.from(files);
     setPendingFiles(fileArray);
 
-    // If replace mode, show warning first
     if (importMode === 'replace') {
       setShowReplaceWarning(true);
     } else {
@@ -90,22 +82,18 @@ export default function ImportExportModal({ onClose, onImported }: ImportExportM
     setError(null);
 
     try {
-      // Determine if JSON or Markdown based on file extension
-      const jsonFiles = files.filter((f) =>
-        f.name.endsWith('.json')
-      );
+      const jsonFiles = files.filter((f) => f.name.endsWith('.json'));
       const mdFiles = files.filter((f) =>
         f.name.endsWith('.md') || f.name.endsWith('.markdown') || f.name.endsWith('.txt')
       );
 
-      let combinedResult: ImportResult = {
+      const combinedResult: ImportResult = {
         imported: 0,
         skipped: 0,
         versionsImported: 0,
         warnings: [],
       };
 
-      // Process JSON files
       for (const file of jsonFiles) {
         const text = await readFileAsText(file);
         const result = await importFromJSON(text, mode);
@@ -115,7 +103,6 @@ export default function ImportExportModal({ onClose, onImported }: ImportExportM
         combinedResult.warnings.push(...result.warnings);
       }
 
-      // Process Markdown files
       if (mdFiles.length > 0) {
         const texts = await Promise.all(mdFiles.map(readFileAsText));
         const result = await importFromMarkdown(texts);
@@ -137,7 +124,6 @@ export default function ImportExportModal({ onClose, onImported }: ImportExportM
     } finally {
       setImporting(false);
       setPendingFiles(null);
-      // Reset the file input so the same file can be selected again
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
@@ -149,8 +135,8 @@ export default function ImportExportModal({ onClose, onImported }: ImportExportM
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-900/40 backdrop-blur-sm">
-      <div className="bg-paper w-full max-w-lg rounded-card shadow-modal border border-ink-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-900/30 backdrop-blur-sm animate-fade-in">
+      <div className="bg-paper w-full max-w-lg rounded-card shadow-modal border border-ink-100 animate-scale-in">
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-5 pb-3">
           <h2 className="text-lg font-serif font-semibold text-ink-900">
@@ -158,7 +144,7 @@ export default function ImportExportModal({ onClose, onImported }: ImportExportM
           </h2>
           <button
             onClick={onClose}
-            className="p-1 text-ink-400 hover:text-ink-600 transition-colors"
+            className="p-1 text-ink-300 hover:text-ink-500 transition-colors rounded-card hover:bg-ink-50"
           >
             <X className="w-5 h-5" />
           </button>
@@ -168,9 +154,9 @@ export default function ImportExportModal({ onClose, onImported }: ImportExportM
         <div className="flex px-6 gap-1">
           <button
             onClick={() => { setTab('export'); setError(null); setImportResult(null); }}
-            className={`px-4 py-2 text-sm font-medium rounded-t-badge transition-colors ${
+            className={`px-4 py-2 text-sm font-medium rounded-t-badge transition-all duration-200 ${
               tab === 'export'
-                ? 'bg-paper-warm text-ink-800 border border-b-0 border-ink-200'
+                ? 'bg-paper-warm text-ink-800 border border-b-0 border-ink-100'
                 : 'text-ink-400 hover:text-ink-600'
             }`}
           >
@@ -179,9 +165,9 @@ export default function ImportExportModal({ onClose, onImported }: ImportExportM
           </button>
           <button
             onClick={() => { setTab('import'); setError(null); setImportResult(null); }}
-            className={`px-4 py-2 text-sm font-medium rounded-t-badge transition-colors ${
+            className={`px-4 py-2 text-sm font-medium rounded-t-badge transition-all duration-200 ${
               tab === 'import'
-                ? 'bg-paper-warm text-ink-800 border border-b-0 border-ink-200'
+                ? 'bg-paper-warm text-ink-800 border border-b-0 border-ink-100'
                 : 'text-ink-400 hover:text-ink-600'
             }`}
           >
@@ -191,19 +177,23 @@ export default function ImportExportModal({ onClose, onImported }: ImportExportM
         </div>
 
         {/* Content */}
-        <div className="px-6 py-5 bg-paper-warm border-t border-ink-200 rounded-b-card space-y-4">
+        <div className="px-6 py-5 bg-paper-warm border-t border-ink-100 rounded-b-card space-y-4">
           {tab === 'export' && (
             <>
-              <p className="text-sm text-ink-500">
+              <p className="text-sm text-ink-400">
                 Download your entire idea archive. Your data stays yours.
               </p>
 
               <div className="space-y-3">
                 <button
                   onClick={handleExportJSON}
-                  className="w-full flex items-center gap-3 px-4 py-3 bg-paper border border-ink-200 rounded-card hover:shadow-card-hover transition-all text-left group"
+                  className="w-full flex items-center gap-3 px-4 py-3.5 bg-paper border border-ink-100 rounded-card
+                             shadow-card hover:shadow-card-hover hover:border-sage-300
+                             transition-all text-left group"
                 >
-                  <FileJson className="w-5 h-5 text-sage-500 group-hover:text-sage-600 shrink-0" />
+                  <div className="w-10 h-10 rounded-full bg-sage-50 border border-sage-100 flex items-center justify-center shrink-0 group-hover:bg-sage-100 transition-colors">
+                    <FileJson className="w-5 h-5 text-sage-600" />
+                  </div>
                   <div>
                     <div className="text-sm font-medium text-ink-800">
                       Archive as JSON
@@ -216,9 +206,13 @@ export default function ImportExportModal({ onClose, onImported }: ImportExportM
 
                 <button
                   onClick={handleExportMarkdown}
-                  className="w-full flex items-center gap-3 px-4 py-3 bg-paper border border-ink-200 rounded-card hover:shadow-card-hover transition-all text-left group"
+                  className="w-full flex items-center gap-3 px-4 py-3.5 bg-paper border border-ink-100 rounded-card
+                             shadow-card hover:shadow-card-hover hover:border-sage-300
+                             transition-all text-left group"
                 >
-                  <FileText className="w-5 h-5 text-sage-500 group-hover:text-sage-600 shrink-0" />
+                  <div className="w-10 h-10 rounded-full bg-sage-50 border border-sage-100 flex items-center justify-center shrink-0 group-hover:bg-sage-100 transition-colors">
+                    <FileText className="w-5 h-5 text-sage-600" />
+                  </div>
                   <div>
                     <div className="text-sm font-medium text-ink-800">
                       Archive as Markdown
@@ -234,13 +228,13 @@ export default function ImportExportModal({ onClose, onImported }: ImportExportM
 
           {tab === 'import' && !showReplaceWarning && (
             <>
-              <p className="text-sm text-ink-500">
+              <p className="text-sm text-ink-400">
                 Import ideas from Seedbank JSON archives or Markdown files.
               </p>
 
               {/* Import mode selector */}
               <div className="flex items-center gap-4">
-                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <label className="flex items-center gap-2 text-sm cursor-pointer group">
                   <input
                     type="radio"
                     name="importMode"
@@ -248,12 +242,12 @@ export default function ImportExportModal({ onClose, onImported }: ImportExportM
                     onChange={() => setImportMode('merge')}
                     className="accent-sage-500"
                   />
-                  <span className="text-ink-700">
+                  <span className="text-ink-600 group-hover:text-ink-800 transition-colors">
                     Merge
-                    <span className="text-ink-400 text-xs ml-1">(keep existing, add new)</span>
+                    <span className="text-ink-300 text-xs ml-1 font-mono">(keep + add)</span>
                   </span>
                 </label>
-                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <label className="flex items-center gap-2 text-sm cursor-pointer group">
                   <input
                     type="radio"
                     name="importMode"
@@ -261,9 +255,9 @@ export default function ImportExportModal({ onClose, onImported }: ImportExportM
                     onChange={() => setImportMode('replace')}
                     className="accent-sage-500"
                   />
-                  <span className="text-ink-700">
+                  <span className="text-ink-600 group-hover:text-ink-800 transition-colors">
                     Replace
-                    <span className="text-ink-400 text-xs ml-1">(clear first)</span>
+                    <span className="text-ink-300 text-xs ml-1 font-mono">(clear first)</span>
                   </span>
                 </label>
               </div>
@@ -281,23 +275,30 @@ export default function ImportExportModal({ onClose, onImported }: ImportExportM
                 />
                 <label
                   htmlFor="import-file-input"
-                  className={`flex items-center justify-center gap-2 px-4 py-6 bg-paper border-2 border-dashed border-ink-200 rounded-card cursor-pointer hover:border-sage-400 hover:bg-sage-50/50 transition-all text-sm text-ink-500 ${
+                  className={`flex flex-col items-center justify-center gap-2 px-4 py-8 bg-paper border-2
+                             border-dashed border-ink-200 rounded-card cursor-pointer
+                             hover:border-sage-400 hover:bg-sage-50/40 transition-all text-center ${
                     importing ? 'opacity-50 pointer-events-none' : ''
                   }`}
                 >
-                  <Upload className="w-5 h-5" />
-                  {importing ? 'Importing…' : 'Choose .json or .md files'}
+                  <Upload className="w-6 h-6 text-ink-300" />
+                  <span className="text-sm text-ink-400">
+                    {importing ? 'Importing…' : 'Choose .json or .md files'}
+                  </span>
+                  <span className="text-[11px] text-ink-300 font-mono">
+                    or drag and drop
+                  </span>
                 </label>
               </div>
 
               {/* Import result */}
               {importResult && (
-                <div className="p-3 bg-sage-50 border border-sage-200 rounded-card text-sm">
-                  <div className="flex items-center gap-2 text-sage-700 font-medium mb-1">
+                <div className="p-4 bg-sage-50 border border-sage-200 rounded-card text-sm animate-slide-up">
+                  <div className="flex items-center gap-2 text-sage-700 font-medium mb-2">
                     <Check className="w-4 h-4" />
                     Import complete
                   </div>
-                  <ul className="text-xs text-sage-600 space-y-0.5 ml-6">
+                  <ul className="text-xs text-sage-600 space-y-0.5 ml-6 font-mono">
                     <li>{importResult.imported} idea{importResult.imported !== 1 ? 's' : ''} imported</li>
                     {importResult.skipped > 0 && (
                       <li>{importResult.skipped} skipped (already exist)</li>
@@ -323,12 +324,12 @@ export default function ImportExportModal({ onClose, onImported }: ImportExportM
 
           {/* Replace confirmation */}
           {showReplaceWarning && (
-            <div className="space-y-4">
+            <div className="space-y-4 animate-scale-in">
               <div className="p-4 bg-amber-50 border border-amber-200 rounded-card">
                 <div className="flex items-start gap-2">
                   <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                   <div>
-                    <h3 className="text-sm font-semibold text-amber-800 mb-1">
+                    <h3 className="text-sm font-serif font-semibold text-amber-800 mb-1">
                       Replace all existing data?
                     </h3>
                     <p className="text-xs text-amber-700 leading-relaxed">
@@ -342,13 +343,15 @@ export default function ImportExportModal({ onClose, onImported }: ImportExportM
               <div className="flex gap-3">
                 <button
                   onClick={() => { setShowReplaceWarning(false); setPendingFiles(null); }}
-                  className="flex-1 px-4 py-2 text-sm font-medium text-ink-600 hover:bg-ink-100 rounded-badge transition-colors"
+                  className="flex-1 px-4 py-2.5 text-sm font-medium text-ink-500 hover:bg-ink-50
+                             rounded-card transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={confirmReplace}
-                  className="flex-1 px-4 py-2 text-sm font-medium bg-amber-600 hover:bg-amber-700 text-white rounded-badge transition-colors"
+                  className="flex-1 px-4 py-2.5 text-sm font-medium bg-amber-600 hover:bg-amber-700
+                             text-white rounded-card transition-all active:scale-[0.98]"
                 >
                   Yes, replace everything
                 </button>
@@ -358,15 +361,13 @@ export default function ImportExportModal({ onClose, onImported }: ImportExportM
 
           {/* Error display */}
           {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-card text-sm text-red-700 flex items-start gap-2">
+            <div className="p-3 bg-red-50 border border-red-200 rounded-card text-sm text-red-700 flex items-start gap-2 animate-slide-up">
               <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
               {error}
             </div>
           )}
         </div>
       </div>
-
-      {/* Backdrop click to close */}
       <div className="fixed inset-0 -z-10" onClick={onClose} />
     </div>
   );

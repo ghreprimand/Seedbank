@@ -3,16 +3,19 @@
 /*
  * Seedbank Design Tokens
  *
- * Palette from the spec: "soft greens, ink, clay, off-white paper tones"
+ * Palette: "soft greens, ink, clay, off-white paper tones"
  * with warm amber for excitement/energy. Gardening-tool aesthetic —
  * dense, calm, closer to a writing tool than a SaaS dashboard.
+ *
+ * Typography: field-note inspired — Lora (serif) for headings,
+ * Inter (humanist sans) for body, JetBrains Mono for metadata.
  */
 
 @theme {
   /* ── Paper (backgrounds) ─────────────────────────────── */
-  --color-paper:       #faf8f4;
-  --color-paper-warm:  #f4efe5;
-  --color-paper-dim:   #eee9df;
+  --color-paper:       #faf8f4;   /* main background           */
+  --color-paper-warm:  #f4efe5;   /* input/card background      */
+  --color-paper-dim:   #eee9df;   /* muted / secondary bg       */
 
   /* ── Sage / Moss greens (growth, stages) ─────────────── */
   --color-sage-50:   #f2f5f0;
@@ -80,12 +83,69 @@
   --font-mono:  "JetBrains Mono", ui-monospace, monospace;
 
   /* ── Shadows (tactile card feel) ─────────────────────── */
-  --shadow-card:    0 1px 3px rgba(26, 24, 22, 0.06), 0 1px 2px rgba(26, 24, 22, 0.04);
-  --shadow-card-hover: 0 4px 12px rgba(26, 24, 22, 0.08), 0 2px 4px rgba(26, 24, 22, 0.04);
-  --shadow-modal:   0 8px 30px rgba(26, 24, 22, 0.12), 0 2px 8px rgba(26, 24, 22, 0.06);
+  --shadow-card:       0 1px 3px rgba(26, 24, 22, 0.06), 0 1px 2px rgba(26, 24, 22, 0.04);
+  --shadow-card-hover: 0 4px 14px rgba(26, 24, 22, 0.09), 0 2px 4px rgba(26, 24, 22, 0.05);
+  --shadow-modal:      0 8px 30px rgba(26, 24, 22, 0.14), 0 2px 8px rgba(26, 24, 22, 0.07);
 
   /* ── Border radii ────────────────────────────────────── */
-  --radius-card: 0.5rem;
-  --radius-badge: 0.25rem;
-  --radius-pill: 9999px;
+  --radius-card:  0.625rem;  /* 10px — slightly softer */
+  --radius-badge: 0.3125rem; /* 5px  */
+  --radius-pill:  9999px;
+
+  /* ── Custom animation timings ────────────────────────── */
+  --animate-fade-in:       fade-in 0.25s ease-out;
+  --animate-slide-up:      slide-up 0.3s ease-out;
+  --animate-scale-in:      scale-in 0.2s ease-out;
+
+  /* ── Custom transition ───────────────────────────────── */
+  --transition-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ── Keyframes ─────────────────────────────────────────── */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* ── Global base styles ────────────────────────────────── */
+
+/* Subtle paper texture on the page body */
+body {
+  background-color: var(--color-paper);
+  background-image:
+    radial-gradient(ellipse at 20% 50%, rgba(226, 217, 199, 0.15) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(191, 212, 183, 0.08) 0%, transparent 50%);
+  min-height: 100vh;
+}
+
+/* Smooth scrolling globally */
+html { scroll-behavior: smooth; }
+
+/* Better focus visible ring */
+*:focus-visible {
+  outline: 2px solid var(--color-sage-400);
+  outline-offset: 2px;
+}
+
+/* Custom scrollbar (webkit browsers) */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--color-ink-200);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--color-ink-300); }
+
+/* Selection colour */
+::selection {
+  background: var(--color-sage-200);
+  color: var(--color-ink-900);
 }

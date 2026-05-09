@@ -36,23 +36,27 @@ export default function TagInput({ label, tags, onChange, placeholder = 'Add tag
 
   return (
     <div>
-      <label className="block text-xs font-medium text-ink-500 uppercase tracking-wider mb-1.5">
+      <label className="block text-[11px] font-medium text-ink-400 uppercase tracking-wider mb-1.5 font-mono">
         {label}
       </label>
       <div
-        className="flex flex-wrap items-center gap-1.5 p-2 bg-paper-warm border border-ink-200 rounded-badge focus-within:ring-2 focus-within:ring-sage-400 transition-all min-h-[38px] cursor-text"
+        className="flex flex-wrap items-center gap-1.5 p-2 bg-paper-warm border border-ink-100 rounded-card
+                   focus-within:ring-2 focus-within:ring-sage-400 focus-within:border-sage-300
+                   transition-all min-h-[38px] cursor-text"
         onClick={() => inputRef.current?.focus()}
       >
         {tags.map((tag) => (
           <span
             key={tag}
-            className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-sage-100 text-sage-700 border border-sage-200 rounded-badge"
+            className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium
+                       bg-sage-50 text-sage-700 border border-sage-100 rounded-badge
+                       shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)] transition-colors"
           >
             {tag}
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); removeTag(tag); }}
-              className="text-sage-400 hover:text-sage-700 p-0"
+              className="text-sage-300 hover:text-sage-600 p-0 transition-colors"
             >
               <X className="w-3 h-3" />
             </button>

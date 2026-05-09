@@ -16,7 +16,6 @@ export default function Board() {
   const [filteredIdeas, setFilteredIdeas] = useState<Idea[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Load all ideas (for tag collection + total count)
   const loadIdeas = useCallback(async () => {
     try {
       const [all, filtered] = await Promise.all([
@@ -54,8 +53,11 @@ export default function Board() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <span className="text-ink-400 text-sm italic">Loading your garden…</span>
+      <div className="flex items-center justify-center py-24 animate-fade-in">
+        <div className="flex flex-col items-center gap-3">
+          <span className="text-2xl animate-pulse">🌱</span>
+          <span className="text-ink-400 text-sm font-mono italic">Loading your garden…</span>
+        </div>
       </div>
     );
   }
@@ -63,10 +65,12 @@ export default function Board() {
   // Empty DB — show first-time empty state
   if (allIdeas.length === 0) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 animate-fade-in">
         <div>
-          <h1 className="text-3xl font-serif font-semibold text-ink-900">The Garden</h1>
-          <p className="text-ink-500 text-sm">Your project seed collection.</p>
+          <h1 className="text-3xl font-serif font-semibold text-ink-900 tracking-tight">
+            The Garden
+          </h1>
+          <p className="text-ink-400 text-sm mt-1">Your project seed collection.</p>
         </div>
         <EmptyState
           onPlantSeed={() => navigate('/idea/new')}
@@ -82,9 +86,11 @@ export default function Board() {
   return (
     <div className="space-y-5">
       {/* Page header */}
-      <div>
-        <h1 className="text-3xl font-serif font-semibold text-ink-900">The Garden</h1>
-        <p className="text-ink-500 text-sm">
+      <div className="animate-fade-in">
+        <h1 className="text-3xl font-serif font-semibold text-ink-900 tracking-tight">
+          The Garden
+        </h1>
+        <p className="text-ink-400 text-sm mt-0.5 font-mono">
           {allIdeas.length} seed{allIdeas.length !== 1 ? 's' : ''} planted
         </p>
       </div>
@@ -99,8 +105,8 @@ export default function Board() {
       {/* Cards grid */}
       {filteredIdeas.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredIdeas.map((idea) => (
-            <IdeaCard key={idea.id} idea={idea} />
+          {filteredIdeas.map((idea, i) => (
+            <IdeaCard key={idea.id} idea={idea} index={i} />
           ))}
         </div>
       ) : (

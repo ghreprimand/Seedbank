@@ -50,7 +50,6 @@ export default function IdeaDetail() {
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
 
-  // Keep a ref to the latest idea for the debounced save callback
   const ideaRef = useRef<Idea | null>(null);
   ideaRef.current = idea;
 
@@ -88,7 +87,6 @@ export default function IdeaDetail() {
     }
   }, SAVE_DELAY);
 
-  /** Update a field locally and trigger debounced save */
   const update = <K extends keyof Idea>(field: K, value: Idea[K]) => {
     setIdea((prev) => {
       if (!prev) return prev;
@@ -97,7 +95,6 @@ export default function IdeaDetail() {
     debouncedSave();
   };
 
-  /** Immediate save (e.g. for stage/category changes) */
   const saveNow = async (changes: Partial<Idea>) => {
     if (!idea) return;
     debouncedSave.cancel();
@@ -143,58 +140,62 @@ export default function IdeaDetail() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <span className="text-ink-400 text-sm italic">Loading…</span>
+      <div className="flex items-center justify-center py-24 animate-fade-in">
+        <div className="flex flex-col items-center gap-3">
+          <span className="text-2xl animate-pulse">📋</span>
+          <span className="text-ink-400 text-sm font-mono italic">Loading…</span>
+        </div>
       </div>
     );
   }
 
   if (notFound || !idea) {
     return (
-      <div className="space-y-6">
-        <Link to="/" className="text-ink-400 hover:text-ink-600 text-sm flex items-center gap-1">
+      <div className="space-y-6 animate-fade-in">
+        <Link to="/" className="text-ink-400 hover:text-ink-600 text-sm flex items-center gap-1 transition-colors">
           <ArrowLeft className="w-4 h-4" /> Back to Garden
         </Link>
-        <div className="p-8 bg-paper-warm border border-ink-200 rounded-card text-center">
+        <div className="p-10 bg-paper-warm border border-ink-100 rounded-card text-center">
+          <span className="text-3xl mb-3 block">🕳️</span>
           <h1 className="text-xl font-serif font-semibold text-ink-700 mb-2">Seed not found</h1>
-          <p className="text-sm text-ink-400">This idea may have been deleted.</p>
+          <p className="text-sm text-ink-400">This idea may have been deleted or moved.</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 max-w-3xl mx-auto pb-16">
+    <div className="space-y-6 max-w-3xl mx-auto pb-16 animate-fade-in">
       {/* ── Top bar ──────────────────────────────────────── */}
       <div className="flex items-center justify-between gap-4">
-        <Link to="/" className="text-ink-400 hover:text-ink-600 text-sm flex items-center gap-1">
-          <ArrowLeft className="w-4 h-4" /> Garden
+        <Link to="/" className="text-ink-400 hover:text-ink-600 text-sm flex items-center gap-1 transition-colors group">
+          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" /> Garden
         </Link>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {/* Save status */}
-          <span className="text-[11px] text-ink-400">
+          <span className="text-[11px] font-mono text-ink-300 mr-1">
             {saveStatus === 'saving' && 'Saving…'}
             {saveStatus === 'saved' && (
-              <span className="flex items-center gap-0.5 text-sage-600">
+              <span className="flex items-center gap-0.5 text-sage-500">
                 <Check className="w-3 h-3" /> Saved
               </span>
             )}
           </span>
 
-          {/* Actions */}
+          {/* Export dropdown */}
           <div className="relative">
             <button
               onClick={() => setExportOpen(!exportOpen)}
               title="Export idea"
-              className="p-1.5 text-ink-400 hover:text-sage-600 transition-colors rounded-badge hover:bg-sage-50"
+              className="p-1.5 text-ink-300 hover:text-sage-600 transition-all rounded-card hover:bg-sage-50"
             >
               <Download className="w-4 h-4" />
             </button>
             {exportOpen && (
               <>
                 <div className="fixed inset-0 z-20" onClick={() => setExportOpen(false)} />
-                <div className="absolute right-0 top-full mt-1 z-30 bg-paper border border-ink-200 rounded-card shadow-modal p-1 min-w-[160px]">
+                <div className="absolute right-0 top-full mt-1 z-30 bg-paper border border-ink-100 rounded-card shadow-modal p-1 min-w-[160px] animate-scale-in">
                   <button
                     onClick={() => { exportIdeaAsMarkdown(idea); setExportOpen(false); }}
                     className="w-full text-left px-3 py-1.5 text-xs text-ink-600 hover:bg-ink-50 rounded-badge transition-colors"
@@ -214,21 +215,21 @@ export default function IdeaDetail() {
           <button
             onClick={handleShelve}
             title={idea.stage === 'cold-storage' ? 'Move back to shelved' : 'Move to cold storage'}
-            className="p-1.5 text-ink-400 hover:text-frost-600 transition-colors rounded-badge hover:bg-frost-50"
+            className="p-1.5 text-ink-300 hover:text-frost-600 transition-all rounded-card hover:bg-frost-50"
           >
             <Snowflake className="w-4 h-4" />
           </button>
           <button
             onClick={handleDuplicate}
             title="Duplicate idea"
-            className="p-1.5 text-ink-400 hover:text-sage-600 transition-colors rounded-badge hover:bg-sage-50"
+            className="p-1.5 text-ink-300 hover:text-sage-600 transition-all rounded-card hover:bg-sage-50"
           >
             <Copy className="w-4 h-4" />
           </button>
           <button
             onClick={() => setShowDeleteConfirm(true)}
             title="Delete idea"
-            className="p-1.5 text-ink-400 hover:text-red-600 transition-colors rounded-badge hover:bg-red-50"
+            className="p-1.5 text-ink-300 hover:text-red-500 transition-all rounded-card hover:bg-red-50"
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -237,41 +238,40 @@ export default function IdeaDetail() {
 
       {/* ── Header: Title + Stage/Category selectors ─────── */}
       <div className="space-y-3">
-        {/* Title */}
         <input
           type="text"
           value={idea.title}
           onChange={(e) => update('title', e.target.value)}
           placeholder="Idea title…"
-          className="w-full text-2xl md:text-3xl font-serif font-semibold text-ink-900 bg-transparent border-none outline-none placeholder:text-ink-300 focus:ring-0"
+          className="w-full text-2xl md:text-3xl font-serif font-semibold text-ink-900 bg-transparent
+                     border-none outline-none placeholder:text-ink-200 focus:ring-0 tracking-tight"
         />
 
-        {/* Stage + Category selectors */}
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
           {/* Stage picker */}
           <div className="relative">
             <button
               onClick={() => { setStageOpen(!stageOpen); setCategoryOpen(false); }}
-              className="flex items-center gap-1"
+              className="flex items-center gap-1 group"
             >
-              <StageBadge stage={idea.stage} />
-              <ChevronDown className="w-3 h-3 text-ink-400" />
+              <StageBadge stage={idea.stage} showIcon />
+              <ChevronDown className="w-3 h-3 text-ink-300 group-hover:text-ink-500 transition-colors" />
             </button>
             {stageOpen && (
               <>
                 <div className="fixed inset-0 z-20" onClick={() => setStageOpen(false)} />
-                <div className="absolute left-0 top-full mt-1 z-30 bg-paper border border-ink-200 rounded-card shadow-modal p-1 min-w-[160px]">
+                <div className="absolute left-0 top-full mt-1 z-30 bg-paper border border-ink-100 rounded-card shadow-modal p-1 min-w-[170px] animate-scale-in">
                   {STAGES.map((s) => (
                     <button
                       key={s}
                       onClick={() => { saveNow({ stage: s }); setStageOpen(false); }}
-                      className={`w-full text-left px-3 py-1.5 text-xs rounded-badge transition-colors flex items-center gap-2 ${
+                      className={`w-full text-left px-3 py-2 text-xs rounded-badge transition-colors flex items-center gap-2 ${
                         idea.stage === s
                           ? 'bg-sage-100 text-sage-800 font-semibold'
                           : 'text-ink-600 hover:bg-ink-50'
                       }`}
                     >
-                      <span>{STAGE_ICONS[s]}</span>
+                      <span className="text-sm">{STAGE_ICONS[s]}</span>
                       {STAGE_LABELS[s]}
                     </button>
                   ))}
@@ -284,20 +284,22 @@ export default function IdeaDetail() {
           <div className="relative">
             <button
               onClick={() => { setCategoryOpen(!categoryOpen); setStageOpen(false); }}
-              className="flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium text-ink-500 bg-ink-50 border border-ink-200 rounded-badge"
+              className="flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium font-mono
+                         text-ink-400 bg-paper-warm border border-ink-100 rounded-badge
+                         hover:border-ink-200 transition-colors"
             >
               {CATEGORY_LABELS[idea.category]}
-              <ChevronDown className="w-3 h-3 text-ink-400" />
+              <ChevronDown className="w-3 h-3 text-ink-300" />
             </button>
             {categoryOpen && (
               <>
                 <div className="fixed inset-0 z-20" onClick={() => setCategoryOpen(false)} />
-                <div className="absolute left-0 top-full mt-1 z-30 bg-paper border border-ink-200 rounded-card shadow-modal p-1 min-w-[160px]">
+                <div className="absolute left-0 top-full mt-1 z-30 bg-paper border border-ink-100 rounded-card shadow-modal p-1 min-w-[160px] animate-scale-in">
                   {CATEGORIES.map((c) => (
                     <button
                       key={c}
                       onClick={() => { saveNow({ category: c }); setCategoryOpen(false); }}
-                      className={`w-full text-left px-3 py-1.5 text-xs rounded-badge transition-colors ${
+                      className={`w-full text-left px-3 py-2 text-xs rounded-badge transition-colors ${
                         idea.category === c
                           ? 'bg-sage-100 text-sage-800 font-semibold'
                           : 'text-ink-600 hover:bg-ink-50'
@@ -315,18 +317,18 @@ export default function IdeaDetail() {
 
       {/* ── Editor sections ──────────────────────────────── */}
       <div className="space-y-6">
-        {/* Pitch */}
         <Section label="Pitch" hint="One-line hook — what is this?">
           <input
             type="text"
             value={idea.pitch}
             onChange={(e) => update('pitch', e.target.value)}
             placeholder="One sentence that captures the idea…"
-            className="w-full px-3 py-2 text-sm bg-paper-warm border border-ink-200 rounded-badge outline-none focus:ring-2 focus:ring-sage-400 transition-all text-ink-800 placeholder:text-ink-300"
+            className="w-full px-3 py-2.5 text-sm bg-paper-warm border border-ink-100 rounded-card
+                       outline-none focus:ring-2 focus:ring-sage-400 focus:border-sage-300
+                       transition-all text-ink-800 placeholder:text-ink-300"
           />
         </Section>
 
-        {/* Full Notes */}
         <Section label="Full Notes" hint="Detailed description, raw thoughts, anything goes">
           <AutoGrowTextarea
             value={idea.fullNotes}
@@ -336,7 +338,6 @@ export default function IdeaDetail() {
           />
         </Section>
 
-        {/* Hook */}
         <Section label="Hook / 30-Second Demo" hint="How would you show this off in 30 seconds?">
           <AutoGrowTextarea
             value={idea.hook}
@@ -346,7 +347,6 @@ export default function IdeaDetail() {
           />
         </Section>
 
-        {/* Why it might work */}
         <Section label="Why It Might Work" hint="Arguments in favour">
           <AutoGrowTextarea
             value={idea.whyItMightWork}
@@ -356,7 +356,6 @@ export default function IdeaDetail() {
           />
         </Section>
 
-        {/* Risks & Blockers */}
         <Section label="Risks & Blockers" hint="What could go wrong or get in the way?">
           <AutoGrowTextarea
             value={idea.risks}
@@ -366,7 +365,6 @@ export default function IdeaDetail() {
           />
         </Section>
 
-        {/* Tech Stack Notes */}
         <Section label="Tech Stack Notes" hint="Languages, frameworks, tools you'd reach for">
           <AutoGrowTextarea
             value={idea.techStack}
@@ -376,7 +374,6 @@ export default function IdeaDetail() {
           />
         </Section>
 
-        {/* Tags & Mood Labels */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <TagInput
             label="Tags"
@@ -392,7 +389,6 @@ export default function IdeaDetail() {
           />
         </div>
 
-        {/* Scores */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <ScorePicker
             label="Personal Excitement"
@@ -406,13 +402,11 @@ export default function IdeaDetail() {
           />
         </div>
 
-        {/* Links & References */}
         <LinkEditor
           links={idea.links}
           onChange={(links) => update('links', links)}
         />
 
-        {/* Related Ideas */}
         <RelatedIdeasLinker
           ideaId={idea.id}
           relatedIds={idea.relatedIdeaIds}
@@ -421,31 +415,33 @@ export default function IdeaDetail() {
       </div>
 
       {/* ── Version History ──────────────────────────────── */}
-      <div className="pt-4 border-t border-ink-200">
+      <div className="pt-5 border-t border-ink-100">
         <VersionHistory ideaId={idea.id} onRestored={handleVersionRestored} />
       </div>
 
       {/* ── Delete confirmation modal ────────────────────── */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-900/40 backdrop-blur-sm">
-          <div className="bg-paper w-full max-w-sm rounded-card shadow-modal border border-ink-200 p-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-900/30 backdrop-blur-sm animate-fade-in">
+          <div className="bg-paper w-full max-w-sm rounded-card shadow-modal border border-ink-100 p-6 animate-scale-in">
             <h2 className="text-lg font-serif font-semibold text-ink-900 mb-2">
               Remove this seed?
             </h2>
-            <p className="text-sm text-ink-500 mb-5">
+            <p className="text-sm text-ink-500 mb-5 leading-relaxed">
               This will permanently delete <strong>"{idea.title || 'Untitled'}"</strong> and all its
               version history. This can't be undone.
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 px-4 py-2 text-sm font-medium text-ink-600 hover:bg-ink-100 rounded-badge transition-colors"
+                className="flex-1 px-4 py-2.5 text-sm font-medium text-ink-500 hover:bg-ink-50
+                           rounded-card transition-colors"
               >
                 Keep it
               </button>
               <button
                 onClick={handleDelete}
-                className="flex-1 px-4 py-2 text-sm font-medium bg-red-600 hover:bg-red-700 text-white rounded-badge transition-colors"
+                className="flex-1 px-4 py-2.5 text-sm font-medium bg-red-600 hover:bg-red-700
+                           active:bg-red-800 text-white rounded-card transition-all active:scale-[0.98]"
               >
                 Delete forever
               </button>
@@ -471,10 +467,10 @@ function Section({
 }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-ink-500 uppercase tracking-wider mb-0.5">
+      <label className="block text-[11px] font-medium text-ink-400 uppercase tracking-wider mb-0.5 font-mono">
         {label}
       </label>
-      {hint && <p className="text-[11px] text-ink-400 mb-1.5">{hint}</p>}
+      {hint && <p className="text-[11px] text-ink-300 mb-2">{hint}</p>}
       {children}
     </div>
   );
@@ -507,7 +503,10 @@ function AutoGrowTextarea({
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       rows={minRows}
-      className="w-full px-3 py-2 text-sm bg-paper-warm border border-ink-200 rounded-badge outline-none focus:ring-2 focus:ring-sage-400 transition-all text-ink-800 placeholder:text-ink-300 resize-none leading-relaxed"
+      className="w-full px-3 py-2.5 text-sm bg-paper-warm border border-ink-100 rounded-card
+                 outline-none focus:ring-2 focus:ring-sage-400 focus:border-sage-300
+                 transition-all text-ink-800 placeholder:text-ink-300
+                 resize-none leading-relaxed"
     />
   );
 }

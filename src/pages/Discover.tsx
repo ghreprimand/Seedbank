@@ -74,23 +74,24 @@ function MiniCard({ idea }: { idea: Idea }) {
   return (
     <Link
       to={`/idea/${idea.id}`}
-      className="block bg-paper border border-ink-200 rounded-card p-4 shadow-card
-                 hover:shadow-card-hover hover:border-sage-300 transition-all duration-200"
+      className="block bg-paper border border-ink-100 rounded-card p-4 shadow-card
+                 hover:shadow-card-hover hover:border-sage-300 hover:-translate-y-0.5
+                 transition-all duration-250 ease-out"
     >
-      <div className="flex items-start gap-2 mb-1.5">
+      <div className="flex items-start gap-2.5 mb-1.5">
         <span className="text-base leading-none mt-0.5 shrink-0" aria-hidden>
           {STAGE_ICONS[idea.stage]}
         </span>
-        <h3 className="text-base font-serif font-semibold text-ink-900 leading-snug line-clamp-2">
+        <h3 className="text-[15px] font-serif font-semibold text-ink-900 leading-snug line-clamp-2">
           {idea.title || 'Untitled Seed'}
         </h3>
       </div>
       {idea.pitch && (
-        <p className="text-sm text-ink-500 leading-relaxed line-clamp-2 mb-2 pl-6">
+        <p className="text-sm text-ink-400 leading-relaxed line-clamp-2 mb-2 pl-[26px]">
           {idea.pitch}
         </p>
       )}
-      <div className="flex flex-wrap items-center gap-1.5 pl-6">
+      <div className="flex flex-wrap items-center gap-1.5 pl-[26px]">
         <StageBadge stage={idea.stage} />
         <CategoryBadge category={idea.category} />
       </div>
@@ -109,7 +110,7 @@ function SectionHeader({
 }) {
   return (
     <div className="flex items-start gap-3 mb-4">
-      <div className="w-10 h-10 rounded-full bg-sage-100 flex items-center justify-center shrink-0">
+      <div className="w-10 h-10 rounded-full bg-sage-50 border border-sage-100 flex items-center justify-center shrink-0">
         {icon}
       </div>
       <div>
@@ -160,7 +161,6 @@ export default function Discover() {
       setStageStats(stats);
       setTotalCount(count);
 
-      // Compute top tags
       const tagCounts: Record<string, number> = {};
       let excitementSum = 0;
       let excitementCount = 0;
@@ -191,7 +191,6 @@ export default function Discover() {
 
       setAvgExcitement(excitementCount > 0 ? excitementSum / excitementCount : 0);
 
-      // Initialize features
       if (all.length > 0) {
         rollDailySeed(all);
         rollCrossPollinate(all);
@@ -245,22 +244,25 @@ export default function Discover() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <span className="text-ink-400 text-sm italic">Loading discoveries…</span>
+      <div className="flex items-center justify-center py-24 animate-fade-in">
+        <div className="flex flex-col items-center gap-3">
+          <span className="text-2xl animate-pulse">🧭</span>
+          <span className="text-ink-400 text-sm font-mono italic">Loading discoveries…</span>
+        </div>
       </div>
     );
   }
 
   if (ideas.length === 0) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 animate-fade-in">
         <div>
-          <h1 className="text-3xl font-serif font-semibold text-ink-900">Discover</h1>
-          <p className="text-ink-500 text-sm">Rediscover and recombine your ideas.</p>
+          <h1 className="text-3xl font-serif font-semibold text-ink-900 tracking-tight">Discover</h1>
+          <p className="text-ink-400 text-sm mt-1">Rediscover and recombine your ideas.</p>
         </div>
         <div className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="w-16 h-16 rounded-full bg-sage-100 flex items-center justify-center mb-5">
-            <Lightbulb className="w-8 h-8 text-sage-500" />
+          <div className="w-16 h-16 rounded-full bg-sage-50 border border-sage-100 flex items-center justify-center mb-5">
+            <Lightbulb className="w-8 h-8 text-sage-400" />
           </div>
           <h2 className="text-xl font-serif font-semibold text-ink-800 mb-2">
             Nothing to discover yet
@@ -270,7 +272,9 @@ export default function Discover() {
           </p>
           <Link
             to="/"
-            className="bg-clay-500 hover:bg-clay-600 text-paper px-5 py-2 rounded-pill text-sm font-medium transition-colors flex items-center gap-2 shadow-card"
+            className="bg-clay-500 hover:bg-clay-600 active:bg-clay-700 text-paper px-5 py-2.5
+                       rounded-pill text-sm font-medium transition-all flex items-center gap-2
+                       shadow-card hover:shadow-card-hover active:scale-[0.98]"
           >
             <span className="text-lg">🌱</span>
             Go to the Garden
@@ -281,11 +285,11 @@ export default function Discover() {
   }
 
   return (
-    <div className="space-y-10 max-w-3xl mx-auto">
+    <div className="space-y-10 max-w-3xl mx-auto animate-fade-in">
       {/* Page header */}
       <div>
-        <h1 className="text-3xl font-serif font-semibold text-ink-900">Discover</h1>
-        <p className="text-ink-500 text-sm">Rediscover, recombine, and reflect on your ideas.</p>
+        <h1 className="text-3xl font-serif font-semibold text-ink-900 tracking-tight">Discover</h1>
+        <p className="text-ink-400 text-sm mt-1">Rediscover, recombine, and reflect on your ideas.</p>
       </div>
 
       {/* ── Daily Seed ────────────────────────────────────── */}
@@ -298,15 +302,15 @@ export default function Discover() {
         {dailySeed ? (
           <div className="space-y-3">
             <MiniCard idea={dailySeed} />
-            <div className="flex items-start gap-2 px-4 py-3 bg-amber-50 border border-amber-200 rounded-card">
-              <Lightbulb className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-              <p className="text-sm text-amber-800 italic">{dailyPrompt}</p>
+            <div className="flex items-start gap-2.5 px-4 py-3 bg-amber-50/60 border border-amber-100 rounded-card">
+              <Lightbulb className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+              <p className="text-sm text-amber-800 italic leading-relaxed">{dailyPrompt}</p>
             </div>
             <button
               onClick={() => rollDailySeed()}
-              className="flex items-center gap-1.5 text-xs text-ink-400 hover:text-sage-600 transition-colors"
+              className="flex items-center gap-1.5 text-xs text-ink-400 hover:text-sage-600 transition-colors group"
             >
-              <RefreshCw className="w-3.5 h-3.5" />
+              <RefreshCw className="w-3.5 h-3.5 group-hover:rotate-180 transition-transform duration-300" />
               Draw another seed
             </button>
           </div>
@@ -328,15 +332,15 @@ export default function Discover() {
               <MiniCard idea={crossPair[0]} />
               <MiniCard idea={crossPair[1]} />
             </div>
-            <div className="flex items-start gap-2 px-4 py-3 bg-sage-50 border border-sage-200 rounded-card">
-              <Shuffle className="w-4 h-4 text-sage-600 shrink-0 mt-0.5" />
-              <p className="text-sm text-sage-800 italic">{hybridPrompt}</p>
+            <div className="flex items-start gap-2.5 px-4 py-3 bg-sage-50/60 border border-sage-100 rounded-card">
+              <Shuffle className="w-4 h-4 text-sage-500 shrink-0 mt-0.5" />
+              <p className="text-sm text-sage-800 italic leading-relaxed">{hybridPrompt}</p>
             </div>
             <button
               onClick={() => rollCrossPollinate()}
-              className="flex items-center gap-1.5 text-xs text-ink-400 hover:text-sage-600 transition-colors"
+              className="flex items-center gap-1.5 text-xs text-ink-400 hover:text-sage-600 transition-colors group"
             >
-              <RefreshCw className="w-3.5 h-3.5" />
+              <RefreshCw className="w-3.5 h-3.5 group-hover:rotate-180 transition-transform duration-300" />
               Shuffle another pair
             </button>
           </div>
@@ -357,29 +361,29 @@ export default function Discover() {
         {storageDraw ? (
           <div className="space-y-3">
             <MiniCard idea={storageDraw} />
-            <div className="flex items-start gap-2 px-4 py-3 bg-frost-50 border border-frost-200 rounded-card">
-              <Archive className="w-4 h-4 text-frost-600 shrink-0 mt-0.5" />
-              <p className="text-sm text-frost-800 italic">{storagePrompt}</p>
+            <div className="flex items-start gap-2.5 px-4 py-3 bg-frost-50/60 border border-frost-100 rounded-card">
+              <Archive className="w-4 h-4 text-frost-500 shrink-0 mt-0.5" />
+              <p className="text-sm text-frost-800 italic leading-relaxed">{storagePrompt}</p>
             </div>
             <div className="flex items-center gap-4">
               <button
                 onClick={() => rollStorageDraw()}
-                className="flex items-center gap-1.5 text-xs text-ink-400 hover:text-frost-600 transition-colors"
+                className="flex items-center gap-1.5 text-xs text-ink-400 hover:text-frost-600 transition-colors group"
               >
-                <RefreshCw className="w-3.5 h-3.5" />
+                <RefreshCw className="w-3.5 h-3.5 group-hover:rotate-180 transition-transform duration-300" />
                 Draw another
               </button>
               <Link
                 to={`/idea/${storageDraw.id}`}
-                className="flex items-center gap-1 text-xs text-frost-600 hover:text-frost-700 transition-colors"
+                className="flex items-center gap-1 text-xs text-frost-600 hover:text-frost-700 transition-colors group"
               >
-                Open & revisit <ArrowRight className="w-3 h-3" />
+                Open & revisit <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
               </Link>
             </div>
           </div>
         ) : (
-          <div className="px-4 py-6 bg-paper-warm border border-ink-200 rounded-card text-center">
-            <p className="text-sm text-ink-500">
+          <div className="px-4 py-6 bg-paper-warm border border-ink-100 rounded-card text-center">
+            <p className="text-sm text-ink-400">
               Nothing in storage — all your ideas are active! 🎉
             </p>
           </div>
@@ -389,7 +393,7 @@ export default function Discover() {
       {/* ── Idea Weather ──────────────────────────────────── */}
       <section className="pb-8">
         <SectionHeader
-          icon={<CloudSun className="w-5 h-5 text-amber-600" />}
+          icon={<CloudSun className="w-5 h-5 text-amber-500" />}
           title="Idea Weather"
           description="Patterns and stats across your garden."
         />
@@ -420,7 +424,7 @@ export default function Discover() {
 
         {/* Stage breakdown */}
         <div className="mb-6">
-          <h3 className="text-xs font-medium text-ink-500 uppercase tracking-wider mb-3">
+          <h3 className="text-[11px] font-medium text-ink-400 uppercase tracking-wider mb-3 font-mono">
             By Stage
           </h3>
           <div className="space-y-2">
@@ -435,11 +439,11 @@ export default function Discover() {
                     </div>
                     <div className="flex-1 h-5 bg-paper-warm border border-ink-100 rounded-pill overflow-hidden">
                       <div
-                        className="h-full bg-sage-300 rounded-pill transition-all duration-500"
+                        className="h-full bg-sage-300 rounded-pill transition-all duration-700 ease-out"
                         style={{ width: `${Math.max(pct, count > 0 ? 2 : 0)}%` }}
                       />
                     </div>
-                    <span className="text-xs text-ink-500 w-8 text-right tabular-nums">
+                    <span className="text-xs text-ink-400 w-8 text-right tabular-nums font-mono">
                       {count}
                     </span>
                   </div>
@@ -452,17 +456,17 @@ export default function Discover() {
         {/* Top categories */}
         {topCategories.length > 0 && (
           <div className="mb-6">
-            <h3 className="text-xs font-medium text-ink-500 uppercase tracking-wider mb-3">
+            <h3 className="text-[11px] font-medium text-ink-400 uppercase tracking-wider mb-3 font-mono">
               Most Common Categories
             </h3>
             <div className="flex flex-wrap gap-2">
               {topCategories.map(({ category, count }) => (
                 <span
                   key={category}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-paper-warm border border-ink-200 rounded-pill text-xs text-ink-600"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-paper-warm border border-ink-100 rounded-pill text-xs text-ink-600"
                 >
                   {CATEGORY_LABELS[category as keyof typeof CATEGORY_LABELS] ?? category}
-                  <span className="text-ink-400 font-medium">{count}</span>
+                  <span className="text-ink-300 font-medium font-mono">{count}</span>
                 </span>
               ))}
             </div>
@@ -472,17 +476,17 @@ export default function Discover() {
         {/* Top tags */}
         {topTags.length > 0 && (
           <div>
-            <h3 className="text-xs font-medium text-ink-500 uppercase tracking-wider mb-3">
+            <h3 className="text-[11px] font-medium text-ink-400 uppercase tracking-wider mb-3 font-mono">
               Top Tags
             </h3>
             <div className="flex flex-wrap gap-2">
               {topTags.map(({ tag, count }) => (
                 <span
                   key={tag}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-sage-50 border border-sage-200 rounded-pill text-xs text-sage-700"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-sage-50 border border-sage-100 rounded-pill text-xs text-sage-700"
                 >
                   {tag}
-                  <span className="text-sage-400 font-medium">{count}</span>
+                  <span className="text-sage-300 font-medium font-mono">{count}</span>
                 </span>
               ))}
             </div>
@@ -505,12 +509,13 @@ function StatCard({
   sublabel: string;
 }) {
   return (
-    <div className="bg-paper border border-ink-200 rounded-card p-3 text-center shadow-card">
+    <div className="bg-paper border border-ink-100 rounded-card p-3.5 text-center shadow-card
+                    hover:shadow-card-hover transition-shadow duration-200">
       <div className="text-2xl font-serif font-semibold text-ink-900 tabular-nums">
         {value}
       </div>
-      <div className="text-xs font-medium text-ink-600">{label}</div>
-      <div className="text-[10px] text-ink-400">{sublabel}</div>
+      <div className="text-xs font-medium text-ink-600 mt-0.5">{label}</div>
+      <div className="text-[10px] text-ink-300 font-mono">{sublabel}</div>
     </div>
   );
 }
