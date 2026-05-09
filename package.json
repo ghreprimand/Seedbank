@@ -1,13 +1,17 @@
 {
   "name": "seedbank",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "A local-first project idea manager — capture, grow, and rediscover ideas for games, apps, tools, and experiments.",
+  "author": "Joel",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "typecheck": "tsc -b --noEmit"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.2.4",

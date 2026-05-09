@@ -1,3 +1,4 @@
+/** Empty state component — first-time welcome or no-results message for the board. */
 import { Sprout } from 'lucide-react';
 
 interface EmptyStateProps {

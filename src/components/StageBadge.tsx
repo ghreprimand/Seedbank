@@ -1,3 +1,4 @@
+/** Per-stage coloured badge with optional gardening emoji icon. */
 import type { Stage } from '@/lib/types';
 import { STAGE_LABELS, STAGE_ICONS } from '@/lib/types';
 

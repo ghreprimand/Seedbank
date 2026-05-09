@@ -1,3 +1,4 @@
+/** App shell — sticky header with search, nav, and CTA. Hosts modals and global keyboard shortcuts. */
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
 import { Search, ArrowUpDown, Compass, X } from 'lucide-react';
@@ -25,23 +26,45 @@ export default function Layout() {
     }
   };
 
-  // Global keyboard shortcut: "/" focuses search
+  // Global keyboard shortcuts: "/" focuses search, "N" opens quick capture, "Esc" closes modals
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (
-        e.key === '/' &&
-        !e.metaKey &&
-        !e.ctrlKey &&
-        document.activeElement?.tagName !== 'INPUT' &&
-        document.activeElement?.tagName !== 'TEXTAREA'
-      ) {
+      const tag = document.activeElement?.tagName;
+      const isTyping = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+
+      // Esc — close any open modal or mobile search
+      if (e.key === 'Escape') {
+        if (isCaptureOpen) { setIsCaptureOpen(false); return; }
+        if (isImportExportOpen) { setIsImportExportOpen(false); return; }
+        if (mobileSearchOpen) { setMobileSearchOpen(false); return; }
+        // Blur focused search input on Esc
+        if (document.activeElement === searchRef.current) {
+          searchRef.current?.blur();
+          return;
+        }
+        return;
+      }
+
+      // Skip other shortcuts when typing in a field
+      if (isTyping || e.metaKey || e.ctrlKey || e.altKey) return;
+
+      // "/" — focus search
+      if (e.key === '/') {
         e.preventDefault();
         searchRef.current?.focus();
+        return;
+      }
+
+      // "N" — open quick capture
+      if (e.key === 'n' || e.key === 'N') {
+        e.preventDefault();
+        setIsCaptureOpen(true);
+        return;
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, []);
+  }, [isCaptureOpen, isImportExportOpen, mobileSearchOpen]);
 
   return (
     <div className="min-h-screen bg-paper text-ink-800 font-sans antialiased">

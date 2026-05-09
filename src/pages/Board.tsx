@@ -1,3 +1,4 @@
+/** Board page — main garden view with responsive card grid, filter bar, and search. */
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { searchIdeas, getAllIdeas } from '@/db/ideas';

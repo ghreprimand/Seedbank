@@ -1,3 +1,4 @@
+/** New idea route — renders QuickCapture as a full-page form. */
 import { useNavigate } from 'react-router-dom';
 import QuickCapture from '@/components/QuickCapture';
 

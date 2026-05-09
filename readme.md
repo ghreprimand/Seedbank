@@ -1,128 +1,251 @@
 # Seedbank
 
-Seedbank is a local-first project idea manager for games, apps, tools, experiments, and half-formed sparks that should not disappear into old notes.
+A local-first project idea manager for games, apps, tools, experiments, and half-formed sparks that shouldn't disappear into old notes.
 
-It is not a general notes app. Seedbank is for people who keep inventing things they might build later and need a better way to preserve, compare, revisit, and grow those ideas over time.
+Seedbank is not a general notes app. It's for people who keep inventing things they might build later and need a better way to preserve, compare, revisit, and grow those ideas over time.
 
-You write down the rough version of an idea, then Seedbank keeps it alive as a structured project entry. The app helps you remember what the idea was, why it seemed promising, what might block it, how it has changed, and whether it is worth developing further.
+![Seedbank — The Garden board view](https://img.shields.io/badge/status-alpha-sage)
 
-Seedbank should feel like a small creative workspace where ideas can be planted, revisited, crossed with other ideas, and eventually grown into something worth building.
+## Features
 
-The core job is simple:
+### Capture & Organize
 
-- Capture a project idea quickly, before it fades.
-- Store the pitch, hook, mechanics, target audience, risks, tech notes, and references in one place.
-- Categorize ideas by type, mood, scope, platform, jam fit, technical novelty, and personal excitement.
-- Search old ideas by keyword, category, tag, status, or fuzzy memory.
-- Keep an idea's history instead of overwriting it: rough seed, stronger pitch, prototype notes, abandoned version, revived version.
+- **Quick capture** — "Plant a Seed" button (or press `N`) opens a minimal form for fast idea entry
+- **14-field editor** — title, pitch, full notes, hook, risks, tech stack, tags, mood labels, scores, links, and related ideas
+- **Gardening-themed lifecycle** — ideas progress through stages: Seed → Sprout → Pitch → Prototype → Plot → Shipped (or Shelved → Cold Storage)
+- **Categories** — game, app, tool, art project, local AI, mobile, browser, open-source utility
+- **Auto-save** — debounced writes to IndexedDB as you type, no save button needed
 
-## How It Works
+### Search & Filter
 
-The basic loop is:
+- **Full-text search** — searches across titles, pitches, notes, hooks, risks, tech stack, tags, and mood labels
+- **Filter bar** — multi-select filters for category, stage, and tag with active-filter counts
+- **Sort options** — recently updated, newest first, most excited, alphabetical
+- **Keyboard shortcut** — press `/` to focus search from anywhere
 
-1. Capture an idea quickly.
-   Write the rough version before it fades. It can be a sentence, a messy note, a game mechanic, a tool concept, a title, or a half-formed problem.
+### Version History
 
-2. Seedbank saves it as a structured project entry.
-   Each idea can have a pitch, category, stage, tags, notes, risks, tech thoughts, references, related ideas, and personal scores.
+- **Automatic versioning** — every meaningful edit creates a timestamped snapshot of the previous state
+- **Version browser** — view any past version in a read-only modal
+- **Restore** — revert to any previous version (current state is saved as a version first, so nothing is lost)
+- **Smart labels** — auto-generated version labels like "Pitch revised", "Stage → prototype", "Notes edited"
 
-3. The idea keeps its history.
-   Instead of overwriting the old version, Seedbank should preserve how the idea changes: first spark, stronger pitch, prototype notes, shelved version, revived version, or shipped project.
+### Discovery & Delight
 
-4. The archive becomes searchable and useful.
-   Search, filters, tags, stages, and related-idea links help old ideas become findable again when they are relevant.
+- **Daily Seed** — resurfaces one random idea with a creative prompt like "What's the smallest version you could build today?"
+- **Cross-Pollinate** — picks two random ideas side-by-side and asks "What hybrid could exist?"
+- **Draw from Storage** — pulls a random shelved or cold-storage idea back into view with a reflective prompt
+- **Idea Weather** — stats panel showing total ideas, stage breakdown, top categories, top tags, and average excitement
 
-5. Seedbank helps ideas mature.
-   A rough idea can become a better pitch, a jam candidate, a build plan, a prototype, a shelved reference, or something to combine with another idea.
+### Import & Export
 
-6. The archive remains yours.
-   Ideas should be stored locally and exported to plain Markdown or JSON, so the user's idea collection can outlive the app.
+- **Export** — single idea or full archive to JSON or Markdown
+- **Import** — from Seedbank JSON (merge or replace) or Markdown files
+- **Seed data** — example ideas can be loaded on first use to try out the app
+- **Portable** — JSON export includes all ideas + version history for full backup/restore
 
-## Product Shape
+### Polish
 
-Seedbank should open directly into the user's living idea collection. No landing page, no heavy setup, no forced workflow. The first screen should show a searchable, filterable board of ideas with enough detail to recognize each one at a glance.
+- **Keyboard shortcuts** — `N` for new idea, `/` for search, `Esc` to close modals
+- **Error boundaries** — graceful fallbacks so a render error doesn't lose your data
+- **Responsive** — works on desktop, tablet, and mobile (mobile search toggle, adaptive grid)
+- **Tactile design** — paper textures, pressed-label tags, card lift-on-hover, smooth animations
 
-Each idea can have:
+## Tech Stack
 
-- Title
-- One-line pitch
-- Category, such as game, app, tool, art project, local AI, mobile, browser, open-source utility
-- Stage, such as seed, sprout, pitch, prototype, shelved, shipped
-- Tags and mood labels
-- Full pitch notes
-- Hook or 30-second demo concept
-- Why it might work
-- Risks and blockers
-- Tech stack notes
-- Jam suitability score
-- Personal excitement score
-- Related ideas
-- Links, images, documents, and inspirations
+| Layer | Choice | Why |
+|-------|--------|-----|
+| Build | [Vite](https://vite.dev/) | Fast, modern, great DX |
+| UI | [React 19](https://react.dev/) + TypeScript | Strict types, solid ecosystem |
+| Styling | [Tailwind CSS v4](https://tailwindcss.com/) | Rapid iteration, custom theme tokens |
+| State | [Zustand](https://zustand.docs.pmnd.rs/) | Lightweight, no boilerplate |
+| Storage | [Dexie](https://dexie.org/) (IndexedDB) | Local-first, indexed queries, versioning-friendly |
+| Icons | [Lucide React](https://lucide.dev/) | Clean, consistent, tree-shakeable |
+| Routing | [React Router v7](https://reactrouter.com/) | Standard client-side routing |
 
-The storage model should be local-first. The user's idea archive should outlive the app. A good default would be IndexedDB for the app experience, plus export/import to plain Markdown or JSON.
+## Design Philosophy
 
-## Theme Direction
+1. **Open directly into the collection** — no landing page, no onboarding walls
+2. **Capture first, structure later** — the quick-add flow should be frictionless
+3. **History over overwriting** — versions are first-class; nothing is lost
+4. **Rediscovery is the killer feature** — search, filters, and random resurfacing are prominent
+5. **Local-first, portable, yours** — IndexedDB + full export means the archive outlives the app
 
-The name Seedbank gives the app a useful metaphor without needing to become childish or overly decorative. The interface can borrow gardening language, but it should still feel like a serious creative tool.
+## Setup & Development
 
-Possible theme language:
+```bash
+# Clone and install
+git clone <repo-url>
+cd Seedbank
+npm install
 
-- Ideas are **seeds** when they are new and rough.
-- Stronger concepts become **sprouts**.
-- More developed concepts become **pitches**.
-- Active experiments become **plots**.
-- Related ideas can be **grafted** together.
-- Archived ideas go into **cold storage**, still preserved and searchable.
-- Weekly review can be called **tending**.
-- A random old idea resurfacer can be called **draw from storage**.
+# Start the dev server (http://localhost:5173)
+npm run dev
 
-The visual style should be warm, tactile, and focused:
+# Type-check
+npx tsc -b --noEmit
 
-- A restrained palette with soft greens, ink, clay, and off-white paper tones.
-- Dense but calm layouts, closer to a writing tool than a SaaS dashboard.
-- Small organic details: seed dots, growth rings, pressed-label tags, field-note typography.
-- Cards with sharp enough edges to feel useful, not toy-like.
-- Search and filters should be prominent, because rediscovery is the main promise.
+# Production build
+npm run build
 
-## What Makes It Fun
+# Preview production build
+npm run preview
+```
 
-Seedbank should reward returning to old ideas. The delight should come from rediscovery, recombination, and seeing thoughts mature over time.
+### Requirements
 
-Feature ideas:
+- Node.js 18+
+- npm 9+
 
-- **Daily seed:** resurface one forgotten idea with a prompt like "add one reason this might work."
-- **Cross-pollinate:** pick two random ideas and ask what hybrid could exist between them.
-- **Pitch pressure:** turn a messy note into a one-line pitch, 30-second hook, and build plan.
-- **Jam lens:** score ideas against a specific jam's constraints, such as browser-playable, no login, open source, two-week scope.
-- **Idea weather:** show patterns in the archive, like "you keep returning to local-first tools" or "your strongest ideas involve procedural systems."
-- **Version branches:** keep alternate forms of an idea instead of flattening them into one note.
-- **Shelf without shame:** make shelving an idea feel like preservation, not failure.
+## Theme & Color Palette
 
-## Initial Build Target
+Seedbank uses a custom warm color palette defined as Tailwind theme tokens in `src/index.css`:
 
-The first usable version should be a browser app with:
+| Token | Purpose | Example |
+|-------|---------|---------|
+| `paper` | Backgrounds (off-white / cream) | `#faf8f4` |
+| `sage` | Growth stages, success, primary actions | `#567d4a` (500) |
+| `ink` | Text, borders, neutral UI | `#1a1816` (900) |
+| `clay` | Accents, CTAs, warmth | `#c06a33` (500) |
+| `amber` | Excitement, energy, warnings | `#f59e0b` (500) |
+| `frost` | Cold storage, shelved, muted states | `#4e7191` (500) |
 
-- Create, edit, delete, and duplicate ideas.
-- Categories, tags, and status labels.
-- Full-text search across titles, pitches, notes, and tags.
-- Filter chips for category, status, and jam fit.
-- A focused detail editor for a single idea.
-- Local persistence.
-- Import of the existing Markdown pitch documents.
-- Export to Markdown or JSON.
+Typography uses three fonts loaded from Google Fonts:
+- **Lora** (serif) — headings and titles
+- **Inter** (sans) — body text and UI
+- **JetBrains Mono** — metadata, timestamps, stats
 
-The project should prove the concept by using the current pitch documents as the first Seedbank archive.
+## Data Formats
 
-## Open Source Angle
+### JSON Export
 
-Seedbank can be valuable as an open-source project because the core is personal, portable, and forkable. People could adapt the schema, scoring rubrics, prompt templates, importers, and visual themes to match how they think.
+The full archive JSON export has this shape:
 
-The forkable soul should be:
+```json
+{
+  "seedbankVersion": 1,
+  "exportedAt": "2025-01-15T10:30:00.000Z",
+  "ideas": [
+    {
+      "id": "uuid-v4",
+      "title": "My Idea",
+      "pitch": "One-line description",
+      "category": "app",
+      "stage": "seed",
+      "tags": ["tag1", "tag2"],
+      "moodLabels": ["cozy"],
+      "fullNotes": "...",
+      "hook": "...",
+      "whyItMightWork": "...",
+      "risks": "...",
+      "techStack": "...",
+      "jamScore": 3,
+      "excitementScore": 4,
+      "relatedIdeaIds": [],
+      "links": [{ "url": "https://...", "label": "Reference" }],
+      "images": [],
+      "createdAt": "2025-01-10T08:00:00.000Z",
+      "updatedAt": "2025-01-15T10:30:00.000Z"
+    }
+  ],
+  "versions": [
+    {
+      "id": "uuid-v4",
+      "ideaId": "parent-idea-uuid",
+      "versionLabel": "Pitch revised",
+      "notes": "",
+      "timestamp": "2025-01-12T14:00:00.000Z",
+      "snapshot": { "...same fields as idea content..." }
+    }
+  ]
+}
+```
 
-- `schema.json` for idea fields and statuses.
-- `rubrics/` for jam scoring and project evaluation templates.
-- `prompts/` for pitch sharpening, recombination, and review flows.
-- `importers/` for Markdown, Notion, Obsidian, Apple Notes exports, and voice memos.
-- `themes/` for visual styles.
+A single-idea JSON export is just the idea object directly (no wrapper).
 
-Seedbank should feel like a creative companion, but it should never trap the user's ideas. The archive belongs to the user.
+### Markdown Export
+
+Each idea exports as a Markdown document with metadata in a blockquote header:
+
+```markdown
+# My Idea
+
+> **Stage:** 🌱 Seed
+> **Category:** App
+> **Tags:** tag1, tag2
+> **Excitement:** ★★★★☆
+> **Planted:** 2025-01-10
+> **Last tended:** 2025-01-15
+
+## Pitch
+
+One-line description...
+
+## Notes
+
+Full notes...
+
+---
+<!-- seedbank-id: uuid-v4 -->
+```
+
+The `seedbank-id` comment allows re-importing a Markdown file and matching it to the original idea.
+
+## Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| `N` | Open quick capture (Plant a Seed) |
+| `/` | Focus the search input |
+| `Esc` | Close modal / blur search |
+
+## Project Structure
+
+```
+src/
+├── components/      # Reusable UI components
+│   ├── Layout.tsx          # App shell (header, nav, modal mounts)
+│   ├── IdeaCard.tsx        # Card for the board grid
+│   ├── FilterBar.tsx       # Category/stage/tag filters + sort
+│   ├── QuickCapture.tsx    # Fast idea entry modal
+│   ├── EmptyState.tsx      # First-time and no-results states
+│   ├── StageBadge.tsx      # Colored stage indicator
+│   ├── CategoryBadge.tsx   # Category label badge
+│   ├── TagInput.tsx        # Keyboard-driven tag entry
+│   ├── ScorePicker.tsx     # Star picker (1–5)
+│   ├── LinkEditor.tsx      # URL + label list editor
+│   ├── RelatedIdeasLinker.tsx  # Search & link other ideas
+│   ├── VersionHistory.tsx  # Version list + snapshot viewer
+│   ├── ImportExportModal.tsx   # Archive import/export UI
+│   └── ErrorBoundary.tsx   # Graceful error fallback
+├── pages/           # Route-level page components
+│   ├── Board.tsx           # Main garden grid (/)
+│   ├── IdeaDetail.tsx      # Idea editor (/idea/:id)
+│   ├── IdeaNew.tsx         # New idea redirect (/idea/new)
+│   └── Discover.tsx        # Discovery features (/discover)
+├── db/              # Data access layer
+│   ├── index.ts            # Dexie database schema
+│   └── ideas.ts            # CRUD, search, versioning functions
+├── lib/             # Utilities
+│   ├── types.ts            # Core TypeScript types & enums
+│   ├── export.ts           # Markdown & JSON export
+│   ├── import.ts           # JSON & Markdown import + seed data
+│   └── timeago.ts          # Relative time formatter
+├── hooks/           # React hooks
+│   └── useDebounce.ts      # Debounced callback with flush/cancel
+├── stores/          # Zustand stores
+│   └── filters.ts          # Search/filter/sort state
+├── App.tsx          # Route definitions
+├── main.tsx         # Entry point
+└── index.css        # Tailwind config + theme tokens
+```
+
+## Data Privacy
+
+All data stays in your browser's IndexedDB. Seedbank makes **zero network calls** beyond loading the app itself (HTML, JS, CSS, fonts). There is no server, no analytics, no telemetry. Your ideas are yours.
+
+Export regularly to JSON for backup — IndexedDB can be cleared by the browser in some circumstances (storage pressure, clearing site data).
+
+## License
+
+MIT
