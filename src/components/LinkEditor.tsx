@@ -1,3 +1,4 @@
+/** Editable list of URL + label pairs for idea references and links. */
 import { useState } from 'react';
 import { Plus, X, ExternalLink } from 'lucide-react';
 import type { IdeaLink } from '@/lib/types';

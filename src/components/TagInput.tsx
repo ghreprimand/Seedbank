@@ -1,3 +1,4 @@
+/** Keyboard-driven tag entry — Enter/comma to add, Backspace to remove, X to delete. */
 import { useState, useRef } from 'react';
 import { X } from 'lucide-react';
 

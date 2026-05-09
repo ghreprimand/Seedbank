@@ -1,3 +1,4 @@
+/** Filter bar with multi-select dropdowns for category, stage, tag, and sort order. */
 import { useState } from 'react';
 import { ChevronDown, X, ArrowUpDown } from 'lucide-react';
 import { CATEGORIES, STAGES, CATEGORY_LABELS, STAGE_LABELS, STAGE_ICONS } from '@/lib/types';

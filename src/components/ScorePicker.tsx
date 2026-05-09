@@ -1,3 +1,4 @@
+/** Clickable 1–5 star picker for excitement and jam suitability scores. */
 import { Star } from 'lucide-react';
 
 interface ScorePickerProps {

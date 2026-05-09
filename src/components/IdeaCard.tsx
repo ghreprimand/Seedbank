@@ -1,3 +1,4 @@
+/** Idea card for the board grid — shows title, pitch, badges, tags, excitement, and timestamp. */
 import { Link } from 'react-router-dom';
 import type { Idea } from '@/lib/types';
 import { STAGE_ICONS } from '@/lib/types';

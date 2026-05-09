@@ -1,3 +1,4 @@
+/** Idea detail / editor page — all 14 fields, auto-save, version history, and actions. */
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {

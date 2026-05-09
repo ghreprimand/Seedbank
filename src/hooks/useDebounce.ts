@@ -1,3 +1,4 @@
+/** Debounced callback hook with `.flush()` and `.cancel()` — used for auto-save. */
 import { useEffect, useRef, useCallback } from 'react';
 
 /**

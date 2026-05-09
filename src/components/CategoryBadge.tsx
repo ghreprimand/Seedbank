@@ -1,3 +1,4 @@
+/** Neutral ink-toned badge showing an idea's category label. */
 import type { Category } from '@/lib/types';
 import { CATEGORY_LABELS } from '@/lib/types';
 
