@@ -8,7 +8,7 @@
  *   4. Idea Weather — stats panel showing archive patterns
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Sprout,
@@ -148,65 +148,6 @@ export default function Discover() {
   >([]);
   const [avgExcitement, setAvgExcitement] = useState(0);
 
-  // ── Load data ──────────────────────────────────────────
-
-  const loadData = useCallback(async () => {
-    try {
-      const [all, stats, count] = await Promise.all([
-        getAllIdeas(),
-        getStageStats(),
-        getIdeaCount(),
-      ]);
-      setIdeas(all);
-      setStageStats(stats);
-      setTotalCount(count);
-
-      const tagCounts: Record<string, number> = {};
-      let excitementSum = 0;
-      let excitementCount = 0;
-      const catCounts: Record<string, number> = {};
-
-      for (const idea of all) {
-        for (const tag of idea.tags) {
-          tagCounts[tag] = (tagCounts[tag] || 0) + 1;
-        }
-        if (idea.excitementScore > 0) {
-          excitementSum += idea.excitementScore;
-          excitementCount++;
-        }
-        catCounts[idea.category] = (catCounts[idea.category] || 0) + 1;
-      }
-
-      const sortedTags = Object.entries(tagCounts)
-        .map(([tag, count]) => ({ tag, count }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 8);
-      setTopTags(sortedTags);
-
-      const sortedCats = Object.entries(catCounts)
-        .map(([category, count]) => ({ category, count }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 5);
-      setTopCategories(sortedCats);
-
-      setAvgExcitement(excitementCount > 0 ? excitementSum / excitementCount : 0);
-
-      if (all.length > 0) {
-        rollDailySeed(all);
-        rollCrossPollinate(all);
-        rollStorageDraw(all);
-      }
-    } catch (err) {
-      console.error('Failed to load ideas:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
-
   // ── Feature logic ──────────────────────────────────────
 
   const rollDailySeed = (pool?: Idea[]) => {
@@ -239,6 +180,81 @@ export default function Discover() {
     setStorageDraw(pickRandom(shelved));
     setStoragePrompt(pickRandom(STORAGE_PROMPTS));
   };
+
+  // ── Load data ──────────────────────────────────────────
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [all, stats, count] = await Promise.all([
+          getAllIdeas(),
+          getStageStats(),
+          getIdeaCount(),
+        ]);
+        if (cancelled) return;
+
+        const tagCounts: Record<string, number> = {};
+        let excitementSum = 0;
+        let excitementCount = 0;
+        const catCounts: Record<string, number> = {};
+
+        for (const idea of all) {
+          for (const tag of idea.tags) {
+            tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+          }
+          if (idea.excitementScore > 0) {
+            excitementSum += idea.excitementScore;
+            excitementCount++;
+          }
+          catCounts[idea.category] = (catCounts[idea.category] || 0) + 1;
+        }
+
+        const sortedTags = Object.entries(tagCounts)
+          .map(([tag, count]) => ({ tag, count }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 8);
+
+        const sortedCats = Object.entries(catCounts)
+          .map(([category, count]) => ({ category, count }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 5);
+
+        setIdeas(all);
+        setStageStats(stats);
+        setTotalCount(count);
+        setTopTags(sortedTags);
+        setTopCategories(sortedCats);
+        setAvgExcitement(excitementCount > 0 ? excitementSum / excitementCount : 0);
+
+        // Initial random selections (inlined so the effect has no
+        // unstable function deps and no dependency on `ideas` state).
+        if (all.length > 0) {
+          setDailySeed(pickRandom(all));
+          setDailyPrompt(pickRandom(DAILY_PROMPTS));
+        }
+        if (all.length >= 2) {
+          const pair = pickRandomN(all, 2);
+          setCrossPair([pair[0], pair[1]]);
+          setHybridPrompt(pickRandom(HYBRID_PROMPTS));
+        }
+        const shelved = all.filter(
+          (i) => i.stage === 'shelved' || i.stage === 'cold-storage'
+        );
+        if (shelved.length > 0) {
+          setStorageDraw(pickRandom(shelved));
+          setStoragePrompt(pickRandom(STORAGE_PROMPTS));
+        }
+      } catch (err) {
+        if (!cancelled) console.error('Failed to load ideas:', err);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // ── Render ─────────────────────────────────────────────
 

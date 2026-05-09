@@ -5,6 +5,14 @@
   "description": "A local-first project idea manager — capture, grow, and rediscover ideas for games, apps, tools, and experiments.",
   "author": "Joel",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ghreprimand/Seedbank.git"
+  },
+  "homepage": "https://github.com/ghreprimand/Seedbank#readme",
+  "bugs": {
+    "url": "https://github.com/ghreprimand/Seedbank/issues"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -14,6 +22,9 @@
     "typecheck": "tsc -b --noEmit"
   },
   "dependencies": {
+    "@fontsource/inter": "^5.2.8",
+    "@fontsource/jetbrains-mono": "^5.2.8",
+    "@fontsource/lora": "^5.2.8",
     "@tailwindcss/vite": "^4.2.4",
     "dexie": "^4.4.2",
     "lucide-react": "^1.14.0",

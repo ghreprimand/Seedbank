@@ -317,7 +317,7 @@ export async function searchIdeas(filters: IdeaFilters = {}): Promise<Idea[]> {
     sortDirection = 'desc',
   } = filters;
 
-  let collection = db.ideas.toCollection();
+  const collection = db.ideas.toCollection();
 
   // Apply indexed filters where possible
   // (Dexie can only use one index per query, so we filter the rest in JS)

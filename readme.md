@@ -4,7 +4,7 @@ A local-first project idea manager for games, apps, tools, experiments, and half
 
 Seedbank is not a general notes app. It's for people who keep inventing things they might build later and need a better way to preserve, compare, revisit, and grow those ideas over time.
 
-![Seedbank — The Garden board view](https://img.shields.io/badge/status-alpha-sage)
+![Status: alpha](https://img.shields.io/badge/status-alpha-sage)
 
 ## Features
 
@@ -110,7 +110,7 @@ Seedbank uses a custom warm color palette defined as Tailwind theme tokens in `s
 | `amber` | Excitement, energy, warnings | `#f59e0b` (500) |
 | `frost` | Cold storage, shelved, muted states | `#4e7191` (500) |
 
-Typography uses three fonts loaded from Google Fonts:
+Typography uses three fonts, **self-hosted via `@fontsource`** (no external font requests):
 - **Lora** (serif) — headings and titles
 - **Inter** (sans) — body text and UI
 - **JetBrains Mono** — metadata, timestamps, stats
@@ -242,7 +242,7 @@ src/
 
 ## Data Privacy
 
-All data stays in your browser's IndexedDB. Seedbank makes **zero network calls** beyond loading the app itself (HTML, JS, CSS, fonts). There is no server, no analytics, no telemetry. Your ideas are yours.
+All data stays in your browser's IndexedDB. Once the app is loaded (HTML, JS, CSS, and self-hosted fonts — all served from the same origin), Seedbank makes **zero network calls**: no server, no analytics, no telemetry, no font CDN. Your ideas are yours.
 
 Export regularly to JSON for backup — IndexedDB can be cleared by the browser in some circumstances (storage pressure, clearing site data).
 

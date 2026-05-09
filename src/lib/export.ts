@@ -143,8 +143,9 @@ export function ideaToMarkdown(idea: Idea): string {
     lines.push('');
   }
 
-  // Footer with ID for re-import
-  lines.push('---');
+  // Footer with ID for re-import. Kept inside the idea section
+  // (no leading `---`) so archive splitting on horizontal rules
+  // preserves the ID alongside its idea.
   lines.push(`<!-- seedbank-id: ${idea.id} -->`);
   lines.push('');
 
@@ -206,12 +207,13 @@ export async function exportArchiveAsJSON() {
 export async function exportArchiveAsMarkdown() {
   const ideas = await getAllIdeas();
 
+  // Header has no trailing `---` so it merges with the first idea's
+  // section after split-on-`---` import; the first idea's `# Title`
+  // wins as the parsed title.
   const header = [
     `# Seedbank Archive`,
     '',
     `> Exported ${formatDateTime(new Date())} · ${ideas.length} idea${ideas.length !== 1 ? 's' : ''}`,
-    '',
-    '---',
     '',
   ].join('\n');
 

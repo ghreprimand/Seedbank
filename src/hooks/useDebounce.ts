@@ -1,50 +1,63 @@
-/** Debounced callback hook with `.flush()` and `.cancel()` — used for auto-save. */
+/** Debounced callback hook with `flush` and `cancel` — used for auto-save. */
 import { useEffect, useRef, useCallback } from 'react';
 
 /**
- * Returns a debounced version of the callback.
- * The callback is invoked after `delay` ms of inactivity.
- * The returned function also exposes `.flush()` to fire immediately
- * and `.cancel()` to discard a pending invocation.
+ * Returns a debounced callback plus `flush` and `cancel` controls.
+ *
+ * - `debounced(...args)` schedules the callback after `delay` ms of inactivity.
+ *   Subsequent calls within the window cancel the previous timer.
+ * - `flush()` fires the most recent pending callback immediately (no-op if nothing pending).
+ * - `cancel()` discards any pending invocation.
+ *
+ * The latest `callback` is always invoked, even if it changed between scheduling and firing.
  */
-export function useDebouncedCallback<T extends (...args: unknown[]) => unknown>(
+export function useDebouncedCallback<T extends (...args: never[]) => unknown>(
   callback: T,
   delay: number,
 ) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const callbackRef = useRef(callback);
-  callbackRef.current = callback;
+  const lastArgsRef = useRef<Parameters<T> | null>(null);
+
+  // Keep `callbackRef` in sync with the latest callback without writing during render.
+  useEffect(() => {
+    callbackRef.current = callback;
+  }, [callback]);
 
   const cancel = useCallback(() => {
     if (timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
+    lastArgsRef.current = null;
   }, []);
 
   const flush = useCallback(() => {
-    if (timerRef.current) {
-      cancel();
-      callbackRef.current();
+    if (timerRef.current && lastArgsRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+      const args = lastArgsRef.current;
+      lastArgsRef.current = null;
+      callbackRef.current(...args);
     }
-  }, [cancel]);
+  }, []);
 
   const debounced = useCallback(
     (...args: Parameters<T>) => {
-      cancel();
+      if (timerRef.current) clearTimeout(timerRef.current);
+      lastArgsRef.current = args;
       timerRef.current = setTimeout(() => {
         timerRef.current = null;
-        callbackRef.current(...args);
+        const fnArgs = lastArgsRef.current;
+        lastArgsRef.current = null;
+        if (fnArgs) callbackRef.current(...fnArgs);
       }, delay);
     },
-    [delay, cancel],
-  ) as T & { flush: () => void; cancel: () => void };
-
-  (debounced as T & { flush: () => void; cancel: () => void }).flush = flush;
-  (debounced as T & { flush: () => void; cancel: () => void }).cancel = cancel;
+    [delay],
+  );
 
   // Cleanup on unmount
   useEffect(() => cancel, [cancel]);
 
-  return debounced;
+  return { debounced, flush, cancel };
 }

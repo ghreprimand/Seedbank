@@ -12,15 +12,6 @@ const SORT_OPTIONS: { field: SortField; label: string }[] = [
   { field: 'title', label: 'Alphabetical' },
 ];
 
-/** Collects all unique tags from the provided ideas. */
-export function collectTags(ideas: { tags: string[] }[]): string[] {
-  const tagSet = new Set<string>();
-  for (const idea of ideas) {
-    for (const t of idea.tags) tagSet.add(t);
-  }
-  return Array.from(tagSet).sort((a, b) => a.localeCompare(b));
-}
-
 interface FilterBarProps {
   availableTags: string[];
   totalCount: number;

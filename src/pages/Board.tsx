@@ -1,11 +1,12 @@
 /** Board page — main garden view with responsive card grid, filter bar, and search. */
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { searchIdeas, getAllIdeas } from '@/db/ideas';
 import { useFilterStore } from '@/stores/filters';
 import type { Idea } from '@/lib/types';
 import IdeaCard from '@/components/IdeaCard';
-import FilterBar, { collectTags } from '@/components/FilterBar';
+import FilterBar from '@/components/FilterBar';
+import { collectTags } from '@/lib/collectTags';
 import EmptyState from '@/components/EmptyState';
 import { seedDatabase } from '@/lib/import';
 
@@ -16,39 +17,40 @@ export default function Board() {
   const [allIdeas, setAllIdeas] = useState<Idea[]>([]);
   const [filteredIdeas, setFilteredIdeas] = useState<Idea[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reloadKey, setReloadKey] = useState(0);
 
-  const loadIdeas = useCallback(async () => {
-    try {
-      const [all, filtered] = await Promise.all([
-        getAllIdeas(),
-        searchIdeas({
-          query: filters.query || undefined,
-          categories: filters.categories.length ? filters.categories : undefined,
-          stages: filters.stages.length ? filters.stages : undefined,
-          tags: filters.tags.length ? filters.tags : undefined,
-          sortBy: filters.sortBy,
-          sortDirection: filters.sortDirection,
-        }),
-      ]);
-      setAllIdeas(all);
-      setFilteredIdeas(filtered);
-    } catch (err) {
-      console.error('Failed to load ideas:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [
-    filters.query,
-    filters.categories,
-    filters.stages,
-    filters.tags,
-    filters.sortBy,
-    filters.sortDirection,
-  ]);
+  const { query, categories, stages, tags, sortBy, sortDirection } = filters;
 
   useEffect(() => {
-    loadIdeas();
-  }, [loadIdeas]);
+    let cancelled = false;
+    (async () => {
+      try {
+        const [all, filtered] = await Promise.all([
+          getAllIdeas(),
+          searchIdeas({
+            query: query || undefined,
+            categories: categories.length ? categories : undefined,
+            stages: stages.length ? stages : undefined,
+            tags: tags.length ? tags : undefined,
+            sortBy,
+            sortDirection,
+          }),
+        ]);
+        if (cancelled) return;
+        setAllIdeas(all);
+        setFilteredIdeas(filtered);
+      } catch (err) {
+        if (!cancelled) console.error('Failed to load ideas:', err);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [query, categories, stages, tags, sortBy, sortDirection, reloadKey]);
+
+  const reload = () => setReloadKey((k) => k + 1);
 
   const availableTags = collectTags(allIdeas);
 
@@ -77,7 +79,7 @@ export default function Board() {
           onPlantSeed={() => navigate('/idea/new')}
           onSeedExamples={async () => {
             await seedDatabase();
-            loadIdeas();
+            reload();
           }}
         />
       </div>

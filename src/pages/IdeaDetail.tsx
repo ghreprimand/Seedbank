@@ -1,6 +1,6 @@
 /** Idea detail / editor page — all 14 fields, auto-save, version history, and actions. */
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   ArrowLeft,
   Copy,
@@ -43,62 +43,68 @@ export default function IdeaDetail() {
   const navigate = useNavigate();
 
   const [idea, setIdea] = useState<Idea | null>(null);
-  const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [loadedId, setLoadedId] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [stageOpen, setStageOpen] = useState(false);
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
 
-  const ideaRef = useRef<Idea | null>(null);
-  ideaRef.current = idea;
+  const [reloadKey, setReloadKey] = useState(0);
+
+  // Loading is derived from "have I finished fetching the requested id?"
+  // — avoids a synchronous setLoading(true) inside the effect.
+  const loading = !!id && loadedId !== id;
 
   // ── Load idea ────────────────────────────────────────────
 
-  const loadIdea = useCallback(async () => {
-    if (!id) return;
-    const loaded = await getIdea(id);
-    if (loaded) {
-      setIdea(loaded);
-      setNotFound(false);
-    } else {
-      setNotFound(true);
-    }
-    setLoading(false);
-  }, [id]);
-
   useEffect(() => {
-    loadIdea();
-  }, [loadIdea]);
+    if (!id) return;
+    let cancelled = false;
+    getIdea(id).then((loaded) => {
+      if (cancelled) return;
+      if (loaded) {
+        setIdea(loaded);
+        setNotFound(false);
+      } else {
+        setIdea(null);
+        setNotFound(true);
+      }
+      setLoadedId(id);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [id, reloadKey]);
 
   // ── Auto-save ────────────────────────────────────────────
 
-  const debouncedSave = useDebouncedCallback(async () => {
-    const current = ideaRef.current;
-    if (!current) return;
-    setSaveStatus('saving');
-    try {
-      await updateIdea(current.id, current);
-      setSaveStatus('saved');
-      setTimeout(() => setSaveStatus('idle'), 1500);
-    } catch (err) {
-      console.error('Auto-save failed:', err);
-      setSaveStatus('idle');
-    }
-  }, SAVE_DELAY);
+  const { debounced: scheduleSave, flush: flushSave, cancel: cancelSave } =
+    useDebouncedCallback(async (current: Idea) => {
+      setSaveStatus('saving');
+      try {
+        await updateIdea(current.id, current);
+        setSaveStatus('saved');
+        setTimeout(() => setSaveStatus('idle'), 1500);
+      } catch (err) {
+        console.error('Auto-save failed:', err);
+        setSaveStatus('idle');
+      }
+    }, SAVE_DELAY);
 
   const update = <K extends keyof Idea>(field: K, value: Idea[K]) => {
     setIdea((prev) => {
       if (!prev) return prev;
-      return { ...prev, [field]: value };
+      const next = { ...prev, [field]: value };
+      scheduleSave(next);
+      return next;
     });
-    debouncedSave();
   };
 
   const saveNow = async (changes: Partial<Idea>) => {
     if (!idea) return;
-    debouncedSave.cancel();
+    cancelSave();
     setIdea((prev) => (prev ? { ...prev, ...changes } : prev));
     setSaveStatus('saving');
     try {
@@ -116,14 +122,14 @@ export default function IdeaDetail() {
 
   const handleDuplicate = async () => {
     if (!idea) return;
-    debouncedSave.flush();
+    flushSave();
     const copy = await duplicateIdea(idea.id);
     if (copy) navigate(`/idea/${copy.id}`);
   };
 
   const handleDelete = async () => {
     if (!idea) return;
-    debouncedSave.cancel();
+    cancelSave();
     await deleteIdea(idea.id);
     navigate('/', { replace: true });
   };
@@ -134,7 +140,7 @@ export default function IdeaDetail() {
   };
 
   const handleVersionRestored = () => {
-    loadIdea();
+    setReloadKey((k) => k + 1);
   };
 
   // ── Render guards ────────────────────────────────────────
