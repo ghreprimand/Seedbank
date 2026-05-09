@@ -16,7 +16,7 @@ Seedbank v1.0 — a local-first project idea manager built with React, TypeScrip
 - **Import/Export** — single idea or full archive to JSON/Markdown; import from JSON (merge/replace) or Markdown; seed data for first-time use
 - **Keyboard shortcuts** — `N` new idea, `/` focus search, `Esc` close modals
 - **Error boundaries** — graceful fallback UI on render errors
-- **Local-first** — zero network calls beyond loading the app; all data in IndexedDB
+- **Local-first** — zero network calls after the app loads; all data in IndexedDB; fonts self-hosted via `@fontsource` (no font CDN)
 - **Responsive** — desktop, tablet, and mobile layouts with mobile search toggle
 
 ### Design
