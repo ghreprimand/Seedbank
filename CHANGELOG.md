@@ -1,36 +1,59 @@
 # Changelog
 
+## 2.0.0 — Permanent Idea Vault
+
+Seedbank v2.0.0 turns the original browser-only idea sketchpad into a durable local application with a persistent backend, AI-assisted development, project graduation, recoverable delete, and automatic backups.
+
+### Added
+
+- **Monorepo workspace** with `client`, `server`, and `shared` packages.
+- **Express API server** on port `4800`.
+- **SQLite persistence** via `better-sqlite3` at `~/.seedbank/seedbank.db`.
+- **Shared TypeScript domain types** used by both client and server.
+- **REST API** for ideas, versions, stats, import/export, compost, backups, integrations, and AI.
+- **Frontend API client** that uses the backend first and Dexie/IndexedDB as offline cache and fallback.
+- **One-time browser data migration** from IndexedDB into SQLite.
+- **Soft delete / Compost** with restore, purge, and 30-day retention.
+- **Automatic backups** with startup database backups, scheduled daily/weekly backups, manual backup, and JSON archive exports.
+- **Project graduation framework** with plugin-style integrations.
+- **Archon integration** for creating project folders and context files.
+- **Generic project scaffold integration** for local project creation without Archon.
+- **Graduation UI** with readiness checks and post-graduation badges.
+- **AI service layer** with OpenAI, Anthropic, and Ollama provider support.
+- **Streaming AI chat** endpoint for per-idea Thinking Partner conversations.
+- **AI field suggestions** for pitch, risks, tech stack, hook, and why-it-might-work fields.
+- **Organic AI prompt modes**: What If, Devil's Advocate, Scope Down, and User Story.
+- **Idea Health Check** with field-by-field readiness feedback.
+- **Smart Cross-Pollinate** and **Pattern Insights** on the Discover page.
+- **Public showcase documentation** in `README.md`, `CONTRIBUTING.md`, and `docs/`.
+
+### Changed
+
+- Ideas now survive browser storage clears because SQLite is the durable source of truth.
+- The client data layer no longer talks directly to Dexie from UI components.
+- Delete actions now move ideas to Compost instead of immediately removing them.
+- Export/import can operate through the server API while preserving local fallback behavior.
+- README now documents setup, platform notes, architecture, configuration, API groups, and development workflow.
+
+### Data and Migration
+
+- Existing IndexedDB data can be migrated into SQLite while preserving IDs, timestamps, and version history.
+- SQLite startup backups keep the latest 10 `.db` copies.
+- Scheduled JSON exports are written to `~/.seedbank/exports/`.
+
 ## 1.0.0 — Initial Release
 
-Seedbank v1.0 — a local-first project idea manager built with React, TypeScript, and IndexedDB.
+Seedbank v1.0.0 was a local-first project idea manager built with React, TypeScript, and IndexedDB.
 
 ### Features
 
-- **Capture** — quick "Plant a Seed" flow (title + notes) with `N` keyboard shortcut
-- **14-field editor** — title, pitch, notes, hook, why-it-might-work, risks, tech stack, tags, mood labels, excitement score, jam suitability, related ideas, links, images
-- **Board view** — responsive card grid with search, multi-select filters (category, stage, tag), and sort
-- **Gardening lifecycle** — ideas progress through 8 stages: Seed → Sprout → Pitch → Prototype → Plot → Shelved → Cold Storage → Shipped
-- **Auto-save** — debounced 800ms writes to IndexedDB; stage/category changes save immediately
-- **Version history** — automatic snapshots on meaningful edits, read-only viewer, restore with undo safety
-- **Discovery** — Daily Seed (random idea + prompt), Cross-Pollinate (two ideas side-by-side), Draw from Storage (resurface archived ideas), Idea Weather (stats & patterns)
-- **Import/Export** — single idea or full archive to JSON/Markdown; import from JSON (merge/replace) or Markdown; seed data for first-time use
-- **Keyboard shortcuts** — `N` new idea, `/` focus search, `Esc` close modals
-- **Error boundaries** — graceful fallback UI on render errors
-- **Local-first** — zero network calls after the app loads; all data in IndexedDB; fonts self-hosted via `@fontsource` (no font CDN)
-- **Responsive** — desktop, tablet, and mobile layouts with mobile search toggle
-
-### Design
-
-- Custom colour palette: paper, sage, ink, clay, amber, frost
-- Typography: Lora (serif headings), Inter (body), JetBrains Mono (metadata)
-- Tactile card styling with paper texture, pressed-label tags, lift-on-hover
-- Smooth animations: fade-in, slide-up, scale-in, staggered card entrance
-
-### Tech Stack
-
-- Vite 8 + React 19 + TypeScript 6
-- Tailwind CSS v4 with `@theme` design tokens
-- Dexie (IndexedDB) for local persistence
-- Zustand for shared filter/search state
-- Lucide React for icons
-- React Router v7 for client-side routing
+- Quick "Plant a Seed" flow with title and notes.
+- 14-field editor for pitch, notes, hook, risks, tech stack, tags, scores, related ideas, links, and images.
+- Board view with search, filters, and sorting.
+- Gardening lifecycle stages from Seed to Shipped.
+- Debounced auto-save to IndexedDB.
+- Automatic version snapshots and restore.
+- Discovery tools: Daily Seed, Cross-Pollinate, Draw from Storage, and Idea Weather.
+- JSON and Markdown import/export.
+- Keyboard shortcuts for capture and search.
+- Responsive UI with custom paper/sage/ink/clay theme.

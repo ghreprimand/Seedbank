@@ -1,55 +1,121 @@
-# Seedbank
+# 🌱 Seedbank
+> A permanent idea vault that helps rough project sparks survive, grow, and graduate into real work.
 
-Seedbank is a permanent idea vault for project seeds: games, apps, tools, art projects, local AI experiments, and open-source utilities. It keeps the fast React editor from the original app, but data now lives in a durable SQLite database behind a local Node.js API.
+## What is Seedbank?
 
-## Architecture
+Seedbank is a personal project-idea system for people who collect more sparks than they can build immediately. It gives each idea a durable home: not a throwaway note, not a browser tab, and not a fragile IndexedDB-only sketchpad. Ideas are stored in a local SQLite database, backed up automatically, and still cached in the browser for a graceful offline fallback.
 
-Seedbank is a TypeScript monorepo:
+The app is built around the way ideas actually mature. A seed can start as a title and a messy paragraph, then gain a pitch, hook, risks, tech-stack notes, links, related ideas, scores, and version history. When an idea is ready, Seedbank can graduate it into a project scaffold through integration plugins.
 
-```text
-.
-├── client/          React 19 + Vite SPA
-├── server/          Express API + SQLite persistence
-└── shared/          Shared domain types
+Seedbank also includes AI-assisted development. The AI is deliberately framed as a thinking partner: it asks questions, reflects patterns, runs health checks, and helps scope ideas down. It does not try to replace the user's taste or generate a pile of generic ideas.
+
+## Quick Start
+
+Prerequisites:
+
+- Node.js 18+
+- npm
+
+```bash
+git clone https://github.com/ghreprimand/Seedbank.git
+cd Seedbank
+npm install
+npm run dev
 ```
 
-The client talks to the server at `http://localhost:4800`. IndexedDB/Dexie remains as an offline cache and fallback, but the durable source of truth is `~/.seedbank/seedbank.db`.
+Open `http://localhost:5173`.
+
+The server runs on `http://localhost:4800`. If Vite finds `5173` occupied, it will print the next available client port.
 
 ## Features
 
-- Persistent idea storage in SQLite with startup backups.
-- Full idea editor with pitch, notes, hook, risks, tech stack, tags, scores, links, related ideas, and version history.
-- REST API for ideas, versions, import/export, integrations, AI suggestions, backups, and compost recovery.
-- One-time browser-data migration from IndexedDB into SQLite.
-- Project graduation through integration plugins.
-- AI-assisted discovery and organic thinking prompts.
-- Compost bin for recoverable soft-deleted ideas.
-- JSON and Markdown archive import/export.
+- **Persistent SQLite storage** — ideas live in `~/.seedbank/seedbank.db`, not only in browser storage.
+- **Version history** — meaningful edits create snapshots that can be inspected and restored.
+- **AI thinking partner** — chat, field suggestions, organic prompt modes, health checks, and archive insights.
+- **Project graduation** — turn a mature idea into an Archon or generic local project scaffold.
+- **Import/export** — full archive export to JSON or Markdown, plus import from Seedbank archives and Markdown.
+- **Compost bin** — deleted ideas are soft-deleted, recoverable for 30 days, then purged.
+- **Auto-backups** — scheduled SQLite backups and JSON archive exports under `~/.seedbank/`.
 
-## Setup
+## Platform Setup
 
-Install dependencies from the workspace root:
+### Linux
 
-```bash
-npm install
-```
-
-Start both the client and server:
+Run from a terminal:
 
 ```bash
 npm run dev
 ```
 
-Default ports:
+For a desktop launcher, use or adapt a helper such as `scripts/install-desktop.sh` that starts `npm run dev` in the project directory and opens the printed Vite URL. For auto-start, create a user systemd service that runs `npm run dev` from the repository root after login.
 
-- Client: `http://localhost:5173`
-- Server: `http://localhost:4800`
+Example service shape:
 
-If Vite finds `5173` occupied it will choose the next available port.
+```ini
+[Service]
+WorkingDirectory=/home/you/Projects/Seedbank
+ExecStart=/usr/bin/npm run dev
+Restart=on-failure
+```
 
-## Data Storage
+### macOS
 
-The server stores data under `~/.seedbank/`:
+Run from Terminal:
+
+```bash
+npm run dev
+```
+
+For an app-like launcher, create an Automator Application or Shortcuts workflow that runs a shell script:
+
+```bash
+cd ~/Projects/Seedbank
+npm run dev
+```
+
+You can then pin that wrapper to the Dock and open the Vite URL in your browser.
+
+### Windows
+
+Run from Command Prompt or PowerShell:
+
+```powershell
+npm run dev
+```
+
+For a launcher, create a `.bat` or `.ps1` file that changes into the Seedbank directory and runs `npm run dev`, then create a Start Menu shortcut to that file.
+
+PowerShell example:
+
+```powershell
+Set-Location "$HOME\Projects\Seedbank"
+npm run dev
+```
+
+## Architecture
+
+```text
+Seedbank
+├── client/   → React 19 + Vite + Tailwind CSS
+├── server/   → Express + SQLite via better-sqlite3
+└── shared/   → TypeScript domain types shared by both packages
+```
+
+Data flow:
+
+```text
+Browser UI ↔ REST API ↔ SQLite (~/.seedbank/seedbank.db)
+     │
+     └── IndexedDB via Dexie for cache and offline fallback
+```
+
+The root workspace runs both apps with one command. The client is intentionally thin: it calls the REST API first and falls back to Dexie when the backend is unavailable.
+
+## Configuration
+
+### Data Storage
+
+Seedbank stores durable data in:
 
 ```text
 ~/.seedbank/
@@ -58,72 +124,76 @@ The server stores data under `~/.seedbank/`:
 └── exports/
 ```
 
-On startup, the server copies the current database into `backups/` and keeps the newest 10 database backups. The backup UI can also run a manual backup and configure scheduled backups as daily, weekly, or off. When JSON export backup is enabled, archives are written to `~/.seedbank/exports/`.
+On server startup, the current database is copied into `backups/` and the newest 10 database backups are retained. The backup UI can run manual backups and configure scheduled backups as daily, weekly, or off. When JSON export backups are enabled, full archive snapshots are written to `exports/`.
 
-## API Overview
+The first time the backend is available, the client can migrate existing browser IndexedDB ideas into SQLite while preserving IDs, timestamps, and versions.
 
-Core endpoints:
+### AI Setup
 
-- `GET /api/ideas`
-- `GET /api/ideas/:id`
-- `POST /api/ideas`
-- `PATCH /api/ideas/:id`
-- `DELETE /api/ideas/:id`
-- `GET /api/ideas/:id/versions`
-- `POST /api/ideas/:id/versions`
-- `POST /api/ideas/:id/versions/restore/:versionId`
-- `GET /api/stats`
-- `POST /api/export`
-- `POST /api/import`
-- `GET /api/compost`
-- `POST /api/compost/:id/restore`
-- `DELETE /api/compost/:id`
-- `GET /api/backups`
-- `PATCH /api/backups/config`
-- `POST /api/backups/run`
+Seedbank supports:
 
-## Integration Plugins
+- OpenAI
+- Anthropic
+- Ollama for local models
 
-Server integrations live in `server/src/integrations/`. Each plugin implements:
+Provider settings are configured in the AI panel inside the app. API keys are stored through the server settings layer and public config responses only expose whether a key exists, not the key itself.
 
-```ts
-interface Integration {
-  id: string;
-  name: string;
-  description: string;
-  icon: string;
-  isConfigured(): boolean;
-  configure(config: Record<string, string>): void;
-  canGraduate(idea: Idea): { ready: boolean; missing: string[] };
-  graduate(idea: Idea): Promise<GraduationResult>;
-}
-```
+AI features include the Thinking Partner chat, contextual field suggestions, What If, Devil's Advocate, Scope Down, User Story, Idea Health Check, Smart Cross-Pollinate, and Pattern Insights. See [docs/AI_GUIDE.md](docs/AI_GUIDE.md).
 
-Available integration endpoints:
+### Integrations
 
-- `GET /api/integrations`
-- `POST /api/integrations/:id/configure`
-- `POST /api/integrations/:id/graduate/:ideaId`
+Graduation integrations live in `server/src/integrations/`. The included integrations can create Archon projects or generic local scaffolds. A graduated idea stores its destination in `graduatedTo` and advances stage automatically.
 
-The included Archon integration creates a project directory with generated project context files. The generic project integration creates a local scaffold in a configured project root.
+See [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md) for the plugin interface and implementation steps.
 
-## AI Configuration
+## API Reference
 
-AI features call:
+### Ideas
 
-- `POST /api/ai/suggest`
-- `POST /api/ai/chat` when the full chat provider layer is enabled
+- `GET /api/ideas` — list, search, filter, sort, and paginate active ideas.
+- `GET /api/ideas/:id` — fetch one idea with its version count.
+- `POST /api/ideas` — create an idea.
+- `PATCH /api/ideas/:id` — update an idea and create an automatic version when content changes.
+- `DELETE /api/ideas/:id` — soft-delete an idea into Compost.
 
-The current UI uses `suggest` for:
+### Versions
 
-- Smart Cross-Pollinate on the Discover page.
-- Pattern Insights across the archive.
-- Idea Health Check.
-- Organic prompt modes: What if, Devil's Advocate, Scope Down, and User Story.
+- `GET /api/ideas/:id/versions` — list snapshots for an idea.
+- `POST /api/ideas/:id/versions` — create a manual snapshot.
+- `POST /api/ideas/:id/versions/restore/:versionId` — restore a snapshot.
 
-Provider credentials and model settings are intended to live in the `settings` table. The UI degrades to local, non-network prompts when the AI backend is unavailable.
+### Discovery
 
-## Scripts
+- `POST /api/ai/suggest` — non-streaming suggestions for field prompts, health checks, cross-pollination, and pattern insights.
+
+### Integrations
+
+- `GET /api/integrations` — list integrations and configuration status.
+- `POST /api/integrations/:id/configure` — save integration settings.
+- `POST /api/integrations/:id/graduate/:ideaId` — graduate an idea.
+
+### AI
+
+- `GET /api/ai/config` — read public AI provider config.
+- `POST /api/ai/config` — update provider config and keys.
+- `GET /api/ai/conversations/:ideaId` — load persisted chat history.
+- `POST /api/ai/chat` — stream Thinking Partner chat responses.
+- `POST /api/ai/suggest` — request single-shot field or discovery suggestions.
+
+### System
+
+- `GET /api/health` — server health check.
+- `GET /api/stats` — dashboard statistics.
+- `POST /api/export` — export JSON or Markdown.
+- `POST /api/import` — import JSON or Markdown.
+- `GET /api/compost` — list deleted ideas and purge expired records.
+- `POST /api/compost/:id/restore` — restore a deleted idea.
+- `DELETE /api/compost/:id` — permanently purge a deleted idea.
+- `GET /api/backups` — read backup status.
+- `PATCH /api/backups/config` — configure backup schedule.
+- `POST /api/backups/run` — run a backup now.
+
+## Development
 
 ```bash
 npm run dev        # client + server
@@ -132,17 +202,20 @@ npm run typecheck  # typecheck client and server
 npm run lint       # lint client
 ```
 
-## Import And Export
+Project structure:
 
-Archive JSON contains all ideas and versions:
+- `client/src/pages/` — route-level screens.
+- `client/src/components/` — reusable UI and workflow components.
+- `client/src/api/client.ts` — browser API client with Dexie fallback.
+- `client/src/db/` — IndexedDB cache/fallback implementation.
+- `server/src/index.ts` — Express routes.
+- `server/src/repository.ts` — SQLite data access.
+- `server/src/ai/` — provider abstraction, streaming, config, and usage tracking.
+- `server/src/integrations/` — graduation plugins.
+- `shared/types.ts` — cross-package domain types.
 
-```json
-{
-  "seedbankVersion": 1,
-  "exportedAt": "2026-05-11T00:00:00.000Z",
-  "ideas": [],
-  "versions": []
-}
-```
+To add an integration, implement the `Integration` interface, register it in the integration registry, add any needed configuration keys, and expose readiness checks that explain what an idea needs before graduation.
 
-Markdown export produces a readable document with one section per idea. JSON is the recommended full-fidelity backup format.
+## License
+
+MIT
