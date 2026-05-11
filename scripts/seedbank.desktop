@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Seedbank
+GenericName=Idea Vault
+Comment=Permanent idea vault for project seeds
+Exec={SEEDBANK_DIR}/scripts/seedbank start
+Icon=accessories-text-editor
+Terminal=false
+Categories=Development;Utility;ProjectManagement;
+StartupNotify=false
+Keywords=ideas;seedbank;projects;brainstorm;
