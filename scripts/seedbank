@@ -1,0 +1,358 @@
+#!/usr/bin/env bash
+# Seedbank launcher - start|stop|restart|status|logs
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SEEDBANK_DIR="${SEEDBANK_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+CLIENT_PORT_ENV_SET="${SEEDBANK_CLIENT_PORT+x}"
+SERVER_PORT_ENV_SET="${SEEDBANK_SERVER_PORT+x}"
+CLIENT_PORT="${SEEDBANK_CLIENT_PORT:-5173}"
+SERVER_PORT="${SEEDBANK_SERVER_PORT:-4800}"
+URL="http://localhost:${CLIENT_PORT}"
+
+CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/seedbank"
+CLIENT_PID_FILE="${CACHE_DIR}/client.pid"
+SERVER_PID_FILE="${CACHE_DIR}/server.pid"
+CLIENT_PORT_FILE="${CACHE_DIR}/client.port"
+SERVER_PORT_FILE="${CACHE_DIR}/server.port"
+LOG_FILE="${CACHE_DIR}/seedbank.log"
+START_LOCK_DIR="${CACHE_DIR}/start.lock.d"
+TRACE_FILE="${CACHE_DIR}/launcher-trace.log"
+
+mkdir -p "$CACHE_DIR"
+
+if [[ -z "$CLIENT_PORT_ENV_SET" && -f "$CLIENT_PORT_FILE" && -f "$CLIENT_PID_FILE" ]]; then
+  cached_pid=$(cat "$CLIENT_PID_FILE" 2>/dev/null || echo "")
+  if [[ -n "$cached_pid" ]] && kill -0 "$cached_pid" 2>/dev/null; then
+    CLIENT_PORT=$(cat "$CLIENT_PORT_FILE" 2>/dev/null || echo "$CLIENT_PORT")
+  fi
+fi
+if [[ -z "$SERVER_PORT_ENV_SET" && -f "$SERVER_PORT_FILE" && -f "$SERVER_PID_FILE" ]]; then
+  cached_pid=$(cat "$SERVER_PID_FILE" 2>/dev/null || echo "")
+  if [[ -n "$cached_pid" ]] && kill -0 "$cached_pid" 2>/dev/null; then
+    SERVER_PORT=$(cat "$SERVER_PORT_FILE" 2>/dev/null || echo "$SERVER_PORT")
+  fi
+fi
+URL="http://localhost:${CLIENT_PORT}"
+
+trace() {
+  printf '%s [pid=%d ppid=%d] %s\n' "$(date -Iseconds)" "$$" "$PPID" "$*" >> "$TRACE_FILE"
+}
+
+notify() {
+  local title="$1"
+  local body="${2:-}"
+  local urgency="${3:-normal}"
+  echo "[seedbank-launcher] $title${body:+: $body}" >&2
+  if command -v notify-send >/dev/null 2>&1; then
+    notify-send -a Seedbank -u "$urgency" "$title" "$body" 2>/dev/null || true
+  elif [[ "$(uname -s)" == "Darwin" ]] && command -v osascript >/dev/null 2>&1; then
+    osascript -e "display notification \"${body//\"/\\\"}\" with title \"${title//\"/\\\"}\"" >/dev/null 2>&1 || true
+  fi
+}
+
+port_in_use() {
+  local port="$1"
+  if command -v ss >/dev/null 2>&1; then
+    ss -ltn 2>/dev/null | awk '{print $4}' | grep -qE "[:.]${port}$"
+  elif command -v lsof >/dev/null 2>&1; then
+    lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1
+  else
+    (exec 3<>/dev/tcp/127.0.0.1/"$port") 2>/dev/null && { exec 3<&-; exec 3>&-; return 0; } || return 1
+  fi
+}
+
+pid_on_port() {
+  local port="$1"
+  if command -v ss >/dev/null 2>&1; then
+    ss -ltnp 2>/dev/null | awk -v p=":$port" '$4 ~ p {print $0}' | grep -oE 'pid=[0-9]+' | head -1 | cut -d= -f2 || true
+  elif command -v lsof >/dev/null 2>&1; then
+    lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null | head -1 || true
+  else
+    echo ""
+  fi
+}
+
+find_free_port() {
+  local start="$1"
+  local port="$start"
+  local limit=$((start + 50))
+  while [[ "$port" -lt "$limit" ]]; do
+    if ! port_in_use "$port"; then
+      echo "$port"
+      return 0
+    fi
+    port=$((port + 1))
+  done
+  return 1
+}
+
+pid_is_seedbank() {
+  local pid="$1"
+  [[ -z "$pid" ]] && return 1
+
+  if [[ -d "/proc/$pid" ]]; then
+    local p="$pid" hops=0
+    while [[ -n "$p" && "$p" -gt 1 && "$hops" -lt 8 ]]; do
+      local cwd=""
+      cwd=$(readlink "/proc/$p/cwd" 2>/dev/null || true)
+      if [[ -n "$cwd" && "$cwd" == "$SEEDBANK_DIR"* ]]; then
+        return 0
+      fi
+      if [[ -r "/proc/$p/cmdline" ]] && tr '\0' ' ' < "/proc/$p/cmdline" 2>/dev/null | grep -Fq "$SEEDBANK_DIR"; then
+        return 0
+      fi
+      p=$(sed -E 's/^[0-9]+ \([^)]*\) [A-Za-z] ([0-9]+).*/\1/' "/proc/$p/stat" 2>/dev/null || echo "")
+      [[ "$p" =~ ^[0-9]+$ ]] || p=""
+      hops=$((hops + 1))
+    done
+    return 1
+  fi
+
+  ps -p "$pid" -o command= 2>/dev/null | grep -Fq "$SEEDBANK_DIR"
+}
+
+kill_pid_file() {
+  local pid_file="$1"
+  [[ -f "$pid_file" ]] || return 0
+  local pid
+  pid=$(cat "$pid_file" 2>/dev/null || echo "")
+  if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+    kill -- -"$pid" 2>/dev/null || kill "$pid" 2>/dev/null || true
+    sleep 0.5
+    kill -9 -- -"$pid" 2>/dev/null || kill -9 "$pid" 2>/dev/null || true
+  fi
+  rm -f "$pid_file"
+}
+
+reap_seedbank_ports() {
+  local reaped=0
+  for port in "$CLIENT_PORT" "$SERVER_PORT"; do
+    local pid
+    pid=$(pid_on_port "$port")
+    if [[ -n "$pid" ]] && pid_is_seedbank "$pid"; then
+      kill -- -"$pid" 2>/dev/null || kill "$pid" 2>/dev/null || true
+      reaped=1
+    fi
+  done
+  if [[ "$reaped" -eq 1 ]]; then
+    sleep 1
+    for port in "$CLIENT_PORT" "$SERVER_PORT"; do
+      local pid
+      pid=$(pid_on_port "$port")
+      if [[ -n "$pid" ]] && pid_is_seedbank "$pid"; then
+        kill -9 -- -"$pid" 2>/dev/null || kill -9 "$pid" 2>/dev/null || true
+      fi
+    done
+  fi
+}
+
+is_running() {
+  local client_pid="" server_pid=""
+  [[ -f "$CLIENT_PID_FILE" ]] && client_pid=$(cat "$CLIENT_PID_FILE" 2>/dev/null || echo "")
+  [[ -f "$SERVER_PID_FILE" ]] && server_pid=$(cat "$SERVER_PID_FILE" 2>/dev/null || echo "")
+  local cached_client_port="" cached_server_port=""
+  [[ -f "$CLIENT_PORT_FILE" ]] && cached_client_port=$(cat "$CLIENT_PORT_FILE" 2>/dev/null || echo "")
+  [[ -f "$SERVER_PORT_FILE" ]] && cached_server_port=$(cat "$SERVER_PORT_FILE" 2>/dev/null || echo "")
+  if [[ -n "$client_pid" && -n "$server_pid" ]] \
+    && [[ "${cached_client_port:-$CLIENT_PORT}" == "$CLIENT_PORT" ]] \
+    && [[ "${cached_server_port:-$SERVER_PORT}" == "$SERVER_PORT" ]] \
+    && kill -0 "$client_pid" 2>/dev/null \
+    && kill -0 "$server_pid" 2>/dev/null; then
+    return 0
+  fi
+  if port_in_use "$CLIENT_PORT" && port_in_use "$SERVER_PORT"; then
+    local client_port_pid server_port_pid
+    client_port_pid=$(pid_on_port "$CLIENT_PORT")
+    server_port_pid=$(pid_on_port "$SERVER_PORT")
+    pid_is_seedbank "$client_port_pid" && pid_is_seedbank "$server_port_pid"
+    return
+  fi
+  return 1
+}
+
+ensure_port_available() {
+  local var_name="$1" name="$2" allow_bump="$3"
+  local port="${!var_name}"
+  if ! port_in_use "$port"; then
+    return 0
+  fi
+  local pid
+  pid=$(pid_on_port "$port")
+  if [[ -n "$pid" ]] && pid_is_seedbank "$pid"; then
+    trace "port $port held by Seedbank pid $pid; reaping"
+    reap_seedbank_ports
+    return 0
+  fi
+  if [[ "$allow_bump" == "true" ]]; then
+    local bumped
+    bumped=$(find_free_port "$port") || {
+      notify "Seedbank: no free $name port" "All ports near $port are busy" "critical"
+      exit 1
+    }
+    notify "Seedbank: $name port busy" "Using $bumped instead of $port"
+    trace "port bump $name $port -> $bumped (held by PID ${pid:-unknown})"
+    printf -v "$var_name" '%s' "$bumped"
+    URL="http://localhost:${CLIENT_PORT}"
+    return 0
+  fi
+  notify "Seedbank: $name port busy" "Port $port is already in use${pid:+ by PID $pid}" "critical"
+  local env_name="SEEDBANK_CLIENT_PORT"
+  [[ "$name" == "server" ]] && env_name="SEEDBANK_SERVER_PORT"
+  echo "Port $port is already in use${pid:+ by PID $pid}. Stop that process or set $env_name." >&2
+  exit 1
+}
+
+install_if_needed() {
+  if [[ ! -d "$SEEDBANK_DIR/node_modules" ]]; then
+    notify "Seedbank setup" "Installing npm dependencies"
+    (cd "$SEEDBANK_DIR" && npm install) >> "$LOG_FILE" 2>&1
+  fi
+}
+
+build_if_needed() {
+  if [[ ! -f "$SEEDBANK_DIR/client/dist/index.html" || ! -d "$SEEDBANK_DIR/server/dist" ]]; then
+    notify "Seedbank setup" "Building missing dist output"
+    (cd "$SEEDBANK_DIR" && npm run build) >> "$LOG_FILE" 2>&1
+  fi
+}
+
+launch_process() {
+  local pid_file="$1"
+  shift
+  if command -v setsid >/dev/null 2>&1; then
+    nohup setsid "$@" >> "$LOG_FILE" 2>&1 &
+  else
+    nohup "$@" >> "$LOG_FILE" 2>&1 &
+  fi
+  echo $! > "$pid_file"
+}
+
+wait_ready() {
+  local tries="${1:-60}"
+  for _ in $(seq 1 "$tries"); do
+    local server_ready=1 client_ready=1
+    if command -v curl >/dev/null 2>&1; then
+      curl -fsS "http://localhost:${SERVER_PORT}/api/health" >/dev/null 2>&1 && server_ready=0
+      curl -fsS "$URL" >/dev/null 2>&1 && client_ready=0
+    else
+      port_in_use "$SERVER_PORT" && server_ready=0
+      port_in_use "$CLIENT_PORT" && client_ready=0
+    fi
+    [[ "$server_ready" -eq 0 && "$client_ready" -eq 0 ]] && return 0
+    sleep 0.5
+  done
+  return 1
+}
+
+open_browser() {
+  if [[ "$(uname -s)" == "Darwin" ]] && command -v open >/dev/null 2>&1; then
+    open "$URL" >/dev/null 2>&1 &
+  elif command -v xdg-open >/dev/null 2>&1; then
+    xdg-open "$URL" >/dev/null 2>&1 &
+  else
+    notify "Seedbank ready" "Open $URL"
+  fi
+}
+
+start() {
+  trace "start ENTER dir=$SEEDBANK_DIR client=$CLIENT_PORT server=$SERVER_PORT"
+  if ! mkdir "$START_LOCK_DIR" 2>/dev/null; then
+    notify "Seedbank start already in progress"
+    return 0
+  fi
+  trap 'rmdir "$START_LOCK_DIR" 2>/dev/null || true' RETURN
+
+  mkdir -p "$CACHE_DIR"
+  {
+    echo ""
+    echo "=== $(date -Iseconds) - seedbank start (client=$CLIENT_PORT server=$SERVER_PORT) ==="
+  } >> "$LOG_FILE"
+
+  if is_running; then
+    notify "Restarting Seedbank" "Stopping existing instance first"
+    stop
+  fi
+
+  ensure_port_available CLIENT_PORT "client" "true"
+  ensure_port_available SERVER_PORT "server" "false"
+  install_if_needed
+  build_if_needed
+
+  cd "$SEEDBANK_DIR"
+  notify "Starting Seedbank" "$URL"
+  launch_process "$SERVER_PID_FILE" env PORT="$SERVER_PORT" npm run dev -w server
+  launch_process "$CLIENT_PID_FILE" env VITE_SEEDBANK_API_URL="http://localhost:${SERVER_PORT}" npm run dev -w client -- --host 127.0.0.1 --port "$CLIENT_PORT" --strictPort
+  echo "$SERVER_PORT" > "$SERVER_PORT_FILE"
+  echo "$CLIENT_PORT" > "$CLIENT_PORT_FILE"
+
+  if ! wait_ready 80; then
+    notify "Seedbank start failed" "See $LOG_FILE" "critical"
+    exit 1
+  fi
+
+  notify "Seedbank ready" "$URL"
+  open_browser
+}
+
+stop() {
+  trace "stop ENTER"
+  kill_pid_file "$CLIENT_PID_FILE"
+  kill_pid_file "$SERVER_PID_FILE"
+  reap_seedbank_ports
+  rm -f "$CLIENT_PID_FILE" "$SERVER_PID_FILE" "$CLIENT_PORT_FILE" "$SERVER_PORT_FILE"
+  notify "Seedbank stopped"
+}
+
+status() {
+  if is_running; then
+    echo "Seedbank: RUNNING"
+    echo "  URL:         $URL"
+    echo "  API:         http://localhost:${SERVER_PORT}"
+    echo "  cache:       $CACHE_DIR"
+    echo "  log:         $LOG_FILE"
+    [[ -f "$CLIENT_PID_FILE" ]] && echo "  client PID:  $(cat "$CLIENT_PID_FILE")"
+    [[ -f "$SERVER_PID_FILE" ]] && echo "  server PID:  $(cat "$SERVER_PID_FILE")"
+  else
+    echo "Seedbank: STOPPED"
+    echo "  cache:       $CACHE_DIR"
+    echo "  log:         $LOG_FILE"
+  fi
+  for port in "$CLIENT_PORT" "$SERVER_PORT"; do
+    if port_in_use "$port"; then
+      local pid=""
+      pid=$(pid_on_port "$port")
+      echo "  port $port:  LISTENING${pid:+ (PID $pid)}"
+    else
+      echo "  port $port:  free"
+    fi
+  done
+}
+
+logs() {
+  if [[ ! -f "$LOG_FILE" ]]; then
+    echo "No log at $LOG_FILE yet"
+    exit 0
+  fi
+  tail -n "${2:-100}" -f "$LOG_FILE"
+}
+
+case "${1:-start}" in
+  start) start ;;
+  stop) stop ;;
+  restart) stop; sleep 1; start ;;
+  status) status ;;
+  logs) logs "$@" ;;
+  *)
+    cat >&2 <<EOF
+Usage: $0 {start|stop|restart|status|logs}
+
+Environment:
+  SEEDBANK_DIR           Project directory (default: parent of scripts/)
+  SEEDBANK_CLIENT_PORT   Vite dev server port (default: 5173)
+  SEEDBANK_SERVER_PORT   Express API port (default: 4800)
+EOF
+    exit 1
+    ;;
+esac
