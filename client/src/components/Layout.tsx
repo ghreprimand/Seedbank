@@ -1,9 +1,12 @@
 /** App shell — sticky header with search, nav, and CTA. Hosts modals and global keyboard shortcuts. */
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
-import { Search, ArrowUpDown, Compass, X } from 'lucide-react';
+import { Search, ArrowUpDown, Compass, Trash2, X } from 'lucide-react';
 import QuickCapture from './QuickCapture';
 import ImportExportModal from './ImportExportModal';
+import ConnectionStatus from './ConnectionStatus';
+import DataMigrationDialog from './DataMigrationDialog';
+import BackupStatus from './BackupStatus';
 import { useFilterStore } from '@/stores/filters';
 
 export default function Layout() {
@@ -112,6 +115,9 @@ export default function Layout() {
 
         {/* Right actions */}
         <div className="flex items-center gap-1.5 sm:gap-2">
+          <ConnectionStatus />
+          <BackupStatus />
+
           {/* Mobile search toggle */}
           <button
             onClick={() => {
@@ -135,6 +141,18 @@ export default function Layout() {
             }`}
           >
             <Compass className="w-[18px] h-[18px]" />
+          </Link>
+
+          <Link
+            to="/compost"
+            title="Compost"
+            className={`p-2 rounded-card transition-all duration-200 ${
+              location.pathname === '/compost'
+                ? 'text-sage-600 bg-sage-50 shadow-sm'
+                : 'text-ink-400 hover:text-ink-600 hover:bg-ink-50'
+            }`}
+          >
+            <Trash2 className="w-[18px] h-[18px]" />
           </Link>
 
           {/* Import/Export */}
@@ -218,6 +236,8 @@ export default function Layout() {
           }}
         />
       )}
+
+      <DataMigrationDialog />
     </div>
   );
 }

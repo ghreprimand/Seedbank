@@ -1,7 +1,7 @@
 /** Search-and-link component for connecting related ideas to the current idea. */
 import { useState, useEffect, useRef } from 'react';
 import { X, Plus, Link2 } from 'lucide-react';
-import { getAllIdeas } from '@/db/ideas';
+import { getAllIdeas } from '@/api/client';
 import type { Idea } from '@/lib/types';
 
 interface RelatedIdeasLinkerProps {
