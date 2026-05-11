@@ -1,7 +1,7 @@
 /** Version history panel — lists snapshots with view (read-only modal) and restore actions. */
 import { useState, useEffect } from 'react';
 import { History, RotateCcw, Eye, X } from 'lucide-react';
-import { getVersions, restoreVersion } from '@/db/ideas';
+import { getVersions, restoreVersion } from '@/api/client';
 import type { IdeaVersion } from '@/lib/types';
 import { STAGE_LABELS, CATEGORY_LABELS } from '@/lib/types';
 import { timeAgo } from '@/lib/timeago';

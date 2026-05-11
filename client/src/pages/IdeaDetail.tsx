@@ -9,6 +9,8 @@ import {
   Check,
   ChevronDown,
   Download,
+  ExternalLink,
+  Rocket,
 } from 'lucide-react';
 
 import type { Idea, Stage } from '@/lib/types';
@@ -24,7 +26,7 @@ import {
   updateIdea,
   deleteIdea,
   duplicateIdea,
-} from '@/db/ideas';
+} from '@/api/client';
 import { useDebouncedCallback } from '@/hooks/useDebounce';
 
 import StageBadge from '@/components/StageBadge';
@@ -33,6 +35,11 @@ import ScorePicker from '@/components/ScorePicker';
 import LinkEditor from '@/components/LinkEditor';
 import RelatedIdeasLinker from '@/components/RelatedIdeasLinker';
 import VersionHistory from '@/components/VersionHistory';
+import GraduationModal from '@/components/GraduationModal';
+import AiChatPanel from '@/components/AiChatPanel';
+import IdeaHealthCheck from '@/components/IdeaHealthCheck';
+import AiSuggestionButton from '@/components/AiSuggestionButton';
+import type { GraduationResponse } from '@/api/client';
 import { exportIdeaAsMarkdown, exportIdeaAsJSON } from '@/lib/export';
 
 /** Auto-save debounce delay in ms */
@@ -50,6 +57,8 @@ export default function IdeaDetail() {
   const [stageOpen, setStageOpen] = useState(false);
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [graduationOpen, setGraduationOpen] = useState(false);
+  const [graduationMessage, setGraduationMessage] = useState<string | null>(null);
 
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -143,6 +152,15 @@ export default function IdeaDetail() {
     setReloadKey((k) => k + 1);
   };
 
+  const handleGraduated = (response: GraduationResponse) => {
+    setIdea(response.idea);
+    setGraduationMessage(response.result.message);
+    setGraduationOpen(false);
+  };
+
+  const canShowGraduation = (current: Idea) =>
+    STAGES.indexOf(current.stage) >= STAGES.indexOf('pitch') && current.stage !== 'shelved' && current.stage !== 'cold-storage';
+
   // ── Render guards ────────────────────────────────────────
 
   if (loading) {
@@ -219,6 +237,15 @@ export default function IdeaDetail() {
               </>
             )}
           </div>
+          {canShowGraduation(idea) && (
+            <button
+              onClick={() => setGraduationOpen(true)}
+              title="Graduate idea"
+              className="p-1.5 text-ink-300 hover:text-sage-600 transition-all rounded-card hover:bg-sage-50"
+            >
+              <Rocket className="w-4 h-4" />
+            </button>
+          )}
           <button
             onClick={handleShelve}
             title={idea.stage === 'cold-storage' ? 'Move back to shelved' : 'Move to cold storage'}
@@ -319,12 +346,35 @@ export default function IdeaDetail() {
               </>
             )}
           </div>
+
+          {idea.graduatedTo && (
+            <a
+              href={`file://${idea.graduatedTo}`}
+              className="flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium font-mono
+                         text-sage-700 bg-sage-50 border border-sage-200 rounded-badge
+                         hover:border-sage-300 transition-colors"
+            >
+              <Rocket className="w-3 h-3" />
+              Graduated
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          )}
         </div>
       </div>
 
+      {graduationMessage && (
+        <div className="px-3 py-2 bg-sage-50 border border-sage-100 rounded-card text-xs text-sage-800">
+          {graduationMessage}
+        </div>
+      )}
+
       {/* ── Editor sections ──────────────────────────────── */}
       <div className="space-y-6">
-        <Section label="Pitch" hint="One-line hook — what is this?">
+        <Section
+          label="Pitch"
+          hint="One-line hook — what is this?"
+          action={<AiSuggestionButton idea={idea} field="pitch" currentValue={idea.pitch} onApply={(value) => saveNow({ pitch: value })} />}
+        >
           <input
             type="text"
             value={idea.pitch}
@@ -345,7 +395,11 @@ export default function IdeaDetail() {
           />
         </Section>
 
-        <Section label="Hook / 30-Second Demo" hint="How would you show this off in 30 seconds?">
+        <Section
+          label="Hook / 30-Second Demo"
+          hint="How would you show this off in 30 seconds?"
+          action={<AiSuggestionButton idea={idea} field="hook" currentValue={idea.hook} onApply={(value) => saveNow({ hook: value })} />}
+        >
           <AutoGrowTextarea
             value={idea.hook}
             onChange={(v) => update('hook', v)}
@@ -354,7 +408,11 @@ export default function IdeaDetail() {
           />
         </Section>
 
-        <Section label="Why It Might Work" hint="Arguments in favour">
+        <Section
+          label="Why It Might Work"
+          hint="Arguments in favour"
+          action={<AiSuggestionButton idea={idea} field="whyItMightWork" currentValue={idea.whyItMightWork} onApply={(value) => saveNow({ whyItMightWork: value })} />}
+        >
           <AutoGrowTextarea
             value={idea.whyItMightWork}
             onChange={(v) => update('whyItMightWork', v)}
@@ -363,7 +421,11 @@ export default function IdeaDetail() {
           />
         </Section>
 
-        <Section label="Risks & Blockers" hint="What could go wrong or get in the way?">
+        <Section
+          label="Risks & Blockers"
+          hint="What could go wrong or get in the way?"
+          action={<AiSuggestionButton idea={idea} field="risks" currentValue={idea.risks} onApply={(value) => saveNow({ risks: value })} />}
+        >
           <AutoGrowTextarea
             value={idea.risks}
             onChange={(v) => update('risks', v)}
@@ -372,7 +434,11 @@ export default function IdeaDetail() {
           />
         </Section>
 
-        <Section label="Tech Stack Notes" hint="Languages, frameworks, tools you'd reach for">
+        <Section
+          label="Tech Stack Notes"
+          hint="Languages, frameworks, tools you'd reach for"
+          action={<AiSuggestionButton idea={idea} field="techStack" currentValue={idea.techStack} onApply={(value) => saveNow({ techStack: value })} />}
+        >
           <AutoGrowTextarea
             value={idea.techStack}
             onChange={(v) => update('techStack', v)}
@@ -421,6 +487,15 @@ export default function IdeaDetail() {
         />
       </div>
 
+      {/* ── Thinking Partner ─────────────────────────────── */}
+      <div className="pt-5 border-t border-ink-100">
+        <IdeaHealthCheck idea={idea} />
+      </div>
+
+      <div className="pt-5 border-t border-ink-100">
+        <AiChatPanel idea={idea} onApply={saveNow} />
+      </div>
+
       {/* ── Version History ──────────────────────────────── */}
       <div className="pt-5 border-t border-ink-100">
         <VersionHistory ideaId={idea.id} onRestored={handleVersionRestored} />
@@ -434,8 +509,8 @@ export default function IdeaDetail() {
               Remove this seed?
             </h2>
             <p className="text-sm text-ink-500 mb-5 leading-relaxed">
-              This will permanently delete <strong>"{idea.title || 'Untitled'}"</strong> and all its
-              version history. This can't be undone.
+              This will move <strong>"{idea.title || 'Untitled'}"</strong> to Compost.
+              You can restore it for 30 days before it is purged.
             </p>
             <div className="flex gap-3">
               <button
@@ -450,12 +525,20 @@ export default function IdeaDetail() {
                 className="flex-1 px-4 py-2.5 text-sm font-medium bg-red-600 hover:bg-red-700
                            active:bg-red-800 text-white rounded-card transition-all active:scale-[0.98]"
               >
-                Delete forever
+                Move to Compost
               </button>
             </div>
           </div>
           <div className="fixed inset-0 -z-10" onClick={() => setShowDeleteConfirm(false)} />
         </div>
+      )}
+
+      {graduationOpen && (
+        <GraduationModal
+          idea={idea}
+          onClose={() => setGraduationOpen(false)}
+          onGraduated={handleGraduated}
+        />
       )}
     </div>
   );
@@ -466,17 +549,22 @@ export default function IdeaDetail() {
 function Section({
   label,
   hint,
+  action,
   children,
 }: {
   label: string;
   hint?: string;
+  action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <div>
-      <label className="block text-[11px] font-medium text-ink-400 uppercase tracking-wider mb-0.5 font-mono">
-        {label}
-      </label>
+      <div className="flex items-center justify-between gap-3 mb-0.5">
+        <label className="block text-[11px] font-medium text-ink-400 uppercase tracking-wider font-mono">
+          {label}
+        </label>
+        {action}
+      </div>
       {hint && <p className="text-[11px] text-ink-300 mb-2">{hint}</p>}
       {children}
     </div>

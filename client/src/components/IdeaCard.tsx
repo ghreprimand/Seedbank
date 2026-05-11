@@ -2,6 +2,7 @@
 import { Link } from 'react-router-dom';
 import type { Idea } from '@/lib/types';
 import { STAGE_ICONS } from '@/lib/types';
+import { Rocket } from 'lucide-react';
 import { timeAgo } from '@/lib/timeago';
 import StageBadge from './StageBadge';
 import CategoryBadge from './CategoryBadge';
@@ -61,6 +62,16 @@ export default function IdeaCard({ idea, index = 0 }: IdeaCardProps) {
       <div className="flex flex-wrap items-center gap-1.5 mb-3 pl-[26px]">
         <StageBadge stage={idea.stage} />
         <CategoryBadge category={idea.category} />
+        {idea.graduatedTo && (
+          <span
+            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-badge text-[10px] font-mono
+                       bg-sage-50 text-sage-700 border border-sage-100"
+            title="Graduated to project"
+          >
+            <Rocket className="w-3 h-3" />
+            graduated
+          </span>
+        )}
       </div>
 
       {/* Tags — pressed-label style */}

@@ -1,8 +1,8 @@
 /**
  * Seedbank core domain types.
  *
- * These types define the shape of data stored in IndexedDB via Dexie.
- * All IDs are UUIDs generated client-side.
+ * These types define the shape of Seedbank data shared by the client,
+ * server, imports, and exports. All IDs are UUIDs.
  */
 
 // ── Enums / unions ──────────────────────────────────────────────────
@@ -146,6 +146,10 @@ export interface Idea {
   // ── Timestamps ──────────────────────────────────────
   createdAt: Date;
   updatedAt: Date;
+  /** Soft-delete timestamp. Undefined/null means active. */
+  deletedAt?: Date | null;
+  /** External graduation target added by integrations in later phases. */
+  graduatedTo?: string | null;
 }
 
 // ── Version snapshot ────────────────────────────────────────────────
@@ -212,4 +216,74 @@ export interface IdeaFilters {
   sortBy?: SortField;
   /** Sort direction */
   sortDirection?: SortDirection;
+}
+
+// ── Integration / graduation types ─────────────────────────────────
+
+export interface GraduationReadiness {
+  ready: boolean;
+  missing: string[];
+  score: number;
+}
+
+export interface IntegrationSummary {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  configured: boolean;
+}
+
+export interface GraduationResult {
+  integrationId: string;
+  ideaId: string;
+  projectName: string;
+  path: string;
+  url?: string;
+  graduatedTo: string;
+  stage: Stage;
+  filesCreated: string[];
+  message: string;
+}
+
+// ── AI assistance types ────────────────────────────────────────────
+
+export type AiProviderId = 'openai' | 'anthropic' | 'ollama';
+
+export interface AiPublicConfig {
+  provider: AiProviderId;
+  openaiModel: string;
+  anthropicModel: string;
+  ollamaModel: string;
+  ollamaBaseUrl: string;
+  dailyTokenBudget: number;
+  hasOpenAIKey: boolean;
+  hasAnthropicKey: boolean;
+}
+
+export interface AiConfigInput {
+  provider?: AiProviderId;
+  openaiModel?: string;
+  anthropicModel?: string;
+  ollamaModel?: string;
+  ollamaBaseUrl?: string;
+  dailyTokenBudget?: number;
+  openaiApiKey?: string;
+  anthropicApiKey?: string;
+}
+
+export interface AiChatMessage {
+  id: string;
+  ideaId: string;
+  role: 'user' | 'assistant';
+  content: string;
+  createdAt: Date;
+}
+
+export type AiSuggestionField = 'pitch' | 'risks' | 'techStack' | 'hook' | 'whyItMightWork';
+
+export interface AiSuggestion {
+  field: AiSuggestionField;
+  suggestion: string;
+  rationale: string;
 }

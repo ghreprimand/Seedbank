@@ -9,7 +9,7 @@
 
 import { v4 as uuid } from 'uuid';
 import { db } from '@/db';
-import { createIdea } from '@/db/ideas';
+import { createIdea, importArchive } from '@/api/client';
 import type { Idea, IdeaVersion, Category, IdeaLink } from '@/lib/types';
 import { CATEGORIES, STAGES } from '@/lib/types';
 import type { SeedbankArchive } from '@/lib/export';
@@ -120,6 +120,18 @@ export async function importFromJSON(
     versionsImported: 0,
     warnings: [],
   };
+
+  try {
+    await importArchive(archive, mode);
+    return {
+      imported: archive.ideas.length,
+      skipped: 0,
+      versionsImported: archive.versions.length,
+      warnings: [],
+    };
+  } catch {
+    // Fall back to IndexedDB import when the backend is unavailable.
+  }
 
   if (mode === 'replace') {
     // Clear all existing data

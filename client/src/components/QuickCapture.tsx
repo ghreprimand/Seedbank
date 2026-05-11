@@ -1,7 +1,7 @@
 /** Quick capture modal — minimal title + notes form for fast idea entry ("Plant a Seed"). */
 import { useState } from 'react';
 import { X } from 'lucide-react';
-import { createIdea } from '@/db/ideas';
+import { createIdea } from '@/api/client';
 
 interface QuickCaptureProps {
   onClose: () => void;

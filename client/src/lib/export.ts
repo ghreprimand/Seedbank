@@ -7,7 +7,7 @@
 
 import type { Idea, IdeaVersion, IdeaLink } from '@/lib/types';
 import { CATEGORY_LABELS, STAGE_LABELS, STAGE_ICONS } from '@/lib/types';
-import { getAllIdeas } from '@/db/ideas';
+import { exportArchive, getAllIdeas } from '@/api/client';
 import { db } from '@/db';
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -185,9 +185,18 @@ export interface SeedbankArchive {
  * Export the entire archive (all ideas + all versions) as JSON.
  */
 export async function exportArchiveAsJSON() {
+  try {
+    const exported = await exportArchive('json');
+    const data = typeof exported === 'string' ? exported : JSON.stringify(exported, null, 2);
+    const date = formatDate(new Date());
+    downloadFile(data, `seedbank-archive-${date}.json`, 'application/json;charset=utf-8');
+    return;
+  } catch {
+    // Fall back to a browser-cache export when the backend is unavailable.
+  }
+
   const ideas = await getAllIdeas();
   const versions = await db.versions.toArray();
-
   const archive: SeedbankArchive = {
     seedbankVersion: 1,
     exportedAt: new Date().toISOString(),
@@ -205,6 +214,17 @@ export async function exportArchiveAsJSON() {
  * Each idea is separated by a horizontal rule.
  */
 export async function exportArchiveAsMarkdown() {
+  try {
+    const exported = await exportArchive('markdown');
+    if (typeof exported === 'string') {
+      const date = formatDate(new Date());
+      downloadFile(exported, `seedbank-archive-${date}.md`, 'text/markdown;charset=utf-8');
+      return;
+    }
+  } catch {
+    // Fall back to local Markdown generation when the backend is unavailable.
+  }
+
   const ideas = await getAllIdeas();
 
   // Header has no trailing `---` so it merges with the first idea's

@@ -22,7 +22,7 @@ import {
 
 import type { Idea, Stage } from '@/lib/types';
 import { STAGE_ICONS, CATEGORY_LABELS } from '@/lib/types';
-import { getAllIdeas, getStageStats, getIdeaCount } from '@/db/ideas';
+import { aiSuggest, getAllIdeas, getStageStats, getIdeaCount } from '@/api/client';
 import StageBadge from '@/components/StageBadge';
 import CategoryBadge from '@/components/CategoryBadge';
 
@@ -134,6 +134,8 @@ export default function Discover() {
   // Cross-Pollinate
   const [crossPair, setCrossPair] = useState<[Idea, Idea] | null>(null);
   const [hybridPrompt, setHybridPrompt] = useState('');
+  const [smartReason, setSmartReason] = useState('');
+  const [smartLoading, setSmartLoading] = useState(false);
 
   // Draw from Storage
   const [storageDraw, setStorageDraw] = useState<Idea | null>(null);
@@ -147,6 +149,8 @@ export default function Discover() {
     Array<{ category: string; count: number }>
   >([]);
   const [avgExcitement, setAvgExcitement] = useState(0);
+  const [patternInsight, setPatternInsight] = useState('');
+  const [patternLoading, setPatternLoading] = useState(false);
 
   // ── Feature logic ──────────────────────────────────────
 
@@ -166,6 +170,48 @@ export default function Discover() {
     const pair = pickRandomN(source, 2);
     setCrossPair([pair[0], pair[1]]);
     setHybridPrompt(pickRandom(HYBRID_PROMPTS));
+    setSmartReason('');
+  };
+
+  const findSmartPair = (pool: Idea[]): [Idea, Idea] | null => {
+    if (pool.length < 2) return null;
+    let best: { pair: [Idea, Idea]; score: number } | null = null;
+    for (let i = 0; i < pool.length; i++) {
+      for (let j = i + 1; j < pool.length; j++) {
+        const a = pool[i];
+        const b = pool[j];
+        const sharedTags = a.tags.filter((tag) => b.tags.includes(tag)).length;
+        const sharedMood = a.moodLabels.filter((tag) => b.moodLabels.includes(tag)).length;
+        const categoryContrast = a.category === b.category ? 0 : 2;
+        const stageContrast = a.stage === b.stage ? 0 : 1;
+        const score = sharedTags * 3 + sharedMood * 2 + categoryContrast + stageContrast;
+        if (!best || score > best.score) best = { pair: [a, b], score };
+      }
+    }
+    return best?.pair ?? null;
+  };
+
+  const rollSmartCrossPollinate = async (pool?: Idea[]) => {
+    const source = pool ?? ideas;
+    const pair = findSmartPair(source);
+    if (!pair) {
+      setCrossPair(null);
+      return;
+    }
+    setCrossPair(pair);
+    setHybridPrompt('What shared problem are these two ideas circling from different angles?');
+    setSmartLoading(true);
+    try {
+      const result = await aiSuggest('smart-cross-pollinate', { ideas: pair });
+      setSmartReason(result.text);
+    } catch {
+      const shared = pair[0].tags.filter((tag) => pair[1].tags.includes(tag));
+      setSmartReason(shared.length
+        ? `They share ${shared.join(', ')}, but approach it from different categories. One could supply the workflow while the other supplies the feel.`
+        : 'They contrast enough to be useful: one can provide constraints while the other suggests an interaction pattern.');
+    } finally {
+      setSmartLoading(false);
+    }
   };
 
   const rollStorageDraw = (pool?: Idea[]) => {
@@ -179,6 +225,25 @@ export default function Discover() {
     }
     setStorageDraw(pickRandom(shelved));
     setStoragePrompt(pickRandom(STORAGE_PROMPTS));
+  };
+
+  const generatePatternInsight = async (pool = ideas) => {
+    if (pool.length === 0) return;
+    setPatternLoading(true);
+    try {
+      const result = await aiSuggest('pattern-insights', { ideas: pool });
+      setPatternInsight(result.text);
+    } catch {
+      const strongestTag = topTags[0];
+      const strongestCategory = topCategories[0];
+      setPatternInsight(strongestTag
+        ? `A repeated thread is "${strongestTag.tag}". Several ideas may benefit from shared primitives, templates, or a common starter project.`
+        : strongestCategory
+          ? `Your archive leans toward ${strongestCategory.category}. Look for one reusable foundation that could support multiple ideas.`
+          : 'The archive is still sparse. Add more pitch, risk, and tech-stack notes to make patterns easier to spot.');
+    } finally {
+      setPatternLoading(false);
+    }
   };
 
   // ── Load data ──────────────────────────────────────────
@@ -226,6 +291,11 @@ export default function Discover() {
         setTopTags(sortedTags);
         setTopCategories(sortedCats);
         setAvgExcitement(excitementCount > 0 ? excitementSum / excitementCount : 0);
+        setPatternInsight(sortedTags[0]
+          ? `A repeated thread is "${sortedTags[0].tag}". Several ideas may benefit from shared primitives, templates, or a common starter project.`
+          : sortedCats[0]
+            ? `Your archive leans toward ${sortedCats[0].category}. Look for one reusable foundation that could support multiple ideas.`
+            : 'The archive is still sparse. Add more pitch, risk, and tech-stack notes to make patterns easier to spot.');
 
         // Initial random selections (inlined so the effect has no
         // unstable function deps and no dependency on `ideas` state).
@@ -234,9 +304,9 @@ export default function Discover() {
           setDailyPrompt(pickRandom(DAILY_PROMPTS));
         }
         if (all.length >= 2) {
-          const pair = pickRandomN(all, 2);
+          const pair = findSmartPair(all) ?? pickRandomN(all, 2) as [Idea, Idea];
           setCrossPair([pair[0], pair[1]]);
-          setHybridPrompt(pickRandom(HYBRID_PROMPTS));
+          setHybridPrompt('What shared problem are these two ideas circling from different angles?');
         }
         const shelved = all.filter(
           (i) => i.stage === 'shelved' || i.stage === 'cold-storage'
@@ -245,6 +315,7 @@ export default function Discover() {
           setStorageDraw(pickRandom(shelved));
           setStoragePrompt(pickRandom(STORAGE_PROMPTS));
         }
+
       } catch (err) {
         if (!cancelled) console.error('Failed to load ideas:', err);
       } finally {
@@ -339,8 +410,8 @@ export default function Discover() {
       <section>
         <SectionHeader
           icon={<Shuffle className="w-5 h-5 text-sage-600" />}
-          title="Cross-Pollinate"
-          description="Two random ideas — what hybrid could exist between them?"
+          title="Smart Cross-Pollinate"
+          description="Two ideas with a useful non-obvious connection."
         />
         {crossPair ? (
           <div className="space-y-3">
@@ -350,15 +421,26 @@ export default function Discover() {
             </div>
             <div className="flex items-start gap-2.5 px-4 py-3 bg-sage-50/60 border border-sage-100 rounded-card">
               <Shuffle className="w-4 h-4 text-sage-500 shrink-0 mt-0.5" />
-              <p className="text-sm text-sage-800 italic leading-relaxed">{hybridPrompt}</p>
+              <p className="text-sm text-sage-800 italic leading-relaxed">
+                {smartLoading ? 'Looking for the connection...' : smartReason || hybridPrompt}
+              </p>
             </div>
-            <button
-              onClick={() => rollCrossPollinate()}
-              className="flex items-center gap-1.5 text-xs text-ink-400 hover:text-sage-600 transition-colors group"
-            >
-              <RefreshCw className="w-3.5 h-3.5 group-hover:rotate-180 transition-transform duration-300" />
-              Shuffle another pair
-            </button>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => rollSmartCrossPollinate()}
+                disabled={smartLoading}
+                className="flex items-center gap-1.5 text-xs text-ink-400 hover:text-sage-600 transition-colors group disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 transition-transform duration-300 ${smartLoading ? 'animate-spin' : 'group-hover:rotate-180'}`} />
+                Find another connection
+              </button>
+              <button
+                onClick={() => rollCrossPollinate()}
+                className="text-xs text-ink-300 hover:text-ink-500 transition-colors"
+              >
+                Random pair
+              </button>
+            </div>
           </div>
         ) : (
           <p className="text-sm text-ink-400 italic">
@@ -491,7 +573,7 @@ export default function Discover() {
 
         {/* Top tags */}
         {topTags.length > 0 && (
-          <div>
+          <div className="mb-6">
             <h3 className="text-[11px] font-medium text-ink-400 uppercase tracking-wider mb-3 font-mono">
               Top Tags
             </h3>
@@ -508,6 +590,30 @@ export default function Discover() {
             </div>
           </div>
         )}
+
+        <div className="bg-paper border border-ink-100 rounded-card p-4 shadow-card">
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <div>
+              <h3 className="text-[11px] font-medium text-ink-400 uppercase tracking-wider font-mono">
+                Pattern Insight
+              </h3>
+              <p className="text-sm text-ink-500 mt-1 leading-relaxed">
+                {patternLoading
+                  ? 'Reading the archive...'
+                  : patternInsight || 'Run an archive pass to surface repeated constraints and themes.'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => generatePatternInsight()}
+              disabled={patternLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-sage-50 border border-sage-100 text-sage-700 rounded-badge hover:bg-sage-100 transition-colors disabled:opacity-50 shrink-0"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${patternLoading ? 'animate-spin' : ''}`} />
+              Analyze
+            </button>
+          </div>
+        </div>
       </section>
     </div>
   );

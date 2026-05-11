@@ -4,6 +4,7 @@ import Board from '@/pages/Board';
 import IdeaDetail from '@/pages/IdeaDetail';
 import IdeaNew from '@/pages/IdeaNew';
 import Discover from '@/pages/Discover';
+import Compost from '@/pages/Compost';
 import ErrorBoundary from '@/components/ErrorBoundary';
 
 function App() {
@@ -13,6 +14,7 @@ function App() {
         <Route path="/" element={<Layout />}>
           <Route index element={<Board />} />
           <Route path="discover" element={<Discover />} />
+          <Route path="compost" element={<Compost />} />
           <Route path="idea/new" element={<IdeaNew />} />
           <Route path="idea/:id" element={<ErrorBoundary><IdeaDetail /></ErrorBoundary>} />
         </Route>
