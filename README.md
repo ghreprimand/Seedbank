@@ -36,16 +36,30 @@ npm install
 npm start
 ```
 
+On Windows PowerShell, use:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/seedbank.ps1 start
+```
+
 Open `http://localhost:5173`.
 
 The API server runs on `http://localhost:4800`.
 
-Manage the local instance:
+Manage the local instance (Linux/macOS):
 
 ```bash
 npm run status   # show URL, API, pid, and log path
 npm run logs     # tail launcher log output
 npm stop         # stop both server and client
+```
+
+Windows equivalents:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/seedbank.ps1 status
+powershell -ExecutionPolicy Bypass -File scripts/seedbank.ps1 stop
+powershell -ExecutionPolicy Bypass -File scripts/seedbank.ps1 logs
 ```
 
 If port `5173` is occupied, the launcher will pick the next free client port. Override defaults with `SEEDBANK_CLIENT_PORT` and `SEEDBANK_SERVER_PORT`.
