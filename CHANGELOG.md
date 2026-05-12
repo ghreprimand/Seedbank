@@ -64,7 +64,7 @@ Seedbank v2.0.0 turns the original browser-only idea sketchpad into a durable lo
 
 - **Monorepo workspace** with `client`, `server`, and `shared` packages.
 - **Express API server** on port `4800`.
-- **SQLite persistence** via `better-sqlite3` at `~/.seedbank/seedbank.db`.
+- **SQLite persistence** via `better-sqlite3` at `<seedbank-data-dir>/seedbank.db` (default: `~/.seedbank/` — configurable via `SEEDBANK_DATA_DIR`).
 - **Shared TypeScript domain types** used by both client and server.
 - **REST API** for ideas, versions, stats, import/export, compost, backups, integrations, and AI.
 - **Frontend API client** that uses the backend first and Dexie/IndexedDB as offline cache and fallback.
@@ -95,7 +95,7 @@ Seedbank v2.0.0 turns the original browser-only idea sketchpad into a durable lo
 
 - Existing IndexedDB data can be migrated into SQLite while preserving IDs, timestamps, and version history.
 - SQLite startup backups keep the latest 10 `.db` copies.
-- Scheduled JSON exports are written to `~/.seedbank/exports/`.
+- Scheduled JSON exports are written to `<seedbank-data-dir>/exports/`.
 
 ## 1.0.0 — Initial Release
 
