@@ -1,5 +1,6 @@
 # Local workflow/tooling state
 .archon/
+test-results/
 
 # Dependencies and build output
 node_modules/
