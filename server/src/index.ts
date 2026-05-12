@@ -15,7 +15,7 @@ import {
 } from './db.js';
 import { IntegrationRegistry } from './integrations/registry.js';
 import { authMiddleware, requireScope } from './middleware/auth.js';
-import { archiveToMarkdown, parseMarkdownArchive } from './markdown.js';
+import { archiveToMarkdown, ideaToMarkdown, parseMarkdownArchive } from './markdown.js';
 import { SeedbankRepository, type ImportArchive, type ListIdeasOptions } from './repository.js';
 import { ApiTokenStore, TOKEN_SCOPES, type TokenScope } from './tokens.js';
 import type { AiConfigPatch } from './ai/types.js';
@@ -354,6 +354,29 @@ function validScopes(input: unknown): TokenScope[] | null {
   return normalized as TokenScope[];
 }
 
+function numberParam(value: unknown, fallback: number, min: number, max: number): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(max, Math.max(min, Math.floor(parsed)));
+}
+
+function summaryScore(jamScore: number, excitementScore: number): number {
+  return Math.round(((jamScore + excitementScore) / 2) * 10) / 10;
+}
+
+function ideaSummary(idea: ReturnType<SeedbankRepository['getIdea']> extends infer T ? Exclude<T, undefined> : never) {
+  return {
+    id: idea.id,
+    title: idea.title,
+    pitch: idea.pitch,
+    hook: idea.hook,
+    stage: idea.stage,
+    category: idea.category,
+    score: summaryScore(idea.jamScore, idea.excitementScore),
+    updatedAt: idea.updatedAt,
+  };
+}
+
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, port: PORT });
 });
@@ -488,6 +511,76 @@ app.patch('/api/settings/:section', requireScope('write:ideas'), asyncRoute((req
 
 app.get('/api/ideas', requireScope('read:ideas'), asyncRoute((req, res) => {
   res.json(repository.listIdeas(listOptionsFromQuery(req.query)));
+}));
+
+app.get('/api/mcp/ideas', requireScope('mcp:read'), asyncRoute((req, res) => {
+  const limit = numberParam(req.query.limit, 50, 1, 200);
+  const offset = numberParam(req.query.offset, 0, 0, 10_000);
+  const stage = stringParam(req.query.stage) as Stage | undefined;
+  const category = stringParam(req.query.category) as Category | undefined;
+
+  const listed = repository.listIdeas({
+    limit: 500,
+    includeDeleted: false,
+    sortBy: 'updatedAt',
+    sortDirection: 'desc',
+    stages: stage ? [stage] : undefined,
+    categories: category ? [category] : undefined,
+  });
+  const items = listed.items.slice(offset, offset + limit).map(ideaSummary);
+  res.json({
+    items,
+    total: listed.total,
+    limit,
+    offset,
+  });
+}));
+
+app.get('/api/mcp/ideas/:id', requireScope('mcp:read'), asyncRoute((req, res) => {
+  const idea = repository.getIdea(routeParam(req, 'id'));
+  if (!idea) {
+    res.status(404).json({ error: 'Idea not found' });
+    return;
+  }
+
+  res.json({
+    idea,
+    rendered: {
+      document: ideaToMarkdown(idea),
+      sections: {
+        pitch: idea.pitch,
+        fullNotes: idea.fullNotes,
+        hook: idea.hook,
+        whyItMightWork: idea.whyItMightWork,
+        risks: idea.risks,
+        techStack: idea.techStack,
+      },
+    },
+    attachments: idea.images.map((pathValue) => ({ path: pathValue })),
+  });
+}));
+
+app.get('/api/mcp/search', requireScope('mcp:read'), asyncRoute((req, res) => {
+  const q = stringParam(req.query.q) ?? '';
+  const limit = numberParam(req.query.limit, 50, 1, 200);
+  if (!q) {
+    res.json({ items: [], total: 0, limit });
+    return;
+  }
+
+  const listed = repository.listIdeas({
+    query: q,
+    limit: 500,
+    includeDeleted: false,
+    sortBy: 'updatedAt',
+    sortDirection: 'desc',
+  });
+  const items = listed.items.slice(0, limit).map(ideaSummary);
+  res.json({
+    items,
+    total: listed.total,
+    limit,
+  });
 }));
 
 app.get('/api/compost', requireScope('write:ideas'), asyncRoute((_req, res) => {
