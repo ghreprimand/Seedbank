@@ -80,7 +80,7 @@ export class CustomLocalIntegration implements Integration {
     const adapterContext = [
       '## Local Adapter Context',
       '',
-      `- Workspace root: ${this.workspaceRoot()}`,
+      '- Workspace root is configured in Seedbank Settings.',
       '- This project was scaffolded by Seedbank for a custom local project workflow.',
       '- Keep implementation notes in README.md and agent-facing context in CLAUDE.md.',
       '',
