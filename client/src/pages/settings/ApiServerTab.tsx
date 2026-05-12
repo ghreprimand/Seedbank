@@ -88,7 +88,7 @@ function ServerInfoCard() {
   return (
     <section className="space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-xs font-mono uppercase tracking-wider text-ink-400">Server</h3>
+        <h3 className="text-xs font-mono uppercase tracking-wider text-ink-500">Server</h3>
         <button
           type="button"
           onClick={() => void handleRefresh()}
@@ -108,7 +108,7 @@ function ServerInfoCard() {
           { label: 'Last backup',  value: lastBackup ? fmtDate(lastBackup) : 'No backup yet' },
         ].map(({ label, value }) => (
           <div key={label} className="flex items-start gap-4 px-4 py-2.5">
-            <span className="text-xs text-ink-400 font-mono w-24 shrink-0">{label}</span>
+            <span className="text-xs text-ink-500 font-mono w-24 shrink-0">{label}</span>
             <span className="text-xs text-ink-700 font-mono break-all">{value}</span>
           </div>
         ))}
@@ -202,7 +202,7 @@ function TokensSection() {
     <section className="space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
-          <h3 className="text-xs font-mono uppercase tracking-wider text-ink-400">Personal Access Tokens</h3>
+          <h3 className="text-xs font-mono uppercase tracking-wider text-ink-500">Personal Access Tokens</h3>
           <HelpButton
             helpId="api-tokens"
             title="Personal Access Tokens"
@@ -276,7 +276,7 @@ function TokensSection() {
                   />
                   <div>
                     <span className="text-xs font-mono text-ink-700">{value}</span>
-                    <span className="ml-1.5 text-[11px] text-ink-400">{desc}</span>
+                    <span className="ml-1.5 text-[11px] text-ink-500">{desc}</span>
                   </div>
                 </label>
               ))}
@@ -324,10 +324,10 @@ function TokensSection() {
           <table className="w-full text-xs">
             <thead className="bg-paper-warm border-b border-ink-100">
               <tr>
-                <th className="text-left px-3 py-2 font-mono text-ink-400 font-normal">Name</th>
-                <th className="text-left px-3 py-2 font-mono text-ink-400 font-normal hidden sm:table-cell">Scopes</th>
-                <th className="text-left px-3 py-2 font-mono text-ink-400 font-normal hidden md:table-cell">Created</th>
-                <th className="text-left px-3 py-2 font-mono text-ink-400 font-normal hidden md:table-cell">Last used</th>
+                <th className="text-left px-3 py-2 font-mono text-ink-500 font-normal">Name</th>
+                <th className="text-left px-3 py-2 font-mono text-ink-500 font-normal hidden sm:table-cell">Scopes</th>
+                <th className="text-left px-3 py-2 font-mono text-ink-500 font-normal hidden md:table-cell">Created</th>
+                <th className="text-left px-3 py-2 font-mono text-ink-500 font-normal hidden md:table-cell">Last used</th>
                 <th className="px-3 py-2"></th>
               </tr>
             </thead>
@@ -344,10 +344,10 @@ function TokensSection() {
                       ))}
                     </div>
                   </td>
-                  <td className="px-3 py-2.5 text-ink-400 font-mono hidden md:table-cell">
+                  <td className="px-3 py-2.5 text-ink-500 font-mono hidden md:table-cell">
                     {fmtDate(token.createdAt)}
                   </td>
-                  <td className="px-3 py-2.5 text-ink-400 font-mono hidden md:table-cell">
+                  <td className="px-3 py-2.5 text-ink-500 font-mono hidden md:table-cell">
                     {token.lastUsedAt ? fmtDate(token.lastUsedAt) : 'Never'}
                   </td>
                   <td className="px-3 py-2.5 text-right">
@@ -422,7 +422,7 @@ function WebhooksSection() {
   return (
     <section className="space-y-3">
       <div className="flex items-center gap-1.5">
-        <h3 className="text-xs font-mono uppercase tracking-wider text-ink-400">Webhooks</h3>
+        <h3 className="text-xs font-mono uppercase tracking-wider text-ink-500">Webhooks</h3>
         <HelpButton
           helpId="webhooks"
           title="Outbound Webhooks"
@@ -486,7 +486,7 @@ function OpenApiSection() {
   const specUrl = apiUrl('/api/openapi.json');
   return (
     <section className="space-y-2">
-      <h3 className="text-xs font-mono uppercase tracking-wider text-ink-400">API Reference</h3>
+      <h3 className="text-xs font-mono uppercase tracking-wider text-ink-500">API Reference</h3>
       <p className="text-xs text-ink-400">
         Seedbank exposes a machine-readable OpenAPI spec. Open it directly or paste the URL into any OpenAPI viewer.
       </p>
@@ -503,8 +503,8 @@ function OpenApiSection() {
           View openapi.json
         </a>
       </div>
-      <p className="text-[11px] text-ink-400 font-mono break-all">{specUrl}</p>
-      <p className="text-[11px] text-ink-400">
+      <p className="text-[11px] text-ink-500 font-mono break-all">{specUrl}</p>
+      <p className="text-[11px] text-ink-500">
         Full REST reference: <code className="font-mono">docs/API.md</code> in the project repo.
       </p>
     </section>

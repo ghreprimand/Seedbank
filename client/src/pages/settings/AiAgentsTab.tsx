@@ -510,7 +510,7 @@ function BudgetSection({ budget, onSave }: BudgetSectionProps) {
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-1.5">
-        <h3 className="text-xs font-mono uppercase tracking-wider text-ink-400">Token Budget</h3>
+        <h3 className="text-xs font-mono uppercase tracking-wider text-ink-500">Token Budget</h3>
         <HelpButton
           helpId="token-budget"
           title="Daily Token Budget"
@@ -629,7 +629,7 @@ export default function AiAgentsTab() {
       {/* ── A1 + A2: Provider cards ─────────────────────────────────────────── */}
       <section className="space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-xs font-mono uppercase tracking-wider text-ink-400">
+          <h3 className="text-xs font-mono uppercase tracking-wider text-ink-500">
             Thinking Partner · Providers
           </h3>
           <Link
@@ -703,7 +703,7 @@ export default function AiAgentsTab() {
       {/* ── A4: Linked agents ───────────────────────────────────────────────── */}
       <section className="space-y-3">
         <div className="flex items-center gap-1.5">
-          <h3 className="text-xs font-mono uppercase tracking-wider text-ink-400">
+          <h3 className="text-xs font-mono uppercase tracking-wider text-ink-500">
             Linked Agents
           </h3>
           <HelpButton

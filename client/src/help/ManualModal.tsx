@@ -119,7 +119,7 @@ function SearchResults({
                      hover:border-ink-100 transition-colors"
         >
           <div className="text-sm font-medium text-ink-700">{section.title}</div>
-          <div className="text-xs text-ink-400 mt-0.5 line-clamp-2">
+          <div className="text-xs text-ink-500 mt-0.5 line-clamp-2">
             {section.keywords.slice(0, 4).join(' · ')}
           </div>
         </button>
@@ -248,7 +248,7 @@ export default function ManualModal({ onClose, initialSection }: ManualModalProp
           >
             {MANUAL_GROUPS.map((group) => (
               <div key={group.label} className="mb-3">
-                <div className="px-4 py-1 text-[10px] font-mono uppercase tracking-wider text-ink-300">
+                <div className="px-4 py-1 text-[10px] font-mono uppercase tracking-wider text-ink-400">
                   {group.label}
                 </div>
                 {group.sections.map((section) => (
