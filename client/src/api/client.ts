@@ -6,6 +6,7 @@ import type {
   AgentProvider,
   AgentRun,
   AgentRunEvent,
+  AgentRunState,
   AiChatMessage,
   AiConfigInput,
   AiPublicConfig,
@@ -561,26 +562,54 @@ export async function unlinkAgent(provider: AgentProvider): Promise<void> {
   return request<void>(`/api/agents/link/${encodeURIComponent(provider)}`, { method: 'DELETE' });
 }
 
+// ── Server response shapes (not exported — normalized before leaving this module) ──
+
+interface ServerRunCreateResult {
+  runId: string;
+  state: AgentRunState;
+}
+
+interface ServerRunDetail {
+  id: string;
+  state: AgentRunState;
+  proposedFiles: string[];
+  // other fields exist but the panel only uses the above
+}
+
+/** Map server AgentRunState → client AgentRunStatus. */
+function mapAgentState(state: AgentRunState): AgentRun['status'] {
+  switch (state) {
+    case 'running':   return 'running';
+    case 'completed': return 'done';
+    case 'failed':    return 'error';
+    case 'stopped':   return 'stopped';
+    default:          return 'error';
+  }
+}
+
 export async function startAgentRun(req: AgentRunRequest): Promise<AgentRun> {
-  return request<AgentRun>('/api/agents/runs', {
+  const raw = await request<ServerRunCreateResult>('/api/agents/runs', {
     method: 'POST',
     body: JSON.stringify(req),
   });
+  return { id: raw.runId, status: mapAgentState(raw.state), proposedFiles: [] };
 }
 
 export async function getAgentRun(id: string): Promise<AgentRun> {
-  return request<AgentRun>(`/api/agents/runs/${encodeURIComponent(id)}`);
+  const raw = await request<ServerRunDetail>(`/api/agents/runs/${encodeURIComponent(id)}`);
+  return { id: raw.id, status: mapAgentState(raw.state), proposedFiles: raw.proposedFiles };
 }
 
-export async function stopAgentRun(id: string): Promise<AgentRun> {
-  return request<AgentRun>(`/api/agents/runs/${encodeURIComponent(id)}/stop`, { method: 'POST' });
+export async function stopAgentRun(id: string): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>(`/api/agents/runs/${encodeURIComponent(id)}/stop`, { method: 'POST' });
 }
 
-export async function applyAgentRun(id: string, files: string[]): Promise<AgentRun> {
-  return request<AgentRun>(`/api/agents/runs/${encodeURIComponent(id)}/apply`, {
+export async function applyAgentRun(id: string, files: string[]): Promise<{ ok: boolean }> {
+  await request<unknown>(`/api/agents/runs/${encodeURIComponent(id)}/apply`, {
     method: 'POST',
-    body: JSON.stringify({ files }),
+    body: JSON.stringify({ paths: files }),
   });
+  return { ok: true };
 }
 
 /**
