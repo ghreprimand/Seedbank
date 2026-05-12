@@ -10,7 +10,7 @@ Only final curated screenshots should be explicitly staged, reviewed for privacy
 Use the capture script from repo root:
 
 ```bash
-node scripts/capture-readme-screenshots.mjs
+node scripts/capture-readme-screenshots.mjs --replace-data
 ```
 
 Default assumptions:
@@ -24,12 +24,13 @@ node scripts/capture-readme-screenshots.mjs \
   --base-url=http://127.0.0.1:5173 \
   --api-url=http://127.0.0.1:4800 \
   --out-dir=docs/assets/screenshots \
+  --replace-data \
   --strict-help
 ```
 
 ## Privacy and Safety Rules
 
-- Use deterministic demo data only (the script seeds this via `/api/import` replace mode).
+- Use deterministic demo data only (the script seeds via `/api/import` `mode=replace` only when `--replace-data` is explicitly provided).
 - Do not capture private API keys, raw tokens, personal names, or private project content.
 - Do not expose personal filesystem paths in screenshots.
 - If showing API/Server surfaces, sanitize DB path text in the capture pipeline.
@@ -41,7 +42,7 @@ To avoid using personal/local Seedbank data, run server/client with an isolated 
 ```bash
 SEEDBANK_DATA_DIR=<seedbank-data-dir> npm run dev -w server
 npm run dev -w client
-node scripts/capture-readme-screenshots.mjs --api-url=http://127.0.0.1:4800
+node scripts/capture-readme-screenshots.mjs --api-url=http://127.0.0.1:4800 --replace-data
 ```
 
 ## Expected Outputs
