@@ -1,5 +1,4 @@
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import type { GraduationResult, Idea } from '../../../shared/types.js';
 import {
@@ -100,8 +99,6 @@ export class CustomLocalIntegration implements Integration {
         source: 'seedbank',
         ideaId: idea.id,
         graduatedAt: new Date().toISOString(),
-        workspaceRoot: this.workspaceRoot(),
-        operatorHome: os.homedir(),
       }, null, 2) + '\n',
     );
     filesCreated.push('.seedbank/seedbank.json');

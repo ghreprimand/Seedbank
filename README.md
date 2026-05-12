@@ -62,7 +62,7 @@ powershell -ExecutionPolicy Bypass -File scripts/seedbank.ps1 stop
 powershell -ExecutionPolicy Bypass -File scripts/seedbank.ps1 logs
 ```
 
-If port `5173` is occupied, the launcher will pick the next free client port. Override defaults with `SEEDBANK_CLIENT_PORT` and `SEEDBANK_SERVER_PORT`.
+On Linux/macOS (bash launcher), if port `5173` is occupied the launcher will pick the next free client port. Windows launchers fail fast on occupied ports; set `SEEDBANK_CLIENT_PORT` and `SEEDBANK_SERVER_PORT` before start when needed.
 
 ## Features
 
