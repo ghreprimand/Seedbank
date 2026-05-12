@@ -148,6 +148,8 @@ See [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md) for the plugin interface and im
 
 ## API Reference
 
+Machine-readable OpenAPI spec: `GET /api/openapi.json`.
+
 ### Ideas
 
 - `GET /api/ideas` — list, search, filter, sort, and paginate active ideas.
