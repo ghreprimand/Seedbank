@@ -70,38 +70,63 @@ See [`docs/THEMING.md`](./THEMING.md) for the full theme model and custom-theme 
 
 ## API & Server
 
-> **Note:** The API & Server tab UI is planned for a near-term follow-up. Server-side infrastructure (tokens, webhooks, MCP endpoints, OpenAPI) is fully implemented. The UI to manage these from within the settings page will land soon.
-
-What will be visible here once the UI lands:
-
 ### Server info card
 
-Port, version, uptime, database path, and last backup time — drawn from `/api/health`, `/api/server-info`, and `/api/backups`.
+Displays live server details at the top of the tab, with a refresh button (↻) to re-fetch without reloading the page:
+
+| Field | Source |
+|-------|--------|
+| Port | Settings store / `GET /api/server/info` |
+| Version | Server package version |
+| Uptime | Formatted d/h/m/s since server start |
+| Database | Absolute path to `seedbank.sqlite` |
+| Last backup | Timestamp of most recent backup run |
 
 ### Personal access tokens
 
-Create scoped bearer tokens for scripting against the local API.
+Create scoped bearer tokens for scripting against the local API without a browser session.
 
-- **Format:** `sbk_<32-char base64url>`, shown once at creation time only.
-- **Scopes:** `read:ideas`, `write:ideas`, `ai:suggest`, `mcp:read`, `agents:run`.
-- **Storage:** hashed with SHA-256 at rest; raw value never persisted.
-- **Table columns:** name, scopes, created, last used, revoke button.
+- **Format:** `sbk_<32-char base64url>`, displayed once at creation time in a sage-toned banner. Copy with the clipboard button; the value is never retrievable after dismissal.
+- **Scopes** (select one or more when creating):
 
-Unauthenticated requests from `localhost` continue to work for normal app use. Tokens are only required when accessing the API from an external client (e.g. a script, another machine, or a Claude/Codex session).
+  | Scope | Permits |
+  |-------|---------|
+  | `read:ideas` | List and view idea records |
+  | `write:ideas` | Create and update ideas |
+  | `ai:suggest` | Call AI suggestion endpoints |
+  | `mcp:read` | Read-only MCP context endpoints |
+  | `agents:run` | Start, stop, and apply agent runs |
+
+- **Storage:** SHA-256 hashed at rest; raw value never persisted server-side.
+- **Table:** name, scope pills, created date, last used date, revoke (🗑) button.
+
+Unauthenticated requests from `localhost` continue to work for normal in-app use. Tokens are required when accessing the API from an external client (e.g. a shell script, a remote host, or an external Claude/Codex session).
 
 **API:** `GET /api/tokens`, `POST /api/tokens`, `DELETE /api/tokens/:id`.
 
+> Token creation is restricted to local browser sessions (the server checks that the request originates from `127.0.0.1` / `::1`). Token creation from a remote host — even a valid bearer token — is not permitted.
+
 ### Webhooks
 
-An optional outbound webhook URL fires a `POST` on these events:
+Configure an outbound webhook URL that receives a `POST` request on idea lifecycle events. The payload is the full idea record.
 
-| Event | Trigger |
-|-------|---------|
-| `idea.created` | A new idea is saved |
-| `idea.graduated` | An idea is graduated via an integration |
-| `idea.shipped` | An idea is marked shipped |
+- **Endpoint URL:** any reachable HTTP endpoint (Zapier, n8n, a local bus, etc.).
+- **Events** (enable individually):
 
-The payload is the full idea record. The URL and enabled events are stored in settings (`api.webhooks`). Configure via `PATCH /api/settings/api`.
+  | Event | Trigger |
+  |-------|---------|
+  | `idea.created` | A new idea is saved |
+  | `idea.graduated` | An idea is graduated via an integration |
+  | `idea.shipped` | An idea is marked shipped |
+
+- Changes are saved via **Save webhook**. The button is disabled when offline.
+- Stored server-side in `settings` under `api.webhooks`. Update programmatically with `PATCH /api/settings/api`.
+
+### API reference
+
+A **View openapi.json** button opens the machine-readable OpenAPI spec at `GET /api/openapi.json` in a new tab. Paste the URL into Postman, Insomnia, Stoplight, or any OpenAPI viewer.
+
+The human-readable full REST reference is in [`docs/API.md`](./API.md) in the project repository.
 
 ### MCP (Model Context Protocol) endpoints
 
@@ -113,7 +138,7 @@ Read-only endpoints for external Claude or Codex sessions to pull seeds as conte
 | `GET /api/mcp/ideas/:id` | Full idea detail with rendered Markdown and attachment paths |
 | `GET /api/mcp/search` | Full-text search over ideas |
 
-> **Caution — filesystem path exposure.** `GET /api/mcp/ideas/:id` includes an `attachments` array whose `path` values are the raw server filesystem paths of uploaded files. If you share your token externally, the recipient can see absolute file paths for any idea with attachments. Use `mcp:read` tokens only with tools you trust.
+> **Caution — filesystem path exposure.** `GET /api/mcp/ideas/:id` includes an `attachments` array whose `path` values are raw server filesystem paths of uploaded files. Only share `mcp:read` tokens with tools you trust.
 
 ---
 

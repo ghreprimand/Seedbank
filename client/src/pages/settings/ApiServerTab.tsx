@@ -12,7 +12,6 @@ import {
   ChevronDown,
   ChevronRight,
   ClipboardCopy,
-  Database,
   ExternalLink,
   Loader2,
   RefreshCw,
@@ -484,19 +483,11 @@ function OpenApiSection() {
           <ExternalLink className="w-3 h-3" />
           View openapi.json
         </a>
-        <a
-          href="/docs/API.md"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium
-                     border border-ink-200 text-ink-600 hover:border-sage-300 hover:text-sage-700
-                     hover:bg-sage-50 rounded-card transition-colors"
-        >
-          <Database className="w-3 h-3" />
-          API docs
-        </a>
       </div>
       <p className="text-[11px] text-ink-400 font-mono break-all">{specUrl}</p>
+      <p className="text-[11px] text-ink-400">
+        Full REST reference: <code className="font-mono">docs/API.md</code> in the project repo.
+      </p>
     </section>
   );
 }
