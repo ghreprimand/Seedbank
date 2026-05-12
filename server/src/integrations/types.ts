@@ -11,6 +11,7 @@ export interface Integration {
   description: string;
   icon: string;
   isConfigured(): boolean;
+  configuredRoots?(): string[];
   configure(config: Record<string, string>): void;
   canGraduate(idea: Idea): GraduationReadiness;
   graduate(idea: Idea): Promise<GraduationResult>;

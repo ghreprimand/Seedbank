@@ -33,6 +33,10 @@ export class GenericProjectIntegration implements Integration {
     return Boolean(this.projectRoot());
   }
 
+  configuredRoots(): string[] {
+    return [path.resolve(this.projectRoot())];
+  }
+
   configure(config: Record<string, string>): void {
     this.configStore.setConfig(this.id, {
       ...this.config(),

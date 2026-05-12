@@ -46,7 +46,7 @@ const repository = new SeedbankRepository(database);
 const integrations = new IntegrationRegistry(repository);
 const aiService = new AiService(repository, new AiStore(database));
 const tokenStore = new ApiTokenStore(database);
-const agentService = new AgentService(repository);
+const agentService = new AgentService(repository, () => integrations.configuredRoots());
 
 const DEFAULT_BACKUP_CONFIG: BackupConfig = {
   frequency: 'daily',

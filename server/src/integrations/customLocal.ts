@@ -17,7 +17,7 @@ interface CustomLocalConfig {
   archonRoot?: string;
 }
 
-function normalizeConfig(config: CustomLocalConfig): CustomLocalConfig {
+function normalizeConfig(config: CustomLocalConfig): Record<string, string> {
   const workspaceRoot = config.workspaceRoot?.trim() || config.archonRoot?.trim() || '';
   return {
     ...(workspaceRoot ? { workspaceRoot } : {}),
