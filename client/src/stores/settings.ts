@@ -25,6 +25,7 @@ import {
   writeThemePrefs,
   applyTheme,
   resolveThemeName,
+  migrateThemeName,
   VALID_THEME_NAMES,
 } from '@/theme/themeUtils';
 
@@ -106,17 +107,34 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   refresh: async () => {
     try {
       const data = await getAggregateSettings();
-      set({ data, loaded: true, offline: false });
+
+      // Migrate any legacy theme name the server may still return (e.g. 'loam' → 'peat').
+      // This is belt-and-suspenders alongside the server-side migration — the client
+      // must never store an invalid/legacy name in Zustand because ThemeTab reads the
+      // store directly to determine which card is active.
+      let resolvedData = data;
+      if (data.ui?.theme) {
+        const rawName = data.ui.theme.name as string;
+        const migratedName: ThemeName = migrateThemeName(rawName);
+        if (migratedName !== rawName) {
+          resolvedData = {
+            ...data,
+            ui: { ...data.ui, theme: { ...data.ui.theme, name: migratedName } },
+          };
+        }
+      }
+
+      set({ data: resolvedData, loaded: true, offline: false });
 
       // Write-through: mirror ui.theme to localStorage so pre-paint bootstrap
       // is correct even if the server is down on next cold boot.
       // Also apply to the DOM immediately so live sessions don't need a reload.
-      if (data.ui?.theme) {
+      if (resolvedData.ui?.theme) {
         const prefs = {
-          name: (VALID_THEME_NAMES as readonly string[]).includes(data.ui.theme.name)
-            ? (data.ui.theme.name as ThemeName)
+          name: (VALID_THEME_NAMES as readonly string[]).includes(resolvedData.ui.theme.name)
+            ? (resolvedData.ui.theme.name as ThemeName)
             : 'paper',
-          matchSystem: data.ui.theme.matchSystem,
+          matchSystem: resolvedData.ui.theme.matchSystem,
         };
         writeThemePrefs(prefs);
         applyTheme(resolveThemeName(prefs));

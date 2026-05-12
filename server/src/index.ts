@@ -78,6 +78,36 @@ const DEFAULT_THEME_CONFIG: UiThemeConfig = {
   matchSystem: false,
 };
 
+/**
+ * Legacy theme names that were removed in v2.2. Maps old name → replacement.
+ * Used in uiThemeConfig() and migrateLegacySettings() so callers never see a
+ * stale name after an upgrade.
+ */
+const LEGACY_THEME_MIGRATIONS: Partial<Record<string, ThemeName>> = {
+  loam: 'peat',
+  parchment: 'paper',
+};
+
+const VALID_THEME_NAMES_SERVER: readonly ThemeName[] = [
+  'paper', 'chalk', 'meadow', 'dusk',
+  'hearth', 'rainwash',
+  'woad', 'moss', 'peat', 'canopy',
+];
+
+/**
+ * Migrate a possibly-legacy theme name to a current valid ThemeName.
+ * Falls back to 'paper' for unknown names.
+ */
+function migrateServerThemeName(name: string | undefined): ThemeName {
+  if (!name) return 'paper';
+  if (Object.prototype.hasOwnProperty.call(LEGACY_THEME_MIGRATIONS, name)) {
+    return LEGACY_THEME_MIGRATIONS[name]!;
+  }
+  return (VALID_THEME_NAMES_SERVER as readonly string[]).includes(name)
+    ? (name as ThemeName)
+    : 'paper';
+}
+
 const DEFAULT_AGENTS_CONFIG: AgentStoredConfig = {
   claudeLinked: false,
   codexLinked: false,
@@ -149,9 +179,12 @@ function backupStatus(): BackupStatus {
 }
 
 function uiThemeConfig(): UiThemeConfig {
+  const stored = repository.getSetting<Partial<UiThemeConfig>>(SETTINGS_KEYS.uiTheme) ?? {};
   return {
     ...DEFAULT_THEME_CONFIG,
-    ...(repository.getSetting<Partial<UiThemeConfig>>(SETTINGS_KEYS.uiTheme) ?? {}),
+    ...stored,
+    // Always return a valid, migrated theme name so callers never see a legacy value.
+    name: migrateServerThemeName(stored.name),
   };
 }
 
@@ -213,6 +246,7 @@ function aggregateSettings(): AggregateSettings {
 }
 
 function migrateLegacySettings(): void {
+  // Migrate AI config key rename (pre-v2.0).
   const legacyAiConfig = repository.getSetting<unknown>(SETTINGS_KEYS.aiConfigLegacy);
   const nextAiConfig = repository.getSetting<unknown>(SETTINGS_KEYS.aiConfig);
   if (legacyAiConfig !== undefined && nextAiConfig === undefined) {
@@ -222,6 +256,19 @@ function migrateLegacySettings(): void {
     } catch {
       // Keep startup resilient for partial/older DB states.
     }
+  }
+
+  // Migrate legacy theme names (v2.2 — Loam→Peat, Parchment→Paper).
+  // Persist the migrated value so subsequent reads are clean.
+  const storedTheme = repository.getSetting<Partial<UiThemeConfig>>(SETTINGS_KEYS.uiTheme);
+  if (
+    storedTheme?.name !== undefined &&
+    Object.prototype.hasOwnProperty.call(LEGACY_THEME_MIGRATIONS, storedTheme.name)
+  ) {
+    repository.setSetting(SETTINGS_KEYS.uiTheme, {
+      ...storedTheme,
+      name: LEGACY_THEME_MIGRATIONS[storedTheme.name]!,
+    });
   }
 }
 

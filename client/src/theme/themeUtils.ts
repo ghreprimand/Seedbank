@@ -21,8 +21,11 @@ export const VALID_THEME_NAMES: readonly ThemeName[] = [
  * Migrate legacy theme names from removed themes to suitable replacements.
  * - 'parchment' → 'paper'  (closest warm-light fallback)
  * - 'loam'      → 'peat'   (closest dark earthy fallback)
+ *
+ * Exported so the settings store can apply the same logic to server-returned
+ * theme names before writing them into the Zustand store and localStorage.
  */
-function migrateThemeName(name: string): ThemeName {
+export function migrateThemeName(name: string): ThemeName {
   if (name === 'parchment') return 'paper';
   if (name === 'loam') return 'peat';
   return (VALID_THEME_NAMES as readonly string[]).includes(name)
