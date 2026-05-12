@@ -18,6 +18,7 @@ import { authMiddleware, requireScope } from './middleware/auth.js';
 import { archiveToMarkdown, ideaToMarkdown, parseMarkdownArchive } from './markdown.js';
 import { SeedbankRepository, type ImportArchive, type ListIdeasOptions } from './repository.js';
 import { ApiTokenStore, TOKEN_SCOPES, type TokenScope } from './tokens.js';
+import { WebhookEmitter, normalizeWebhookUrl, toWebhookEventList } from './webhooks.js';
 import type { AiConfigPatch } from './ai/types.js';
 import type {
   AgentsPublicConfig,
@@ -92,6 +93,7 @@ function readServerVersion(): string {
 }
 
 const SERVER_VERSION = readServerVersion();
+const webhookEmitter = new WebhookEmitter(SERVER_VERSION, () => webhooksConfig());
 
 function backupConfig(): BackupConfig {
   return {
@@ -454,14 +456,21 @@ app.patch('/api/settings/:section', requireScope('write:ideas'), asyncRoute((req
     }
     if (body?.webhooks) {
       const current = webhooksConfig();
+      const nextUrl = normalizeWebhookUrl(body.webhooks.url, current.url);
+      if (nextUrl === 'invalid') {
+        res.status(400).json({ error: 'Webhook URL must use http:// or https://.' });
+        return;
+      }
+      const nextEvents = body.webhooks.events === undefined
+        ? current.events
+        : toWebhookEventList(body.webhooks.events);
+      if (nextEvents === null) {
+        res.status(400).json({ error: 'Invalid webhook events.' });
+        return;
+      }
       const next: WebhooksConfig = {
-        url: body.webhooks.url === null
-          ? null
-          : (typeof body.webhooks.url === 'string' ? body.webhooks.url : current.url),
-        events: Array.isArray(body.webhooks.events)
-          ? body.webhooks.events
-            .filter((event): event is string => typeof event === 'string' && event.trim().length > 0)
-          : current.events,
+        url: nextUrl,
+        events: nextEvents,
       };
       repository.setSetting(SETTINGS_KEYS.apiWebhooks, next);
     }
@@ -627,14 +636,20 @@ app.get('/api/ideas/:id', requireScope('read:ideas'), asyncRoute((req, res) => {
 
 app.post('/api/ideas', requireScope('write:ideas'), asyncRoute((req, res) => {
   const idea = repository.createIdea(req.body);
+  webhookEmitter.emit('idea.created', idea);
   res.status(201).json(idea);
 }));
 
 app.patch('/api/ideas/:id', requireScope('write:ideas'), asyncRoute((req, res) => {
-  const idea = repository.updateIdea(routeParam(req, 'id'), req.body);
+  const ideaId = routeParam(req, 'id');
+  const previous = repository.getIdea(ideaId, true);
+  const idea = repository.updateIdea(ideaId, req.body);
   if (!idea) {
     res.status(404).json({ error: 'Idea not found' });
     return;
+  }
+  if (previous?.stage !== 'shipped' && idea.stage === 'shipped') {
+    webhookEmitter.emit('idea.shipped', idea);
   }
 
   res.json(idea);
@@ -808,6 +823,7 @@ app.post('/api/integrations/:id/graduate/:ideaId', requireScope('write:ideas'), 
     res.status(404).json({ error: 'Integration or idea not found' });
     return;
   }
+  webhookEmitter.emit('idea.graduated', payload.idea);
   res.json(payload);
 }));
 
