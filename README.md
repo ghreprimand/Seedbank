@@ -3,11 +3,13 @@
 
 ## What is Seedbank?
 
-Seedbank is a personal project-idea system for people who collect more sparks than they can build immediately. It gives each idea a durable home: not a throwaway note, not a browser tab, and not a fragile IndexedDB-only sketchpad. Ideas are stored in a local SQLite database, backed up automatically, and still cached in the browser for a graceful offline fallback.
+Seedbank is a **local-first, single-user app** you run on your own computer. It is not a hosted service or a SaaS product — your data never leaves your machine unless you explicitly export it or configure an AI provider.
 
-The app is built around the way ideas actually mature. A seed can start as a title and a messy paragraph, then gain a pitch, hook, risks, tech-stack notes, links, related ideas, scores, and version history. When an idea is ready, Seedbank can graduate it into a project scaffold through integration plugins.
+Ideas are stored in a local SQLite database (`<seedbank-data-dir>/seedbank.db`). SQLite is the durable source of truth. Browser storage (IndexedDB) is used as a read-through cache for fast loads, an offline fallback when the server is unreachable, and a migration path for any ideas created before the backend was available. If you clear browser storage, your ideas are safe in the database.
 
-Seedbank also includes AI-assisted development. The AI is deliberately framed as a thinking partner: it asks questions, reflects patterns, runs health checks, and helps scope ideas down. It does not try to replace the user's taste or generate a pile of generic ideas.
+The app is built around the way ideas actually mature. A seed can start as a title and a messy paragraph, then gain a pitch, hook, risks, tech-stack notes, links, related ideas, scores, and version history. When an idea is ready, Seedbank can graduate it into a project scaffold via an adapter plugin.
+
+Seedbank also includes AI-assisted development. The AI is deliberately framed as a thinking partner: it asks questions, reflects patterns, runs health checks, and helps scope ideas down. It does not try to replace your taste or generate a pile of generic ideas.
 
 ## Screenshots
 
@@ -203,7 +205,7 @@ AI features include the Thinking Partner chat, contextual field suggestions, Wha
 
 ### Integrations
 
-Graduation integrations live in `server/src/integrations/`. Seedbank is adapter-driven: the built-in generic local adapter works out of the box, and optional adapters (including Archon) can target specific external workflows. A graduated idea stores its destination in `graduatedTo` and advances stage automatically.
+Graduation integrations live in `server/src/integrations/`. Seedbank is adapter-driven: the built-in generic local adapter works out of the box. Optional custom adapters can target specific local tools or external project workflows — implement the `Integration` interface, register in the registry, and graduate ideas to any local path. A graduated idea stores its destination in `graduatedTo` and advances stage automatically.
 
 See [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md) for the plugin interface and implementation steps.
 
@@ -227,10 +229,21 @@ Quick endpoint groups: ideas, versions, integrations, AI (chat, suggest, usage),
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System diagram, data-flow, settings store, token middleware, theme tokens, agent runner. |
 | [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md) | Graduation adapter interface, built-in adapters, and "Continue with agent" handoff. |
 
+## Security and Hosting
+
+Seedbank is designed for **single-user, local use only**. It is not a multi-user hosted application and does not implement user accounts or session authentication for browser clients on a shared host.
+
+- **Default binding:** `localhost` / `127.0.0.1`. The CORS policy blocks non-loopback origins. Port `4800` is not intended to be exposed to the public internet.
+- **Do not expose the API publicly** without adding a reverse-proxy that enforces authentication and TLS. Seedbank API access from `localhost` does not require a bearer token by design; public exposure without a proxy would give unauthenticated access to your ideas and data.
+- **API tokens** provide scoped bearer access for local scripting. Token creation is restricted to `localhost` browser sessions even if you hold a valid token.
+- **Data:** all idea content stays on your machine. AI features send idea content to your configured AI provider (OpenAI/Anthropic/Ollama). With Ollama, nothing leaves your machine.
+
+For trusted LAN or self-hosted access, place a reverse proxy (nginx, Caddy) in front of port `4800` with HTTP basic auth or mutual TLS, and similarly protect port `5173`.
+
 ## Development
 
 ```bash
-npm run dev        # client + server
+npm run dev        # client + server, hot reload (dev mode)
 npm run build      # build client and server
 npm run typecheck  # typecheck client and server
 npm run lint       # lint client

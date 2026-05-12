@@ -160,7 +160,7 @@ The header status pill continues to show last-backup time and links to this tab.
 Integration configuration that was previously inside the Graduation modal now lives here.
 
 - **Local Project adapter** — set an external project root; generic scaffolds are created here.
-- **Optional adapters** (for example Archon) — configure adapter-specific roots/fields when that adapter is enabled.
+- **Optional custom adapters** — if additional adapters are registered, configure their workspace and project roots here.
 
 A `configured` badge appears next to each integration that has a valid configuration. Unconfigured integrations show an amber notice inside the Graduation modal directing you here.
 
@@ -184,7 +184,7 @@ A `configured` badge appears next to each integration that has a valid configura
 | Agents config (linked, CLI paths) | Server `settings` table (`agents.config`) | Shown from cache; linking requires server |
 | Token budget | Server `settings` table (`ai.config`) | Shown from cache; changes require server |
 | Backups config | Server `settings` table (`backups.config`) | Shown from cache; changes require server |
-| Integrations config | Server `settings` table (`integration:<adapter-id>`, examples: `integration:generic-project`, `integration:archon`) | Shown from cache; changes require server |
+| Integrations config | Server `settings` table (`integration:<adapter-id>`; for example `integration:generic-project`) | Shown from cache; changes require server |
 | Personal access tokens | Server `api_tokens` table, hashed | Not visible offline |
 | Webhook URL + events | Server `settings` table (`api.webhooks`) | Not visible offline |
 
