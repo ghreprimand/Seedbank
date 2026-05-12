@@ -124,7 +124,6 @@ export const openApiSpec: OpenAPIObject = {
           startedAt: { type: 'string', format: 'date-time' },
           endedAt: { type: ['string', 'null'], format: 'date-time' },
           exitCode: { type: ['number', 'null'] },
-          transcriptPath: { type: 'string' },
           proposedFiles: { type: 'array', items: { type: 'string' } },
           transcript: { type: 'string' },
           truncated: { type: 'boolean' },

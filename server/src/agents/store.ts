@@ -49,7 +49,13 @@ export interface CreateRunInput {
 }
 
 export class AgentRunStore {
-  constructor(private readonly db: Database.Database) {}
+  constructor(private readonly db: Database.Database) {
+    this.db.prepare(`
+      UPDATE agent_runs
+      SET state = 'failed', ended_at = ?
+      WHERE state = 'running'
+    `).run(new Date().toISOString());
+  }
 
   create(input: CreateRunInput): AgentRunRecord {
     this.db.prepare(`
@@ -100,4 +106,3 @@ export class AgentRunStore {
     return row.count;
   }
 }
-
