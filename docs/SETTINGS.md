@@ -62,7 +62,7 @@ See [`docs/AGENTS.md`](./AGENTS.md) for the full agent workflow.
 
 ## Theme
 
-Six built-in themes are selectable from swatched mini-preview cards. Arrow-key navigation and Enter selection are supported for accessibility. A **Match system** toggle automatically pairs **Paper** (light) ↔ **Loam** (dark) based on `prefers-color-scheme`.
+Ten built-in themes are selectable from swatched mini-preview cards: Paper, Chalk, Meadow, Dusk (light), Hearth, Rainwash (mid-depth), and Woad, Moss, Peat, Canopy (dark). Arrow-key navigation and Enter selection are supported for accessibility. A **Match system** toggle automatically pairs **Paper** (light) ↔ **Peat** (dark) based on `prefers-color-scheme`.
 
 See [`docs/THEMING.md`](./THEMING.md) for the full theme model and custom-theme authoring.
 

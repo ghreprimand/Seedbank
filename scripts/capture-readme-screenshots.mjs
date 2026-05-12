@@ -288,7 +288,7 @@ async function captureSet(config) {
     await screenshot(page, outDir, 'settings-api-server.jpg');
 
     await openRoute(page, baseUrl, '/settings/theme');
-    const darkPicked = await setThemeFromNames(page, ['Peat', 'Canopy', 'Loam', 'Moss']);
+    const darkPicked = await setThemeFromNames(page, ['Woad', 'Peat', 'Canopy', 'Moss']);
     if (darkPicked) {
       await page.waitForTimeout(250);
       await screenshot(page, outDir, 'theme-dark-view.jpg');
@@ -297,7 +297,7 @@ async function captureSet(config) {
       console.warn('dark theme candidate not found; skipped theme-dark-view.jpg');
     }
 
-    const midPicked = await setThemeFromNames(page, ['Hearth', 'Rainwash', 'Dusk', 'Parchment']);
+    const midPicked = await setThemeFromNames(page, ['Hearth', 'Rainwash', 'Dusk', 'Chalk']);
     if (midPicked) {
       await page.waitForTimeout(250);
       await screenshot(page, outDir, 'theme-mid-view.jpg');
