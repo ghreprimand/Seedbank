@@ -19,22 +19,22 @@ function IconFor({ icon }: { icon: string }) {
   return <Icon className="w-4 h-4" />;
 }
 
-function configPlaceholder(id: string, field: 'root' | 'archon') {
-  if (field === 'archon') return '/path/to/your/adapter-workspace';
-  if (id === 'archon') return '/path/to/your/adapter-workspace/projects';
+function configPlaceholder(id: string, field: 'root' | 'workspace') {
+  if (field === 'workspace') return '/path/to/your/adapter-workspace';
+  if (id === 'custom-local') return '/path/to/your/adapter-workspace/projects';
   return '/path/to/your/projects';
 }
 
 interface CardState {
   projectRoot: string;
-  archonRoot: string;
+  workspaceRoot: string;
   busy: boolean;
   saved: boolean;
   error: string | null;
 }
 
 function defaultCardState(): CardState {
-  return { projectRoot: '', archonRoot: '', busy: false, saved: false, error: null };
+  return { projectRoot: '', workspaceRoot: '', busy: false, saved: false, error: null };
 }
 
 export default function IntegrationsTab() {
@@ -58,8 +58,8 @@ export default function IntegrationsTab() {
     try {
       const config: Record<string, string> = {};
       if (state.projectRoot.trim()) config.projectRoot = state.projectRoot.trim();
-      if (integration.id === 'archon' && state.archonRoot.trim()) {
-        config.archonRoot = state.archonRoot.trim();
+      if (integration.id === 'custom-local' && state.workspaceRoot.trim()) {
+        config.workspaceRoot = state.workspaceRoot.trim();
       }
       await configureIntegration(integration.id, config);
       // Refresh full aggregate so integrations[].configured updates in store.
@@ -127,15 +127,15 @@ export default function IntegrationsTab() {
 
             {/* Config fields */}
             <div className="space-y-3">
-              {integration.id === 'archon' && (
+              {integration.id === 'custom-local' && (
                 <label className="block">
                   <span className="block text-[11px] font-mono uppercase text-ink-400 mb-1 tracking-wider">
                     Workspace root
                   </span>
                   <input
-                    value={state.archonRoot}
-                    onChange={(e) => patchCard(integration.id, { archonRoot: e.target.value })}
-                    placeholder={configPlaceholder(integration.id, 'archon')}
+                    value={state.workspaceRoot}
+                    onChange={(e) => patchCard(integration.id, { workspaceRoot: e.target.value })}
+                    placeholder={configPlaceholder(integration.id, 'workspace')}
                     className="w-full px-3 py-2 text-sm bg-paper-warm border border-ink-100
                                rounded-card outline-none focus:ring-2 focus:ring-sage-400
                                transition-all placeholder:text-ink-300"

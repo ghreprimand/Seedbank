@@ -120,7 +120,10 @@ export class AgentService {
   private readonly activeRuns = new Map<string, ActiveRun>();
   private readonly streamListeners = new Map<string, Set<StreamListener>>();
 
-  constructor(private readonly repository: SeedbankRepository) {
+  constructor(
+    private readonly repository: SeedbankRepository,
+    private readonly integrationRootsProvider: () => string[] = () => [],
+  ) {
     this.runStore = new AgentRunStore(repository.database());
     ensureDir(scratchRoot);
     ensureDir(runsRoot);
@@ -156,14 +159,9 @@ export class AgentService {
 
   private configuredRoots(): string[] {
     const roots = new Set<string>([scratchRoot]);
-    const archon = this.repository.getSetting<{ projectRoot?: string; archonRoot?: string }>('integration:archon') ?? {};
-    const generic = this.repository.getSetting<{ projectRoot?: string }>('integration:generic-project') ?? {};
-
-    if (archon.projectRoot?.trim()) roots.add(path.resolve(expandHome(archon.projectRoot.trim())));
-    if (archon.archonRoot?.trim()) {
-      roots.add(path.resolve(path.join(expandHome(archon.archonRoot.trim()), 'projects')));
+    for (const root of this.integrationRootsProvider()) {
+      roots.add(path.resolve(expandHome(root)));
     }
-    if (generic.projectRoot?.trim()) roots.add(path.resolve(expandHome(generic.projectRoot.trim())));
     return [...roots];
   }
 
