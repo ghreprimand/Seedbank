@@ -1,42 +1,35 @@
 # Architecture
 
-Seedbank is a local-first monorepo with a durable backend. The app is designed to feel fast and private while avoiding the fragility of browser-only persistence.
+Seedbank is a local-first monorepo with a durable backend. The client prefers the API and falls back to local browser storage when the API is unavailable.
 
 ## System Overview
 
 ```text
-Browser
-  React 19 + Vite + Tailwind
+Browser (React 19 + Vite + Tailwind)
   client/src/api/client.ts
-        │
-        │ REST first
-        ▼
+        |
+        v
 Express API
   server/src/index.ts
-  server/src/repository.ts
-        │
-        ▼
+        |
+        v
 SQLite
   ~/.seedbank/seedbank.db
 ```
 
-Fallback path:
+Fallback path when API is down:
 
 ```text
-Browser ↔ Dexie / IndexedDB
+Browser <-> Dexie / IndexedDB cache
 ```
-
-The client always prefers the API. If the API is unreachable, it falls back to IndexedDB so the user can still read and edit local cached ideas.
 
 ## Monorepo Packages
 
-```text
-client/   React SPA, API client, Dexie fallback
-server/   Express routes, SQLite repository, AI, integrations
-shared/   TypeScript domain types
-```
+- `client/` — SPA UI, settings store, API client, offline fallback cache
+- `server/` — Express routes, auth, SQLite repository, AI, integrations, agent runner
+- `shared/` — shared TypeScript domain types
 
-Root scripts coordinate both packages:
+Top-level scripts:
 
 ```bash
 npm run dev
@@ -45,130 +38,169 @@ npm run typecheck
 npm run lint
 ```
 
-## Data Model
+## Persistence Model
 
-Core tables:
+Primary DB tables:
+- `ideas`
+- `versions`
+- `settings`
+- `ai_*` usage/conversation tables
+- `api_tokens` (`server/migrations/003_api_tokens.sql`)
+- `agent_runs` (`server/migrations/004_agent_runs.sql`)
 
-- `ideas` — the current idea records.
-- `versions` — point-in-time snapshots of idea content.
-- `settings` — user preferences, AI config, integration config, and backup metadata.
-- AI conversation and usage tables are added by the AI migration.
+`settings` is namespaced and now includes keys such as:
+- `ui.theme`
+- `ai.config` (legacy `ai:config` migrated on startup)
+- `api.webhooks`
+- `agents.config`
+- `integration:archon`
+- `integration:generic-project`
+- backup keys (`backup.config`, `backup.lastRun`)
 
-Ideas include:
+## Settings Architecture
 
-- identity fields: `id`, `title`, `pitch`
-- development fields: notes, hook, why it might work, risks, tech stack
-- organization fields: category, stage, tags, mood labels
-- relationship fields: related ideas, links, images
-- lifecycle fields: created, updated, deleted, graduated target
+Server aggregate endpoint:
+- `GET /api/settings`
 
-## REST API Boundary
+Section patch endpoint:
+- `PATCH /api/settings/:section`
 
-The API is the durable source of truth. `client/src/api/client.ts` owns:
+The server composes a single aggregate payload containing:
+- UI theme
+- AI public config
+- API webhooks and token metadata
+- linked-agent public status
+- backup status
+- integration summaries
+- server info
 
-- request construction
-- response hydration from ISO strings back into `Date`
-- connection status
-- cache writes into Dexie
-- fallback behavior when the backend is unavailable
+Client state:
+- `client/src/stores/settings.ts` (Zustand)
+- hydrates from `GET /api/settings`
+- writes through `PATCH /api/settings/:section`
+- preserves theme behavior offline via `localStorage`
 
-This keeps React components from knowing whether data came from SQLite or IndexedDB.
+## Theme Token Layer
 
-## Offline Fallback Strategy
+Theme architecture is palette-only and does not require component rewrites:
+- `client/src/theme/themes.css` defines per-theme `--c-*` tokens.
+- `client/src/index.css` maps Tailwind semantic tokens (`--color-*`) to `--c-*` via `@theme`.
+- `client/src/main.tsx` sets `data-theme` before first paint to avoid FOUC.
 
-Dexie is retained for two reasons:
+Result: components continue using semantic utility classes (`bg-paper`, `text-ink-800`) across all themes.
 
-1. Existing users may already have IndexedDB data.
-2. The app should remain useful if the backend is temporarily unavailable.
+## API Security Model
 
-On first launch with the backend available, Seedbank can migrate browser data into SQLite. The migration preserves:
+Auth middleware (`server/src/middleware/auth.ts`) runs on `/api`:
+- Loopback requests can use implicit local auth with no bearer token.
+- Non-loopback requests must present `Authorization: Bearer <token>`.
+- Bearer tokens are scoped and deny-by-default per route.
 
-- idea IDs
-- created and updated timestamps
-- deleted/graduated state where present
-- version history
+Token storage:
+- plaintext token is returned once at creation
+- only `sha256` hash is stored in `api_tokens`
 
-After migration, Dexie remains a cache and fallback, not the primary persistence layer.
+Important hardening:
+- `POST /api/tokens` requires implicit local session, preventing bearer token chaining.
+- `trust proxy` is disabled in Express to reduce IP spoofing ambiguity in local-first deployments.
 
-## Soft Delete and Compost
+## OpenAPI and API Surface
 
-Deleting an idea sets `deletedAt` instead of removing the row. Active list endpoints exclude deleted ideas by default.
+`server/src/openapi.ts` builds the OpenAPI document served at:
+- `GET /api/openapi.json`
 
-Compost endpoints:
+This spec is the machine-readable API contract used by the in-app API reference.
 
-- list deleted ideas
-- restore an idea
-- permanently purge an idea
+## Webhook Subsystem
 
-Compost uses a 30-day retention window. Expired deleted ideas are purged when the compost list is requested.
+`server/src/webhooks.ts` delivers optional outbound events:
+- `idea.created`
+- `idea.graduated`
+- `idea.shipped`
 
-## Backup System
+Delivery characteristics:
+- queued async dispatch
+- max queue depth 500 (drops oldest when full)
+- 5 second request timeout
+- redirects refused
+- no HMAC signing in v1
 
-Seedbank stores data under:
+## MCP Facade
+
+Read-only MCP-style endpoints:
+- `GET /api/mcp/ideas`
+- `GET /api/mcp/ideas/:id`
+- `GET /api/mcp/search`
+
+These routes require `mcp:read` for bearer auth and are designed for external agent/tool context pulls, not mutation.
+
+## Agent Runner Architecture
+
+Core modules:
+- `server/src/agents/link.ts` — CLI binary resolution and `--version` validation for `claude`/`codex`
+- `server/src/agents/service.ts` — run lifecycle, process control, transcript streaming, safety rails
+- `server/src/agents/store.ts` — `agent_runs` persistence
+
+Execution model:
+- Seedbank spawns local CLI processes (`spawn`) in either:
+  - scratch workspace for idea development mode
+  - graduated project path for continue mode
+- environment is intentionally inherited so CLIs can discover local credentials/session.
+
+Transcript model:
+- transcript written to disk under `~/.seedbank/agent-runs/<runId>.log`
+- capped at 256 KB with truncation marker
+- run API exposes transcript content, not internal transcript file paths
+
+Persistence model (`agent_runs`):
+- run metadata and state
+- transcript path (internal)
+- proposed files JSON
+- startup normalization marks orphaned `running` rows as `failed`
+
+## Agent Safety Rails
+
+Implemented safety controls include:
+- per-run runtime cap (`runtimeCapMinutes`, max 30)
+- daily run budget (`dailyRunBudget`)
+- explicit stop endpoint with SIGTERM then SIGKILL escalation
+- workspace root allowlist for continue mode (configured integration roots)
+- scratch apply-only behavior for attachment copy flow
+- no direct auto-write to canonical idea fields
+- symlink traversal protections during proposed-file collection and apply
+
+This keeps the agent role as a constrained assistant that proposes changes and requires explicit user acceptance.
+
+## Integration Architecture
+
+Integrations live under `server/src/integrations/` and implement a shared interface. The registry currently provides:
+- `archon`
+- `generic-project`
+
+Graduation is server-side because it performs local filesystem writes and then updates idea lifecycle fields (`graduatedTo`, `stage`).
+
+## Backup Architecture
+
+Data directory:
 
 ```text
 ~/.seedbank/
 ├── seedbank.db
 ├── backups/
-└── exports/
+├── exports/
+├── scratch/
+├── agent-runs/
+└── attachments/
 ```
 
-Backups include:
-
-- startup database copy
-- manual backup from the UI
-- scheduled daily or weekly database backup
+Backup flow supports:
+- scheduled daily/weekly DB copies
+- manual backup runs
 - optional JSON archive export
-
-The server keeps the newest 10 database backup files. JSON exports are written to `~/.seedbank/exports/` for portable archive recovery.
-
-## AI Architecture
-
-The AI layer lives in `server/src/ai/`.
-
-Responsibilities:
-
-- provider abstraction for OpenAI, Anthropic, and Ollama
-- provider configuration stored in settings
-- server-side API key handling
-- streaming chat endpoint
-- single-shot suggestion endpoint
-- conversation persistence per idea
-- token usage tracking and budget checks
-
-The browser never calls model providers directly. It sends idea context to the local Seedbank API, and the server handles provider-specific requests.
-
-## Encryption and Key Handling
-
-AI keys are accepted through server configuration endpoints. Public config responses expose booleans such as `hasOpenAIKey`, not raw keys.
-
-The AI module includes a crypto helper for protecting stored secrets. In local deployments, the encryption material should be treated like any other local application secret: protect the user account and the `~/.seedbank` directory.
-
-## Integration Architecture
-
-Integrations live under `server/src/integrations/` and implement a common interface. The registry exposes all available integrations to the frontend.
-
-Graduation is intentionally server-side because it may create files on disk. The browser chooses an integration; the server performs the scaffold work and updates the idea with `graduatedTo`.
-
-## Import and Export
-
-JSON archive format:
-
-```json
-{
-  "seedbankVersion": 1,
-  "exportedAt": "2026-05-11T00:00:00.000Z",
-  "ideas": [],
-  "versions": []
-}
-```
-
-Markdown export is optimized for reading. JSON export is optimized for backup and restore.
 
 ## Operational Notes
 
-- The API defaults to port `4800`.
-- The Vite client defaults to port `5173`.
-- The SQLite database uses WAL mode.
-- CORS accepts local development origins.
-- The server is intentionally lightweight and local-machine oriented.
+- API default port: `4800`
+- Vite default port: `5173`
+- SQLite uses WAL mode
+- CORS is restricted to local origins (`localhost` / `127.0.0.1`)
