@@ -2,6 +2,9 @@
 
 This folder holds deterministic screenshots used by the top-level `README.md`.
 
+Generated image captures in this folder are ignored by default via `.gitignore`.
+Only final curated screenshots should be explicitly staged, reviewed for privacy/platform-neutral wording, and committed.
+
 ## Capture Script
 
 Use the capture script from repo root:
