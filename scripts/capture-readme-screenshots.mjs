@@ -240,7 +240,7 @@ async function redactApiServerSensitiveText(page) {
       if (text.includes('Database')) {
         const monos = row.querySelectorAll('span');
         if (monos.length > 1) {
-          monos[1].textContent = '/seedbank/seedbank.db';
+          monos[1].textContent = '<seedbank-data-dir>/seedbank.db';
         }
       }
     }
