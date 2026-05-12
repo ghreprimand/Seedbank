@@ -35,7 +35,7 @@ The server runs on `http://localhost:4800`. If Vite finds `5173` occupied, it wi
 - **Six runtime themes** — Paper, Parchment, Meadow, Dusk, Loam, and Moss; switchable live from Settings → Theme, with system dark/light auto-pairing.
 - **Settings page** — a permanent `/settings` home for every configuration option: AI providers, agents, theme, API tokens, webhooks, backups, integrations, and app info.
 - **Personal access tokens** — generate scoped bearer tokens (`read:ideas`, `write:ideas`, `ai:suggest`) for local scripting. Tokens are hashed at rest; creation is localhost-only.
-- **Outbound webhooks** — fire a JSON payload to any URL on `idea.created`, `idea.updated`, `idea.graduated`, or `idea.shipped`. Useful for Zapier, n8n, or local automation.
+- **Outbound webhooks** — fire a JSON payload to any URL on `idea.created`, `idea.graduated`, or `idea.shipped`. Useful for Zapier, n8n, or local automation.
 - **Read-only MCP endpoints** — `/api/mcp/ideas` and `/api/mcp/search` expose seeds as context for external Claude or Codex sessions; token-gated.
 - **OpenAPI spec** — machine-readable at `/api/openapi.json`; browsable from Settings → API & Server.
 - **Local CLI agent runs** — link a Claude Code or Codex CLI binary in Settings → AI & Agents; launch a sandboxed "Develop with agent" run from any idea. Transcript streamed live; proposed files reviewed and accepted before anything is saved. Runtime capped; kill switch always present.
