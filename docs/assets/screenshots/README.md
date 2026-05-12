@@ -36,7 +36,7 @@ node scripts/capture-readme-screenshots.mjs \
 To avoid using personal/local Seedbank data, run server/client with an isolated data dir:
 
 ```bash
-SEEDBANK_DATA_DIR=/tmp/seedbank-v22-screens npm run dev -w server
+SEEDBANK_DATA_DIR=<seedbank-data-dir> npm run dev -w server
 npm run dev -w client
 node scripts/capture-readme-screenshots.mjs --api-url=http://127.0.0.1:4800
 ```
