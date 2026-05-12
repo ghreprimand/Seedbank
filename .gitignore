@@ -25,10 +25,10 @@ local-archive/
 *.seedbank.backup.json
 
 # Generated screenshot captures (keep docs/assets/screenshots/README.md tracked)
-docs/assets/screenshots/*.jpg
-docs/assets/screenshots/*.jpeg
-docs/assets/screenshots/*.png
-docs/assets/screenshots/*.webp
+docs/assets/screenshots/**/*.jpg
+docs/assets/screenshots/**/*.jpeg
+docs/assets/screenshots/**/*.png
+docs/assets/screenshots/**/*.webp
 
 # OS/editor noise
 .DS_Store
