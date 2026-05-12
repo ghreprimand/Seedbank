@@ -11,13 +11,15 @@
     "status": "bash scripts/seedbank status",
     "build": "npm run build -w client && npm run build -w server",
     "lint": "npm run lint -w client",
-    "typecheck": "npm run typecheck -w client && npm run typecheck -w server"
+    "typecheck": "npm run typecheck -w client && npm run typecheck -w server",
+    "screenshots:readme": "node scripts/capture-readme-screenshots.mjs"
   },
   "workspaces": [
     "client",
     "server"
   ],
   "devDependencies": {
-    "concurrently": "^9.2.1"
+    "concurrently": "^9.2.1",
+    "playwright": "^1.60.0"
   }
 }
