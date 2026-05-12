@@ -1,12 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Bot, Check, ChevronDown, Send, Settings, X } from 'lucide-react';
-import type { AiChatMessage, AiConfigInput, AiProviderId, AiPublicConfig, Idea } from '@/lib/types';
-import {
-  getAiConfig,
-  getAiConversation,
-  streamAiChat,
-  updateAiConfig,
-} from '@/api/client';
+import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Bot, ChevronDown, Send, Settings, X } from 'lucide-react';
+import type { AiChatMessage, Idea } from '@/lib/types';
+import { getAiConversation, streamAiChat } from '@/api/client';
+import { useAiSettings } from '@/stores/settings';
 
 interface AiThinkingPanelProps {
   idea: Idea;
@@ -40,61 +37,32 @@ const ORGANIC_MODES: Array<{ label: string; prompt: string }> = [
   },
 ];
 
-function blankConfig(): AiConfigInput {
-  return {
-    provider: 'ollama',
-    openaiModel: 'gpt-5.5',
-    anthropicModel: 'claude-sonnet-4-5',
-    ollamaModel: 'llama3.2',
-    ollamaBaseUrl: 'http://localhost:11434',
-    dailyTokenBudget: 200000,
-  };
-}
-
 export default function AiThinkingPanel({ idea, onApply }: AiThinkingPanelProps) {
   const [open, setOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [messages, setMessages] = useState<AiChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [streamingText, setStreamingText] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [config, setConfig] = useState<AiPublicConfig | null>(null);
-  const [configDraft, setConfigDraft] = useState<AiConfigInput>(blankConfig);
-  const [configSaved, setConfigSaved] = useState(false);
   const localMessageCounter = useRef(0);
+
+  // Read provider config from the settings store (A2 — single source of truth).
+  const aiConfig = useAiSettings();
+
+  const providerStatus = (() => {
+    if (aiConfig.provider === 'openai') return aiConfig.hasOpenAIKey ? aiConfig.openaiModel : 'OpenAI key needed';
+    if (aiConfig.provider === 'anthropic') return aiConfig.hasAnthropicKey ? aiConfig.anthropicModel : 'Anthropic key needed';
+    return aiConfig.ollamaModel;
+  })();
 
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    Promise.all([getAiConfig(), getAiConversation(idea.id)])
-      .then(([nextConfig, nextMessages]) => {
-        if (cancelled) return;
-        setConfig(nextConfig);
-        setConfigDraft({
-          provider: nextConfig.provider,
-          openaiModel: nextConfig.openaiModel,
-          anthropicModel: nextConfig.anthropicModel,
-          ollamaModel: nextConfig.ollamaModel,
-          ollamaBaseUrl: nextConfig.ollamaBaseUrl,
-          dailyTokenBudget: nextConfig.dailyTokenBudget,
-        });
-        setMessages(nextMessages);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
-      });
-    return () => {
-      cancelled = true;
-    };
+    getAiConversation(idea.id)
+      .then((msgs) => { if (!cancelled) setMessages(msgs); })
+      .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : String(err)); });
+    return () => { cancelled = true; };
   }, [open, idea.id]);
-
-  const providerStatus = useMemo(() => {
-    if (!config) return '';
-    if (config.provider === 'openai') return config.hasOpenAIKey ? config.openaiModel : 'OpenAI key needed';
-    if (config.provider === 'anthropic') return config.hasAnthropicKey ? config.anthropicModel : 'Anthropic key needed';
-    return config.ollamaModel;
-  }, [config]);
 
   const submit = async (override?: string) => {
     const content = (override ?? input).trim();
@@ -125,22 +93,6 @@ export default function AiThinkingPanel({ idea, onApply }: AiThinkingPanelProps)
     }
   };
 
-  const saveConfig = async () => {
-    setConfigSaved(false);
-    const next = await updateAiConfig(configDraft);
-    setConfig(next);
-    setConfigDraft({
-      provider: next.provider,
-      openaiModel: next.openaiModel,
-      anthropicModel: next.anthropicModel,
-      ollamaModel: next.ollamaModel,
-      ollamaBaseUrl: next.ollamaBaseUrl,
-      dailyTokenBudget: next.dailyTokenBudget,
-    });
-    setConfigSaved(true);
-    setTimeout(() => setConfigSaved(false), 1500);
-  };
-
   const applyMessage = (field: keyof Idea, content: string) => {
     if (typeof idea[field] !== 'string') return;
     onApply({ [field]: content } as Partial<Idea>);
@@ -165,105 +117,15 @@ export default function AiThinkingPanel({ idea, onApply }: AiThinkingPanelProps)
 
       {open && (
         <div className="border-t border-ink-100 p-4 space-y-4">
+          {/* Link to full AI settings instead of inline popover */}
           <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={() => setSettingsOpen((value) => !value)}
-              className="inline-flex items-center gap-1 text-xs text-ink-400 hover:text-sage-700"
+            <Link
+              to="/settings/ai-agents"
+              className="inline-flex items-center gap-1 text-xs text-ink-400 hover:text-sage-700 transition-colors"
             >
-              <Settings className="w-3 h-3" /> Settings
-            </button>
+              <Settings className="w-3 h-3" /> AI settings
+            </Link>
           </div>
-
-          {settingsOpen && (
-            <div className="bg-paper-warm border border-ink-100 rounded-card p-3 space-y-3">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <label className="text-xs text-ink-500">
-                  Provider
-                  <select
-                    value={configDraft.provider}
-                    onChange={(event) => setConfigDraft((draft) => ({ ...draft, provider: event.target.value as AiProviderId }))}
-                    className="mt-1 w-full px-2 py-2 bg-paper border border-ink-100 rounded-card text-sm"
-                  >
-                    <option value="ollama">Ollama</option>
-                    <option value="openai">OpenAI</option>
-                    <option value="anthropic">Anthropic</option>
-                  </select>
-                </label>
-                <label className="text-xs text-ink-500">
-                  Daily token budget
-                  <input
-                    type="number"
-                    value={configDraft.dailyTokenBudget ?? 200000}
-                    onChange={(event) => setConfigDraft((draft) => ({ ...draft, dailyTokenBudget: Number(event.target.value) }))}
-                    className="mt-1 w-full px-2 py-2 bg-paper border border-ink-100 rounded-card text-sm"
-                  />
-                </label>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <label className="text-xs text-ink-500">
-                  OpenAI model
-                  <input
-                    value={configDraft.openaiModel ?? ''}
-                    onChange={(event) => setConfigDraft((draft) => ({ ...draft, openaiModel: event.target.value }))}
-                    className="mt-1 w-full px-2 py-2 bg-paper border border-ink-100 rounded-card text-sm"
-                  />
-                </label>
-                <label className="text-xs text-ink-500">
-                  Anthropic model
-                  <input
-                    value={configDraft.anthropicModel ?? ''}
-                    onChange={(event) => setConfigDraft((draft) => ({ ...draft, anthropicModel: event.target.value }))}
-                    className="mt-1 w-full px-2 py-2 bg-paper border border-ink-100 rounded-card text-sm"
-                  />
-                </label>
-                <label className="text-xs text-ink-500">
-                  Ollama model
-                  <input
-                    value={configDraft.ollamaModel ?? ''}
-                    onChange={(event) => setConfigDraft((draft) => ({ ...draft, ollamaModel: event.target.value }))}
-                    className="mt-1 w-full px-2 py-2 bg-paper border border-ink-100 rounded-card text-sm"
-                  />
-                </label>
-              </div>
-              <label className="block text-xs text-ink-500">
-                Ollama base URL
-                <input
-                  value={configDraft.ollamaBaseUrl ?? ''}
-                  onChange={(event) => setConfigDraft((draft) => ({ ...draft, ollamaBaseUrl: event.target.value }))}
-                  className="mt-1 w-full px-2 py-2 bg-paper border border-ink-100 rounded-card text-sm"
-                />
-              </label>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <label className="text-xs text-ink-500">
-                  OpenAI API key
-                  <input
-                    type="password"
-                    placeholder={config?.hasOpenAIKey ? 'Stored' : 'sk-...'}
-                    onChange={(event) => setConfigDraft((draft) => ({ ...draft, openaiApiKey: event.target.value }))}
-                    className="mt-1 w-full px-2 py-2 bg-paper border border-ink-100 rounded-card text-sm"
-                  />
-                </label>
-                <label className="text-xs text-ink-500">
-                  Anthropic API key
-                  <input
-                    type="password"
-                    placeholder={config?.hasAnthropicKey ? 'Stored' : 'sk-ant-...'}
-                    onChange={(event) => setConfigDraft((draft) => ({ ...draft, anthropicApiKey: event.target.value }))}
-                    className="mt-1 w-full px-2 py-2 bg-paper border border-ink-100 rounded-card text-sm"
-                  />
-                </label>
-              </div>
-              <button
-                type="button"
-                onClick={saveConfig}
-                className="inline-flex items-center gap-1 px-3 py-2 text-xs font-semibold bg-sage-600 hover:bg-sage-700 text-white rounded-card"
-              >
-                {configSaved ? <Check className="w-3 h-3" /> : <Settings className="w-3 h-3" />}
-                {configSaved ? 'Saved' : 'Save AI settings'}
-              </button>
-            </div>
-          )}
 
           <div className="space-y-3 max-h-96 overflow-y-auto">
             {messages.length === 0 && !streamingText && (
@@ -327,7 +189,7 @@ export default function AiThinkingPanel({ idea, onApply }: AiThinkingPanelProps)
               onKeyDown={(event) => {
                 if (event.key === 'Enter' && !event.shiftKey) {
                   event.preventDefault();
-                  submit();
+                  void submit();
                 }
               }}
               placeholder="Ask a reflective question…"
@@ -335,7 +197,7 @@ export default function AiThinkingPanel({ idea, onApply }: AiThinkingPanelProps)
             />
             <button
               type="button"
-              onClick={() => submit()}
+              onClick={() => void submit()}
               disabled={busy || !input.trim()}
               className="inline-flex items-center justify-center w-10 h-10 bg-sage-600 hover:bg-sage-700 disabled:bg-ink-200 text-white rounded-card"
             >

@@ -182,6 +182,16 @@ export class AiService {
     return this.store.getMessages(ideaId);
   }
 
+  getUsageSummary(): { last24h: number; last7d: number } {
+    const now = Date.now();
+    const since24h = new Date(now - 24 * 60 * 60 * 1000).toISOString();
+    const since7d = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString();
+    return {
+      last24h: this.store.tokensSince(since24h),
+      last7d: this.store.tokensSince(since7d),
+    };
+  }
+
   private provider(config: AiStoredConfig): AiProvider {
     const provider = this.providers.get(config.provider);
     if (!provider) throw new Error(`Unknown AI provider: ${config.provider}`);

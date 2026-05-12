@@ -37,10 +37,12 @@ import RelatedIdeasLinker from '@/components/RelatedIdeasLinker';
 import VersionHistory from '@/components/VersionHistory';
 import GraduationModal from '@/components/GraduationModal';
 import AiChatPanel from '@/components/AiChatPanel';
+import AgentRunPanel from '@/components/AgentRunPanel';
 import IdeaHealthCheck from '@/components/IdeaHealthCheck';
 import AiSuggestionButton from '@/components/AiSuggestionButton';
 import type { GraduationResponse } from '@/api/client';
 import { exportIdeaAsMarkdown, exportIdeaAsJSON } from '@/lib/export';
+import { useAgentsSettings } from '@/stores/settings';
 
 /** Auto-save debounce delay in ms */
 const SAVE_DELAY = 800;
@@ -59,6 +61,11 @@ export default function IdeaDetail() {
   const [exportOpen, setExportOpen] = useState(false);
   const [graduationOpen, setGraduationOpen] = useState(false);
   const [graduationMessage, setGraduationMessage] = useState<string | null>(null);
+  const [agentPanelOpen, setAgentPanelOpen] = useState(false);
+  const [agentContinuePath, setAgentContinuePath] = useState<string | undefined>();
+
+  const agents = useAgentsSettings();
+  const anyAgentLinked = agents.claudeLinked || agents.codexLinked;
 
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -348,16 +355,32 @@ export default function IdeaDetail() {
           </div>
 
           {idea.graduatedTo && (
-            <a
-              href={`file://${idea.graduatedTo}`}
-              className="flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium font-mono
-                         text-sage-700 bg-sage-50 border border-sage-200 rounded-badge
-                         hover:border-sage-300 transition-colors"
-            >
-              <Rocket className="w-3 h-3" />
-              Graduated
-              <ExternalLink className="w-3 h-3" />
-            </a>
+            <div className="flex items-center gap-2 flex-wrap">
+              <a
+                href={`file://${idea.graduatedTo}`}
+                className="flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium font-mono
+                           text-sage-700 bg-sage-50 border border-sage-200 rounded-badge
+                           hover:border-sage-300 transition-colors"
+              >
+                <Rocket className="w-3 h-3" />
+                Graduated
+                <ExternalLink className="w-3 h-3" />
+              </a>
+              {anyAgentLinked && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAgentContinuePath(idea.graduatedTo ?? undefined);
+                    setAgentPanelOpen(true);
+                  }}
+                  className="flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium font-mono
+                             text-ink-600 bg-paper-warm border border-ink-200 rounded-badge
+                             hover:border-sage-300 hover:text-sage-700 hover:bg-sage-50 transition-colors"
+                >
+                  Continue with agent
+                </button>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -492,7 +515,23 @@ export default function IdeaDetail() {
         <IdeaHealthCheck idea={idea} />
       </div>
 
-      <div className="pt-5 border-t border-ink-100">
+      <div className="pt-5 border-t border-ink-100 space-y-3">
+        {anyAgentLinked && (
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => {
+                setAgentContinuePath(undefined);
+                setAgentPanelOpen(true);
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium
+                         border border-ink-200 text-ink-600 hover:border-sage-300 hover:text-sage-700
+                         hover:bg-sage-50 rounded-card transition-colors"
+            >
+              Develop with agent
+            </button>
+          </div>
+        )}
         <AiChatPanel idea={idea} onApply={saveNow} />
       </div>
 
@@ -538,6 +577,17 @@ export default function IdeaDetail() {
           idea={idea}
           onClose={() => setGraduationOpen(false)}
           onGraduated={handleGraduated}
+        />
+      )}
+
+      {agentPanelOpen && (
+        <AgentRunPanel
+          idea={idea}
+          projectPath={agentContinuePath}
+          onClose={() => {
+            setAgentPanelOpen(false);
+            setAgentContinuePath(undefined);
+          }}
         />
       )}
     </div>

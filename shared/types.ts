@@ -268,10 +268,49 @@ export interface UiThemeConfig {
   matchSystem: boolean;
 }
 
+export type AgentProvider = 'claude' | 'codex';
+
 export interface AgentsPublicConfig {
   claudeLinked: boolean;
   codexLinked: boolean;
+  claudeVersion?: string;
+  codexVersion?: string;
 }
+
+export interface AgentLinkResult {
+  provider: AgentProvider;
+  linked: boolean;
+  version?: string;
+  cliPath?: string;
+}
+
+export type AgentRunStatus = 'pending' | 'running' | 'stopped' | 'done' | 'error';
+
+export interface AgentProposedFile {
+  path: string;
+  content: string;
+  /** Whether the user has accepted this file to be applied */
+  accepted?: boolean;
+}
+
+export interface AgentRun {
+  id: string;
+  ideaId: string;
+  provider: AgentProvider;
+  status: AgentRunStatus;
+  prompt: string;
+  transcriptLines: string[];
+  proposedFiles: AgentProposedFile[];
+  createdAt: string;
+  updatedAt: string;
+  errorMessage?: string;
+}
+
+export type AgentRunEvent =
+  | { type: 'line'; text: string }
+  | { type: 'file'; file: AgentProposedFile }
+  | { type: 'status'; status: AgentRunStatus }
+  | { type: 'error'; message: string };
 
 export interface WebhooksConfig {
   url: string | null;

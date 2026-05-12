@@ -203,6 +203,10 @@ function sortIdeas(ideas: Idea[], sortBy: SortField, sortDirection: SortDirectio
 export class SeedbankRepository {
   constructor(private readonly db: Database.Database) {}
 
+  database(): Database.Database {
+    return this.db;
+  }
+
   private insertOrReplaceIdea(idea: Idea) {
     this.db.prepare(`
       INSERT INTO ideas (

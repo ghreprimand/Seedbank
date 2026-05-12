@@ -240,14 +240,14 @@ export default function ThemeTab() {
   const uiTheme = useUiSettings().theme;
   const patchStore = useSettingsStore((s) => s.patch);
 
-  const [prefs, setPrefs] = useState<ThemePrefs>(() => {
-    // Prefer the store value (already accounts for matchSystem); fall back to DOM.
-    const applied = currentAppliedTheme();
-    if (uiTheme) {
-      return { name: uiTheme.name, matchSystem: uiTheme.matchSystem };
-    }
-    return { name: applied, matchSystem: false };
-  });
+  // localPrefs is null until the user interacts. When null, display falls back to
+  // uiTheme from the store — this way the card automatically reflects server state
+  // when the store hydrates (fixes direct /settings/theme loads showing stale card).
+  const [localPrefs, setLocalPrefs] = useState<ThemePrefs | null>(null);
+  const prefs: ThemePrefs = localPrefs ?? {
+    name: uiTheme?.name ?? currentAppliedTheme(),
+    matchSystem: uiTheme?.matchSystem ?? false,
+  };
 
   const cardRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
@@ -264,7 +264,7 @@ export default function ThemeTab() {
 
   const selectTheme = (name: ThemeName) => {
     const next: ThemePrefs = { name, matchSystem: false };
-    setPrefs(next);
+    setLocalPrefs(next);
     // Apply immediately (optimistic).
     applyTheme(name);
     // Persist to server + localStorage (fire-and-forget; offline fallback is handled in store).
@@ -275,7 +275,7 @@ export default function ThemeTab() {
 
   const toggleMatchSystem = () => {
     const next: ThemePrefs = { ...prefs, matchSystem: !prefs.matchSystem };
-    setPrefs(next);
+    setLocalPrefs(next);
     const resolved = next.matchSystem ? resolveThemeName(next) : prefs.name;
     applyTheme(resolved);
     patchStore('ui', { theme: { name: resolved, matchSystem: next.matchSystem } }).catch(() => {});

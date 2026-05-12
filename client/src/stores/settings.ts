@@ -23,6 +23,8 @@ import {
 import {
   readThemePrefs,
   writeThemePrefs,
+  applyTheme,
+  resolveThemeName,
   VALID_THEME_NAMES,
 } from '@/theme/themeUtils';
 
@@ -108,13 +110,16 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
       // Write-through: mirror ui.theme to localStorage so pre-paint bootstrap
       // is correct even if the server is down on next cold boot.
+      // Also apply to the DOM immediately so live sessions don't need a reload.
       if (data.ui?.theme) {
-        writeThemePrefs({
+        const prefs = {
           name: (VALID_THEME_NAMES as readonly string[]).includes(data.ui.theme.name)
             ? (data.ui.theme.name as ThemeName)
             : 'paper',
           matchSystem: data.ui.theme.matchSystem,
-        });
+        };
+        writeThemePrefs(prefs);
+        applyTheme(resolveThemeName(prefs));
       }
     } catch {
       // Offline — build best-effort state from localStorage
