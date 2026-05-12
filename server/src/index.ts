@@ -526,7 +526,11 @@ app.patch('/api/settings/:section', requireScope('write:ideas'), asyncRoute((req
   const section = routeParam(req, 'section');
 
   if (section === 'ui') {
-    const VALID_THEMES: readonly ThemeName[] = ['paper', 'parchment', 'meadow', 'dusk', 'loam', 'moss'];
+    const VALID_THEMES: readonly ThemeName[] = [
+      'paper', 'parchment', 'meadow', 'dusk',
+      'hearth', 'rainwash',
+      'loam', 'moss', 'peat', 'canopy',
+    ];
     const body = req.body as { theme?: Partial<UiThemeConfig> };
     if (body?.theme?.name !== undefined && !VALID_THEMES.includes(body.theme.name)) {
       res.status(400).json({ error: `Invalid theme name: ${String(body.theme.name)}` });

@@ -483,3 +483,321 @@
   --c-bg-spot-warm: rgba(80, 100, 70, 0.08);
   --c-bg-spot-sage: rgba(60, 110, 70, 0.06);
 }
+
+
+/* ═══════════════════════════════════════════════════════════
+   THEME 7 — Hearth  (MID-DEPTH, warm)
+   Adobe clay / terracotta-brown surfaces. Not as dark as Loam.
+   Scale INVERTED like dark themes: ink-800 = near-white primary text.
+   Action colour: golden ochre (sage-500) — warm and visible on clay.
+   ═══════════════════════════════════════════════════════════ */
+:root[data-theme="hearth"] {
+  --c-paper:      #5c4838;
+  --c-paper-warm: #503e2c;
+  --c-paper-dim:  #443220;
+
+  /* Sage → golden ochre action colour on clay */
+  --c-sage-50:  #301e0e;  /* dark badge bg */
+  --c-sage-100: #44301a;
+  --c-sage-200: #5e4428;
+  --c-sage-300: #7a5c38;
+  --c-sage-400: #9c7a52;
+  --c-sage-500: #c09870;  /* main action — warm ochre */
+  --c-sage-600: #a07c52;  /* button bg */
+  --c-sage-700: #d8b898;  /* badge text on sage-50 dark bg */
+  --c-sage-800: #ecd0b4;
+  --c-sage-900: #f6e4cc;
+
+  /* Ink — inverted, warm umber tint */
+  --c-ink-50:  #3c2c1c;  /* subtle dark surface */
+  --c-ink-100: #503c28;  /* border */
+  --c-ink-200: #7a6252;  /* muted interactive */
+  --c-ink-300: #9a8068;  /* muted text */
+  --c-ink-400: #b89e86;  /* secondary text */
+  --c-ink-500: #d0bca4;  /* body text */
+  --c-ink-600: #e0d0bc;  /* medium text */
+  --c-ink-700: #ecdcc8;  /* high contrast */
+  --c-ink-800: #f4ece0;  /* primary text — warm near-white */
+  --c-ink-900: #faf6f0;  /* maximum contrast */
+
+  /* Clay — terracotta, bright enough to pop on mid clay bg */
+  --c-clay-50:  #28140a;
+  --c-clay-100: #3e2010;
+  --c-clay-200: #5c341c;
+  --c-clay-300: #7c4e30;
+  --c-clay-400: #a26848;
+  --c-clay-500: #c88460;  /* CTA */
+  --c-clay-600: #b06840;  /* hover */
+  --c-clay-700: #e0aa88;  /* badge text on clay-50 dark bg */
+  --c-clay-800: #f0c8a8;
+  --c-clay-900: #f8e0cc;
+
+  /* Amber */
+  --c-amber-50:  #241408;
+  --c-amber-100: #382210;
+  --c-amber-200: #543618;
+  --c-amber-300: #744e28;
+  --c-amber-400: #9c6c40;
+  --c-amber-500: #c08c58;
+  --c-amber-600: #a47040;
+  --c-amber-700: #d8b080;
+  --c-amber-800: #eccc9c;
+  --c-amber-900: #f8e4bc;
+
+  /* Frost — cool contrast colour for shelved/cold-storage badges */
+  --c-frost-50:  #101620;
+  --c-frost-100: #1a2434;
+  --c-frost-200: #283848;
+  --c-frost-300: #3a5060;
+  --c-frost-400: #526a7a;
+  --c-frost-500: #6a8898;
+  --c-frost-600: #88a4b4;
+  --c-frost-700: #a8c0cc;
+  --c-frost-800: #c4d8e4;
+  --c-frost-900: #dceaf4;
+
+  --c-shadow-xs: rgba(0, 0, 0, 0.16);
+  --c-shadow-sm: rgba(0, 0, 0, 0.26);
+  --c-shadow-md: rgba(0, 0, 0, 0.38);
+  --c-shadow-lg: rgba(0, 0, 0, 0.52);
+  --c-bg-spot-warm: rgba(180, 130, 80, 0.08);
+  --c-bg-spot-sage: rgba(130, 100, 50, 0.06);
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   THEME 8 — Rainwash  (MID-DEPTH, cool)
+   Cool sage-stone surfaces — the garden after rain.
+   Scale INVERTED like dark themes.
+   Action colour: rainy sage-teal (sage-500).
+   ═══════════════════════════════════════════════════════════ */
+:root[data-theme="rainwash"] {
+  --c-paper:      #485a52;
+  --c-paper-warm: #3e5048;
+  --c-paper-dim:  #344640;
+
+  /* Sage → cool rainy sage-teal */
+  --c-sage-50:  #243630;  /* dark badge bg */
+  --c-sage-100: #2e4840;
+  --c-sage-200: #3c5e56;
+  --c-sage-300: #4e7870;
+  --c-sage-400: #629488;
+  --c-sage-500: #7eb4a8;  /* main action — rainy sage-teal */
+  --c-sage-600: #629488;  /* button bg */
+  --c-sage-700: #b0d4cc;  /* badge text on sage-50 dark bg */
+  --c-sage-800: #cce8e2;
+  --c-sage-900: #e2f4f0;
+
+  /* Ink — inverted, cool sage tint */
+  --c-ink-50:  #2e3e38;  /* subtle dark surface */
+  --c-ink-100: #3e5048;  /* border */
+  --c-ink-200: #6a7e78;  /* muted interactive */
+  --c-ink-300: #849890;  /* muted text */
+  --c-ink-400: #a0b4ac;  /* secondary text */
+  --c-ink-500: #bcccc4;  /* body text */
+  --c-ink-600: #ccdcd4;  /* medium text */
+  --c-ink-700: #dce8e2;  /* high contrast */
+  --c-ink-800: #e8f2ec;  /* primary text — cool near-white */
+  --c-ink-900: #f2f8f5;  /* maximum contrast */
+
+  /* Clay — warm stone/terracotta to contrast the cool bg */
+  --c-clay-50:  #2c1e18;
+  --c-clay-100: #402c22;
+  --c-clay-200: #5e4030;
+  --c-clay-300: #7e5848;
+  --c-clay-400: #a07260;
+  --c-clay-500: #c49080;  /* CTA — warm on cool */
+  --c-clay-600: #a07260;  /* hover */
+  --c-clay-700: #dcb4a4;  /* badge text on clay-50 dark bg */
+  --c-clay-800: #eeccc0;
+  --c-clay-900: #f6e2da;
+
+  /* Amber */
+  --c-amber-50:  #201c0e;
+  --c-amber-100: #342e16;
+  --c-amber-200: #4e4620;
+  --c-amber-300: #6a6030;
+  --c-amber-400: #8a7e44;
+  --c-amber-500: #aca05a;
+  --c-amber-600: #908440;
+  --c-amber-700: #cac07a;
+  --c-amber-800: #e0da98;
+  --c-amber-900: #f0ecba;
+
+  /* Frost — cold-storage badges on cool stone */
+  --c-frost-50:  #0e1820;
+  --c-frost-100: #182430;
+  --c-frost-200: #243848;
+  --c-frost-300: #305060;
+  --c-frost-400: #406878;
+  --c-frost-500: #548090;
+  --c-frost-600: #709cb0;
+  --c-frost-700: #90b8c8;
+  --c-frost-800: #acccdc;
+  --c-frost-900: #c4e0ec;
+
+  --c-shadow-xs: rgba(0, 0, 0, 0.16);
+  --c-shadow-sm: rgba(0, 0, 0, 0.26);
+  --c-shadow-md: rgba(0, 0, 0, 0.38);
+  --c-shadow-lg: rgba(0, 0, 0, 0.52);
+  --c-bg-spot-warm: rgba(80, 120, 100, 0.08);
+  --c-bg-spot-sage: rgba(60, 110, 90, 0.07);
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   THEME 9 — Peat  (DARK)
+   Deep umber / black-soil surfaces. Muted lichen action colour.
+   Scale INVERTED. Warmer and drier than Loam.
+   ═══════════════════════════════════════════════════════════ */
+:root[data-theme="peat"] {
+  --c-paper:      #1a1510;
+  --c-paper-warm: #221c14;
+  --c-paper-dim:  #2c2418;
+
+  /* Sage → muted lichen (desaturated olive on dark soil) */
+  --c-sage-50:  #1c2014;  /* dark badge bg */
+  --c-sage-100: #28301c;
+  --c-sage-200: #3e4828;
+  --c-sage-300: #566238;
+  --c-sage-400: #72804c;
+  --c-sage-500: #90a064;  /* muted lichen action */
+  --c-sage-600: #748248;  /* button bg */
+  --c-sage-700: #bace94;  /* badge text on sage-50 dark bg */
+  --c-sage-800: #d0e0ac;
+  --c-sage-900: #e6f0cc;
+
+  /* Ink — inverted, warm umber tint */
+  --c-ink-50:  #261e14;  /* subtle dark surface */
+  --c-ink-100: #3c3028;  /* border */
+  --c-ink-200: #6a5c4a;  /* muted interactive */
+  --c-ink-300: #8a7862;  /* muted text */
+  --c-ink-400: #a8967e;  /* secondary text */
+  --c-ink-500: #c4b09a;  /* body text */
+  --c-ink-600: #d6c8b2;  /* medium text */
+  --c-ink-700: #e4d8c8;  /* high contrast */
+  --c-ink-800: #f0e8de;  /* primary text — warm near-white */
+  --c-ink-900: #f8f4ee;  /* maximum contrast */
+
+  /* Clay — terracotta on dark soil */
+  --c-clay-50:  #28180a;
+  --c-clay-100: #3e2610;
+  --c-clay-200: #5c3a1c;
+  --c-clay-300: #7e522e;
+  --c-clay-400: #a66e46;
+  --c-clay-500: #c88a62;  /* CTA */
+  --c-clay-600: #ae6e44;  /* hover */
+  --c-clay-700: #e0ac86;  /* badge text */
+  --c-clay-800: #f0cab0;
+  --c-clay-900: #f8e4d0;
+
+  /* Amber */
+  --c-amber-50:  #1c1608;
+  --c-amber-100: #302610;
+  --c-amber-200: #4e3c1c;
+  --c-amber-300: #6a5430;
+  --c-amber-400: #8e7244;
+  --c-amber-500: #b09260;
+  --c-amber-600: #947644;
+  --c-amber-700: #d0b47c;
+  --c-amber-800: #e8cc98;
+  --c-amber-900: #f4e4bc;
+
+  /* Frost */
+  --c-frost-50:  #12161e;
+  --c-frost-100: #1c2430;
+  --c-frost-200: #2c3848;
+  --c-frost-300: #3e5062;
+  --c-frost-400: #546a7e;
+  --c-frost-500: #6e8698;
+  --c-frost-600: #8aa2b4;
+  --c-frost-700: #a8bece;
+  --c-frost-800: #c0d2e0;
+  --c-frost-900: #d8e6f2;
+
+  --c-shadow-xs: rgba(0, 0, 0, 0.20);
+  --c-shadow-sm: rgba(0, 0, 0, 0.30);
+  --c-shadow-md: rgba(0, 0, 0, 0.42);
+  --c-shadow-lg: rgba(0, 0, 0, 0.58);
+  --c-bg-spot-warm: rgba(100, 80, 40, 0.07);
+  --c-bg-spot-sage: rgba(70, 80, 40, 0.05);
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   THEME 10 — Canopy  (DARK)
+   Forest-understory charcoal-green. Rich forest sage action.
+   Bark / copper clay accents. Scale INVERTED.
+   ═══════════════════════════════════════════════════════════ */
+:root[data-theme="canopy"] {
+  --c-paper:      #111610;
+  --c-paper-warm: #181e14;
+  --c-paper-dim:  #202a1c;
+
+  /* Sage → rich forest green (bright on understory dark) */
+  --c-sage-50:  #142010;  /* dark badge bg */
+  --c-sage-100: #1c2e14;
+  --c-sage-200: #2c4420;
+  --c-sage-300: #3e5e2e;
+  --c-sage-400: #547a40;
+  --c-sage-500: #72a058;  /* forest action green */
+  --c-sage-600: #5a8044;  /* button bg */
+  --c-sage-700: #b0d48a;  /* badge text on sage-50 dark bg */
+  --c-sage-800: #c8e8a8;
+  --c-sage-900: #e0f4c8;
+
+  /* Ink — inverted, cool dark-green tint */
+  --c-ink-50:  #182014;  /* subtle dark surface */
+  --c-ink-100: #243220;  /* border */
+  --c-ink-200: #506045;  /* muted interactive */
+  --c-ink-300: #6a7e60;  /* muted text */
+  --c-ink-400: #8a9e80;  /* secondary text */
+  --c-ink-500: #a8bca0;  /* body text */
+  --c-ink-600: #c0d0b8;  /* medium text */
+  --c-ink-700: #d0dec8;  /* high contrast */
+  --c-ink-800: #e0eadc;  /* primary text — cool near-white */
+  --c-ink-900: #eef6ea;  /* maximum contrast */
+
+  /* Clay → bark / copper accents on dark forest floor */
+  --c-clay-50:  #1c1008;
+  --c-clay-100: #2e1c0c;
+  --c-clay-200: #4a2c14;
+  --c-clay-300: #6a4024;
+  --c-clay-400: #8e5c38;
+  --c-clay-500: #b07850;  /* bark/copper CTA */
+  --c-clay-600: #94603a;  /* hover */
+  --c-clay-700: #d0a07a;  /* badge text on clay-50 dark bg */
+  --c-clay-800: #e4c09e;
+  --c-clay-900: #f4dac0;
+
+  /* Amber — warm gold under the canopy */
+  --c-amber-50:  #1a1608;
+  --c-amber-100: #2c2610;
+  --c-amber-200: #463c1c;
+  --c-amber-300: #60522e;
+  --c-amber-400: #806e44;
+  --c-amber-500: #a08c5a;
+  --c-amber-600: #847040;
+  --c-amber-700: #c4ac7a;
+  --c-amber-800: #dcc898;
+  --c-amber-900: #eeded4;
+
+  /* Frost — cool shelter badges on dark forest */
+  --c-frost-50:  #0e141e;
+  --c-frost-100: #162030;
+  --c-frost-200: #203446;
+  --c-frost-300: #2e4a60;
+  --c-frost-400: #406478;
+  --c-frost-500: #547e96;
+  --c-frost-600: #6e98b2;
+  --c-frost-700: #90b4ca;
+  --c-frost-800: #accade;
+  --c-frost-900: #c4dff0;
+
+  --c-shadow-xs: rgba(0, 0, 0, 0.22);
+  --c-shadow-sm: rgba(0, 0, 0, 0.34);
+  --c-shadow-md: rgba(0, 0, 0, 0.46);
+  --c-shadow-lg: rgba(0, 0, 0, 0.62);
+  --c-bg-spot-warm: rgba(60, 80, 40, 0.07);
+  --c-bg-spot-sage: rgba(50, 100, 40, 0.06);
+}

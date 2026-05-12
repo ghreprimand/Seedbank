@@ -43,6 +43,7 @@ import AiSuggestionButton from '@/components/AiSuggestionButton';
 import type { GraduationResponse } from '@/api/client';
 import { exportIdeaAsMarkdown, exportIdeaAsJSON } from '@/lib/export';
 import { useAgentsSettings } from '@/stores/settings';
+import { HelpButton } from '@/help/HelpPopover';
 
 /** Auto-save debounce delay in ms */
 const SAVE_DELAY = 800;
@@ -290,7 +291,7 @@ export default function IdeaDetail() {
 
         <div className="flex flex-wrap items-center gap-2.5">
           {/* Stage picker */}
-          <div className="relative">
+          <div className="relative flex items-center gap-1">
             <button
               onClick={() => { setStageOpen(!stageOpen); setCategoryOpen(false); }}
               className="flex items-center gap-1 group"
@@ -319,6 +320,12 @@ export default function IdeaDetail() {
                 </div>
               </>
             )}
+            <HelpButton
+              helpId="stage"
+              title="Lifecycle Stages"
+              summary="Every idea moves through gardening-themed stages from Seed to Shipped. Change stage at any time — it affects filtering, graduation eligibility, and discovery tools."
+              manualSection="stages"
+            />
           </div>
 
           {/* Category picker */}
@@ -490,11 +497,15 @@ export default function IdeaDetail() {
             label="Personal Excitement"
             value={idea.excitementScore}
             onChange={(v) => update('excitementScore', v)}
+            helpSummary="How excited are you about this idea? 1 = vague interest, 5 = can't stop thinking about it. Used for sorting and health checks."
+            helpManualSection="idea-editing"
           />
           <ScorePicker
             label="Jam Suitability"
             value={idea.jamScore}
             onChange={(v) => update('jamScore', v)}
+            helpSummary="How well does this idea fit a game jam or hackathon format? 1 = needs months, 5 = could ship in a weekend."
+            helpManualSection="idea-editing"
           />
         </div>
 
@@ -512,12 +523,30 @@ export default function IdeaDetail() {
 
       {/* ── Thinking Partner ─────────────────────────────── */}
       <div className="pt-5 border-t border-ink-100">
+        <div className="flex items-center gap-1.5 mb-2">
+          <span className="text-xs font-mono uppercase tracking-wider text-ink-400">Health Check</span>
+          <HelpButton
+            helpId="health-check"
+            title="Idea Health Check"
+            summary="Analyses your idea against a completeness rubric: pitch clarity, hook presence, risks, tech-stack specificity, and score balance. Returns field-by-field feedback."
+            manualSection="health-check"
+            alwaysShow
+          />
+        </div>
         <IdeaHealthCheck idea={idea} />
       </div>
 
       <div className="pt-5 border-t border-ink-100 space-y-3">
         {anyAgentLinked && (
-          <div className="flex justify-end">
+          <div className="flex items-center justify-end gap-2">
+            <HelpButton
+              helpId="agent-run"
+              title="Develop with Agent"
+              summary="Launches a local CLI agent (Claude Code or Codex) against a scratch workspace seeded with this idea. Transcript streams live. Proposed files need your explicit approval before anything is saved."
+              details="Agents are sandboxed and time-capped. Link agents in Settings → AI & Agents."
+              manualSection="agents"
+              alwaysShow
+            />
             <button
               type="button"
               onClick={() => {

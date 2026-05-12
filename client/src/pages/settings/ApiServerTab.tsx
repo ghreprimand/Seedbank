@@ -19,6 +19,7 @@ import {
   Trash2,
   Webhook,
 } from 'lucide-react';
+import { HelpButton } from '@/help/HelpPopover';
 import {
   listTokens,
   createToken,
@@ -200,7 +201,16 @@ function TokensSection() {
   return (
     <section className="space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-xs font-mono uppercase tracking-wider text-ink-400">Personal Access Tokens</h3>
+        <div className="flex items-center gap-1.5">
+          <h3 className="text-xs font-mono uppercase tracking-wider text-ink-400">Personal Access Tokens</h3>
+          <HelpButton
+            helpId="api-tokens"
+            title="Personal Access Tokens"
+            summary="Scoped bearer tokens for local scripting or external tools. Tokens are SHA-256 hashed at rest — the raw value is shown once. Creation is restricted to localhost sessions."
+            manualSection="settings-api"
+            alwaysShow
+          />
+        </div>
         <button
           type="button"
           onClick={() => { setCreateOpen((v) => !v); setCreateError(null); }}
@@ -411,7 +421,16 @@ function WebhooksSection() {
 
   return (
     <section className="space-y-3">
-      <h3 className="text-xs font-mono uppercase tracking-wider text-ink-400">Webhooks</h3>
+      <div className="flex items-center gap-1.5">
+        <h3 className="text-xs font-mono uppercase tracking-wider text-ink-400">Webhooks</h3>
+        <HelpButton
+          helpId="webhooks"
+          title="Outbound Webhooks"
+          summary="Fires a JSON POST to your URL on idea lifecycle events: idea.created, idea.graduated, idea.shipped. Payload is the full idea record."
+          manualSection="settings-api"
+          alwaysShow
+        />
+      </div>
       <p className="text-xs text-ink-400">
         Outbound HTTP POST on idea lifecycle events. Payload is the full idea record.
       </p>

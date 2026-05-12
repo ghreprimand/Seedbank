@@ -8,6 +8,7 @@
  */
 import { useState } from 'react';
 import { RefreshCw, Archive } from 'lucide-react';
+import { HelpButton } from '@/help/HelpPopover';
 import { runBackupNow, type BackupFrequency } from '@/api/client';
 import { useBackupsSettings, useSettingsStore } from '@/stores/settings';
 import { timeAgo } from '@/lib/timeago';
@@ -86,7 +87,16 @@ export default function BackupsTab() {
 
       {/* Schedule */}
       <section>
-        <h3 className="text-base font-serif font-semibold text-ink-800 mb-1">Schedule</h3>
+        <div className="flex items-center gap-2 mb-1">
+          <h3 className="text-base font-serif font-semibold text-ink-800">Schedule</h3>
+          <HelpButton
+            helpId="backup-schedule"
+            title="Backup Schedule"
+            summary="Seedbank keeps the latest 10 database backups and prunes older ones automatically. A startup backup always runs regardless of schedule. Backups go to ~/.seedbank/backups/."
+            manualSection="settings-backups"
+            alwaysShow
+          />
+        </div>
         <p className="text-sm text-ink-400 mb-3">
           How often Seedbank automatically backs up your data.
         </p>

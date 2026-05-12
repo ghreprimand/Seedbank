@@ -8,6 +8,7 @@
  */
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { HelpButton } from '@/help/HelpPopover';
 import {
   Bot,
   Check,
@@ -508,7 +509,16 @@ function BudgetSection({ budget, onSave }: BudgetSectionProps) {
 
   return (
     <div className="space-y-3">
-      <h3 className="text-xs font-mono uppercase tracking-wider text-ink-400">Token Budget</h3>
+      <div className="flex items-center gap-1.5">
+        <h3 className="text-xs font-mono uppercase tracking-wider text-ink-400">Token Budget</h3>
+        <HelpButton
+          helpId="token-budget"
+          title="Daily Token Budget"
+          summary="Caps how many AI tokens Seedbank uses per day across the Thinking Partner, field suggestions, and health checks. Set to 0 to disable the limit. Usage resets at midnight."
+          manualSection="settings-ai"
+          alwaysShow
+        />
+      </div>
       <div className="flex items-end gap-3 flex-wrap">
         <label className="block text-xs text-ink-500">
           Daily token limit
@@ -692,9 +702,19 @@ export default function AiAgentsTab() {
 
       {/* ── A4: Linked agents ───────────────────────────────────────────────── */}
       <section className="space-y-3">
-        <h3 className="text-xs font-mono uppercase tracking-wider text-ink-400">
-          Linked Agents
-        </h3>
+        <div className="flex items-center gap-1.5">
+          <h3 className="text-xs font-mono uppercase tracking-wider text-ink-400">
+            Linked Agents
+          </h3>
+          <HelpButton
+            helpId="linked-agents"
+            title="Linked CLI Agents"
+            summary="Link Claude Code or Codex CLI by binary path. Seedbank spawns the agent in a sandboxed scratch workspace when you click 'Develop with agent' on an idea."
+            details="Credentials stay in your OS keychain or CLI tool. Seedbank stores only the binary path and a linked flag."
+            manualSection="agents"
+            alwaysShow
+          />
+        </div>
         <p className="text-xs text-ink-400">
           Link a local CLI agent so Seedbank can spawn it to develop an idea or continue work
           on a graduated project. The CLI path is stored server-side only.
