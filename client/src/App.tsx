@@ -5,6 +5,7 @@ import IdeaDetail from '@/pages/IdeaDetail';
 import IdeaNew from '@/pages/IdeaNew';
 import Discover from '@/pages/Discover';
 import Compost from '@/pages/Compost';
+import Settings from '@/pages/Settings';
 import ErrorBoundary from '@/components/ErrorBoundary';
 
 function App() {
@@ -17,6 +18,8 @@ function App() {
           <Route path="compost" element={<Compost />} />
           <Route path="idea/new" element={<IdeaNew />} />
           <Route path="idea/:id" element={<ErrorBoundary><IdeaDetail /></ErrorBoundary>} />
+          <Route path="settings" element={<Settings />} />
+          <Route path="settings/:tab" element={<Settings />} />
         </Route>
       </Routes>
     </ErrorBoundary>

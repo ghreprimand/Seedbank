@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ExternalLink, FolderPlus, Network, Rocket, X } from 'lucide-react';
+import { ExternalLink, FolderPlus, Network, Rocket, Settings, X } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import type { GraduationReadiness, Idea, IntegrationSummary } from '@/lib/types';
 import {
-  configureIntegration,
   getIntegrations,
   graduateIdea,
   type GraduationResponse,
@@ -44,17 +44,11 @@ function iconFor(integration: IntegrationSummary) {
   return <Icon className="w-4 h-4" />;
 }
 
-function configPlaceholder(id: string) {
-  if (id === 'archon') return '~/Projects/Archon/projects';
-  return '~/Projects/Seedbank-Graduated';
-}
 
 export default function GraduationModal({ idea, onClose, onGraduated }: GraduationModalProps) {
   const localReadiness = useMemo(() => readinessFor(idea), [idea]);
   const [integrations, setIntegrations] = useState<IntegrationWithReadiness[]>([]);
   const [selectedId, setSelectedId] = useState<string>('');
-  const [projectRoot, setProjectRoot] = useState('');
-  const [archonRoot, setArchonRoot] = useState('');
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -80,19 +74,13 @@ export default function GraduationModal({ idea, onClose, onGraduated }: Graduati
 
   const selected = integrations.find((integration) => integration.id === selectedId);
   const readiness = selected?.readiness ?? localReadiness;
-  const canSubmit = Boolean(selected) && readiness.ready && !working;
+  const canSubmit = Boolean(selected) && (selected?.configured ?? false) && readiness.ready && !working;
 
   const handleGraduate = async () => {
-    if (!selected) return;
+    if (!selected || !selected.configured) return;
     setWorking(true);
     setError(null);
     try {
-      const config: Record<string, string> = {};
-      if (projectRoot.trim()) config.projectRoot = projectRoot.trim();
-      if (selected.id === 'archon' && archonRoot.trim()) config.archonRoot = archonRoot.trim();
-      if (Object.keys(config).length > 0) {
-        await configureIntegration(selected.id, config);
-      }
       const response = await graduateIdea(selected.id, idea.id);
       onGraduated(response);
     } catch (err) {
@@ -174,28 +162,21 @@ export default function GraduationModal({ idea, onClose, onGraduated }: Graduati
           </div>
         )}
 
-        {selected && (
-          <div className="space-y-3 mb-5">
-            {selected.id === 'archon' && (
-              <label className="block">
-                <span className="block text-[11px] font-mono uppercase text-ink-400 mb-1">Archon root</span>
-                <input
-                  value={archonRoot}
-                  onChange={(event) => setArchonRoot(event.target.value)}
-                  placeholder="~/Projects/Archon"
-                  className="w-full px-3 py-2 text-sm bg-paper-warm border border-ink-100 rounded-card outline-none focus:ring-2 focus:ring-sage-400"
-                />
-              </label>
-            )}
-            <label className="block">
-              <span className="block text-[11px] font-mono uppercase text-ink-400 mb-1">Project root</span>
-              <input
-                value={projectRoot}
-                onChange={(event) => setProjectRoot(event.target.value)}
-                placeholder={configPlaceholder(selected.id)}
-                className="w-full px-3 py-2 text-sm bg-paper-warm border border-ink-100 rounded-card outline-none focus:ring-2 focus:ring-sage-400"
-              />
-            </label>
+        {selected && !selected.configured && (
+          <div className="mb-5 px-3 py-3 bg-amber-50 border border-amber-200 rounded-card text-sm">
+            <p className="text-amber-800 font-medium mb-1">Integration not configured</p>
+            <p className="text-xs text-amber-700 mb-2">
+              Set a project root path before graduating an idea.
+            </p>
+            <Link
+              to="/settings/integrations"
+              onClick={onClose}
+              className="inline-flex items-center gap-1.5 text-xs text-amber-800 font-medium
+                         underline underline-offset-2 hover:text-amber-900 transition-colors"
+            >
+              <Settings className="w-3.5 h-3.5" />
+              Configure in Settings → Integrations
+            </Link>
           </div>
         )}
 
