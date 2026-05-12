@@ -32,6 +32,13 @@ The server runs on `http://localhost:4800`. If Vite finds `5173` occupied, it wi
 - **Persistent SQLite storage** — ideas live in `~/.seedbank/seedbank.db`, not only in browser storage.
 - **Version history** — meaningful edits create snapshots that can be inspected and restored.
 - **AI thinking partner** — chat, field suggestions, organic prompt modes, health checks, and archive insights.
+- **Six runtime themes** — Paper, Parchment, Meadow, Dusk, Loam, and Moss; switchable live from Settings → Theme, with system dark/light auto-pairing.
+- **Settings page** — a permanent `/settings` home for every configuration option: AI providers, agents, theme, API tokens, webhooks, backups, integrations, and app info.
+- **Personal access tokens** — generate scoped bearer tokens (`read:ideas`, `write:ideas`, `ai:suggest`) for local scripting. Tokens are hashed at rest; creation is localhost-only.
+- **Outbound webhooks** — fire a JSON payload to any URL on `idea.created`, `idea.updated`, `idea.graduated`, or `idea.shipped`. Useful for Zapier, n8n, or local automation.
+- **Read-only MCP endpoints** — `/api/mcp/ideas` and `/api/mcp/search` expose seeds as context for external Claude or Codex sessions; token-gated.
+- **OpenAPI spec** — machine-readable at `/api/openapi.json`; browsable from Settings → API & Server.
+- **Local CLI agent runs** — link a Claude Code or Codex CLI binary in Settings → AI & Agents; launch a sandboxed "Develop with agent" run from any idea. Transcript streamed live; proposed files reviewed and accepted before anything is saved. Runtime capped; kill switch always present.
 - **Project graduation** — turn a mature idea into an Archon or generic local project scaffold.
 - **Import/export** — full archive export to JSON or Markdown, plus import from Seedbank archives and Markdown.
 - **Compost bin** — deleted ideas are soft-deleted, recoverable for 30 days, then purged.
@@ -136,7 +143,7 @@ Seedbank supports:
 - Anthropic
 - Ollama for local models
 
-Provider settings are configured in the AI panel inside the app. API keys are stored through the server settings layer and public config responses only expose whether a key exists, not the key itself.
+Provider settings are configured in **Settings → AI & Agents**. API keys are stored server-side; public config responses only expose whether a key exists, not the key itself. To link a local CLI agent (Claude Code or Codex CLI), point Seedbank at the binary path in the same tab.
 
 AI features include the Thinking Partner chat, contextual field suggestions, What If, Devil's Advocate, Scope Down, User Story, Idea Health Check, Smart Cross-Pollinate, and Pattern Insights. See [docs/AI_GUIDE.md](docs/AI_GUIDE.md).
 
@@ -148,52 +155,23 @@ See [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md) for the plugin interface and im
 
 ## API Reference
 
-Machine-readable OpenAPI spec: `GET /api/openapi.json`.
+Full REST reference with request/response shapes, token auth, and webhook payloads: **[docs/API.md](docs/API.md)**.
 
-### Ideas
+Machine-readable OpenAPI spec: `GET /api/openapi.json`. The same spec is browsable from **Settings → API & Server → View API reference** inside the running app.
 
-- `GET /api/ideas` — list, search, filter, sort, and paginate active ideas.
-- `GET /api/ideas/:id` — fetch one idea with its version count.
-- `POST /api/ideas` — create an idea.
-- `PATCH /api/ideas/:id` — update an idea and create an automatic version when content changes.
-- `DELETE /api/ideas/:id` — soft-delete an idea into Compost.
+Quick endpoint groups: ideas, versions, integrations, AI (chat, suggest, usage), settings, tokens, webhooks, MCP, agents, backups, export/import, health. See `docs/API.md` for the full list.
 
-### Versions
+## Documentation
 
-- `GET /api/ideas/:id/versions` — list snapshots for an idea.
-- `POST /api/ideas/:id/versions` — create a manual snapshot.
-- `POST /api/ideas/:id/versions/restore/:versionId` — restore a snapshot.
-
-### Discovery
-
-- `POST /api/ai/suggest` — non-streaming suggestions for field prompts, health checks, cross-pollination, and pattern insights.
-
-### Integrations
-
-- `GET /api/integrations` — list integrations and configuration status.
-- `POST /api/integrations/:id/configure` — save integration settings.
-- `POST /api/integrations/:id/graduate/:ideaId` — graduate an idea.
-
-### AI
-
-- `GET /api/ai/config` — read public AI provider config.
-- `POST /api/ai/config` — update provider config and keys.
-- `GET /api/ai/conversations/:ideaId` — load persisted chat history.
-- `POST /api/ai/chat` — stream Thinking Partner chat responses.
-- `POST /api/ai/suggest` — request single-shot field or discovery suggestions.
-
-### System
-
-- `GET /api/health` — server health check.
-- `GET /api/stats` — dashboard statistics.
-- `POST /api/export` — export JSON or Markdown.
-- `POST /api/import` — import JSON or Markdown.
-- `GET /api/compost` — list deleted ideas and purge expired records.
-- `POST /api/compost/:id/restore` — restore a deleted idea.
-- `DELETE /api/compost/:id` — permanently purge a deleted idea.
-- `GET /api/backups` — read backup status.
-- `PATCH /api/backups/config` — configure backup schedule.
-- `POST /api/backups/run` — run a backup now.
+| Document | Contents |
+|----------|----------|
+| [docs/SETTINGS.md](docs/SETTINGS.md) | Every Settings tab explained — what's stored where, offline behavior, server vs localStorage. |
+| [docs/THEMING.md](docs/THEMING.md) | Token model, the six themes, dark-mode scale inversion, custom theme authoring. |
+| [docs/API.md](docs/API.md) | Full REST reference — endpoint list, token auth, webhook payloads, MCP surface. |
+| [docs/AGENTS.md](docs/AGENTS.md) | Claude Code / Codex CLI linkage, "Develop with agent" and "Continue with agent" surfaces, safety rails, transcript storage. |
+| [docs/AI_GUIDE.md](docs/AI_GUIDE.md) | Thinking Partner posture, provider setup, prompt modes, field suggestions, usage readout. |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System diagram, data-flow, settings store, token middleware, theme tokens, agent runner. |
+| [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md) | Graduation plugin interface, Archon and generic integrations, "Continue with agent" handoff. |
 
 ## Development
 

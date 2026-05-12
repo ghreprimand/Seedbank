@@ -1,5 +1,61 @@
 # Changelog
 
+## 2.1.0 — Settings, API, Theming & Agents
+
+Seedbank v2.1.0 ships four closely-related feature groups that turn scattered configuration popovers into a permanent Settings page, give the local API a real security surface, make the UI themeable at runtime, and link local AI CLI agents for sandboxed "develop with agent" runs.
+
+### Settings foundation
+
+- New `/settings` route with a 7-tab shell: General, AI & Agents, Theme, API & Server, Backups, Integrations, About.
+- Left-rail nav on desktop, horizontal scrollable pill strip on mobile. Deep-linkable `/settings/:tab` routes.
+- Gear icon in the header replaces the old Import/Export button. Import/Export moves to the General tab; keyboard shortcut preserved.
+- Backup config controls move from a header popover to the Backups tab. `BackupStatus` pill becomes a status link.
+- Integration configure form moves from `GraduationModal` to the Integrations tab. Graduation modal detects unconfigured integrations and links there.
+- Zustand settings store hydrates from `GET /api/settings` on mount (idempotent), writes through `PATCH /api/settings/:section`, and falls back to `localStorage` + sensible defaults when offline.
+- Offline banner shown on the Settings page when the server is unreachable. Mutation buttons disabled in that state.
+
+### API & Server tab
+
+- **Personal access tokens** — generate scoped bearer tokens (`read:ideas`, `write:ideas`, `ai:suggest`). Tokens are SHA-256 hashed at rest; creation is restricted to localhost sessions. Raw token shown once with a copy button.
+- **Outbound webhooks** — configure a URL and pick events (`idea.created`, `idea.updated`, `idea.graduated`, `idea.shipped`). Payload is the full idea record.
+- **Read-only MCP endpoints** — `/api/mcp/ideas` and `/api/mcp/search` expose seeds as context for external Claude or Codex sessions. Token-gated.
+- **OpenAPI spec** — generated at `/api/openapi.json`; browsable from the API & Server tab.
+- **Server info card** — port, version, uptime, DB path, last backup time.
+- `ConnectionStatus` pill links to `/settings/api`.
+
+### AI & Agents tab
+
+- Provider cards for OpenAI, Anthropic, and Ollama — status pill, inline test-connection, expandable key/model/URL fields. Replaces the dense grid in the AI panel popover.
+- Default-provider radio — single source of truth; the Thinking Partner panel reads this setting.
+- Token budget slider with last-24 h / last-7 d usage readout (from `ai_usage` table).
+- **Claude Code / Codex CLI linking** — enter the binary path; Seedbank validates with `--version` server-side and stores `agentLinked: true`. No raw credentials enter the browser.
+- **"Develop with agent"** button on idea detail — opens a panel that streams the agent's run against a scratch workspace seeded with the idea's markdown context. Proposed files appear in a checklist; accepted files are saved as attachments.
+- **"Continue with agent"** button on graduated ideas — hands the idea + scaffolded project directory to the agent for follow-on work.
+
+### Theming system
+
+- Six named themes: **Paper** (default), **Parchment**, **Meadow**, **Dusk**, **Loam** (dark), **Moss** (dark).
+- Themes are runtime-switchable via CSS custom properties and `data-theme` on `<html>`. No component changes needed.
+- Dark themes invert the ink scale so `text-ink-800` stays "strong body copy" in both modes.
+- Theme picker in Settings → Theme: six mini-preview cards, keyboard-arrow selectable, "Match system" toggle that auto-pairs Paper ↔ Loam by `prefers-color-scheme`.
+- No flash of unstyled content — theme applied in a pre-paint IIFE in `main.tsx` before `createRoot`.
+
+### Security highlights
+
+- API tokens hashed at rest (SHA-256 via `server/src/ai/crypto.ts` pattern); only the hash is stored.
+- Token creation endpoint enforces `requireImplicitLocal` — only requests from `127.0.0.1` / `::1` / `localhost` can mint new tokens.
+- Bearer-token middleware is additive: cookie-less local requests continue to work without a token.
+- MCP endpoints are read-only and token-gated; they return `hasX` booleans rather than raw keys.
+- CLI agent credentials stay in the OS / CLI tool's own keyring; Seedbank stores only the binary path and `agentLinked: true`.
+- Agent runs are sandboxed to a per-idea scratch workspace (no access to arbitrary filesystem paths). Runtime capped at 5 min per run (30 min absolute); kill switch always visible in the UI.
+- No agent output auto-writes to canonical idea fields — every proposed change flows through an explicit accept/reject step.
+
+### Documentation
+
+Seven docs added or refreshed: `SETTINGS.md`, `THEMING.md`, `API.md`, `AGENTS.md`, `AI_GUIDE.md`, `ARCHITECTURE.md`, `INTEGRATIONS.md`. README Features list and API Reference section updated; full Documentation table added.
+
+---
+
 ## 2.0.0 — Permanent Idea Vault
 
 Seedbank v2.0.0 turns the original browser-only idea sketchpad into a durable local application with a persistent backend, AI-assisted development, project graduation, recoverable delete, and automatic backups.

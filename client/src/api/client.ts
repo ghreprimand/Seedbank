@@ -150,7 +150,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!response.ok) {
     setConnectionStatus(response.status >= 500 ? 'offline' : 'online');
-    throw new Error(`Seedbank API ${response.status}: ${response.statusText}`);
+    let message = response.statusText;
+    try {
+      const body = await response.json() as Record<string, unknown>;
+      if (typeof body?.error === 'string') message = body.error;
+      else if (typeof body?.message === 'string') message = body.message;
+    } catch { /* non-JSON error body — keep statusText */ }
+    throw new Error(`Seedbank API ${response.status}: ${message}`);
   }
 
   setConnectionStatus('online');
