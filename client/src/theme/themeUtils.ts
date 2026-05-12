@@ -12,10 +12,23 @@ import type { ThemeName } from '@/lib/types';
 export const THEME_STORAGE_KEY = 'seedbank.ui.theme';
 
 export const VALID_THEME_NAMES: readonly ThemeName[] = [
-  'paper', 'parchment', 'meadow', 'dusk',
+  'paper', 'chalk', 'meadow', 'dusk',
   'hearth', 'rainwash',
-  'loam', 'moss', 'peat', 'canopy',
+  'woad', 'moss', 'peat', 'canopy',
 ];
+
+/**
+ * Migrate legacy theme names from removed themes to suitable replacements.
+ * - 'parchment' → 'paper'  (closest warm-light fallback)
+ * - 'loam'      → 'peat'   (closest dark earthy fallback)
+ */
+function migrateThemeName(name: string): ThemeName {
+  if (name === 'parchment') return 'paper';
+  if (name === 'loam') return 'peat';
+  return (VALID_THEME_NAMES as readonly string[]).includes(name)
+    ? (name as ThemeName)
+    : 'paper';
+}
 
 export interface ThemePrefs {
   name: ThemeName;
@@ -25,7 +38,16 @@ export interface ThemePrefs {
 export function readThemePrefs(): ThemePrefs {
   try {
     const raw = localStorage.getItem(THEME_STORAGE_KEY);
-    if (raw) return JSON.parse(raw) as ThemePrefs;
+    if (raw) {
+      const parsed = JSON.parse(raw) as { name?: string; matchSystem?: boolean };
+      const name = migrateThemeName(parsed.name ?? 'paper');
+      const prefs: ThemePrefs = { name, matchSystem: parsed.matchSystem ?? false };
+      // Write back if migration changed the name, so future reads are clean.
+      if (name !== parsed.name) {
+        localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(prefs));
+      }
+      return prefs;
+    }
   } catch { /* ignore */ }
   return { name: 'paper', matchSystem: false };
 }
@@ -36,7 +58,7 @@ export function writeThemePrefs(prefs: ThemePrefs): void {
 
 export function resolveThemeName(prefs: ThemePrefs): ThemeName {
   if (!prefs.matchSystem) return prefs.name;
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'loam' : 'paper';
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'peat' : 'paper';
 }
 
 export function applyTheme(name: ThemeName): void {

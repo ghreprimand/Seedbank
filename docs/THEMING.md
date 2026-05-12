@@ -33,10 +33,10 @@ Tailwind v4 processes `@theme` blocks at build time and produces static utility 
      /* … */
    }
 
-   :root[data-theme="loam"] {
-     --c-paper: #1e1a16;
-     --c-sage-600: #7aaa7e;
-     --c-ink-800: #ede8e2;   /* inverted — see Dark themes below */
+   :root[data-theme="woad"] {
+     --c-paper: #0f1620;
+     --c-sage-600: #3e6e98;
+     --c-ink-800: #dce8f4;   /* inverted — see Dark themes below */
      /* … */
    }
    ```
@@ -53,7 +53,7 @@ The browser resolves the chain `text-ink-800` → `var(--color-ink-800)` → `va
 
 Tailwind's default semantic scale reads `ink-800` as very dark, `ink-50` as very light. This direction is preserved in all four light themes.
 
-The four dark themes (**Loam**, **Moss**, **Peat**, **Canopy**) and two mid-depth themes (**Hearth**, **Rainwash**) all invert the scale:
+The four dark themes (**Woad**, **Moss**, **Peat**, **Canopy**) and two mid-depth themes (**Hearth**, **Rainwash**) all invert the scale:
 
 | Token | Light themes | Dark themes |
 |-------|-------------|-------------|
@@ -78,18 +78,18 @@ The original Seedbank palette. Feels like a physical field journal.
 | Accent | Clay / warm amber |
 | Type | Warm ink |
 
-### 2. Parchment
+### 2. Chalk
 
-Warmer and slightly more aged than Paper. Terracotta leans deeper; sage is dustier.
+Cool mineral/blue-gray paper. The ink has a slate-blue tint; sage action is cooler-toned. Completely distinct from the warm cream of Paper and the taupe of Dusk.
 
 | Role | Character |
 |------|-----------|
-| Surface | Warm cream |
-| Action color | Dusty sage |
-| Accent | Deep terracotta |
-| Type | Brown-ink |
+| Surface | Cool chalky blue-gray |
+| Action color | Mineral sage (cooler) |
+| Accent | Warm clay (contrast against cool surface) |
+| Type | Cool slate-ink |
 
-Good for longer reading sessions where cooler Paper feels slightly sterile.
+Good for users who find warm-paper themes too yellow, or who work in bright/blue-light environments.
 
 ### 3. Meadow
 
@@ -135,16 +135,16 @@ Cool sage/stone surfaces — the garden after rain. Quieter and more muted than 
 | Accent | Warm stone / terracotta contrast |
 | Type | Cool near-white (`ink-800` inverted) |
 
-### 7. Loam (dark)
+### 7. Woad (dark)
 
-Full dark. Deep earth-brown surfaces. Sage stays the action color; clay becomes brighter terracotta for contrast against dark backgrounds.
+Full dark. Deep botanical blue-indigo surfaces, named after *Isatis tinctoria* — the plant used for natural blue dye. The only blue-dominant theme in the catalog.
 
 | Role | Character |
 |------|-----------|
-| Surface | Deep earth brown |
-| Action color | Sage (slightly lightened) |
-| Accent | Bright terracotta |
-| Type | Warm near-white (`ink-800` inverted) |
+| Surface | Deep blue-indigo night |
+| Action color | Woad-blue (distinctively blue — no other theme shares this) |
+| Accent | Warm terracotta (high-contrast complement) |
+| Type | Cool near-white (`ink-800` inverted) |
 
 ### 8. Moss (dark)
 
@@ -186,7 +186,7 @@ Forest-understory charcoal-green. Rich forest-green action color; bark and coppe
 **Settings → Theme** shows ten mini-preview cards. Each card contains an inline swatch — a tiny simulated header bar and a card — rendered with `style` attributes that directly reference the theme's CSS variables. This means the swatch colors are always accurate regardless of which theme is currently active.
 
 - **Keyboard navigation:** arrow keys move between cards; Enter selects.
-- **Match system:** a toggle below the cards enables automatic dark/light pairing — **Paper** when `prefers-color-scheme: light`, **Loam** when `prefers-color-scheme: dark`. Picking any theme manually overrides this. The system preference is watched live; if you change your OS theme while Seedbank is open, the active theme updates immediately.
+- **Match system:** a toggle below the cards enables automatic dark/light pairing — **Paper** when `prefers-color-scheme: light`, **Peat** when `prefers-color-scheme: dark`. Picking any theme manually overrides this. The system preference is watched live; if you change your OS theme while Seedbank is open, the active theme updates immediately.
 - **Persistence:** the selection is saved to `PATCH /api/settings/ui` and mirrored to `localStorage` (`seedbank.ui.theme` key, JSON `{ name, matchSystem }`). The localStorage mirror is what the pre-paint bootstrap reads.
 
 ---
@@ -197,7 +197,7 @@ The pre-paint IIFE in `client/src/main.tsx` runs synchronously before `createRoo
 
 1. Reads `localStorage.getItem('seedbank.ui.theme')`.
 2. Parses `{ name, matchSystem }`.
-3. If `matchSystem` is true, resolves to `loam` or `paper` based on `prefers-color-scheme`.
+3. If `matchSystem` is true, resolves to `peat` or `paper` based on `prefers-color-scheme`.
 4. Sets `document.documentElement.dataset.theme = name` before any React render.
 5. If `matchSystem` is true, also subscribes a `change` listener on the media query for live switching.
 

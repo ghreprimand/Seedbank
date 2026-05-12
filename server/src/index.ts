@@ -527,9 +527,9 @@ app.patch('/api/settings/:section', requireScope('write:ideas'), asyncRoute((req
 
   if (section === 'ui') {
     const VALID_THEMES: readonly ThemeName[] = [
-      'paper', 'parchment', 'meadow', 'dusk',
+      'paper', 'chalk', 'meadow', 'dusk',
       'hearth', 'rainwash',
-      'loam', 'moss', 'peat', 'canopy',
+      'woad', 'moss', 'peat', 'canopy',
     ];
     const body = req.body as { theme?: Partial<UiThemeConfig> };
     if (body?.theme?.name !== undefined && !VALID_THEMES.includes(body.theme.name)) {

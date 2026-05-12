@@ -22,14 +22,21 @@ import App from './App.tsx'
 // before the first paint. Reads from localStorage; server source-of-truth
 // (GET /api/settings) overrides later once the settings store hydrates (F3).
 ;(function applyBootTheme() {
-  const VALID = ['paper', 'parchment', 'meadow', 'dusk', 'loam', 'moss', 'hearth', 'rainwash', 'peat', 'canopy']
+  const VALID = ['paper', 'chalk', 'meadow', 'dusk', 'hearth', 'rainwash', 'woad', 'moss', 'peat', 'canopy']
+  // Legacy names from removed themes — migrate silently before first paint.
+  const MIGRATE: Record<string, string> = { parchment: 'paper', loam: 'peat' }
   try {
     const raw = localStorage.getItem('seedbank.ui.theme')
     if (!raw) return
     const prefs = JSON.parse(raw) as { name?: string; matchSystem?: boolean }
     let name = prefs.name ?? 'paper'
+    // Apply migration if needed and write back so subsequent store reads are clean.
+    if (Object.prototype.hasOwnProperty.call(MIGRATE, name)) {
+      name = MIGRATE[name]
+      try { localStorage.setItem('seedbank.ui.theme', JSON.stringify({ ...prefs, name })) } catch { /* ignore */ }
+    }
     if (prefs.matchSystem) {
-      name = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'loam' : 'paper'
+      name = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'peat' : 'paper'
     }
     if (VALID.includes(name)) document.documentElement.dataset.theme = name
   } catch { /* ignore — defaults to paper via :root selector in themes.css */ }
@@ -41,7 +48,7 @@ import App from './App.tsx'
     const prefs = JSON.parse(raw) as { matchSystem?: boolean }
     if (!prefs.matchSystem) return
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-      document.documentElement.dataset.theme = e.matches ? 'loam' : 'paper'
+      document.documentElement.dataset.theme = e.matches ? 'peat' : 'paper'
     })
   } catch { /* ignore */ }
 })()

@@ -353,13 +353,13 @@ export const MANUAL_GROUPS: ManualGroup[] = [
         id: 'settings-theme',
         title: 'Settings — Theme',
         indexLabel: 'Theme',
-        keywords: ['settings', 'theme', 'colour', 'dark mode', 'light mode', 'match system', 'paper', 'parchment', 'meadow', 'dusk', 'hearth', 'rainwash', 'loam', 'moss', 'peat', 'canopy'],
+        keywords: ['settings', 'theme', 'colour', 'dark mode', 'light mode', 'match system', 'paper', 'chalk', 'meadow', 'dusk', 'hearth', 'rainwash', 'woad', 'moss', 'peat', 'canopy'],
         blocks: [
           { type: 'p', text: 'Settings → Theme lets you choose from 10 palettes, all switchable live without a reload.' },
           { type: 'h3', text: 'Light themes' },
           { type: 'ul', items: [
             'Paper — default, off-white, sage and clay.',
-            'Parchment — warmer cream, aged amber.',
+            'Chalk — cool mineral/blue-gray paper, crisp slate-tinted ink.',
             'Meadow — light green-tinted, sage-forward.',
             'Dusk — warm taupe, evening field-journal feel.',
           ]},
@@ -370,13 +370,13 @@ export const MANUAL_GROUPS: ManualGroup[] = [
           ]},
           { type: 'h3', text: 'Dark themes' },
           { type: 'ul', items: [
-            'Loam — deep earth-brown, bright sage.',
+            'Woad — deep botanical blue-indigo, warm terracotta accents.',
             'Moss — charcoal-green, copper accents.',
             'Peat — black-soil umber, muted lichen.',
             'Canopy — forest understory, bark/copper.',
           ]},
           { type: 'h3', text: 'Match system' },
-          { type: 'p', text: 'The Match system toggle auto-selects Paper (light) or Loam (dark) based on your OS preference. Picking a theme manually overrides it.' },
+          { type: 'p', text: 'The Match system toggle auto-selects Paper (light) or Peat (dark) based on your OS preference. Picking a theme manually overrides it.' },
         ],
       },
       {

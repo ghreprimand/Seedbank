@@ -56,20 +56,20 @@ const THEMES: ThemeMeta[] = [
     },
   },
   {
-    id: 'parchment',
-    label: 'Parchment',
-    description: 'Warmer cream, aged amber, deeper terracotta.',
+    id: 'chalk',
+    label: 'Chalk',
+    description: 'Cool mineral/blue-gray paper. Crisp slate-tinted ink.',
     dark: false,
     preview: {
-      paper:     '#f7f1e3',
-      paperWarm: '#ede4cf',
-      ink800:    '#2a231c',
-      ink400:    '#857a6a',
-      sage500:   '#4f734a',
-      sage50:    '#f0f2ed',
-      clay500:   '#b05e28',
-      amber100:  '#faf0be',
-      amber800:  '#664808',
+      paper:     '#f3f5f8',
+      paperWarm: '#e8ecf2',
+      ink800:    '#242f3e',
+      ink400:    '#7a88a0',
+      sage500:   '#46764e',
+      sage50:    '#edf2ee',
+      clay500:   '#c06a33',
+      amber100:  '#fef3c7',
+      amber800:  '#92400e',
     },
   },
   {
@@ -107,20 +107,20 @@ const THEMES: ThemeMeta[] = [
     },
   },
   {
-    id: 'loam',
-    label: 'Loam',
-    description: 'Full dark. Deep earth-brown, bright sage action.',
+    id: 'woad',
+    label: 'Woad',
+    description: 'Full dark. Deep botanical blue-indigo, warm terracotta accents.',
     dark: true,
     preview: {
-      paper:     '#1c1812',
-      paperWarm: '#242018',
-      ink800:    '#ede8e0',
-      ink400:    '#a09280',
-      sage500:   '#8aba76',
-      sage50:    '#1e2a1a',
-      clay500:   '#d4926a',
-      amber100:  '#3a2e0e',
-      amber800:  '#f0dc9c',
+      paper:     '#0f1620',
+      paperWarm: '#162030',
+      ink800:    '#dce8f4',
+      ink400:    '#7a96b0',
+      sage500:   '#5088b8',
+      sage50:    '#0e1826',
+      clay500:   '#b47850',
+      amber100:  '#281c10',
+      amber800:  '#d8bc8c',
     },
   },
   {
@@ -324,7 +324,7 @@ export default function ThemeTab() {
     if (!prefs.matchSystem) return;
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = () => {
-      applyTheme(mq.matches ? 'loam' : 'paper');
+      applyTheme(mq.matches ? 'peat' : 'paper');
     };
     mq.addEventListener('change', handleChange);
     return () => mq.removeEventListener('change', handleChange);
@@ -375,7 +375,7 @@ export default function ThemeTab() {
             <div>
               <div className="text-sm font-medium text-ink-800">Match system</div>
               <div className="text-xs text-ink-400 mt-0.5">
-                Auto-select Paper (light) or Loam (dark) based on your OS preference. Pick any theme manually to override.
+                Auto-select Paper (light) or Peat (dark) based on your OS preference. Pick any theme manually to override.
               </div>
             </div>
             <button
