@@ -13,12 +13,11 @@ import { Monitor } from 'lucide-react';
 import {
   type ThemeName,
   type ThemePrefs,
-  readThemePrefs,
-  writeThemePrefs,
   resolveThemeName,
   applyTheme,
   currentAppliedTheme,
 } from '@/theme/themeUtils';
+import { useUiSettings, useSettingsStore } from '@/stores/settings';
 
 interface ThemeMeta {
   id: ThemeName;
@@ -236,15 +235,18 @@ function ThemeCard({ theme, selected, onClick, innerRef, onKeyDown, tabIndex }: 
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function ThemeTab() {
-  // Lazy initializer reads current prefs and reconciles with the live data-theme.
+  // Local optimistic state — kept in sync with the store's ui.theme.
+  // Apply immediately for snappiness; patch store (→ server + localStorage) in background.
+  const uiTheme = useUiSettings().theme;
+  const patchStore = useSettingsStore((s) => s.patch);
+
   const [prefs, setPrefs] = useState<ThemePrefs>(() => {
-    const stored = readThemePrefs();
-    // Reconcile with what's actually applied on <html> (may differ if system-matched)
+    // Prefer the store value (already accounts for matchSystem); fall back to DOM.
     const applied = currentAppliedTheme();
-    if (!stored.matchSystem && applied !== stored.name) {
-      return { ...stored, name: applied };
+    if (uiTheme) {
+      return { name: uiTheme.name, matchSystem: uiTheme.matchSystem };
     }
-    return stored;
+    return { name: applied, matchSystem: false };
   });
 
   const cardRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -263,15 +265,20 @@ export default function ThemeTab() {
   const selectTheme = (name: ThemeName) => {
     const next: ThemePrefs = { name, matchSystem: false };
     setPrefs(next);
-    writeThemePrefs(next);
+    // Apply immediately (optimistic).
     applyTheme(name);
+    // Persist to server + localStorage (fire-and-forget; offline fallback is handled in store).
+    patchStore('ui', { theme: { name, matchSystem: false } }).catch(() => {
+      // Store already falls back to localStorage-only on failure; no extra handling needed.
+    });
   };
 
   const toggleMatchSystem = () => {
     const next: ThemePrefs = { ...prefs, matchSystem: !prefs.matchSystem };
     setPrefs(next);
-    writeThemePrefs(next);
-    applyTheme(next.matchSystem ? resolveThemeName(next) : prefs.name);
+    const resolved = next.matchSystem ? resolveThemeName(next) : prefs.name;
+    applyTheme(resolved);
+    patchStore('ui', { theme: { name: resolved, matchSystem: next.matchSystem } }).catch(() => {});
   };
 
   // Keyboard nav — roving tabindex

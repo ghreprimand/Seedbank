@@ -261,8 +261,10 @@ export interface AiPublicConfig {
   hasAnthropicKey: boolean;
 }
 
+export type ThemeName = 'paper' | 'parchment' | 'meadow' | 'dusk' | 'loam' | 'moss';
+
 export interface UiThemeConfig {
-  name: string;
+  name: ThemeName;
   matchSystem: boolean;
 }
 

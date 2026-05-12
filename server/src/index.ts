@@ -32,6 +32,7 @@ import type {
   PublicToken,
   ServerInfo,
   Stage,
+  ThemeName,
   UiThemeConfig,
   WebhooksConfig,
 } from '../../shared/types.js';
@@ -438,12 +439,15 @@ app.patch('/api/settings/:section', requireScope('write:ideas'), asyncRoute((req
   const section = routeParam(req, 'section');
 
   if (section === 'ui') {
+    const VALID_THEMES: readonly ThemeName[] = ['paper', 'parchment', 'meadow', 'dusk', 'loam', 'moss'];
     const body = req.body as { theme?: Partial<UiThemeConfig> };
+    if (body?.theme?.name !== undefined && !VALID_THEMES.includes(body.theme.name)) {
+      res.status(400).json({ error: `Invalid theme name: ${String(body.theme.name)}` });
+      return;
+    }
     const current = uiThemeConfig();
     const nextTheme: UiThemeConfig = {
-      name: typeof body?.theme?.name === 'string' && body.theme.name.trim()
-        ? body.theme.name.trim()
-        : current.name,
+      name: (VALID_THEMES.includes(body?.theme?.name as ThemeName) ? body?.theme?.name : current.name) as ThemeName,
       matchSystem: typeof body?.theme?.matchSystem === 'boolean'
         ? body.theme.matchSystem
         : current.matchSystem,

@@ -1,9 +1,13 @@
 /**
- * Theme utility types and helpers shared between ThemeTab and main.tsx.
+ * Theme utility types and helpers shared between ThemeTab, settings store, and main.tsx.
  * Kept in a separate file so ThemeTab only exports components (fast-refresh rule).
+ *
+ * ThemeName is canonical in shared/types.ts; we re-export it from here for convenience.
  */
 
-export type ThemeName = 'paper' | 'parchment' | 'meadow' | 'dusk' | 'loam' | 'moss';
+// Re-export from shared so the whole codebase uses one canonical ThemeName.
+export type { ThemeName } from '@/lib/types';
+import type { ThemeName } from '@/lib/types';
 
 export const THEME_STORAGE_KEY = 'seedbank.ui.theme';
 
