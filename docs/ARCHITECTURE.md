@@ -14,7 +14,7 @@ Express API
         |
         v
 SQLite
-  ~/.seedbank/seedbank.db
+  <seedbank-data-dir>/seedbank.db
 ```
 
 Fallback path when API is down:
@@ -53,8 +53,7 @@ Primary DB tables:
 - `ai.config` (legacy `ai:config` migrated on startup)
 - `api.webhooks`
 - `agents.config`
-- `integration:archon`
-- `integration:generic-project`
+- `integration:<adapter-id>` (for example `integration:generic-project`, optional `integration:archon`)
 - backup keys (`backup.config`, `backup.lastRun`)
 
 ## Settings Architecture
@@ -148,7 +147,7 @@ Execution model:
 - environment is intentionally inherited so CLIs can discover local credentials/session.
 
 Transcript model:
-- transcript written to disk under `~/.seedbank/agent-runs/<runId>.log`
+- transcript written to disk under `<seedbank-data-dir>/agent-runs/<runId>.log`
 - capped at 256 KB with truncation marker
 - run API exposes transcript content, not internal transcript file paths
 
@@ -173,9 +172,9 @@ This keeps the agent role as a constrained assistant that proposes changes and r
 
 ## Integration Architecture
 
-Integrations live under `server/src/integrations/` and implement a shared interface. The registry currently provides:
-- `archon`
-- `generic-project`
+Integrations live under `server/src/integrations/` and implement a shared adapter interface. The registry currently provides:
+- `generic-project` (general-purpose built-in adapter)
+- `archon` (optional adapter for Archon-specific workflows)
 
 Graduation is server-side because it performs local filesystem writes and then updates idea lifecycle fields (`graduatedTo`, `stage`).
 
@@ -184,7 +183,7 @@ Graduation is server-side because it performs local filesystem writes and then u
 Data directory:
 
 ```text
-~/.seedbank/
+<seedbank-data-dir>/
 ├── seedbank.db
 ├── backups/
 ├── exports/

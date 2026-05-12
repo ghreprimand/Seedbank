@@ -1,27 +1,27 @@
 # Integrations and Graduation
 
-Seedbank integrations turn mature ideas into real project starting points. Graduation is intentionally server-side because integrations write files and return project paths.
+Seedbank integrations turn mature ideas into real project starting points. Graduation is intentionally server-side because adapters write files and return project paths.
 
 ## Where to Configure Integrations
 
 Integration settings are managed in the app at:
 - `Settings -> Integrations`
 
-Current built-ins:
-- `Archon`
-- `Local Project` (`generic-project`)
+Built-in adapters:
+- `Local Project` (`generic-project`) — general-purpose external project scaffold
+- `Archon` (`archon`) — optional adapter for Archon-specific workflows
 
-The Settings tab stores configuration in the server `settings` table under namespaced keys:
-- `integration:archon`
+The Settings tab stores adapter configuration in the server `settings` table under namespaced keys:
 - `integration:generic-project`
+- `integration:archon` (optional adapter-specific)
 
 ## Graduation Flow
 
 1. User opens an idea that is ready to graduate.
 2. Client requests `GET /api/integrations` (optionally with `ideaId` for readiness).
-3. User configures integration roots in Settings if needed.
+3. User configures one or more integration roots in Settings.
 4. Client calls `POST /api/integrations/:id/graduate/:ideaId`.
-5. Server integration creates scaffolded files in the target location.
+5. Server adapter creates scaffolded files in the target location.
 6. Server updates idea fields:
    - `graduatedTo`
    - `stage`
@@ -36,42 +36,40 @@ The Settings tab stores configuration in the server `settings` table under names
 
 All integration routes are authenticated through the standard API middleware and use `read:ideas` / `write:ideas` scopes for bearer mode.
 
-## Integration Implementations
-
-### Archon (`server/src/integrations/archon.ts`)
-
-Config fields:
-- `archonRoot` (default `~/Projects/Archon`)
-- `projectRoot` (default `<archonRoot>/projects`)
-
-Behavior:
-- validates Archon root exists
-- scaffolds project files
-- writes Archon context files including `.archon/seedbank.json`
+## Adapter Implementations
 
 ### Local Project (`server/src/integrations/genericProject.ts`)
 
 Config fields:
-- `projectRoot` (default `~/Projects/Seedbank-Graduated`)
+- `projectRoot` (default external project root; set in Settings)
 
 Behavior:
-- creates a standalone scaffold in local project root
+- creates a standalone scaffold in a configured external project root
 - chooses target stage based on category helper logic
+
+### Archon (optional adapter) (`server/src/integrations/archon.ts`)
+
+Config fields:
+- `archonRoot`
+- `projectRoot` (typically `<archonRoot>/projects`)
+
+Behavior:
+- validates Archon workspace roots
+- scaffolds project files with Archon-specific context artifacts
 
 ## Continue With Agent Handoff
 
 After graduation, the UI can launch "Continue with agent" using the returned `path` from graduation.
 
 The backend enforces that continue-mode agent runs (`POST /api/agents/runs` with `projectPath`) are constrained to configured integration roots:
-- Archon `projectRoot`
-- Archon `<archonRoot>/projects`
-- Generic project `projectRoot`
+- configured `projectRoot` values for enabled adapters
+- adapter-specific derived roots when applicable (for example optional Archon project directories)
 
 If `projectPath` is outside configured roots, the run is rejected.
 
 ## Safety Expectations
 
-Integrations should:
+Adapters should:
 - write only inside configured roots
 - produce actionable starter scaffolds, not full products
 - preserve idea language in generated docs where possible

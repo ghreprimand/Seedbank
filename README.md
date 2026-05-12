@@ -29,7 +29,7 @@ The server runs on `http://localhost:4800`. If Vite finds `5173` occupied, it wi
 
 ## Features
 
-- **Persistent SQLite storage** — ideas live in `~/.seedbank/seedbank.db`, not only in browser storage.
+- **Persistent SQLite storage** — ideas live in `<seedbank-data-dir>/seedbank.db`, not only in browser storage.
 - **Version history** — meaningful edits create snapshots that can be inspected and restored.
 - **AI thinking partner** — chat, field suggestions, organic prompt modes, health checks, and archive insights.
 - **Six runtime themes** — Paper, Parchment, Meadow, Dusk, Loam, and Moss; switchable live from Settings → Theme, with system dark/light auto-pairing.
@@ -39,10 +39,10 @@ The server runs on `http://localhost:4800`. If Vite finds `5173` occupied, it wi
 - **Read-only MCP endpoints** — `/api/mcp/ideas` and `/api/mcp/search` expose seeds as context for external Claude or Codex sessions; token-gated.
 - **OpenAPI spec** — machine-readable at `/api/openapi.json`; browsable from Settings → API & Server.
 - **Local CLI agent runs** — link a Claude Code or Codex CLI binary in Settings → AI & Agents; launch a sandboxed "Develop with agent" run from any idea. Transcript streamed live; proposed files reviewed and accepted before anything is saved. Runtime capped; kill switch always present.
-- **Project graduation** — turn a mature idea into an Archon or generic local project scaffold.
+- **Project graduation** — turn a mature idea into an external project scaffold via integration adapters.
 - **Import/export** — full archive export to JSON or Markdown, plus import from Seedbank archives and Markdown.
 - **Compost bin** — deleted ideas are soft-deleted, recoverable for 30 days, then purged.
-- **Auto-backups** — scheduled SQLite backups and JSON archive exports under `~/.seedbank/`.
+- **Auto-backups** — scheduled SQLite backups and JSON archive exports under `<seedbank-data-dir>/`.
 
 ## Platform Setup
 
@@ -60,7 +60,7 @@ Example service shape:
 
 ```ini
 [Service]
-WorkingDirectory=/home/you/Projects/Seedbank
+WorkingDirectory=/path/to/Seedbank
 ExecStart=/usr/bin/npm run dev
 Restart=on-failure
 ```
@@ -76,7 +76,7 @@ npm run dev
 For an app-like launcher, create an Automator Application or Shortcuts workflow that runs a shell script:
 
 ```bash
-cd ~/Projects/Seedbank
+cd /path/to/Seedbank
 npm run dev
 ```
 
@@ -95,7 +95,7 @@ For a launcher, create a `.bat` or `.ps1` file that changes into the Seedbank di
 PowerShell example:
 
 ```powershell
-Set-Location "$HOME\Projects\Seedbank"
+Set-Location "<path-to-seedbank>"
 npm run dev
 ```
 
@@ -111,7 +111,7 @@ Seedbank
 Data flow:
 
 ```text
-Browser UI ↔ REST API ↔ SQLite (~/.seedbank/seedbank.db)
+Browser UI ↔ REST API ↔ SQLite (<seedbank-data-dir>/seedbank.db)
      │
      └── IndexedDB via Dexie for cache and offline fallback
 ```
@@ -125,7 +125,7 @@ The root workspace runs both apps with one command. The client is intentionally 
 Seedbank stores durable data in:
 
 ```text
-~/.seedbank/
+<seedbank-data-dir>/
 ├── seedbank.db
 ├── backups/
 └── exports/
@@ -149,7 +149,7 @@ AI features include the Thinking Partner chat, contextual field suggestions, Wha
 
 ### Integrations
 
-Graduation integrations live in `server/src/integrations/`. The included integrations can create Archon projects or generic local scaffolds. A graduated idea stores its destination in `graduatedTo` and advances stage automatically.
+Graduation integrations live in `server/src/integrations/`. Seedbank is adapter-driven: the built-in generic local adapter works out of the box, and optional adapters (including Archon) can target specific external workflows. A graduated idea stores its destination in `graduatedTo` and advances stage automatically.
 
 See [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md) for the plugin interface and implementation steps.
 
@@ -171,7 +171,7 @@ Quick endpoint groups: ideas, versions, integrations, AI (chat, suggest, usage),
 | [docs/AGENTS.md](docs/AGENTS.md) | Claude Code / Codex CLI linkage, "Develop with agent" and "Continue with agent" surfaces, safety rails, transcript storage. |
 | [docs/AI_GUIDE.md](docs/AI_GUIDE.md) | Thinking Partner posture, provider setup, prompt modes, field suggestions, usage readout. |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System diagram, data-flow, settings store, token middleware, theme tokens, agent runner. |
-| [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md) | Graduation plugin interface, Archon and generic integrations, "Continue with agent" handoff. |
+| [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md) | Graduation adapter interface, built-in adapters, and "Continue with agent" handoff. |
 
 ## Development
 

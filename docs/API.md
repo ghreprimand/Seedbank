@@ -101,7 +101,7 @@ High-level shape:
     "port": 4800,
     "version": "2.1.0",
     "uptimeMs": 12345,
-    "dbPath": "/home/you/.seedbank/seedbank.db"
+    "dbPath": "<seedbank-data-dir>/seedbank.db"
   }
 }
 ```
@@ -405,7 +405,7 @@ Rules:
 - symlinks and symlink traversal are blocked
 
 Effect:
-- copies selected files into `~/.seedbank/attachments/<ideaId>/<runId>/...`
+- copies selected files into `<seedbank-data-dir>/attachments/<ideaId>/<runId>/...`
 - appends copied paths to `idea.images`
 - does not auto-write canonical idea fields (`pitch`, `hook`, etc.)
 
