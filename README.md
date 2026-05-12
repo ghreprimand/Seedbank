@@ -31,12 +31,22 @@ Prerequisites:
 git clone https://github.com/ghreprimand/Seedbank.git
 cd Seedbank
 npm install
-npm run dev
+npm start
 ```
 
 Open `http://localhost:5173`.
 
-The server runs on `http://localhost:4800`. If Vite finds `5173` occupied, it will print the next available client port.
+The API server runs on `http://localhost:4800`.
+
+Manage the local instance:
+
+```bash
+npm run status   # show URL, API, pid, and log path
+npm run logs     # tail launcher log output
+npm stop         # stop both server and client
+```
+
+If port `5173` is occupied, the launcher will pick the next free client port. Override defaults with `SEEDBANK_CLIENT_PORT` and `SEEDBANK_SERVER_PORT`.
 
 ## Features
 
@@ -62,17 +72,26 @@ The server runs on `http://localhost:4800`. If Vite finds `5173` occupied, it wi
 Run from a terminal:
 
 ```bash
-npm run dev
+npm start
 ```
 
-For a desktop launcher, use or adapt a helper such as `scripts/install-desktop.sh` that starts `npm run dev` in the project directory and opens the printed Vite URL. For auto-start, create a user systemd service that runs `npm run dev` from the repository root after login.
+For a desktop launcher, install `scripts/seedbank.desktop`:
+
+```bash
+bash scripts/install-desktop.sh
+```
+
+This launcher runs `scripts/seedbank start` from your cloned repository.
+
+For auto-start, create a user systemd service that runs the launcher script from the repository root after login.
 
 Example service shape:
 
 ```ini
 [Service]
 WorkingDirectory=/path/to/Seedbank
-ExecStart=/usr/bin/npm run dev
+ExecStart=/usr/bin/bash /path/to/Seedbank/scripts/seedbank start
+ExecStop=/usr/bin/bash /path/to/Seedbank/scripts/seedbank stop
 Restart=on-failure
 ```
 
@@ -81,34 +100,58 @@ Restart=on-failure
 Run from Terminal:
 
 ```bash
-npm run dev
+npm start
 ```
 
 For an app-like launcher, create an Automator Application or Shortcuts workflow that runs a shell script:
 
 ```bash
 cd /path/to/Seedbank
-npm run dev
+bash scripts/seedbank start
 ```
 
-You can then pin that wrapper to the Dock and open the Vite URL in your browser.
+You can then pin that wrapper to the Dock. Use `bash scripts/seedbank stop` to stop background processes.
 
 ### Windows
 
-Run from Command Prompt or PowerShell:
+Use one of the native launcher scripts from PowerShell or Command Prompt:
 
 ```powershell
-npm run dev
+powershell -ExecutionPolicy Bypass -File scripts/seedbank.ps1 start
 ```
 
-For a launcher, create a `.bat` or `.ps1` file that changes into the Seedbank directory and runs `npm run dev`, then create a Start Menu shortcut to that file.
+```bat
+scripts\seedbank.bat start
+```
 
-PowerShell example:
+Status and stop:
 
 ```powershell
-Set-Location "<path-to-seedbank>"
-npm run dev
+powershell -ExecutionPolicy Bypass -File scripts/seedbank.ps1 status
+powershell -ExecutionPolicy Bypass -File scripts/seedbank.ps1 stop
 ```
+
+```bat
+scripts\seedbank.bat status
+scripts\seedbank.bat stop
+```
+
+For a launcher shortcut, point Start Menu/Desktop shortcuts at either script with `start`.
+
+## Packaging Roadmap
+
+Seedbank is currently distributed as a local source checkout with launcher scripts (`npm start` or `scripts/seedbank*`).
+
+Near-term deliverables:
+
+- `npx`/global CLI wrapper for `start|stop|status|logs` around the same local runtime model.
+- Container image for trusted local/LAN self-hosting, with explicit storage volume mapping for `<seedbank-data-dir>`.
+- Installable release archives that bundle launcher scripts and setup guidance per platform.
+
+Deferred packaging:
+
+- Full desktop bundles (Tauri/Electron) are intentionally deferred. They would require native signing/notarization, auto-update strategy, and consistent cross-platform packaging CI.
+- Public internet hosting is not a default target; any remote exposure needs additional auth, TLS, and network hardening beyond current defaults.
 
 ## Architecture
 
