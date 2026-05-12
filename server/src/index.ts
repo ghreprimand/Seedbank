@@ -16,6 +16,7 @@ import {
 import { IntegrationRegistry } from './integrations/registry.js';
 import { authMiddleware, requireScope } from './middleware/auth.js';
 import { archiveToMarkdown, ideaToMarkdown, parseMarkdownArchive } from './markdown.js';
+import { openApiSpec } from './openapi.js';
 import { SeedbankRepository, type ImportArchive, type ListIdeasOptions } from './repository.js';
 import { ApiTokenStore, TOKEN_SCOPES, type TokenScope } from './tokens.js';
 import { WebhookEmitter, normalizeWebhookUrl, toWebhookEventList } from './webhooks.js';
@@ -381,6 +382,10 @@ function ideaSummary(idea: ReturnType<SeedbankRepository['getIdea']> extends inf
 
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, port: PORT });
+});
+
+app.get('/api/openapi.json', (_req, res) => {
+  res.json(openApiSpec);
 });
 
 app.get('/api/server/info', requireScope('read:ideas'), asyncRoute((_req, res) => {
