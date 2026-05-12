@@ -14,7 +14,7 @@ export default function ScorePicker({ label, value, onChange, helpSummary, helpM
   return (
     <div>
       <div className="flex items-center gap-1 mb-1.5">
-        <label className="text-[11px] font-medium text-ink-400 uppercase tracking-wider font-mono">
+        <label className="text-[11px] font-medium text-ink-500 uppercase tracking-wider font-mono">
           {label}
         </label>
         {helpSummary && (

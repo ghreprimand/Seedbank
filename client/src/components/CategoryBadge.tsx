@@ -11,7 +11,7 @@ export default function CategoryBadge({ category, className = '' }: CategoryBadg
   return (
     <span
       className={`inline-flex items-center px-2 py-0.5 text-[11px] font-medium font-mono
-                  text-ink-400 bg-paper-warm border border-ink-100 rounded-badge leading-tight
+                  text-ink-500 bg-paper-warm border border-ink-100 rounded-badge leading-tight
                   transition-colors ${className}`}
     >
       {CATEGORY_LABELS[category]}
