@@ -1,9 +1,8 @@
 /** App shell — sticky header with search, nav, and CTA. Hosts modals and global keyboard shortcuts. */
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
-import { Search, ArrowUpDown, Compass, Trash2, X } from 'lucide-react';
+import { Search, Compass, Trash2, X, Settings } from 'lucide-react';
 import QuickCapture from './QuickCapture';
-import ImportExportModal from './ImportExportModal';
 import ConnectionStatus from './ConnectionStatus';
 import DataMigrationDialog from './DataMigrationDialog';
 import BackupStatus from './BackupStatus';
@@ -11,7 +10,6 @@ import { useFilterStore } from '@/stores/filters';
 
 export default function Layout() {
   const [isCaptureOpen, setIsCaptureOpen] = useState(false);
-  const [isImportExportOpen, setIsImportExportOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const mobileSearchRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
@@ -38,7 +36,6 @@ export default function Layout() {
       // Esc — close any open modal or mobile search
       if (e.key === 'Escape') {
         if (isCaptureOpen) { setIsCaptureOpen(false); return; }
-        if (isImportExportOpen) { setIsImportExportOpen(false); return; }
         if (mobileSearchOpen) { setMobileSearchOpen(false); return; }
         // Blur focused search input on Esc
         if (document.activeElement === searchRef.current) {
@@ -67,7 +64,7 @@ export default function Layout() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [isCaptureOpen, isImportExportOpen, mobileSearchOpen]);
+  }, [isCaptureOpen, mobileSearchOpen]);
 
   return (
     <div className="min-h-screen bg-paper text-ink-800 font-sans antialiased">
@@ -155,14 +152,18 @@ export default function Layout() {
             <Trash2 className="w-[18px] h-[18px]" />
           </Link>
 
-          {/* Import/Export */}
-          <button
-            onClick={() => setIsImportExportOpen(true)}
-            title="Import & Export"
-            className="p-2 text-ink-400 hover:text-ink-600 transition-all duration-200 rounded-card hover:bg-ink-50"
+          {/* Settings gear */}
+          <Link
+            to="/settings"
+            title="Settings"
+            className={`p-2 rounded-card transition-all duration-200 ${
+              location.pathname.startsWith('/settings')
+                ? 'text-sage-600 bg-sage-50 shadow-sm'
+                : 'text-ink-400 hover:text-ink-600 hover:bg-ink-50'
+            }`}
           >
-            <ArrowUpDown className="w-[18px] h-[18px]" />
-          </button>
+            <Settings className="w-[18px] h-[18px]" />
+          </Link>
 
           {/* Divider — desktop only */}
           <div className="hidden sm:block w-px h-6 bg-ink-100 mx-1" />
@@ -223,16 +224,6 @@ export default function Layout() {
           onSuccess={(id) => {
             setIsCaptureOpen(false);
             navigate(`/idea/${id}`);
-          }}
-        />
-      )}
-
-      {/* ── Import/Export Modal ──────────────────────────── */}
-      {isImportExportOpen && (
-        <ImportExportModal
-          onClose={() => setIsImportExportOpen(false)}
-          onImported={() => {
-            if (location.pathname !== '/') navigate('/');
           }}
         />
       )}
