@@ -284,33 +284,31 @@ export interface AgentLinkResult {
   cliPath?: string;
 }
 
+/** Client-side run status (maps from server's AgentRunState). */
 export type AgentRunStatus = 'pending' | 'running' | 'stopped' | 'done' | 'error';
 
-export interface AgentProposedFile {
-  path: string;
-  content: string;
-  /** Whether the user has accepted this file to be applied */
-  accepted?: boolean;
-}
+/** Server AgentRunState values as returned by the API. */
+export type AgentRunState = 'running' | 'completed' | 'failed' | 'stopped';
 
+/**
+ * Minimal client representation of a run after startAgentRun / getAgentRun.
+ * proposedFiles: relative paths inside the scratch workspace.
+ */
 export interface AgentRun {
   id: string;
-  ideaId: string;
-  provider: AgentProvider;
   status: AgentRunStatus;
-  prompt: string;
-  transcriptLines: string[];
-  proposedFiles: AgentProposedFile[];
-  createdAt: string;
-  updatedAt: string;
-  errorMessage?: string;
+  proposedFiles: string[];
 }
 
+/**
+ * SSE stream event — mirrors server's AgentRunStreamEvent shape exactly.
+ * Use the `type` discriminant to handle each case.
+ */
 export type AgentRunEvent =
-  | { type: 'line'; text: string }
-  | { type: 'file'; file: AgentProposedFile }
-  | { type: 'status'; status: AgentRunStatus }
-  | { type: 'error'; message: string };
+  | { type: 'state'; runId: string; state: AgentRunState; timestamp: string }
+  | { type: 'delta'; runId: string; delta: string; timestamp: string }
+  | { type: 'done';  runId: string; state: AgentRunState; timestamp: string }
+  | { type: 'error'; runId: string; error: string;  timestamp: string };
 
 export interface WebhooksConfig {
   url: string | null;

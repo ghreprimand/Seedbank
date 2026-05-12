@@ -138,15 +138,22 @@ function OpenAIDetail({ model, hasKey, onSave }: OpenAIDetailProps) {
   const [key, setKey] = useState('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const save = async () => {
     setSaving(true);
     setSaved(false);
-    await onSave(m, key || undefined);
-    setKey('');
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1500);
+    setSaveError(null);
+    try {
+      await onSave(m, key || undefined);
+      setKey('');
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -179,6 +186,7 @@ function OpenAIDetail({ model, hasKey, onSave }: OpenAIDetailProps) {
         {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : saved ? <Check className="w-3 h-3" /> : null}
         {saved ? 'Saved' : 'Save'}
       </button>
+      {saveError && <p className="text-[11px] text-red-600 font-mono">{saveError}</p>}
     </div>
   );
 }
@@ -196,15 +204,22 @@ function AnthropicDetail({ model, hasKey, onSave }: AnthropicDetailProps) {
   const [key, setKey] = useState('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const save = async () => {
     setSaving(true);
     setSaved(false);
-    await onSave(m, key || undefined);
-    setKey('');
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1500);
+    setSaveError(null);
+    try {
+      await onSave(m, key || undefined);
+      setKey('');
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -237,6 +252,7 @@ function AnthropicDetail({ model, hasKey, onSave }: AnthropicDetailProps) {
         {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : saved ? <Check className="w-3 h-3" /> : null}
         {saved ? 'Saved' : 'Save'}
       </button>
+      {saveError && <p className="text-[11px] text-red-600 font-mono">{saveError}</p>}
     </div>
   );
 }
@@ -254,14 +270,21 @@ function OllamaDetail({ model, baseUrl, onSave }: OllamaDetailProps) {
   const [url, setUrl] = useState(baseUrl);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const save = async () => {
     setSaving(true);
     setSaved(false);
-    await onSave(m, url);
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1500);
+    setSaveError(null);
+    try {
+      await onSave(m, url);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -292,6 +315,7 @@ function OllamaDetail({ model, baseUrl, onSave }: OllamaDetailProps) {
         {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : saved ? <Check className="w-3 h-3" /> : null}
         {saved ? 'Saved' : 'Save'}
       </button>
+      {saveError && <p className="text-[11px] text-red-600 font-mono">{saveError}</p>}
     </div>
   );
 }
@@ -457,6 +481,7 @@ function BudgetSection({ budget, onSave }: BudgetSectionProps) {
   const draft = localDraft ?? budget;
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [usage, setUsage] = useState<AiUsageSummary | null>(null);
 
   useEffect(() => {
@@ -467,11 +492,18 @@ function BudgetSection({ budget, onSave }: BudgetSectionProps) {
 
   const save = async () => {
     setSaving(true);
-    await onSave(draft);
-    setLocalDraft(null); // let parent prop take over again
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1500);
+    setSaved(false);
+    setSaveError(null);
+    try {
+      await onSave(draft);
+      setLocalDraft(null); // let parent prop take over again
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -500,6 +532,7 @@ function BudgetSection({ budget, onSave }: BudgetSectionProps) {
           {saved ? 'Saved' : 'Save'}
         </button>
       </div>
+      {saveError && <p className="text-[11px] text-red-600 font-mono">{saveError}</p>}
       {usage !== null && (
         <div className="font-mono text-[11px] text-ink-400 space-y-0.5">
           <div>

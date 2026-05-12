@@ -12,19 +12,18 @@ import { useEffect, useRef, useState } from 'react';
 import {
   Bot,
   Check,
-  ChevronDown,
-  ChevronRight,
   FileCode,
   Loader2,
   Square,
   X,
 } from 'lucide-react';
-import type { AgentProvider, AgentProposedFile, AgentRunStatus, Idea } from '@/lib/types';
+import type { AgentProvider, AgentRunStatus, Idea } from '@/lib/types';
 import {
   startAgentRun,
   stopAgentRun,
   streamAgentRun,
   applyAgentRun,
+  getAgentRun,
 } from '@/api/client';
 import { useAgentsSettings } from '@/stores/settings';
 
@@ -39,12 +38,11 @@ interface AgentRunPanelProps {
 
 // ── file preview sub-component ────────────────────────────────────────────────
 
-function FilePreview({ file, selected, onToggle }: {
-  file: AgentProposedFile;
+function FilePreview({ path, selected, onToggle }: {
+  path: string;
   selected: boolean;
   onToggle: () => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
   return (
     <div className={`rounded-card border text-xs transition-colors ${selected ? 'border-sage-300 bg-sage-50' : 'border-ink-100 bg-paper'}`}>
       <div className="flex items-center gap-2 px-3 py-2">
@@ -58,20 +56,8 @@ function FilePreview({ file, selected, onToggle }: {
           {selected && <Check className="w-2.5 h-2.5 text-white" />}
         </button>
         <FileCode className="w-3.5 h-3.5 text-ink-400 shrink-0" />
-        <span className="flex-1 font-mono text-ink-700 truncate">{file.path}</span>
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          className="text-ink-400 hover:text-ink-700 transition-colors"
-        >
-          {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-        </button>
+        <span className="flex-1 font-mono text-ink-700 truncate">{path}</span>
       </div>
-      {expanded && (
-        <pre className="border-t border-ink-100 px-3 py-2 bg-paper-warm font-mono text-[10px] text-ink-700 overflow-x-auto max-h-48 whitespace-pre-wrap break-all">
-          {file.content}
-        </pre>
-      )}
     </div>
   );
 }
@@ -91,7 +77,7 @@ export default function AgentRunPanel({ idea, projectPath, onClose }: AgentRunPa
   const [runId, setRunId] = useState<string | null>(null);
   const [status, setStatus] = useState<AgentRunStatus | null>(null);
   const [transcript, setTranscript] = useState<string[]>([]);
-  const [proposedFiles, setProposedFiles] = useState<AgentProposedFile[]>([]);
+  const [proposedFiles, setProposedFiles] = useState<string[]>([]);
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
   const [applying, setApplying] = useState(false);
   const [applied, setApplied] = useState(false);
@@ -145,21 +131,35 @@ export default function AgentRunPanel({ idea, projectPath, onClose }: AgentRunPa
       await streamAgentRun(
         run.id,
         (event) => {
-          if (event.type === 'line') {
-            setTranscript((t) => [...t, event.text]);
-          } else if (event.type === 'file') {
-            setProposedFiles((files) => {
-              const exists = files.some((f) => f.path === event.file.path);
-              return exists
-                ? files.map((f) => f.path === event.file.path ? event.file : f)
-                : [...files, event.file];
+          if (event.type === 'delta') {
+            // Append each delta chunk; split on newlines so transcript renders line-by-line
+            setTranscript((t) => {
+              const lines = event.delta.split('\n');
+              if (t.length === 0) return lines.filter(Boolean);
+              // Append to last partial line, then add any new lines
+              const last = (t[t.length - 1] ?? '') + (lines[0] ?? '');
+              return [...t.slice(0, -1), last, ...lines.slice(1)].filter(
+                (l, i, arr) => l !== '' || i === arr.length - 1,
+              );
             });
-            // Auto-select new files
-            setSelectedFiles((s) => new Set([...s, event.file.path]));
-          } else if (event.type === 'status') {
-            setStatus(event.status);
+          } else if (event.type === 'state') {
+            // Map server state → client status
+            const stateMap: Record<string, AgentRunStatus> = {
+              running: 'running', completed: 'done', failed: 'error', stopped: 'stopped',
+            };
+            setStatus(stateMap[event.state] ?? 'error');
+          } else if (event.type === 'done') {
+            const stateMap: Record<string, AgentRunStatus> = {
+              running: 'done', completed: 'done', failed: 'error', stopped: 'stopped',
+            };
+            setStatus(stateMap[event.state] ?? 'done');
+            // Fetch full run detail to get proposed files list
+            void getAgentRun(run.id).then((detail) => {
+              setProposedFiles(detail.proposedFiles);
+              setSelectedFiles(new Set(detail.proposedFiles));
+            }).catch(() => { /* ignore — proposed files just won't show */ });
           } else if (event.type === 'error') {
-            setError(event.message);
+            setError(event.error);
             setStatus('error');
           }
         },
@@ -177,8 +177,10 @@ export default function AgentRunPanel({ idea, projectPath, onClose }: AgentRunPa
     setStopping(true);
     abortRef.current?.abort();
     try {
-      const stopped = await stopAgentRun(runId);
-      setStatus(stopped.status);
+      await stopAgentRun(runId);
+      // Server returns { ok: true } — update status conservatively; the stream
+      // will deliver a 'state:stopped' or 'done' event if it hasn't already.
+      setStatus('stopped');
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -320,7 +322,7 @@ export default function AgentRunPanel({ idea, projectPath, onClose }: AgentRunPa
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={() => setSelectedFiles(new Set(proposedFiles.map((f) => f.path)))}
+                    onClick={() => setSelectedFiles(new Set(proposedFiles))}
                     className="text-[10px] text-sage-700 hover:underline"
                   >
                     Select all
@@ -335,12 +337,12 @@ export default function AgentRunPanel({ idea, projectPath, onClose }: AgentRunPa
                 </div>
               </div>
               <div className="space-y-1.5">
-                {proposedFiles.map((file) => (
+                {proposedFiles.map((filePath) => (
                   <FilePreview
-                    key={file.path}
-                    file={file}
-                    selected={selectedFiles.has(file.path)}
-                    onToggle={() => toggleFile(file.path)}
+                    key={filePath}
+                    path={filePath}
+                    selected={selectedFiles.has(filePath)}
+                    onToggle={() => toggleFile(filePath)}
                   />
                 ))}
               </div>
