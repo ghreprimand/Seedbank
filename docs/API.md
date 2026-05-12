@@ -122,11 +122,11 @@ Unsupported section values return `400`.
 Body:
 
 ```json
-{ "theme": { "name": "loam", "matchSystem": false } }
+{ "theme": { "name": "woad", "matchSystem": false } }
 ```
 
 Rules:
-- `name` must be one of `paper|parchment|meadow|dusk|loam|moss`.
+- `name` must be one of `paper|chalk|meadow|dusk|hearth|rainwash|woad|moss|peat|canopy`.
 
 #### `ai`
 

@@ -262,9 +262,9 @@ export interface AiPublicConfig {
 }
 
 export type ThemeName =
-  | 'paper' | 'parchment' | 'meadow' | 'dusk'   // light themes
-  | 'hearth' | 'rainwash'                         // mid-depth themes
-  | 'loam' | 'moss' | 'peat' | 'canopy';          // dark themes
+  | 'paper' | 'chalk' | 'meadow' | 'dusk'         // light themes
+  | 'hearth' | 'rainwash'                          // mid-depth themes
+  | 'woad' | 'moss' | 'peat' | 'canopy';           // dark themes
 
 export interface UiThemeConfig {
   name: ThemeName;
