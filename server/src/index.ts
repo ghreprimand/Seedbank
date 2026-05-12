@@ -8,18 +8,20 @@ import {
   backupsDir,
   createDatabaseBackup,
   dbPath,
+  dataDir,
   exportsDir,
   latestFileInfo,
   openDatabase,
   writeArchiveExport,
 } from './db.js';
 import { IntegrationRegistry } from './integrations/registry.js';
-import { authMiddleware, requireScope } from './middleware/auth.js';
+import { authMiddleware, requireImplicitLocal, requireScope } from './middleware/auth.js';
 import { archiveToMarkdown, ideaToMarkdown, parseMarkdownArchive } from './markdown.js';
 import { openApiSpec } from './openapi.js';
 import { SeedbankRepository, type ImportArchive, type ListIdeasOptions } from './repository.js';
 import { ApiTokenStore, TOKEN_SCOPES, type TokenScope } from './tokens.js';
 import { WebhookEmitter, normalizeWebhookUrl, toWebhookEventList } from './webhooks.js';
+import { AgentService } from './agents/service.js';
 import type { AiConfigPatch } from './ai/types.js';
 import type {
   AgentsPublicConfig,
@@ -44,6 +46,7 @@ const repository = new SeedbankRepository(database);
 const integrations = new IntegrationRegistry(repository);
 const aiService = new AiService(repository, new AiStore(database));
 const tokenStore = new ApiTokenStore(database);
+const agentService = new AgentService(repository);
 
 const DEFAULT_BACKUP_CONFIG: BackupConfig = {
   frequency: 'daily',
@@ -55,6 +58,10 @@ interface AgentStoredConfig {
   codexLinked: boolean;
   claudeCliPath?: string;
   codexCliPath?: string;
+  claudeVersion?: string;
+  codexVersion?: string;
+  runtimeCapMinutes?: number;
+  dailyRunBudget?: number;
 }
 
 const SETTINGS_KEYS = {
@@ -176,6 +183,8 @@ function agentsPublicConfig(): AgentsPublicConfig {
   return {
     claudeLinked: Boolean(stored.claudeLinked),
     codexLinked: Boolean(stored.codexLinked),
+    ...(stored.claudeVersion ? { claudeVersion: stored.claudeVersion } : {}),
+    ...(stored.codexVersion ? { codexVersion: stored.codexVersion } : {}),
   };
 }
 
@@ -237,6 +246,7 @@ app.use(cors({
     callback(new Error(`CORS origin not allowed: ${origin}`));
   },
 }));
+app.set('trust proxy', false);
 app.use(express.json({ limit: '25mb' }));
 app.use('/api', authMiddleware(tokenStore));
 
@@ -403,7 +413,7 @@ app.get('/api/tokens', requireScope('write:ideas'), asyncRoute((_req, res) => {
   res.json({ items: tokenStore.list() });
 }));
 
-app.post('/api/tokens', requireScope('write:ideas'), asyncRoute((req, res) => {
+app.post('/api/tokens', requireScope('write:ideas'), requireImplicitLocal, asyncRoute((req, res) => {
   const body = req.body as { name?: unknown; scopes?: unknown };
   const name = typeof body?.name === 'string' ? body.name.trim() : '';
   const scopes = validScopes(body?.scopes);
@@ -420,6 +430,83 @@ app.post('/api/tokens', requireScope('write:ideas'), asyncRoute((req, res) => {
     ...created.record,
     token: created.token,
   });
+}));
+
+app.post('/api/agents/link', requireScope('agents:run'), asyncRoute((req, res) => {
+  const body = req.body as { provider?: string; cliPath?: string };
+  if (!body.provider) {
+    res.status(400).json({ error: 'provider is required.' });
+    return;
+  }
+  res.json(agentService.link(body.provider, body.cliPath));
+}));
+
+app.delete('/api/agents/link/:provider', requireScope('agents:run'), asyncRoute((req, res) => {
+  res.json(agentService.unlink(routeParam(req, 'provider')));
+}));
+
+app.post('/api/agents/runs', requireScope('agents:run'), asyncRoute((req, res) => {
+  const body = req.body as { ideaId?: string; projectPath?: string; provider?: string; prompt?: string };
+  if (!body.provider || !body.prompt) {
+    res.status(400).json({ error: 'provider and prompt are required.' });
+    return;
+  }
+
+  const created = agentService.startRun({
+    ideaId: body.ideaId,
+    projectPath: body.projectPath,
+    provider: body.provider as 'claude' | 'codex',
+    prompt: body.prompt,
+  });
+  res.status(202).json(created);
+}));
+
+app.get('/api/agents/runs/:id', requireScope('agents:run'), asyncRoute((req, res) => {
+  res.json(agentService.getRun(routeParam(req, 'id')));
+}));
+
+app.get('/api/agents/runs/:id/stream', requireScope('agents:run'), asyncRoute((req, res) => {
+  const runId = routeParam(req, 'id');
+  const current = agentService.getRun(runId);
+
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache, no-transform',
+    Connection: 'keep-alive',
+  });
+
+  res.write(`event: state\ndata: ${JSON.stringify({ type: 'state', runId, state: current.state, timestamp: new Date().toISOString() })}\n\n`);
+  if (current.transcript) {
+    res.write(`event: delta\ndata: ${JSON.stringify({ type: 'delta', runId, delta: current.transcript, timestamp: new Date().toISOString() })}\n\n`);
+  }
+  if (current.state !== 'running') {
+    res.write(`event: done\ndata: ${JSON.stringify({ type: 'done', runId, state: current.state, timestamp: new Date().toISOString() })}\n\n`);
+    res.end();
+    return;
+  }
+
+  const unsubscribe = agentService.subscribe(runId, (event) => {
+    res.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
+    if (event.type === 'done') {
+      unsubscribe();
+      res.end();
+    }
+  });
+
+  req.on('close', () => {
+    unsubscribe();
+  });
+}));
+
+app.post('/api/agents/runs/:id/stop', requireScope('agents:run'), asyncRoute((req, res) => {
+  agentService.stopRun(routeParam(req, 'id'));
+  res.status(202).json({ ok: true });
+}));
+
+app.post('/api/agents/runs/:id/apply', requireScope('agents:run'), asyncRoute((req, res) => {
+  const body = req.body as { paths?: string[] };
+  const result = agentService.applyRunPaths(routeParam(req, 'id'), { paths: body.paths ?? [] });
+  res.json(result);
 }));
 
 app.delete('/api/tokens/:id', requireScope('write:ideas'), asyncRoute((req, res) => {
@@ -494,7 +581,12 @@ app.patch('/api/settings/:section', requireScope('write:ideas'), asyncRoute((req
   }
 
   if (section === 'agents') {
-    const body = req.body as { claudeCliPath?: unknown; codexCliPath?: unknown };
+    const body = req.body as {
+      claudeCliPath?: unknown;
+      codexCliPath?: unknown;
+      runtimeCapMinutes?: unknown;
+      dailyRunBudget?: unknown;
+    };
     const current = agentsStoredConfig();
     const claudeCliPath = typeof body.claudeCliPath === 'string' && body.claudeCliPath.trim()
       ? body.claudeCliPath.trim()
@@ -507,6 +599,12 @@ app.patch('/api/settings/:section', requireScope('write:ideas'), asyncRoute((req
       ...current,
       claudeCliPath: body.claudeCliPath === undefined ? current.claudeCliPath : claudeCliPath,
       codexCliPath: body.codexCliPath === undefined ? current.codexCliPath : codexCliPath,
+      runtimeCapMinutes: typeof body.runtimeCapMinutes === 'number'
+        ? Math.min(30, Math.max(1, Math.floor(body.runtimeCapMinutes)))
+        : current.runtimeCapMinutes,
+      dailyRunBudget: typeof body.dailyRunBudget === 'number'
+        ? Math.max(1, Math.floor(body.dailyRunBudget))
+        : current.dailyRunBudget,
     };
     next.claudeLinked = body.claudeCliPath === undefined ? current.claudeLinked : Boolean(next.claudeCliPath);
     next.codexLinked = body.codexCliPath === undefined ? current.codexLinked : Boolean(next.codexCliPath);
@@ -719,6 +817,10 @@ app.get('/api/ai/config', requireScope('read:ideas'), asyncRoute((_req, res) => 
   res.json(aiService.getPublicConfig());
 }));
 
+app.get('/api/ai/usage', requireScope('read:ideas'), asyncRoute((_req, res) => {
+  res.json(aiService.getUsageSummary());
+}));
+
 app.post('/api/ai/config', requireScope('write:ideas'), asyncRoute((req, res) => {
   res.json(aiService.configure(req.body ?? {}));
 }));
@@ -883,6 +985,8 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 migrateLegacySettings();
+fs.mkdirSync(path.join(dataDir, 'scratch'), { recursive: true });
+fs.mkdirSync(path.join(dataDir, 'agent-runs'), { recursive: true });
 
 app.listen(PORT, () => {
   runScheduledBackupIfDue();

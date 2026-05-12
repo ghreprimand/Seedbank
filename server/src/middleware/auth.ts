@@ -12,7 +12,7 @@ export interface AuthState {
   token: AuthToken | null;
 }
 
-type RequestWithAuth = Request & { auth?: AuthState };
+export type RequestWithAuth = Request & { auth?: AuthState };
 
 const LOOPBACK_IPS = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
 
@@ -91,4 +91,12 @@ export function requireScope(scope: TokenScope) {
 
     next();
   };
+}
+
+export function requireImplicitLocal(req: RequestWithAuth, res: Response, next: NextFunction): void {
+  if (!req.auth?.implicitLocal) {
+    res.status(403).json({ error: 'Token creation is only allowed from a local session.' });
+    return;
+  }
+  next();
 }

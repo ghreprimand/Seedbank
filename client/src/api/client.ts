@@ -2,6 +2,10 @@ import { db } from '@/db';
 import * as localIdeas from '@/db/ideas';
 import type {
   AggregateSettings,
+  AgentLinkResult,
+  AgentProvider,
+  AgentRun,
+  AgentRunEvent,
   AiChatMessage,
   AiConfigInput,
   AiPublicConfig,
@@ -513,6 +517,111 @@ export async function streamAiChat(
 
   if (!assistantMessage) throw new Error('AI chat ended without an assistant response.');
   return assistantMessage;
+}
+
+// ── AI Usage ─────────────────────────────────────────────────────────────────
+
+export interface AiUsageSummary {
+  last24h: number;
+  last7d: number;
+}
+
+export async function getAiUsage(): Promise<AiUsageSummary> {
+  return request<AiUsageSummary>('/api/ai/usage');
+}
+
+// ── Agent linking + runs ──────────────────────────────────────────────────────
+
+export interface AgentLinkRequest {
+  provider: AgentProvider;
+  cliPath?: string;
+  detect?: boolean;
+}
+
+export interface AgentRunRequest {
+  ideaId: string;
+  provider: AgentProvider;
+  prompt: string;
+  /** Absolute path to project dir (for "Continue with agent" after graduation) */
+  projectPath?: string;
+}
+
+export interface AgentApplyRequest {
+  files: string[];
+}
+
+export async function linkAgent(req: AgentLinkRequest): Promise<AgentLinkResult> {
+  return request<AgentLinkResult>('/api/agents/link', {
+    method: 'POST',
+    body: JSON.stringify(req),
+  });
+}
+
+export async function unlinkAgent(provider: AgentProvider): Promise<void> {
+  return request<void>(`/api/agents/link/${encodeURIComponent(provider)}`, { method: 'DELETE' });
+}
+
+export async function startAgentRun(req: AgentRunRequest): Promise<AgentRun> {
+  return request<AgentRun>('/api/agents/runs', {
+    method: 'POST',
+    body: JSON.stringify(req),
+  });
+}
+
+export async function getAgentRun(id: string): Promise<AgentRun> {
+  return request<AgentRun>(`/api/agents/runs/${encodeURIComponent(id)}`);
+}
+
+export async function stopAgentRun(id: string): Promise<AgentRun> {
+  return request<AgentRun>(`/api/agents/runs/${encodeURIComponent(id)}/stop`, { method: 'POST' });
+}
+
+export async function applyAgentRun(id: string, files: string[]): Promise<AgentRun> {
+  return request<AgentRun>(`/api/agents/runs/${encodeURIComponent(id)}/apply`, {
+    method: 'POST',
+    body: JSON.stringify({ files }),
+  });
+}
+
+/**
+ * Stream agent run events via SSE.
+ * `onEvent` is called for each event. Returns when the stream closes.
+ */
+export async function streamAgentRun(
+  id: string,
+  onEvent: (event: AgentRunEvent) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  const response = await fetch(apiUrl(`/api/agents/runs/${encodeURIComponent(id)}/stream`), {
+    headers: { Accept: 'text/event-stream' },
+    signal,
+  });
+  if (!response.ok || !response.body) {
+    throw new Error(`Agent stream ${response.status}: ${response.statusText}`);
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  const handleChunk = (chunk: string) => {
+    const eventType = chunk.split('\n').find((l) => l.startsWith('event:'))?.slice(6).trim();
+    const dataLine = chunk.split('\n').filter((l) => l.startsWith('data:')).map((l) => l.slice(5).trim()).join('\n');
+    if (!eventType || !dataLine) return;
+    try {
+      const payload = JSON.parse(dataLine) as AgentRunEvent;
+      onEvent(payload);
+    } catch { /* ignore malformed */ }
+  };
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const chunks = buffer.split('\n\n');
+    buffer = chunks.pop() ?? '';
+    chunks.filter(Boolean).forEach(handleChunk);
+  }
+  if (buffer.trim()) handleChunk(buffer);
 }
 
 // ── Aggregate Settings ────────────────────────────────────────────────────────

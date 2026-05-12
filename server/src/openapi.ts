@@ -83,7 +83,7 @@ export const openApiSpec: OpenAPIObject = {
           port: { type: 'number' },
           version: { type: 'string' },
           uptimeMs: { type: 'number' },
-          dbPath: { type: 'string' },
+          dbPath: { type: 'string', description: 'Absolute path to the active SQLite database file.' },
         },
       },
       AggregateSettings: {
@@ -102,6 +102,32 @@ export const openApiSpec: OpenAPIObject = {
           backups: { type: 'object' },
           integrations: { type: 'array', items: { $ref: '#/components/schemas/IntegrationSummary' } },
           server: { $ref: '#/components/schemas/ServerInfo' },
+        },
+      },
+      AgentLinkPublic: {
+        type: 'object',
+        properties: {
+          claudeLinked: { type: 'boolean' },
+          codexLinked: { type: 'boolean' },
+          claudeVersion: { type: ['string', 'null'] },
+          codexVersion: { type: ['string', 'null'] },
+        },
+      },
+      AgentRun: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          ideaId: { type: ['string', 'null'] },
+          projectPath: { type: ['string', 'null'] },
+          provider: { type: 'string', enum: ['claude', 'codex'] },
+          state: { type: 'string', enum: ['running', 'completed', 'failed', 'stopped'] },
+          startedAt: { type: 'string', format: 'date-time' },
+          endedAt: { type: ['string', 'null'], format: 'date-time' },
+          exitCode: { type: ['number', 'null'] },
+          transcriptPath: { type: 'string' },
+          proposedFiles: { type: 'array', items: { type: 'string' } },
+          transcript: { type: 'string' },
+          truncated: { type: 'boolean' },
         },
       },
     },
@@ -241,26 +267,102 @@ export const openApiSpec: OpenAPIObject = {
       get: { summary: 'MCP search ideas', security: [{ bearerAuth: [] }] },
     },
     '/api/agents/link': {
-      post: { summary: 'Link agent CLI', 'x-stub': true, security: [{ bearerAuth: [] }] },
+      post: {
+        summary: 'Link an agent CLI',
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  provider: { type: 'string', enum: ['claude', 'codex'] },
+                  cliPath: { type: 'string' },
+                },
+                required: ['provider'],
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Updated linked-agent public status',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/AgentLinkPublic' },
+              },
+            },
+          },
+        },
+      },
     },
     '/api/agents/link/{provider}': {
-      delete: { summary: 'Unlink agent CLI', 'x-stub': true, security: [{ bearerAuth: [] }] },
+      delete: {
+        summary: 'Unlink an agent CLI',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: {
+            description: 'Updated linked-agent public status',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/AgentLinkPublic' },
+              },
+            },
+          },
+        },
+      },
     },
     '/api/agents/runs': {
-      post: { summary: 'Start agent run', 'x-stub': true, security: [{ bearerAuth: [] }] },
+      post: {
+        summary: 'Start an agent run',
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  ideaId: { type: 'string' },
+                  projectPath: { type: 'string' },
+                  provider: { type: 'string', enum: ['claude', 'codex'] },
+                  prompt: { type: 'string' },
+                },
+                required: ['provider', 'prompt'],
+              },
+            },
+          },
+        },
+      },
     },
     '/api/agents/runs/{id}': {
-      get: { summary: 'Get agent run', 'x-stub': true, security: [{ bearerAuth: [] }] },
+      get: {
+        summary: 'Get agent run',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: {
+            description: 'Run metadata and transcript',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/AgentRun' },
+              },
+            },
+          },
+        },
+      },
     },
     '/api/agents/runs/{id}/stream': {
-      get: { summary: 'Stream agent run events', 'x-stub': true, security: [{ bearerAuth: [] }] },
+      get: { summary: 'Stream agent run events (SSE)', security: [{ bearerAuth: [] }] },
     },
     '/api/agents/runs/{id}/stop': {
-      post: { summary: 'Stop agent run', 'x-stub': true, security: [{ bearerAuth: [] }] },
+      post: { summary: 'Stop agent run', security: [{ bearerAuth: [] }] },
     },
     '/api/agents/runs/{id}/apply': {
-      post: { summary: 'Apply agent output files', 'x-stub': true, security: [{ bearerAuth: [] }] },
+      post: {
+        summary: 'Apply accepted run files to idea attachments',
+        security: [{ bearerAuth: [] }],
+      },
     },
   },
 };
-

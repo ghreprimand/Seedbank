@@ -57,6 +57,7 @@ function toPayload(event: string, payload: unknown): WebhookEventPayload {
 }
 
 export class WebhookEmitter {
+  private static readonly MAX_QUEUE_DEPTH = 500;
   private readonly queue = new Map<number, WebhookJob>();
   private nextId = 1;
   private scheduled = false;
@@ -72,6 +73,11 @@ export class WebhookEmitter {
     const url = config.url?.trim();
     if (!url) return;
     if (config.events.length > 0 && !config.events.includes(event)) return;
+
+    if (this.queue.size >= WebhookEmitter.MAX_QUEUE_DEPTH) {
+      const oldest = this.queue.keys().next().value as number | undefined;
+      if (oldest !== undefined) this.queue.delete(oldest);
+    }
 
     const id = this.nextId++;
     this.queue.set(id, { id, event, payload, url });
