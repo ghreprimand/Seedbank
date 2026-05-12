@@ -59,24 +59,24 @@ Available from the idea detail page once at least one agent is linked. A button 
 1. A modal panel opens. You choose the agent (if both are linked) and write an initial prompt — for example, *"Write a SPEC.md, a RESEARCH.md, and a prototype outline based on the idea fields below."*
 2. Click **Start**. The server creates a scratch workspace at:
    ```
-   ~/.seedbank/scratch/<ideaId>/<runId>/
+   <seedbank-data-dir>/scratch/<ideaId>/<runId>/
    ```
    and seeds it with `IDEA.md` (all idea fields as Markdown) and optionally `ATTACHMENTS.md` (a list of existing attachment paths if the idea has any).
 3. The agent CLI is spawned with your prompt in that workspace. Its stdout/stderr is streamed in real time to the **Transcript** pane inside the modal.
 4. When the run ends (completed, stopped, or failed), the server walks the workspace, collects all files it wrote (excluding `IDEA.md` and `ATTACHMENTS.md`), and returns the list as **proposed files**.
 5. You review the file list (expandable per-file), select the ones you want, and click **Apply selected files**. Selected files are copied to:
    ```
-   ~/.seedbank/attachments/<ideaId>/<runId>/
+   <seedbank-data-dir>/attachments/<ideaId>/<runId>/
    ```
    and added to the idea's attachment list (`idea.images`). Nothing else on the idea changes.
 
 ### "Continue with agent" (Graduated projects)
 
-Available on the idea detail page after an idea has been graduated via an integration (Archon or Generic project). A **Continue with agent** button appears in the graduation banner.
+Available on the idea detail page after an idea has been graduated via an integration adapter. A **Continue with agent** button appears in the graduation banner.
 
 **What happens:**
 
-The same modal panel opens, but instead of a scratch workspace the agent receives the existing graduated project directory as its working directory. The project path is the `graduatedTo` value from the graduation result. The path must be inside a configured integration project root (Archon root or generic project root) — the server validates this before spawning.
+The same modal panel opens, but instead of a scratch workspace the agent receives the existing graduated project directory as its working directory. The project path is the `graduatedTo` value from the graduation result. The path must be inside a configured integration root — the server validates this before spawning.
 
 Proposed-file collection does not run in Continue mode (the project already has existing files). The transcript is still streamed and persisted.
 
@@ -110,7 +110,7 @@ A **Stop** button is visible in the agent modal for the entire duration of the r
 
 All agent stdout and stderr is written to:
 ```
-~/.seedbank/agent-runs/<runId>.log
+<seedbank-data-dir>/agent-runs/<runId>.log
 ```
 Transcripts are capped at 256 KB. If the cap is reached, a `...[truncated at 256KB]` marker is appended and further output is dropped. Transcripts are not automatically deleted — they remain available for inspection.
 
@@ -124,15 +124,15 @@ The Apply step copies files to `attachments/` and adds them to `idea.images`. Th
 
 ### Scratch runs
 
-The agent's working directory is `~/.seedbank/scratch/<ideaId>/<runId>/`. Files created anywhere under this directory are eligible to be collected as proposed files. The server validates that any applied file path is inside the workspace before copying it — symlinks that escape the sandbox are rejected.
+The agent's working directory is `<seedbank-data-dir>/scratch/<ideaId>/<runId>/`. Files created anywhere under this directory are eligible to be collected as proposed files. The server validates that any applied file path is inside the workspace before copying it — symlinks that escape the sandbox are rejected.
 
 ### Continue runs
 
-The agent works inside the graduated project directory. The server validates that the `projectPath` is inside a configured integration root (Archon project root or generic project root) before spawning. Absolute paths and paths with `..` traversal are rejected.
+The agent works inside the graduated project directory. The server validates that the `projectPath` is inside a configured integration root before spawning. Absolute paths and paths with `..` traversal are rejected.
 
 ### Data directory
 
-The default data directory is `~/.seedbank/` (override with `SEEDBANK_DATA_DIR`). All agent artifacts (scratch workspaces, transcripts, attachments) live inside it.
+The default data directory is `<seedbank-data-dir>/` (override with `SEEDBANK_DATA_DIR`). All agent artifacts (scratch workspaces, transcripts, attachments) live inside it.
 
 ---
 

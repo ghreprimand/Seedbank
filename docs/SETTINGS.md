@@ -13,7 +13,7 @@ Settings uses a tabbed shell. On desktop (`md+`) a left-rail sidebar lists every
 | Theme | `/settings/theme` | Color palette, system preference toggle |
 | API & Server | `/settings/api` | Server info, personal access tokens, webhooks, MCP |
 | Backups | `/settings/backups` | Backup schedule, path, manual run |
-| Integrations | `/settings/integrations` | Archon and generic project root configuration |
+| Integrations | `/settings/integrations` | External project adapters and integration root configuration |
 | About | `/settings/about` | Version, GitHub link, acknowledgements |
 
 The header API-status pill (top-right, next to the gear icon) is now a link that jumps to **API & Server** when clicked.
@@ -148,7 +148,7 @@ All backup settings that were previously in the header popover live here.
 
 - **Backup frequency** — off, daily, or weekly.
 - **Max backups to keep** — older backups are pruned automatically.
-- **Backup directory** — defaults to `~/.seedbank/backups/` (or `$SEEDBANK_DATA_DIR/backups/`).
+- **Backup directory** — defaults to `<seedbank-data-dir>/backups/` (or `$SEEDBANK_DATA_DIR/backups/`).
 - **Manual backup** — runs a backup immediately.
 
 The header status pill continues to show last-backup time and links to this tab.
@@ -159,8 +159,8 @@ The header status pill continues to show last-backup time and links to this tab.
 
 Integration configuration that was previously inside the Graduation modal now lives here.
 
-- **Archon** — set the Archon workspace root and project root; save once, graduate from any idea.
-- **Generic project** — set a project root directory; generic scaffolds are created here.
+- **Local Project adapter** — set an external project root; generic scaffolds are created here.
+- **Optional adapters** (for example Archon) — configure adapter-specific roots/fields when that adapter is enabled.
 
 A `configured` badge appears next to each integration that has a valid configuration. Unconfigured integrations show an amber notice inside the Graduation modal directing you here.
 
@@ -184,7 +184,7 @@ A `configured` badge appears next to each integration that has a valid configura
 | Agents config (linked, CLI paths) | Server `settings` table (`agents.config`) | Shown from cache; linking requires server |
 | Token budget | Server `settings` table (`ai.config`) | Shown from cache; changes require server |
 | Backups config | Server `settings` table (`backups.config`) | Shown from cache; changes require server |
-| Integrations config | Server `settings` table (`integration:archon`, `integration:generic-project`) | Shown from cache; changes require server |
+| Integrations config | Server `settings` table (`integration:<adapter-id>`, examples: `integration:generic-project`, `integration:archon`) | Shown from cache; changes require server |
 | Personal access tokens | Server `api_tokens` table, hashed | Not visible offline |
 | Webhook URL + events | Server `settings` table (`api.webhooks`) | Not visible offline |
 
