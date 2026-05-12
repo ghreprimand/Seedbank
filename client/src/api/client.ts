@@ -18,6 +18,7 @@ import type {
   IdeaFilters,
   IdeaVersion,
   IntegrationSummary,
+  PublicToken,
 } from '@/lib/types';
 
 export type ConnectionStatus = 'checking' | 'online' | 'offline';
@@ -94,6 +95,8 @@ export interface AiConversationResponse {
 }
 
 const API_BASE_URL = import.meta.env.VITE_SEEDBANK_API_URL ?? 'http://localhost:4800';
+
+
 const MIGRATION_MARKER = 'seedbank:migrated-to-api:v1';
 
 let connectionStatus: ConnectionStatus = 'checking';
@@ -111,7 +114,7 @@ function setConnectionStatus(status: ConnectionStatus) {
   for (const listener of listeners) listener(status);
 }
 
-function apiUrl(path: string) {
+export function apiUrl(path: string) {
   return `${API_BASE_URL}${path}`;
 }
 
@@ -689,6 +692,44 @@ export async function runBackupNow(): Promise<{ run: BackupStatus['lastRun']; st
     method: 'POST',
   });
 }
+
+// ── API Tokens ────────────────────────────────────────────────────────────────
+
+export interface TokenCreateRequest {
+  name: string;
+  scopes: string[];
+}
+
+/** Token creation response — includes the raw token value (shown once). */
+export interface TokenCreateResponse extends PublicToken {
+  token: string;
+}
+
+export async function listTokens(): Promise<PublicToken[]> {
+  const res = await request<{ items: PublicToken[] }>('/api/tokens');
+  return res.items;
+}
+
+export async function createToken(req: TokenCreateRequest): Promise<TokenCreateResponse> {
+  return request<TokenCreateResponse>('/api/tokens', {
+    method: 'POST',
+    body: JSON.stringify(req),
+  });
+}
+
+export async function revokeToken(id: string): Promise<void> {
+  await request<void>(`/api/tokens/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
+export async function getServerInfo(): Promise<import('@/lib/types').ServerInfo> {
+  return request<import('@/lib/types').ServerInfo>('/api/server/info');
+}
+
+export async function getOpenApiSpec(): Promise<unknown> {
+  return request<unknown>('/api/openapi.json');
+}
+
+// ── Integrations ──────────────────────────────────────────────────────────────
 
 export async function getIntegrations(ideaId?: string): Promise<IntegrationWithReadiness[]> {
   const integrations = await request<IntegrationWithReadiness[]>(
