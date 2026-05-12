@@ -709,7 +709,7 @@ export default function AiAgentsTab() {
           <HelpButton
             helpId="linked-agents"
             title="Linked CLI Agents"
-            summary="Link Claude Code or Codex CLI by binary path. Seedbank spawns the agent in a sandboxed scratch workspace when you click 'Develop with agent' on an idea."
+            summary="Link Claude Code or Codex CLI by binary path. Seedbank spawns the agent in a per-idea scratch workspace when you click 'Develop with agent' on an idea."
             details="Credentials stay in your OS keychain or CLI tool. Seedbank stores only the binary path and a linked flag."
             manualSection="agents"
             alwaysShow
@@ -760,8 +760,8 @@ export default function AiAgentsTab() {
         <div className="mt-2 flex items-center gap-1.5 text-[11px] text-ink-400">
           <Zap className="w-3 h-3" />
           <span>
-            Agent runs are sandboxed to a temporary workspace. Proposed file changes require
-            your explicit approval before being saved as idea attachments.
+            Agent runs use a per-idea scratch workspace; the agent process is not OS-sandboxed.
+            Proposed file changes require your explicit approval before being saved as idea attachments.
           </span>
         </div>
       </section>
