@@ -30,6 +30,9 @@ docs/assets/screenshots/**/*.jpeg
 docs/assets/screenshots/**/*.png
 docs/assets/screenshots/**/*.webp
 
+# Local scratch outputs (smoke scripts, temp capture data, ephemeral runtime files)
+.tmp/
+
 # OS/editor noise
 .DS_Store
 Thumbs.db
