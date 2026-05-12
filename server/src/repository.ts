@@ -402,6 +402,10 @@ export class SeedbankRepository {
     `).run(key, JSON.stringify(value), new Date().toISOString());
   }
 
+  deleteSetting(key: string): void {
+    this.db.prepare('DELETE FROM settings WHERE key = ?').run(key);
+  }
+
   getVersions(ideaId: string): IdeaVersion[] {
     return (this.db.prepare('SELECT * FROM versions WHERE idea_id = ? ORDER BY timestamp DESC').all(ideaId) as VersionRow[])
       .map(versionFromRow);

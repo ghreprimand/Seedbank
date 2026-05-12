@@ -60,6 +60,7 @@ const SETTINGS_KEYS = {
   uiTheme: 'ui.theme',
   aiConfig: 'ai.config',
   aiConfigLegacy: 'ai:config',
+  backupConfig: 'backup.config',
   apiWebhooks: 'api.webhooks',
   agentsConfig: 'agents.config',
 } as const;
@@ -99,7 +100,7 @@ const webhookEmitter = new WebhookEmitter(SERVER_VERSION, () => webhooksConfig()
 function backupConfig(): BackupConfig {
   return {
     ...DEFAULT_BACKUP_CONFIG,
-    ...(repository.getSetting<Partial<BackupConfig>>('backup.config') ?? {}),
+    ...(repository.getSetting<Partial<BackupConfig>>(SETTINGS_KEYS.backupConfig) ?? {}),
   };
 }
 
@@ -206,6 +207,11 @@ function migrateLegacySettings(): void {
   const nextAiConfig = repository.getSetting<unknown>(SETTINGS_KEYS.aiConfig);
   if (legacyAiConfig !== undefined && nextAiConfig === undefined) {
     repository.setSetting(SETTINGS_KEYS.aiConfig, legacyAiConfig);
+    try {
+      repository.deleteSetting(SETTINGS_KEYS.aiConfigLegacy);
+    } catch {
+      // Keep startup resilient for partial/older DB states.
+    }
   }
 }
 
@@ -515,7 +521,7 @@ app.patch('/api/settings/:section', requireScope('write:ideas'), asyncRoute((req
     const exportJson = typeof requested.exportJson === 'boolean'
       ? requested.exportJson
       : current.exportJson;
-    repository.setSetting('backup.config', { frequency, exportJson });
+    repository.setSetting(SETTINGS_KEYS.backupConfig, { frequency, exportJson });
     res.json(aggregateSettings());
     return;
   }
@@ -788,7 +794,7 @@ app.patch('/api/backups/config', requireScope('write:ideas'), asyncRoute((req, r
       : backupConfig().frequency,
     exportJson: typeof body.exportJson === 'boolean' ? body.exportJson : backupConfig().exportJson,
   };
-  repository.setSetting('backup.config', next);
+  repository.setSetting(SETTINGS_KEYS.backupConfig, next);
   res.json(backupStatus());
 }));
 
@@ -872,8 +878,9 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   res.status(500).json({ error: message });
 });
 
+migrateLegacySettings();
+
 app.listen(PORT, () => {
-  migrateLegacySettings();
   runScheduledBackupIfDue();
   setInterval(runScheduledBackupIfDue, 5 * 60 * 1000).unref();
   console.log(`Seedbank server listening on http://localhost:${PORT}`);
