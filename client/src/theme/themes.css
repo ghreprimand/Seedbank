@@ -415,7 +415,7 @@
 /* ═══════════════════════════════════════════════════════════
    THEME 6 — Moss  (DARK, green-dominant)
    Charcoal-green surfaces, paler sage for type, copper clay accents.
-   Scale INVERTED same as Loam.
+   Scale INVERTED same as all dark themes: ink-800 = near-white primary text.
    ═══════════════════════════════════════════════════════════ */
 :root[data-theme="moss"] {
   --c-paper:      #131c17;
@@ -493,7 +493,7 @@
 
 /* ═══════════════════════════════════════════════════════════
    THEME 7 — Hearth  (MID-DEPTH, warm)
-   Adobe clay / terracotta-brown surfaces. Not as dark as Loam.
+   Adobe clay / terracotta-brown surfaces. Mid-depth between light and full-dark themes.
    Scale INVERTED like dark themes: ink-800 = near-white primary text.
    Action colour: golden ochre (sage-500) — warm and visible on clay.
    ═══════════════════════════════════════════════════════════ */
@@ -654,7 +654,7 @@
 /* ═══════════════════════════════════════════════════════════
    THEME 9 — Peat  (DARK)
    Deep umber / black-soil surfaces. Muted lichen action colour.
-   Scale INVERTED. Warmer and drier than Loam.
+   Scale INVERTED. Warmer and drier than Woad or Canopy.
    ═══════════════════════════════════════════════════════════ */
 :root[data-theme="peat"] {
   --c-paper:      #1a1510;
