@@ -1,8 +1,16 @@
-/** Settings → Integrations: configure Archon and generic project-root integrations. */
-import { useEffect, useState } from 'react';
+/**
+ * Settings → Integrations: configure Archon and generic project-root integrations.
+ *
+ * Data: reads integration list from the settings store (hydrated on boot).
+ * Mutations: configureIntegration goes direct to POST /api/integrations/:id/configure
+ *   (not part of aggregate PATCH). After configure, we refresh the full store so
+ *   the `configured` flag updates everywhere.
+ */
+import { useState } from 'react';
 import { FolderPlus, Network, Check, Loader2 } from 'lucide-react';
-import { getIntegrations, configureIntegration } from '@/api/client';
-import type { IntegrationWithReadiness } from '@/api/client';
+import { configureIntegration } from '@/api/client';
+import { useIntegrationsSettings, useSettingsStore, useSettingsOffline } from '@/stores/settings';
+import type { IntegrationSummary } from '@/lib/types';
 
 const ICONS = { Network, FolderPlus } as const;
 
@@ -30,36 +38,22 @@ function defaultCardState(): CardState {
 }
 
 export default function IntegrationsTab() {
-  const [integrations, setIntegrations] = useState<IntegrationWithReadiness[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [cardState, setCardState] = useState<Record<string, CardState>>({});
+  const integrations = useIntegrationsSettings();
+  const loaded = useSettingsStore((s) => s.loaded);
+  const refreshSettings = useSettingsStore((s) => s.refresh);
+  const offline = useSettingsOffline();
 
-  useEffect(() => {
-    let cancelled = false;
-    getIntegrations()
-      .then((items) => {
-        if (cancelled) return;
-        setIntegrations(items);
-        const initial: Record<string, CardState> = {};
-        for (const item of items) initial[item.id] = defaultCardState();
-        setCardState(initial);
-      })
-      .catch((err) => {
-        if (!cancelled) setLoadError(err instanceof Error ? err.message : String(err));
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => { cancelled = true; };
-  }, []);
+  const [cardState, setCardState] = useState<Record<string, CardState>>(() => {
+    const initial: Record<string, CardState> = {};
+    for (const item of integrations) initial[item.id] = defaultCardState();
+    return initial;
+  });
 
   const patchCard = (id: string, patch: Partial<CardState>) =>
-    setCardState((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
+    setCardState((prev) => ({ ...prev, [id]: { ...(prev[id] ?? defaultCardState()), ...patch } }));
 
-  const handleSave = async (integration: IntegrationWithReadiness) => {
-    const state = cardState[integration.id];
-    if (!state) return;
+  const handleSave = async (integration: IntegrationSummary) => {
+    const state = cardState[integration.id] ?? defaultCardState();
     patchCard(integration.id, { busy: true, error: null, saved: false });
     try {
       const config: Record<string, string> = {};
@@ -67,10 +61,9 @@ export default function IntegrationsTab() {
       if (integration.id === 'archon' && state.archonRoot.trim()) {
         config.archonRoot = state.archonRoot.trim();
       }
-      const updated = await configureIntegration(integration.id, config);
-      setIntegrations((prev) =>
-        prev.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)),
-      );
+      await configureIntegration(integration.id, config);
+      // Refresh full aggregate so integrations[].configured updates in store.
+      await refreshSettings();
       patchCard(integration.id, { busy: false, saved: true });
       setTimeout(() => patchCard(integration.id, { saved: false }), 2500);
     } catch (err) {
@@ -81,19 +74,11 @@ export default function IntegrationsTab() {
     }
   };
 
-  if (loading) {
+  if (!loaded) {
     return (
       <div className="flex items-center gap-2 py-12 text-sm text-ink-400 font-mono">
         <Loader2 className="w-4 h-4 animate-spin" />
         Loading integrations…
-      </div>
-    );
-  }
-
-  if (loadError) {
-    return (
-      <div className="px-3 py-2 bg-red-50 border border-red-100 rounded-card text-xs text-red-700 max-w-xl">
-        {loadError}
       </div>
     );
   }
@@ -104,6 +89,12 @@ export default function IntegrationsTab() {
         Configure where Seedbank graduates ideas. These paths are used when you graduate an idea
         to a project scaffold.
       </p>
+
+      {offline && integrations.length === 0 && (
+        <div className="px-3 py-2.5 bg-sage-50 border border-sage-200 rounded-card text-xs text-sage-800">
+          Integration details are not available while offline.
+        </div>
+      )}
 
       {integrations.map((integration) => {
         const state = cardState[integration.id] ?? defaultCardState();
@@ -168,7 +159,7 @@ export default function IntegrationsTab() {
 
             {/* Error */}
             {state.error && (
-              <div className="px-3 py-2 bg-red-50 border border-red-100 rounded-card text-xs text-red-700">
+              <div className="px-3 py-2 bg-sage-50 border border-sage-200 rounded-card text-xs text-sage-800">
                 {state.error}
               </div>
             )}
@@ -178,7 +169,7 @@ export default function IntegrationsTab() {
               <button
                 type="button"
                 onClick={() => handleSave(integration)}
-                disabled={state.busy}
+                disabled={state.busy || offline}
                 className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium
                            bg-sage-600 hover:bg-sage-700 text-paper rounded-card
                            transition-colors disabled:opacity-50"
@@ -190,12 +181,15 @@ export default function IntegrationsTab() {
                 ) : null}
                 {state.saved ? 'Saved' : 'Save'}
               </button>
+              {offline && (
+                <span className="text-xs text-ink-400 font-mono">API offline</span>
+              )}
             </div>
           </div>
         );
       })}
 
-      {integrations.length === 0 && (
+      {!offline && integrations.length === 0 && (
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <span className="text-3xl mb-3">🔌</span>
           <p className="text-sm font-mono text-ink-400">No integrations available</p>

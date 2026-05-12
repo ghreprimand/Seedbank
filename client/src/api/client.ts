@@ -1,6 +1,7 @@
 import { db } from '@/db';
 import * as localIdeas from '@/db/ideas';
 import type {
+  AggregateSettings,
   AiChatMessage,
   AiConfigInput,
   AiPublicConfig,
@@ -513,6 +514,26 @@ export async function streamAiChat(
   if (!assistantMessage) throw new Error('AI chat ended without an assistant response.');
   return assistantMessage;
 }
+
+// ── Aggregate Settings ────────────────────────────────────────────────────────
+
+export async function getAggregateSettings(): Promise<AggregateSettings> {
+  return request<AggregateSettings>('/api/settings');
+}
+
+export type SettingsSection = 'ui' | 'ai' | 'api' | 'agents' | 'backups';
+
+export async function patchSettings(
+  section: SettingsSection,
+  body: unknown,
+): Promise<AggregateSettings> {
+  return request<AggregateSettings>(`/api/settings/${section}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+}
+
+// ── Backups ───────────────────────────────────────────────────────────────────
 
 export async function getBackupStatus(): Promise<BackupStatus> {
   return request<BackupStatus>('/api/backups');

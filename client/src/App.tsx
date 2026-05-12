@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Layout from '@/components/Layout';
 import Board from '@/pages/Board';
@@ -7,8 +8,18 @@ import Discover from '@/pages/Discover';
 import Compost from '@/pages/Compost';
 import Settings from '@/pages/Settings';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import { useSettingsStore } from '@/stores/settings';
 
 function App() {
+  const hydrateSettings = useSettingsStore((s) => s.hydrate);
+
+  // Hydrate settings once on app boot. The store is idempotent — skips if
+  // already loaded. This fires before the user reaches any Settings tab so
+  // data is ready immediately on navigation.
+  useEffect(() => {
+    hydrateSettings();
+  }, [hydrateSettings]);
+
   return (
     <ErrorBoundary>
       <Routes>

@@ -1,11 +1,12 @@
 /**
- * Settings page — left-rail tabbed shell.
+ * Settings page — responsive tabbed shell.
  *
  * Routes: /settings  →  /settings/general (default redirect)
  *         /settings/:tab
+ *         /settings/unknown → redirects to /settings/general (FU3)
  *
- * Left rail tabs: General, AI & Agents, Theme, API & Server, Backups,
- *                 Integrations, About.
+ * Desktop (md+): left-rail nav sidebar + content pane side by side.
+ * Mobile: horizontal scrollable pill strip above content.
  *
  * Each tab body is a separate component under ./settings/.
  */
@@ -26,6 +27,7 @@ import ApiServerTab from './settings/ApiServerTab';
 import BackupsTab from './settings/BackupsTab';
 import IntegrationsTab from './settings/IntegrationsTab';
 import AboutTab from './settings/AboutTab';
+import OfflineBanner from './settings/OfflineBanner';
 
 interface TabDef {
   id: string;
@@ -87,14 +89,18 @@ const TABS: TabDef[] = [
   },
 ];
 
+const TAB_IDS = new Set(TABS.map((t) => t.id));
+
 export default function Settings() {
   const { tab } = useParams<{ tab: string }>();
   const navigate = useNavigate();
 
-  // Default to "general" when no tab param is present
+  // Redirect when no tab segment is present
   if (!tab) return <Navigate to="/settings/general" replace />;
+  // FU3 — redirect unknown tab names rather than silently showing General
+  if (!TAB_IDS.has(tab)) return <Navigate to="/settings/general" replace />;
 
-  const active = TABS.find((t) => t.id === tab) ?? TABS[0];
+  const active = TABS.find((t) => t.id === tab)!;
   const ActiveComponent = active.component;
 
   return (
@@ -107,11 +113,48 @@ export default function Settings() {
         </p>
       </div>
 
-      <div className="flex gap-8 items-start">
-        {/* ── Left rail ──────────────────────────────────── */}
+      {/* Offline hint shown at page level */}
+      <OfflineBanner />
+
+      {/* ── Responsive layout: stacked on mobile, side-by-side on md+ ── */}
+      <div className="flex flex-col md:flex-row md:gap-8 md:items-start">
+
+        {/* ── Mobile: horizontal scrollable pill strip ──────────────── */}
         <nav
           aria-label="Settings sections"
-          className="shrink-0 w-44 space-y-0.5"
+          className="
+            md:hidden flex items-center gap-1 overflow-x-auto pb-2 mb-5
+            scrollbar-none -mx-4 px-4
+          "
+        >
+          {TABS.map((t) => {
+            const Icon = t.icon;
+            const isActive = t.id === active.id;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => navigate(`/settings/${t.id}`)}
+                className={`
+                  whitespace-nowrap inline-flex items-center gap-1.5 px-3 py-1.5
+                  rounded-pill text-xs font-medium transition-all border shrink-0
+                  ${isActive
+                    ? 'bg-sage-50 text-sage-700 border-sage-300 shadow-sm'
+                    : 'text-ink-500 border-ink-100 hover:bg-ink-50 hover:border-ink-200 bg-paper'
+                  }
+                `}
+              >
+                <Icon className="w-3 h-3 shrink-0" />
+                {t.label}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* ── Desktop: left-rail sidebar ────────────────────────────── */}
+        <nav
+          aria-label="Settings sections"
+          className="hidden md:block shrink-0 w-44 space-y-0.5"
         >
           {TABS.map((t) => {
             const Icon = t.icon;
@@ -135,7 +178,7 @@ export default function Settings() {
           })}
         </nav>
 
-        {/* ── Content pane ───────────────────────────────── */}
+        {/* ── Content pane ──────────────────────────────────────────── */}
         <div className="flex-1 min-w-0">
           <div className="mb-5 pb-4 border-b border-ink-100">
             <h2 className="text-xl font-serif font-semibold text-ink-900">{active.label}</h2>

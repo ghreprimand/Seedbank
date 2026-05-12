@@ -1,55 +1,44 @@
-/** Settings → Backups: full backup configuration (ported from BackupStatus popover). */
-import { useEffect, useState } from 'react';
+/**
+ * Settings → Backups: full backup configuration.
+ *
+ * Data: reads backup status from the settings store (hydrated on app boot).
+ * Mutations:
+ *   - Schedule change: settingsStore.patch('backups', { config: { frequency } })
+ *   - Run now: direct POST /api/backups/run; refreshes store after.
+ */
+import { useState } from 'react';
 import { RefreshCw, Archive } from 'lucide-react';
-import {
-  getBackupStatus,
-  runBackupNow,
-  updateBackupConfig,
-  type BackupFrequency,
-  type BackupStatus as BackupState,
-} from '@/api/client';
+import { runBackupNow, type BackupFrequency } from '@/api/client';
+import { useBackupsSettings, useSettingsStore } from '@/stores/settings';
 import { timeAgo } from '@/lib/timeago';
 
 const FREQUENCIES: BackupFrequency[] = ['daily', 'weekly', 'off'];
 
-function lastBackupDate(status: BackupState | null): Date | null {
+function lastBackupDate(backups: ReturnType<typeof useBackupsSettings>): Date | null {
   const timestamp =
-    status?.lastRun?.timestamp ??
-    status?.latestDatabaseBackup?.timestamp ??
-    status?.latestJsonExport?.timestamp;
+    backups.lastRun?.timestamp ??
+    backups.latestDatabaseBackup?.timestamp ??
+    backups.latestJsonExport?.timestamp;
   return timestamp ? new Date(timestamp) : null;
 }
 
 export default function BackupsTab() {
-  const [status, setStatus] = useState<BackupState | null>(null);
+  const backups = useBackupsSettings();
+  const patchSettings = useSettingsStore((s) => s.patch);
+  const refreshSettings = useSettingsStore((s) => s.refresh);
+
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    getBackupStatus()
-      .then((next) => {
-        if (!cancelled) {
-          setStatus(next);
-          setError(null);
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Backup status unavailable');
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const runNow = async () => {
     setBusy(true);
     setError(null);
     setSuccessMsg(null);
     try {
-      const result = await runBackupNow();
-      setStatus(result.status);
+      await runBackupNow();
+      // Refresh full aggregate so lastRun / latestDatabaseBackup update.
+      await refreshSettings();
       setSuccessMsg('Backup completed.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Backup failed');
@@ -63,7 +52,7 @@ export default function BackupsTab() {
     setError(null);
     setSuccessMsg(null);
     try {
-      setStatus(await updateBackupConfig({ frequency }));
+      await patchSettings('backups', { config: { frequency } });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not update backup settings');
     } finally {
@@ -71,7 +60,7 @@ export default function BackupsTab() {
     }
   };
 
-  const last = lastBackupDate(status);
+  const last = lastBackupDate(backups);
   const lastLabel = last ? timeAgo(last, 'backed up') : 'No backups yet';
 
   return (
@@ -84,16 +73,14 @@ export default function BackupsTab() {
         <div>
           <div className="text-sm font-semibold text-ink-800">Last backup</div>
           <div className="text-xs text-ink-400 mt-0.5 font-mono">{lastLabel}</div>
-          {status && (
-            <div className="mt-2 space-y-1 text-[11px] text-ink-400 font-mono">
-              <div className="truncate">
-                DB: {status.latestDatabaseBackup?.path ?? status.paths.backupsDir}
-              </div>
-              <div className="truncate">
-                JSON: {status.latestJsonExport?.path ?? status.paths.exportsDir}
-              </div>
+          <div className="mt-2 space-y-1 text-[11px] text-ink-400 font-mono">
+            <div className="truncate">
+              DB: {backups.latestDatabaseBackup?.path ?? backups.paths.backupsDir}
             </div>
-          )}
+            <div className="truncate">
+              JSON: {backups.latestJsonExport?.path ?? backups.paths.exportsDir}
+            </div>
+          </div>
         </div>
       </section>
 
@@ -112,7 +99,7 @@ export default function BackupsTab() {
               disabled={busy}
               className={`flex-1 max-w-[120px] px-3 py-2 text-sm font-medium rounded-card border
                          transition-colors disabled:opacity-50 capitalize ${
-                status?.config.frequency === frequency
+                backups.config.frequency === frequency
                   ? 'bg-sage-50 border-sage-300 text-sage-700 shadow-sm'
                   : 'bg-paper border-ink-200 text-ink-500 hover:bg-ink-50 hover:border-ink-300'
               }`}
@@ -147,7 +134,10 @@ export default function BackupsTab() {
       </section>
 
       {error && (
-        <div className="px-3 py-2 bg-red-50 border border-red-100 rounded-card text-xs text-red-700">
+        <div
+          className="px-3 py-2.5 bg-sage-50 border border-sage-200 rounded-card text-xs text-sage-800"
+          role="alert"
+        >
           {error}
         </div>
       )}
