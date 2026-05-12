@@ -523,7 +523,14 @@ export class AgentService {
       const relPath = sanitizeAttachmentPath(rawPath);
       const source = path.resolve(path.join(workspace, relPath));
       const lstat = fs.lstatSync(source, { throwIfNoEntry: false });
-      const resolvedSource = lstat ? fs.realpathSync(source) : source;
+      let resolvedSource = source;
+      if (lstat && !lstat.isSymbolicLink()) {
+        try {
+          resolvedSource = fs.realpathSync(source);
+        } catch {
+          resolvedSource = source;
+        }
+      }
       if (
         !insideRoot(source, workspace)
         || !insideRoot(resolvedSource, resolvedWorkspace)
