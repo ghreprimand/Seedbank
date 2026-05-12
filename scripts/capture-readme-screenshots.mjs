@@ -225,7 +225,12 @@ async function setThemeFromNames(page, names) {
 async function tryOpenHelpOverlay(page) {
   const clicked = await page.evaluate(() => {
     const candidates = Array.from(document.querySelectorAll('button, a, [role="button"]'));
-    const target = candidates.find((el) => /\b(help|manual)\b/i.test((el.textContent ?? '').trim()));
+    const target = candidates.find((el) => {
+      const text = (el.textContent ?? '').trim();
+      const aria = el.getAttribute('aria-label') ?? '';
+      const title = el.getAttribute('title') ?? '';
+      return /\b(help|manual)\b/i.test(`${text} ${aria} ${title}`);
+    });
     if (!target) return false;
     target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     return true;

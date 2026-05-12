@@ -9,6 +9,17 @@ The app is built around the way ideas actually mature. A seed can start as a tit
 
 Seedbank also includes AI-assisted development. The AI is deliberately framed as a thinking partner: it asks questions, reflects patterns, runs health checks, and helps scope ideas down. It does not try to replace the user's taste or generate a pile of generic ideas.
 
+## Screenshots
+
+Real app surfaces captured with deterministic demo data:
+
+![Garden overview showing seeded ideas and filters](docs/assets/screenshots/garden-overview.jpg)
+![Idea detail with Thinking Partner opened](docs/assets/screenshots/idea-detail-thinking-partner.jpg)
+![Theme settings with ten live-switchable themes](docs/assets/screenshots/settings-theme.jpg)
+![In-app manual overlay opened from the header](docs/assets/screenshots/manual-help-overlay.jpg)
+![Dark theme view using Woad](docs/assets/screenshots/theme-dark-view.jpg)
+![Mid-depth theme view using Hearth](docs/assets/screenshots/theme-mid-view.jpg)
+
 ## Quick Start
 
 Prerequisites:
