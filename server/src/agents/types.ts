@@ -3,7 +3,7 @@ import type { Idea } from '../../../shared/types.js';
 export type AgentProvider = 'claude' | 'codex';
 export type AgentRunState = 'running' | 'completed' | 'failed' | 'stopped';
 
-export interface AgentRunRecord {
+export interface AgentRunPublic {
   id: string;
   ideaId: string | null;
   projectPath: string | null;
@@ -12,11 +12,14 @@ export interface AgentRunRecord {
   startedAt: string;
   endedAt: string | null;
   exitCode: number | null;
-  transcriptPath: string;
   proposedFiles: string[];
 }
 
-export interface AgentRunDetail extends AgentRunRecord {
+export interface AgentRunRecord extends AgentRunPublic {
+  transcriptPath: string;
+}
+
+export interface AgentRunDetail extends AgentRunPublic {
   transcript: string;
   truncated: boolean;
 }
@@ -62,4 +65,3 @@ export interface AgentRunStreamEvent {
   delta?: string;
   error?: string;
 }
-

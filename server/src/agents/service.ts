@@ -337,10 +337,13 @@ export class AgentService {
       const entries = fs.readdirSync(current, { withFileTypes: true });
       for (const entry of entries) {
         const fullPath = path.join(current, entry.name);
-        if (entry.isDirectory()) {
+        const lstat = fs.lstatSync(fullPath, { throwIfNoEntry: false });
+        if (!lstat || lstat.isSymbolicLink()) continue;
+        if (lstat.isDirectory()) {
           stack.push(fullPath);
           continue;
         }
+        if (!lstat.isFile()) continue;
         const rel = path.relative(workspacePath, fullPath);
         if (!rel || rel === 'IDEA.md' || rel === 'ATTACHMENTS.md') continue;
         results.push(rel);
@@ -391,6 +394,7 @@ export class AgentService {
     const cli = this.providerBinary(provider);
     const proc = spawn(cli, runArgs(provider, prompt), {
       cwd: workspacePath,
+      // Intentionally inherit environment so linked CLIs can resolve local credentials/session.
       env: process.env,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -479,8 +483,9 @@ export class AgentService {
     const run = this.runStore.get(id);
     if (!run) throw new Error('Run not found.');
     const transcript = readText(run.transcriptPath);
+    const { transcriptPath: _transcriptPath, ...publicRun } = run;
     return {
-      ...run,
+      ...publicRun,
       transcript: transcript.text,
       truncated: transcript.truncated,
     };
@@ -516,7 +521,8 @@ export class AgentService {
     for (const rawPath of input.paths) {
       const relPath = sanitizeAttachmentPath(rawPath);
       const source = path.resolve(path.join(workspace, relPath));
-      if (!insideRoot(source, workspace) || !fs.existsSync(source) || !fs.statSync(source).isFile()) {
+      const lstat = fs.lstatSync(source, { throwIfNoEntry: false });
+      if (!insideRoot(source, workspace) || !lstat || lstat.isSymbolicLink() || !lstat.isFile()) {
         throw new Error(`File not found in run workspace: ${rawPath}`);
       }
 
