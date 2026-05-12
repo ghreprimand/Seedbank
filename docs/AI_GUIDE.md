@@ -4,19 +4,23 @@ Seedbank's AI features are designed to help you develop your own ideas. The AI i
 
 ## Provider Setup
 
-Open the AI panel on an idea detail page and use **Settings** to choose a provider.
+Provider configuration has moved from the inline AI panel to **Settings → AI & Agents**. Navigate there via the gear icon (⚙) in the header, or go directly to `/settings/ai-agents`.
+
+### Default provider
+
+A **Set default** radio button on each provider card determines which provider the Thinking Partner uses for all conversations. This replaces the per-panel provider toggle that was previously inside the chat panel.
 
 ### OpenAI
 
-Provide an OpenAI API key and model name. The default model is set in the UI config and can be changed without code changes.
+In the OpenAI card, expand the details row and provide an API key and model name (e.g. `gpt-4o`).
 
 ### Anthropic
 
-Provide an Anthropic API key and model name. Anthropic works well for reflective critique and longer contextual responses.
+In the Anthropic card, expand the details row and provide an API key and model name (e.g. `claude-opus-4-5`). Anthropic works well for reflective critique and longer contextual responses.
 
 ### Ollama
 
-Use Ollama for local models. Configure:
+In the Ollama card, expand the details row and configure:
 
 - Ollama base URL, usually `http://localhost:11434`
 - Model name, for example `llama3.2`
@@ -25,13 +29,20 @@ Ollama is useful when you want local-only experimentation or do not want to send
 
 ## Stored Configuration
 
-AI configuration is stored in the server `settings` table. Public config responses expose model names and whether a key exists, but not the key value itself. Provider calls are made by the server, not directly from the browser.
+AI configuration is stored in the server `settings` table under `ai.config`. Public config responses expose model names and whether a key exists (`hasOpenAIKey`, `hasAnthropicKey`), but never the key values themselves. All provider API calls are made server-side — the browser never sends keys or receives raw model responses directly.
 
-The AI service tracks token usage against a daily budget. The budget is configured in the AI settings UI.
+## Token Budget & Usage Readout
+
+A **daily token limit** input in Settings → AI & Agents controls how many tokens the AI features can consume in 24 hours. Below it, a mono-styled readout shows:
+
+- Tokens used in the last 24 hours (with percentage of budget).
+- Tokens used in the last 7 days.
+
+This is drawn from the `ai_usage` tracking table. The readout is informational — it does not block requests when the budget is exceeded (the server enforces the limit server-side).
 
 ## Thinking Partner Chat
 
-The Thinking Partner panel is available on the idea detail page. It sees the current idea fields and the persisted conversation history for that idea.
+The Thinking Partner panel is available on the idea detail page. It sees the current idea fields and the persisted conversation history for that idea. The panel no longer contains its own provider settings — use **Settings → AI & Agents** to change providers, models, or API keys. A small **Settings** link inside the panel header navigates there directly.
 
 The system behavior is intentionally constrained:
 
@@ -146,3 +157,11 @@ If the AI backend is unavailable, Seedbank keeps working:
 - The Thinking Partner panel reports provider errors without losing the idea.
 
 This preserves Seedbank's core promise: the archive remains useful even without a model provider.
+
+---
+
+## Agents (separate surface)
+
+The **Develop with agent** and **Continue with agent** buttons on the idea detail page launch a more powerful but strictly opt-in feature: a local Claude Code or Codex CLI agent that can produce multi-file outputs (specs, research docs, prototype scaffolds). Agents are distinct from the Thinking Partner — they write files, not chat messages.
+
+See [`docs/AGENTS.md`](./AGENTS.md) for the full agent workflow, safety rails, and filesystem boundaries.
