@@ -1,6 +1,6 @@
 # Agents
 
-Seedbank can link a local **Claude Code** or **Codex CLI** agent to help develop an idea further. Agents are a *tool*, not an autonomous co-creator: they run in a sandboxed scratch workspace, produce proposed files, and stop. Every file they produce must be explicitly accepted by you before it touches your idea record.
+Seedbank can link a local **Claude Code** or **Codex CLI** agent to help develop an idea further. Agents are a *tool*, not an autonomous co-creator: they run in a per-idea scratch workspace, produce proposed files, and stop. Every file they produce must be explicitly accepted by you before it touches your idea record.
 
 ---
 
@@ -124,7 +124,7 @@ The Apply step copies files to `attachments/` and adds them to `idea.images`. Th
 
 ### Scratch runs
 
-The agent's working directory is `<seedbank-data-dir>/scratch/<ideaId>/<runId>/`. Files created anywhere under this directory are eligible to be collected as proposed files. The server validates that any applied file path is inside the workspace before copying it — symlinks that escape the sandbox are rejected.
+The agent's working directory is `<seedbank-data-dir>/scratch/<ideaId>/<runId>/`. Files created anywhere under this directory are eligible to be collected as proposed files. The server validates that any applied file path is inside the workspace before copying it — symlinks that escape the scratch workspace are rejected.
 
 ### Continue runs
 
@@ -147,7 +147,7 @@ See [docs/SETTINGS.md — API & Server — MCP](./SETTINGS.md#mcp-model-context-
 ## What agents cannot do
 
 - Modify or delete ideas in the database.
-- Access any file outside the sandbox directory (scratch run) or integration project root (continue run).
+- Access any file outside the scratch workspace directory (scratch run) or integration project root (continue run).
 - Run multiple concurrent runs for the same idea (the daily budget and runtime cap apply globally).
 - Auto-apply files — every file must go through the user's explicit accept step.
 - Access other ideas in the archive (the workspace only contains `IDEA.md` for the specific idea).
