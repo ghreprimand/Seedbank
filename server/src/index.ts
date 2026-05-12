@@ -14,8 +14,10 @@ import {
   writeArchiveExport,
 } from './db.js';
 import { IntegrationRegistry } from './integrations/registry.js';
+import { authMiddleware, requireScope } from './middleware/auth.js';
 import { archiveToMarkdown, parseMarkdownArchive } from './markdown.js';
 import { SeedbankRepository, type ImportArchive, type ListIdeasOptions } from './repository.js';
+import { ApiTokenStore, TOKEN_SCOPES, type TokenScope } from './tokens.js';
 import type { AiConfigPatch } from './ai/types.js';
 import type {
   AgentsPublicConfig,
@@ -38,6 +40,7 @@ const database = openDatabase();
 const repository = new SeedbankRepository(database);
 const integrations = new IntegrationRegistry(repository);
 const aiService = new AiService(repository, new AiStore(database));
+const tokenStore = new ApiTokenStore(database);
 
 const DEFAULT_BACKUP_CONFIG: BackupConfig = {
   frequency: 'daily',
@@ -51,15 +54,10 @@ interface AgentStoredConfig {
   codexCliPath?: string;
 }
 
-interface StoredApiToken extends PublicToken {
-  hash: string;
-}
-
 const SETTINGS_KEYS = {
   uiTheme: 'ui.theme',
   aiConfig: 'ai.config',
   aiConfigLegacy: 'ai:config',
-  apiTokens: 'api.tokens',
   apiWebhooks: 'api.webhooks',
   agentsConfig: 'agents.config',
 } as const;
@@ -154,36 +152,8 @@ function webhooksConfig(): WebhooksConfig {
   return { url, events };
 }
 
-function isStoredApiToken(value: unknown): value is StoredApiToken {
-  if (!value || typeof value !== 'object') return false;
-  const token = value as Record<string, unknown>;
-  return typeof token.id === 'string'
-    && typeof token.name === 'string'
-    && Array.isArray(token.scopes)
-    && token.scopes.every((scope) => typeof scope === 'string')
-    && typeof token.hash === 'string'
-    && typeof token.createdAt === 'string'
-    && (typeof token.lastUsedAt === 'string' || token.lastUsedAt === null || typeof token.lastUsedAt === 'undefined');
-}
-
-function storedApiTokens(): StoredApiToken[] {
-  const stored = repository.getSetting<unknown>(SETTINGS_KEYS.apiTokens);
-  if (!Array.isArray(stored)) return [];
-
-  return stored
-    .filter(isStoredApiToken)
-    .map((token) => ({
-      id: token.id,
-      name: token.name,
-      scopes: token.scopes.filter((scope) => scope.trim().length > 0),
-      hash: token.hash,
-      createdAt: token.createdAt,
-      lastUsedAt: typeof token.lastUsedAt === 'string' ? token.lastUsedAt : null,
-    }));
-}
-
 function publicTokens(): PublicToken[] {
-  return storedApiTokens().map(({ hash: _hash, ...token }) => token);
+  return tokenStore.list();
 }
 
 function agentsStoredConfig(): AgentStoredConfig {
@@ -258,6 +228,7 @@ app.use(cors({
   },
 }));
 app.use(express.json({ limit: '25mb' }));
+app.use('/api', authMiddleware(tokenStore));
 
 function asyncRoute(
   handler: (req: Request, res: Response, next: NextFunction) => Promise<void> | void,
@@ -372,15 +343,62 @@ function listOptionsFromQuery(query: Request['query']): ListIdeasOptions {
   };
 }
 
+function validScopes(input: unknown): TokenScope[] | null {
+  if (!Array.isArray(input)) return null;
+  const rawScopes = input.filter((scope): scope is string => typeof scope === 'string');
+  if (rawScopes.length !== input.length) return null;
+
+  const allowed = new Set<string>(TOKEN_SCOPES);
+  const normalized = [...new Set(rawScopes.map((scope) => scope.trim()).filter(Boolean))];
+  if (normalized.some((scope) => !allowed.has(scope))) return null;
+  return normalized as TokenScope[];
+}
+
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, port: PORT });
 });
 
-app.get('/api/settings', asyncRoute((_req, res) => {
+app.get('/api/server/info', requireScope('read:ideas'), asyncRoute((_req, res) => {
+  res.json(serverInfo());
+}));
+
+app.get('/api/tokens', requireScope('write:ideas'), asyncRoute((_req, res) => {
+  res.json({ items: tokenStore.list() });
+}));
+
+app.post('/api/tokens', requireScope('write:ideas'), asyncRoute((req, res) => {
+  const body = req.body as { name?: unknown; scopes?: unknown };
+  const name = typeof body?.name === 'string' ? body.name.trim() : '';
+  const scopes = validScopes(body?.scopes);
+  if (!name) {
+    res.status(400).json({ error: 'Token name is required.' });
+    return;
+  }
+  if (!scopes || scopes.length === 0) {
+    res.status(400).json({ error: `Scopes must be a non-empty subset of: ${TOKEN_SCOPES.join(', ')}` });
+    return;
+  }
+  const created = tokenStore.create(name, scopes);
+  res.status(201).json({
+    ...created.record,
+    token: created.token,
+  });
+}));
+
+app.delete('/api/tokens/:id', requireScope('write:ideas'), asyncRoute((req, res) => {
+  const removed = tokenStore.revoke(routeParam(req, 'id'));
+  if (!removed) {
+    res.status(404).json({ error: 'Token not found.' });
+    return;
+  }
+  res.status(204).send();
+}));
+
+app.get('/api/settings', requireScope('read:ideas'), asyncRoute((_req, res) => {
   res.json(aggregateSettings());
 }));
 
-app.patch('/api/settings/:section', asyncRoute((req, res) => {
+app.patch('/api/settings/:section', requireScope('write:ideas'), asyncRoute((req, res) => {
   const section = routeParam(req, 'section');
 
   if (section === 'ui') {
@@ -468,11 +486,11 @@ app.patch('/api/settings/:section', asyncRoute((req, res) => {
   res.status(400).json({ error: `Unsupported settings section: ${section}` });
 }));
 
-app.get('/api/ideas', asyncRoute((req, res) => {
+app.get('/api/ideas', requireScope('read:ideas'), asyncRoute((req, res) => {
   res.json(repository.listIdeas(listOptionsFromQuery(req.query)));
 }));
 
-app.get('/api/compost', asyncRoute((_req, res) => {
+app.get('/api/compost', requireScope('write:ideas'), asyncRoute((_req, res) => {
   const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const purged = repository.purgeDeletedBefore(cutoff);
   res.json({
@@ -482,7 +500,7 @@ app.get('/api/compost', asyncRoute((_req, res) => {
   });
 }));
 
-app.post('/api/compost/:id/restore', asyncRoute((req, res) => {
+app.post('/api/compost/:id/restore', requireScope('write:ideas'), asyncRoute((req, res) => {
   const idea = repository.restoreDeletedIdea(routeParam(req, 'id'));
   if (!idea) {
     res.status(404).json({ error: 'Deleted idea not found' });
@@ -491,7 +509,7 @@ app.post('/api/compost/:id/restore', asyncRoute((req, res) => {
   res.json(idea);
 }));
 
-app.delete('/api/compost/:id', asyncRoute((req, res) => {
+app.delete('/api/compost/:id', requireScope('write:ideas'), asyncRoute((req, res) => {
   const purged = repository.purgeIdea(routeParam(req, 'id'));
   if (!purged) {
     res.status(404).json({ error: 'Idea not found' });
@@ -500,7 +518,7 @@ app.delete('/api/compost/:id', asyncRoute((req, res) => {
   res.status(204).send();
 }));
 
-app.get('/api/ideas/:id', asyncRoute((req, res) => {
+app.get('/api/ideas/:id', requireScope('read:ideas'), asyncRoute((req, res) => {
   const id = routeParam(req, 'id');
   const idea = repository.getIdea(id, boolParam(req.query.includeDeleted));
   if (!idea) {
@@ -514,12 +532,12 @@ app.get('/api/ideas/:id', asyncRoute((req, res) => {
   });
 }));
 
-app.post('/api/ideas', asyncRoute((req, res) => {
+app.post('/api/ideas', requireScope('write:ideas'), asyncRoute((req, res) => {
   const idea = repository.createIdea(req.body);
   res.status(201).json(idea);
 }));
 
-app.patch('/api/ideas/:id', asyncRoute((req, res) => {
+app.patch('/api/ideas/:id', requireScope('write:ideas'), asyncRoute((req, res) => {
   const idea = repository.updateIdea(routeParam(req, 'id'), req.body);
   if (!idea) {
     res.status(404).json({ error: 'Idea not found' });
@@ -529,7 +547,7 @@ app.patch('/api/ideas/:id', asyncRoute((req, res) => {
   res.json(idea);
 }));
 
-app.delete('/api/ideas/:id', asyncRoute((req, res) => {
+app.delete('/api/ideas/:id', requireScope('write:ideas'), asyncRoute((req, res) => {
   const idea = repository.softDeleteIdea(routeParam(req, 'id'));
   if (!idea) {
     res.status(404).json({ error: 'Idea not found' });
@@ -539,7 +557,7 @@ app.delete('/api/ideas/:id', asyncRoute((req, res) => {
   res.json(idea);
 }));
 
-app.get('/api/ideas/:id/versions', asyncRoute((req, res) => {
+app.get('/api/ideas/:id/versions', requireScope('read:ideas'), asyncRoute((req, res) => {
   const id = routeParam(req, 'id');
   if (!repository.getIdea(id, true)) {
     res.status(404).json({ error: 'Idea not found' });
@@ -549,7 +567,7 @@ app.get('/api/ideas/:id/versions', asyncRoute((req, res) => {
   res.json(repository.getVersions(id));
 }));
 
-app.post('/api/ideas/:id/versions', asyncRoute((req, res) => {
+app.post('/api/ideas/:id/versions', requireScope('write:ideas'), asyncRoute((req, res) => {
   const body = req.body as { label?: string; notes?: string };
   const version = repository.createVersion(routeParam(req, 'id'), body.label ?? 'Manual snapshot', body.notes ?? '');
   if (!version) {
@@ -560,7 +578,7 @@ app.post('/api/ideas/:id/versions', asyncRoute((req, res) => {
   res.status(201).json(version);
 }));
 
-app.post('/api/ideas/:id/versions/restore/:versionId', asyncRoute((req, res) => {
+app.post('/api/ideas/:id/versions/restore/:versionId', requireScope('write:ideas'), asyncRoute((req, res) => {
   const idea = repository.restoreVersion(routeParam(req, 'id'), routeParam(req, 'versionId'));
   if (!idea) {
     res.status(404).json({ error: 'Idea or version not found' });
@@ -570,23 +588,23 @@ app.post('/api/ideas/:id/versions/restore/:versionId', asyncRoute((req, res) => 
   res.json(idea);
 }));
 
-app.get('/api/stats', asyncRoute((_req, res) => {
+app.get('/api/stats', requireScope('read:ideas'), asyncRoute((_req, res) => {
   res.json(repository.getStats());
 }));
 
-app.get('/api/ai/config', asyncRoute((_req, res) => {
+app.get('/api/ai/config', requireScope('read:ideas'), asyncRoute((_req, res) => {
   res.json(aiService.getPublicConfig());
 }));
 
-app.post('/api/ai/config', asyncRoute((req, res) => {
+app.post('/api/ai/config', requireScope('write:ideas'), asyncRoute((req, res) => {
   res.json(aiService.configure(req.body ?? {}));
 }));
 
-app.get('/api/ai/conversations/:ideaId', asyncRoute((req, res) => {
+app.get('/api/ai/conversations/:ideaId', requireScope('read:ideas'), asyncRoute((req, res) => {
   res.json({ messages: aiService.getConversation(routeParam(req, 'ideaId')) });
 }));
 
-app.post('/api/ai/suggest', asyncRoute(async (req, res) => {
+app.post('/api/ai/suggest', requireScope('ai:suggest'), asyncRoute(async (req, res) => {
   const body = req.body as {
     ideaId?: string;
     field?: string;
@@ -612,7 +630,7 @@ app.post('/api/ai/suggest', asyncRoute(async (req, res) => {
   });
 }));
 
-app.post('/api/ai/chat', async (req, res) => {
+app.post('/api/ai/chat', requireScope('ai:suggest'), async (req, res) => {
   const body = req.body as { ideaId?: string; message?: string };
   if (!body.ideaId || !body.message?.trim()) {
     res.status(400).json({ error: 'ideaId and message are required.' });
@@ -644,11 +662,11 @@ app.post('/api/ai/chat', async (req, res) => {
   }
 });
 
-app.get('/api/backups', asyncRoute((_req, res) => {
+app.get('/api/backups', requireScope('read:ideas'), asyncRoute((_req, res) => {
   res.json(backupStatus());
 }));
 
-app.patch('/api/backups/config', asyncRoute((req, res) => {
+app.patch('/api/backups/config', requireScope('write:ideas'), asyncRoute((req, res) => {
   const body = req.body as Partial<BackupConfig>;
   const next: BackupConfig = {
     ...backupConfig(),
@@ -661,14 +679,14 @@ app.patch('/api/backups/config', asyncRoute((req, res) => {
   res.json(backupStatus());
 }));
 
-app.post('/api/backups/run', asyncRoute((_req, res) => {
+app.post('/api/backups/run', requireScope('write:ideas'), asyncRoute((_req, res) => {
   res.json({
     run: runBackup('manual'),
     status: backupStatus(),
   });
 }));
 
-app.get('/api/integrations', asyncRoute((req, res) => {
+app.get('/api/integrations', requireScope('read:ideas'), asyncRoute((req, res) => {
   const ideaId = stringParam(req.query.ideaId);
   const items = integrations.list().map((integration) => {
     if (!ideaId) return integration;
@@ -682,7 +700,7 @@ app.get('/api/integrations', asyncRoute((req, res) => {
   res.json(items);
 }));
 
-app.post('/api/integrations/:id/configure', asyncRoute((req, res) => {
+app.post('/api/integrations/:id/configure', requireScope('write:ideas'), asyncRoute((req, res) => {
   const configured = integrations.configure(routeParam(req, 'id'), req.body?.config ?? req.body ?? {});
   if (!configured) {
     res.status(404).json({ error: 'Integration not found' });
@@ -691,7 +709,7 @@ app.post('/api/integrations/:id/configure', asyncRoute((req, res) => {
   res.json(configured);
 }));
 
-app.post('/api/integrations/:id/graduate/:ideaId', asyncRoute(async (req, res) => {
+app.post('/api/integrations/:id/graduate/:ideaId', requireScope('write:ideas'), asyncRoute(async (req, res) => {
   const payload = await integrations.graduate(routeParam(req, 'id'), routeParam(req, 'ideaId'));
   if (!payload) {
     res.status(404).json({ error: 'Integration or idea not found' });
@@ -700,7 +718,7 @@ app.post('/api/integrations/:id/graduate/:ideaId', asyncRoute(async (req, res) =
   res.json(payload);
 }));
 
-app.post('/api/export', asyncRoute((req, res) => {
+app.post('/api/export', requireScope('read:ideas'), asyncRoute((req, res) => {
   const body = req.body as { format?: string; includeDeleted?: boolean };
   const archive = repository.exportArchive(Boolean(body.includeDeleted));
 
@@ -712,7 +730,7 @@ app.post('/api/export', asyncRoute((req, res) => {
   res.json(archive);
 }));
 
-app.post('/api/import', asyncRoute((req, res) => {
+app.post('/api/import', requireScope('write:ideas'), asyncRoute((req, res) => {
   const body = req.body as {
     archive?: ImportArchive;
     content?: string;
