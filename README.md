@@ -75,7 +75,7 @@ If port `5173` is occupied, the launcher will pick the next free client port. Ov
 - **Outbound webhooks** — fire a JSON payload to any URL on `idea.created`, `idea.graduated`, or `idea.shipped`. Useful for Zapier, n8n, or local automation.
 - **Read-only MCP endpoints** — `/api/mcp/ideas` and `/api/mcp/search` expose seeds as context for external Claude or Codex sessions; token-gated.
 - **OpenAPI spec** — machine-readable at `/api/openapi.json`; browsable from Settings → API & Server.
-- **Local CLI agent runs** — link a Claude Code or Codex CLI binary in Settings → AI & Agents; launch a sandboxed "Develop with agent" run from any idea. Transcript streamed live; proposed files reviewed and accepted before anything is saved. Runtime capped; kill switch always present.
+- **Local CLI agent runs** — link a Claude Code or Codex CLI binary in Settings → AI & Agents; launch a "Develop with agent" run from any idea in a per-idea scratch workspace. Transcript streamed live; proposed files reviewed and accepted before anything is saved. Runtime capped; kill switch always present.
 - **Project graduation** — turn a mature idea into an external project scaffold via integration adapters.
 - **Import/export** — full archive export to JSON or Markdown, plus import from Seedbank archives and Markdown.
 - **Compost bin** — deleted ideas are soft-deleted, recoverable for 30 days, then purged.
@@ -207,15 +207,13 @@ The first time the backend is available, the client can migrate existing browser
 
 ### AI Setup
 
-Seedbank supports:
+Built-in providers: **OpenAI**, **Anthropic**, and **Ollama** (local). Custom OpenAI-compatible endpoints — OpenRouter, LM Studio, vLLM, LiteLLM gateways, and similar — are planned for a future release. For advanced routing or multi-model fallback, point a custom provider at an OpenRouter or LiteLLM gateway URL.
 
-- OpenAI
-- Anthropic
-- Ollama for local models
+Provider settings are configured in **Settings → AI & Agents**. Provider API keys (OpenAI, Anthropic) are stored server-side, encrypted at rest; public config responses only expose whether a key exists. These are separate from **Seedbank personal access tokens** (Settings → API & Server), which are bearer tokens for the Seedbank REST API itself.
 
-Provider settings are configured in **Settings → AI & Agents**. API keys are stored server-side; public config responses only expose whether a key exists, not the key itself. To link a local CLI agent (Claude Code or Codex CLI), point Seedbank at the binary path in the same tab.
+To link a local CLI agent (Claude Code or Codex CLI), point Seedbank at the binary path in Settings → AI & Agents. Agents authenticate via their own CLI credentials (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `claude auth login`) — Seedbank stores only the binary path and a linked flag.
 
-AI features include the Thinking Partner chat, contextual field suggestions, What If, Devil's Advocate, Scope Down, User Story, Idea Health Check, Smart Cross-Pollinate, and Pattern Insights. See [docs/AI_GUIDE.md](docs/AI_GUIDE.md).
+AI features include the Thinking Partner chat, contextual field suggestions, What If, Devil's Advocate, Scope Down, User Story, Idea Health Check, Smart Cross-Pollinate, and Pattern Insights. All AI features are opt-in. See [docs/AI_GUIDE.md](docs/AI_GUIDE.md).
 
 ### Integrations
 

@@ -42,21 +42,31 @@ Three provider cards appear in a column: **OpenAI**, **Anthropic**, and **Ollama
 
 The default provider is stored server-side and read by the Thinking Partner panel on every idea detail page. You no longer configure the provider from within the chat panel itself.
 
-**Keys are never exposed to the browser.** The public settings response includes `hasOpenAIKey` / `hasAnthropicKey` booleans only. Keys are stored server-side in the `settings` table.
+**Provider API keys vs. Seedbank tokens.** Provider API keys (OpenAI, Anthropic) are credentials for external AI services — stored server-side, encrypted at rest, never exposed to the browser. `hasOpenAIKey` / `hasAnthropicKey` booleans in the public config indicate whether a key is stored. These are entirely separate from **Seedbank personal access tokens** (Settings → API & Server), which are bearer tokens for the Seedbank REST API itself.
+
+> **Data flow:** Ollama calls stay on your machine. OpenAI and Anthropic calls send idea content to those providers' servers. All calls are proxied server-side; the browser communicates only with the local Seedbank server.
+
+### Custom providers (planned)
+
+A future release will add a **Custom provider** card for any OpenAI-compatible endpoint — including OpenRouter, LM Studio, vLLM, LiteLLM gateways, Groq, Mistral, and locally-hosted inference servers. The planned configuration: base URL, API key, model name, display name, and optional custom headers. For advanced routing, fallback, or multi-model strategies, use a gateway like OpenRouter or LiteLLM as the base URL — Seedbank delegates those concerns rather than implementing native routing.
 
 ### Token budget & usage
 
-A daily token limit input controls how many tokens Seedbank's AI features can consume in a 24-hour window. Below the input a mono-styled readout shows tokens used in the last 24 hours and last 7 days, drawn from the `ai_usage` table.
+A daily token limit input controls how many tokens Seedbank's AI features can consume in a 24-hour window. The limit is enforced server-side — requests that exceed the budget return an error. Setting `0` disables enforcement. The mono-styled readout below shows tokens used in the last 24 hours and last 7 days, drawn from the `ai_usage` table.
 
 ### Agents
 
 Two agent cards appear here — **Claude Code** and **Codex CLI**. Each card lets you:
 
 1. Enter an explicit path to the CLI binary (e.g. `/usr/local/bin/claude`), or leave it blank and click the detect button to find the binary on `$PATH`.
-2. Link the agent — the server runs `<cli> --version` to validate. Version is stored server-side; no credentials enter the browser.
+2. Link the agent — the server runs `<cli> --version` to validate the binary. Version is stored server-side; no credentials enter the browser.
 3. Unlink at any time.
 
-See [`docs/AGENTS.md`](./AGENTS.md) for the full agent workflow.
+**Agent authentication** is CLI-managed, not Seedbank-managed. Claude Code uses `claude auth login` or `ANTHROPIC_API_KEY` in the environment; Codex CLI uses `OPENAI_API_KEY` or its own config file. Seedbank only stores the binary path and a linked flag. Agents inherit the environment variables of the Seedbank server process.
+
+**Workspace boundaries:** Seedbank sets the agent's working directory to a per-idea scratch workspace and validates applied file paths for directory traversal. The agent process is not OS-sandboxed — only link binaries you trust.
+
+See [`docs/AGENTS.md`](./AGENTS.md) and [`docs/AI_GUIDE.md`](./AI_GUIDE.md) for the full agent workflow, safety rails, and transcript storage.
 
 ---
 
@@ -168,7 +178,7 @@ A `configured` badge appears next to each integration that has a valid configura
 
 ## About
 
-- App version (hardcoded to `2.1.0`; will eventually pull from server info).
+- App version (shown from server info).
 - Link to the Seedbank GitHub repository.
 - Attribution.
 

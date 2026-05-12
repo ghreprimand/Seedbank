@@ -1,48 +1,75 @@
 # AI Guide
 
-Seedbank's AI features are designed to help you develop your own ideas. The AI is a thinking partner: it asks questions, reflects gaps, and offers focused suggestions without taking over the creative direction.
+Seedbank's AI features are designed to help you develop your own ideas. The AI is a thinking partner: it asks questions, reflects gaps, and offers focused suggestions — it does not take over the creative direction, and all features are opt-in.
+
+---
 
 ## Provider Setup
 
-Provider configuration has moved from the inline AI panel to **Settings → AI & Agents**. Navigate there via the gear icon (⚙) in the header, or go directly to `/settings/ai-agents`.
+Provider configuration lives in **Settings → AI & Agents**. Navigate there via the gear icon (⚙) in the header, or go directly to `/settings/ai-agents`.
 
-### Default provider
+### Built-in providers
 
-A **Set default** radio button on each provider card determines which provider the Thinking Partner uses for all conversations. This replaces the per-panel provider toggle that was previously inside the chat panel.
+Three provider cards are available today:
 
-### OpenAI
+**OpenAI** — enter your API key and model name (e.g. `gpt-4o`). Calls are made server-side to `api.openai.com`. Idea content is sent to OpenAI's servers.
 
-In the OpenAI card, expand the details row and provide an API key and model name (e.g. `gpt-4o`).
+**Anthropic** — enter your API key and model name (e.g. `claude-opus-4-5`). Calls are made server-side to `api.anthropic.com`. Works well for reflective critique and longer contextual responses. Idea content is sent to Anthropic's servers.
 
-### Anthropic
+**Ollama** — configure the base URL (usually `http://localhost:11434`) and model name (e.g. `llama3.2`). No API key required. All calls stay on your machine — idea content never leaves your local network. Useful for local-only experimentation or privacy-sensitive archives.
 
-In the Anthropic card, expand the details row and provide an API key and model name (e.g. `claude-opus-4-5`). Anthropic works well for reflective critique and longer contextual responses.
+### Choosing a default provider
 
-### Ollama
+A **Set default** radio button on each provider card determines which provider the Thinking Partner and field suggestions use. The default is stored server-side.
 
-In the Ollama card, expand the details row and configure:
+### Provider API keys vs. Seedbank tokens
 
-- Ollama base URL, usually `http://localhost:11434`
-- Model name, for example `llama3.2`
+**Provider API keys** (OpenAI, Anthropic) are credentials for external AI services. They are stored server-side, encrypted at rest. Public API responses expose only a boolean (`hasOpenAIKey` / `hasAnthropicKey`) — the raw key value is never sent to the browser. All AI calls are proxied through the Seedbank server; the browser has no direct contact with the provider.
 
-Ollama is useful when you want local-only experimentation or do not want to send idea context to a hosted provider.
+**Seedbank personal access tokens** are a separate concept. They are bearer tokens you generate in **Settings → API & Server** to call the Seedbank REST API from scripts, external tools, or remote hosts. They do not interact with provider API keys.
+
+### Custom and OpenAI-compatible providers (planned)
+
+The current built-in cards cover OpenAI, Anthropic, and Ollama. A future release will add a **Custom provider** card that accepts any OpenAI-compatible endpoint. The planned configuration fields are:
+
+| Field | Description |
+|---|---|
+| Base URL | Full endpoint root, e.g. `https://openrouter.ai/api/v1` or `http://localhost:8080/v1` |
+| API key | Optional bearer token for the endpoint |
+| Model | Model identifier string as accepted by the endpoint |
+| Display name | Label shown in the UI (e.g. `OpenRouter`, `LM Studio`, `vLLM`) |
+| Custom headers | Optional extra headers (e.g. `X-Title`, `HTTP-Referer` for OpenRouter) |
+
+This will let you use providers such as OpenRouter, LM Studio, vLLM, LiteLLM gateways, Groq, Mistral, and any locally-hosted inference server that exposes an OpenAI-compatible `/v1/chat/completions` endpoint.
+
+### Advanced routing and fallback
+
+Seedbank does not implement native provider routing, model cascading, or multi-provider fallback. For those patterns, use a gateway like **OpenRouter** or **LiteLLM** as your custom provider base URL — they handle routing, fallback, rate-limit balancing, and multi-model strategies. Point Seedbank at the gateway URL and treat it as a single provider.
+
+---
 
 ## Stored Configuration
 
-AI configuration is stored in the server `settings` table under `ai.config`. Public config responses expose model names and whether a key exists (`hasOpenAIKey`, `hasAnthropicKey`), but never the key values themselves. All provider API calls are made server-side — the browser never sends keys or receives raw model responses directly.
+AI configuration is stored in the server `settings` table under `ai.config`. Public config responses expose model names and whether a key exists, but never key values. All provider API calls are made server-side.
+
+---
 
 ## Token Budget & Usage Readout
 
-A **daily token limit** input in Settings → AI & Agents controls how many tokens the AI features can consume in 24 hours. Below it, a mono-styled readout shows:
+A **daily token limit** input in Settings → AI & Agents controls how many tokens all AI features can consume in a 24-hour window. Below it, a mono-styled readout shows:
 
 - Tokens used in the last 24 hours (with percentage of budget).
 - Tokens used in the last 7 days.
 
-This is drawn from the `ai_usage` tracking table. The readout is informational — it does not block requests when the budget is exceeded (the server enforces the limit server-side).
+Drawn from the `ai_usage` tracking table. The limit is enforced server-side — requests that would exceed the budget return an error. Setting the limit to `0` disables enforcement.
+
+---
 
 ## Thinking Partner Chat
 
-The Thinking Partner panel is available on the idea detail page. It sees the current idea fields and the persisted conversation history for that idea. The panel no longer contains its own provider settings — use **Settings → AI & Agents** to change providers, models, or API keys. A small **Settings** link inside the panel header navigates there directly.
+The Thinking Partner panel is available on the idea detail page. It sees the current idea fields and the persisted conversation history for that idea.
+
+Configure providers in **Settings → AI & Agents** — a small **Settings** link in the panel header navigates there directly.
 
 The system behavior is intentionally constrained:
 
@@ -54,88 +81,51 @@ The system behavior is intentionally constrained:
 
 Messages are streamed from `POST /api/ai/chat` and persisted per idea.
 
+---
+
 ## Contextual Field Suggestions
 
-Field-level AI prompts use `POST /api/ai/suggest`.
+Field-level AI prompts use `POST /api/ai/suggest`. Each suggestion is shown as a draft — you choose whether to apply it.
 
 Supported fields:
 
-- `pitch` — sharpen a one-line explanation.
-- `risks` — identify missing blockers or failure modes.
-- `techStack` — suggest implementation tools and constraints.
-- `hook` — clarify the 30-second demo.
-- `whyItMightWork` — strengthen the argument for the idea.
+| Field | Prompt goal |
+|---|---|
+| `pitch` | Sharpen a one-line explanation |
+| `risks` | Identify missing blockers or failure modes |
+| `techStack` | Suggest implementation tools and constraints |
+| `hook` | Clarify the 30-second demo |
+| `whyItMightWork` | Strengthen the argument for the idea |
 
-Suggestions are shown as suggestions, not silent replacements. The user chooses whether to apply them.
+---
 
 ## Organic Prompt Modes
 
 Organic modes are available in the AI chat panel.
 
-### What If
+**What If** — asks one provocative "what if" question and waits for the user's response before going further. Good for breaking a stale framing, finding a surprising angle, or exploring inversions or constraints.
 
-Asks one provocative "what if" question and waits for the user's response before going further.
+**Devil's Advocate** — challenges the weakest assumption in the idea without dismissing it. Good for finding hidden risks, testing whether the idea has a real user, and separating excitement from evidence.
 
-Good for:
+**Scope Down** — pushes the idea toward the smallest viable test. Good for jam projects, first prototypes, and reducing a broad concept to one screen, one mechanic, or one workflow.
 
-- Breaking a stale framing.
-- Finding a surprising angle.
-- Exploring inversions or constraints.
+**User Story** — asks about a specific person in a specific situation. Good for clarifying who the idea serves, avoiding abstract feature lists, and finding the moment of need.
 
-### Devil's Advocate
-
-Challenges the weakest assumption in the idea without dismissing it.
-
-Good for:
-
-- Finding hidden risks.
-- Testing whether the idea has a real user.
-- Separating excitement from evidence.
-
-### Scope Down
-
-Pushes the idea toward the smallest viable test.
-
-Good for:
-
-- Jam projects.
-- First prototypes.
-- Reducing a broad concept to one screen, one mechanic, or one workflow.
-
-### User Story
-
-Asks about a specific person in a specific situation.
-
-Good for:
-
-- Clarifying who the idea serves.
-- Avoiding abstract feature lists.
-- Finding the moment of need.
+---
 
 ## Idea Health Check
 
-The Idea Health Check appears on the idea detail page. It calls:
+The Idea Health Check appears on the idea detail page. It combines AI summary text with field-by-field readiness feedback for: Pitch, Hook, Why It Might Work, Risks, Tech Stack, and Tags.
 
-```ts
-aiSuggest('health-check', { idea, fields })
-```
+Each field is marked as strong or needing attention, giving a concrete next editing target. No fields are auto-updated — you decide what to change.
 
-It combines AI summary text with field-by-field readiness feedback for:
-
-- Pitch
-- Hook
-- Why It Might Work
-- Risks
-- Tech Stack
-- Tags
-
-Each field is marked as strong or needing attention, giving the user a concrete next editing target.
+---
 
 ## Smart Cross-Pollinate
 
 Smart Cross-Pollinate lives on the Discover page. Instead of showing only random pairs, Seedbank looks for ideas with useful contrast or shared traits, then asks the AI why they might combine well.
 
-The goal is not to mash everything together. The goal is to uncover hidden relationships in the archive.
+---
 
 ## Pattern Insights
 
@@ -146,6 +136,8 @@ Example insights:
 - Several local-first tools could share infrastructure.
 - Multiple game ideas use the same mood or mechanic.
 - Several app ideas need the same authentication or sync foundation.
+
+---
 
 ## Failure Modes and Fallbacks
 
@@ -162,6 +154,38 @@ This preserves Seedbank's core promise: the archive remains useful even without 
 
 ## Agents (separate surface)
 
-The **Develop with agent** and **Continue with agent** buttons on the idea detail page launch a more powerful but strictly opt-in feature: a local Claude Code or Codex CLI agent that can produce multi-file outputs (specs, research docs, prototype scaffolds). Agents are distinct from the Thinking Partner — they write files, not chat messages.
+The **Develop with agent** and **Continue with agent** buttons on the idea detail page launch a strictly opt-in, more powerful feature: a local Claude Code or Codex CLI agent that can produce multi-file outputs (specs, research docs, prototype scaffolds). Agents are distinct from the Thinking Partner — they write files, not chat messages.
 
-See [`docs/AGENTS.md`](./AGENTS.md) for the full agent workflow, safety rails, and filesystem boundaries.
+### How agents authenticate
+
+Agents use their **own** CLI-managed authentication — not Seedbank's provider API keys. Claude Code authenticates via `claude auth login` (or `ANTHROPIC_API_KEY` in the environment); Codex CLI uses `OPENAI_API_KEY` or its own config. Seedbank only stores the binary path and a linked flag. No agent credentials are stored in or passed through Seedbank.
+
+Agents inherit the environment variables of the Seedbank server process. If `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` is set in that environment, the agent will pick it up. This is the standard CLI auth mechanism — it is not a Seedbank feature.
+
+### Workspace boundaries
+
+Seedbank sets the agent's working directory to a per-idea scratch workspace and validates all applied file paths for directory traversal. The agent process is **not OS-sandboxed** — it can access your filesystem with the same permissions as the Seedbank server process. Only link agent binaries you trust.
+
+### Transcript and output handling
+
+The agent transcript streams live in the panel. When the agent proposes file changes, a checklist appears — you select which files to accept before anything is saved. No file is written without explicit approval.
+
+Transcripts are stored per-run in the Seedbank database. Previous run transcripts are visible from the idea detail page via the **Continue with agent** button.
+
+### Runtime controls
+
+- **Runtime cap:** 5 minutes per run, 30-minute absolute maximum.
+- **Kill button:** always visible in the agent panel; terminates the process immediately.
+- No output auto-writes to canonical idea fields.
+
+### MCP context for agent sessions
+
+For external agent sessions (outside Seedbank's own agent runner), read-only MCP endpoints expose seeds as context:
+
+| Endpoint | Description |
+|---|---|
+| `GET /api/mcp/ideas` | Paginated idea list with stage/category filtering |
+| `GET /api/mcp/ideas/:id` | Full idea detail with rendered Markdown |
+| `GET /api/mcp/search` | Full-text search over ideas |
+
+All MCP endpoints require a bearer token with `mcp:read` scope, created in Settings → API & Server. See [`docs/API.md`](./API.md) for the full MCP surface.
