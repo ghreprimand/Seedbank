@@ -1,5 +1,71 @@
 # Changelog
 
+## 2.2.0 — Expanded Themes, In-App Manual & Contextual Help
+
+Seedbank v2.2.0 completes the theme catalog, adds a comprehensive searchable in-app user manual, and layers in a quiet contextual help system — all while tightening platform-neutral documentation and public-repo hygiene.
+
+### Theme catalog — now 10 themes
+
+- **Four new themes added:** Hearth (mid-depth warm clay/taupe), Rainwash (mid-depth cool sage/stone), Peat (dark umber/black-soil), Canopy (dark forest green with bark/copper accents).
+- **Two themes replaced for distinctness:** Parchment → **Chalk** (cool mineral/blue-gray, opposite temperature from all other light themes); Loam → **Woad** (deep botanical blue-indigo, the only blue-dominant dark theme). The collision pairs Parchment/Dusk (warm cream) and Loam/Peat (warm dark earth) no longer exist.
+- **Migration:** Users with `parchment` or `loam` saved in the database are automatically migrated — at server startup (`migrateLegacySettings`), at API read time (`uiThemeConfig`), and at client hydration (`stores/settings.ts`) — to ensure ThemeTab always shows the correct active card and localStorage stays in sync.
+- **Match system dark default** updated from Loam → Peat (warmer, more neutral dark fallback).
+- Pre-paint IIFE in `main.tsx` carries a `MIGRATE` map for both legacy names; the IIFE writes back on migration so subsequent cold boots are already clean.
+- Theme picker expanded to 10 cards; keyboard arrow navigation preserved; mobile layout scales gracefully.
+- `docs/THEMING.md` updated for the full 10-theme catalog.
+
+### In-app searchable manual (28 sections)
+
+- **Help/Manual trigger** — BookOpen icon in the app header; `?` global keyboard shortcut.
+- **Manual modal** — grouped index (left rail on desktop, optgroup selector on mobile), section anchors, scroll-to-section navigation, field-note aesthetic.
+- **Local search** — all-words matching across title/body/keywords; matching words highlighted in result titles (`bg-sage-100 text-sage-700`); empty state with guidance.
+- **28 sections across 8 groups:** Getting Started, Garden, Idea Editor, Health & AI, Settings, Integrations, API & Automation, Troubleshooting. Covers every major feature including: stage/category badges, score pickers, health check, Thinking Partner, prompt modes, agent runs, theme match system, token budgets, API tokens (all four scopes including `mcp:read`), webhooks, MCP, backups, import/export, version history, compost, and integrations.
+- **Deep-link support** — contextual help popovers can open the manual to a specific section without breaking the current route.
+- **Accessibility** — focus trap, Escape close, labelled `role="dialog"`, keyboard-navigable index/search/results.
+- **Platform-neutral language** — integration sections explain generic adapters, external project roots, REST/OpenAPI, webhooks, MCP, and CLI agents. Archon is referenced only as an optional adapter example.
+
+### Contextual help system
+
+- **`HelpProvider` / `useHelp()` hook** — fast-refresh-safe context split across `helpContext.ts`, `HelpContext.tsx`, `useHelp.ts`.
+- **`HelpModeToggle`** — always-visible button in the manual modal header to enable/disable help mode. When enabled, `HelpButton` markers appear near documented UI elements.
+- **`HelpButton` + `HelpPopover`** — each popover carries a summary, optional details, and an "Open manual section" deep-link. Touch and keyboard activation work; hover-only dead ends avoided.
+- **Coverage:** stage picker, category badges, health check, agent run controls, score pickers, token budget, linked agents, API token scopes, webhooks, backup schedule.
+- **Non-intrusive by default** — help triggers do not block primary actions or resize controls; `HelpButton` is only rendered when help mode is on.
+
+### Full ApiServerTab implementation
+
+- Server info card (port, version, uptime, DB path).
+- Personal access tokens table — create/revoke, scope list (`read:ideas`, `write:ideas`, `ai:suggest`, `mcp:read`), token shown once with copy button.
+- Webhooks configuration — URL + event picker.
+- OpenAPI spec link.
+
+### Agent isolation wording fix
+
+- Removed inaccurate "sandboxed" and "no access to arbitrary filesystem paths" claims from the manual.
+- Now says explicitly: the agent process is **not** OS-sandboxed; Seedbank sets `cwd` and validates applied file paths for directory traversal, and users should only link binaries they trust.
+
+### Legibility audit
+
+- Eleven `ink-400` → `ink-500` bumps on small-text surfaces: `CategoryBadge`, `ScorePicker` labels, `ManualModal` group/search-meta text, settings section headers, `ApiServerTab` table headers and date columns.
+- `ManualModal` group labels: `ink-300` → `ink-400`.
+
+### Platform-neutral documentation
+
+- `docs/INTEGRATIONS.md` rewritten generic-first — no Archon-specific framing.
+- All `~/.seedbank/` paths in docs generalised to `<seedbank-data-dir>`.
+- `docs/SETTINGS.md` updated: six themes → ten themes; theme names listed; Paper ↔ Peat noted for match-system default.
+- `docs/AI_GUIDE.md`, `docs/API.md`, `docs/AGENTS.md` refreshed with v2.2 accuracy fixes.
+- Four new doc files added this cycle.
+- MCP scope corrected to `mcp:read` (not `read:ideas`) throughout manual, docs, and API reference.
+
+### Screenshot tooling
+
+- `scripts/capture-readme-screenshots.mjs` — Playwright-based deterministic screenshot script. Seeds demo data via `/api/import`, navigates routes, captures 8 named JPGs to `docs/assets/screenshots/`. Additive-safe by default; `--replace-data` required for destructive seed. Flags: `--base-url`, `--api-url`, `--out-dir`, `--skip-seed`, `--strict-help`.
+- `docs/assets/screenshots/README.md` — privacy/safety rules and expected output list.
+- Generated image files are `.gitignore`d by default; only explicitly `git add`-ed images are committed.
+
+---
+
 ## 2.1.0 — Settings, API, Theming & Agents
 
 Seedbank v2.1.0 ships four closely-related feature groups that turn scattered configuration popovers into a permanent Settings page, give the local API a real security surface, make the UI themeable at runtime, and link local AI CLI agents for sandboxed "develop with agent" runs.
