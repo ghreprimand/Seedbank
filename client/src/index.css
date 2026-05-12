@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./theme/themes.css";
 
 /*
  * Seedbank Design Tokens
@@ -9,93 +10,98 @@
  *
  * Typography: field-note inspired — Lora (serif) for headings,
  * Inter (humanist sans) for body, JetBrains Mono for metadata.
+ *
+ * Color tokens are defined in ./theme/themes.css as --c-* custom
+ * properties per data-theme value. The @theme block below maps
+ * every Tailwind token to var(--c-*) so all utility classes update
+ * automatically when data-theme changes on <html>.
  */
 
 @theme {
   /* ── Paper (backgrounds) ─────────────────────────────── */
-  --color-paper:       #faf8f4;   /* main background           */
-  --color-paper-warm:  #f4efe5;   /* input/card background      */
-  --color-paper-dim:   #eee9df;   /* muted / secondary bg       */
+  --color-paper:      var(--c-paper);
+  --color-paper-warm: var(--c-paper-warm);
+  --color-paper-dim:  var(--c-paper-dim);
 
   /* ── Sage / Moss greens (growth, stages) ─────────────── */
-  --color-sage-50:   #f2f5f0;
-  --color-sage-100:  #e0e8dc;
-  --color-sage-200:  #bfd4b7;
-  --color-sage-300:  #97b88c;
-  --color-sage-400:  #739e66;
-  --color-sage-500:  #567d4a;
-  --color-sage-600:  #43623a;
-  --color-sage-700:  #354d2e;
-  --color-sage-800:  #273a22;
-  --color-sage-900:  #1a2717;
+  --color-sage-50:  var(--c-sage-50);
+  --color-sage-100: var(--c-sage-100);
+  --color-sage-200: var(--c-sage-200);
+  --color-sage-300: var(--c-sage-300);
+  --color-sage-400: var(--c-sage-400);
+  --color-sage-500: var(--c-sage-500);
+  --color-sage-600: var(--c-sage-600);
+  --color-sage-700: var(--c-sage-700);
+  --color-sage-800: var(--c-sage-800);
+  --color-sage-900: var(--c-sage-900);
 
   /* ── Ink (text, borders) ─────────────────────────────── */
-  --color-ink-50:   #f5f5f4;
-  --color-ink-100:  #e7e5e2;
-  --color-ink-200:  #ccc9c4;
-  --color-ink-300:  #a8a49e;
-  --color-ink-400:  #857f78;
-  --color-ink-500:  #6b655e;
-  --color-ink-600:  #514c46;
-  --color-ink-700:  #3d3935;
-  --color-ink-800:  #2a2725;
-  --color-ink-900:  #1a1816;
+  --color-ink-50:  var(--c-ink-50);
+  --color-ink-100: var(--c-ink-100);
+  --color-ink-200: var(--c-ink-200);
+  --color-ink-300: var(--c-ink-300);
+  --color-ink-400: var(--c-ink-400);
+  --color-ink-500: var(--c-ink-500);
+  --color-ink-600: var(--c-ink-600);
+  --color-ink-700: var(--c-ink-700);
+  --color-ink-800: var(--c-ink-800);
+  --color-ink-900: var(--c-ink-900);
 
   /* ── Clay / Terracotta (accents, actions, CTA) ───────── */
-  --color-clay-50:   #fdf5f0;
-  --color-clay-100:  #f9e5d6;
-  --color-clay-200:  #f0c9a8;
-  --color-clay-300:  #e5a878;
-  --color-clay-400:  #d4864e;
-  --color-clay-500:  #c06a33;
-  --color-clay-600:  #a05328;
-  --color-clay-700:  #7d4020;
-  --color-clay-800:  #5e3119;
-  --color-clay-900:  #3f2112;
+  --color-clay-50:  var(--c-clay-50);
+  --color-clay-100: var(--c-clay-100);
+  --color-clay-200: var(--c-clay-200);
+  --color-clay-300: var(--c-clay-300);
+  --color-clay-400: var(--c-clay-400);
+  --color-clay-500: var(--c-clay-500);
+  --color-clay-600: var(--c-clay-600);
+  --color-clay-700: var(--c-clay-700);
+  --color-clay-800: var(--c-clay-800);
+  --color-clay-900: var(--c-clay-900);
 
   /* ── Amber (excitement, energy, warmth) ──────────────── */
-  --color-amber-50:   #fefbe8;
-  --color-amber-100:  #fef3c7;
-  --color-amber-200:  #fde68a;
-  --color-amber-300:  #fcd34d;
-  --color-amber-400:  #fbbf24;
-  --color-amber-500:  #f59e0b;
-  --color-amber-600:  #d97706;
-  --color-amber-700:  #b45309;
-  --color-amber-800:  #92400e;
-  --color-amber-900:  #78350f;
+  --color-amber-50:  var(--c-amber-50);
+  --color-amber-100: var(--c-amber-100);
+  --color-amber-200: var(--c-amber-200);
+  --color-amber-300: var(--c-amber-300);
+  --color-amber-400: var(--c-amber-400);
+  --color-amber-500: var(--c-amber-500);
+  --color-amber-600: var(--c-amber-600);
+  --color-amber-700: var(--c-amber-700);
+  --color-amber-800: var(--c-amber-800);
+  --color-amber-900: var(--c-amber-900);
 
   /* ── Frost (cold storage, shelved, muted) ────────────── */
-  --color-frost-50:   #f0f4f8;
-  --color-frost-100:  #dce4ed;
-  --color-frost-200:  #b8c9da;
-  --color-frost-300:  #8fabc4;
-  --color-frost-400:  #6b8dad;
-  --color-frost-500:  #4e7191;
-  --color-frost-600:  #3d5a74;
-  --color-frost-700:  #30465a;
-  --color-frost-800:  #243442;
-  --color-frost-900:  #19242e;
+  --color-frost-50:  var(--c-frost-50);
+  --color-frost-100: var(--c-frost-100);
+  --color-frost-200: var(--c-frost-200);
+  --color-frost-300: var(--c-frost-300);
+  --color-frost-400: var(--c-frost-400);
+  --color-frost-500: var(--c-frost-500);
+  --color-frost-600: var(--c-frost-600);
+  --color-frost-700: var(--c-frost-700);
+  --color-frost-800: var(--c-frost-800);
+  --color-frost-900: var(--c-frost-900);
 
-  /* ── Typography ──────────────────────────────────────── */
+  /* ── Typography (shared, not themed) ────────────────── */
   --font-sans:  "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-serif: "Lora", ui-serif, Georgia, serif;
   --font-mono:  "JetBrains Mono", ui-monospace, monospace;
 
-  /* ── Shadows (tactile card feel) ─────────────────────── */
-  --shadow-card:       0 1px 3px rgba(26, 24, 22, 0.06), 0 1px 2px rgba(26, 24, 22, 0.04);
-  --shadow-card-hover: 0 4px 14px rgba(26, 24, 22, 0.09), 0 2px 4px rgba(26, 24, 22, 0.05);
-  --shadow-modal:      0 8px 30px rgba(26, 24, 22, 0.14), 0 2px 8px rgba(26, 24, 22, 0.07);
+  /* ── Shadows (theme-aware via --c-shadow-*) ──────────── */
+  --shadow-card:       0 1px 3px var(--c-shadow-sm), 0 1px 2px var(--c-shadow-xs);
+  --shadow-card-hover: 0 4px 14px var(--c-shadow-md), 0 2px 4px var(--c-shadow-sm);
+  --shadow-modal:      0 8px 30px var(--c-shadow-lg), 0 2px 8px var(--c-shadow-md);
 
-  /* ── Border radii ────────────────────────────────────── */
+  /* ── Border radii (shared, not themed) ───────────────── */
   --radius-card:  0.625rem;  /* 10px — slightly softer */
   --radius-badge: 0.3125rem; /* 5px  */
   --radius-pill:  9999px;
 
   /* ── Custom animation timings ────────────────────────── */
-  --animate-fade-in:       fade-in 0.25s ease-out;
-  --animate-slide-up:      slide-up 0.3s ease-out;
-  --animate-scale-in:      scale-in 0.2s ease-out;
+  --animate-fade-in:  fade-in 0.25s ease-out;
+  --animate-slide-up: slide-up 0.3s ease-out;
+  --animate-scale-in: scale-in 0.2s ease-out;
 
   /* ── Custom transition ───────────────────────────────── */
   --transition-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -121,8 +127,8 @@
 body {
   background-color: var(--color-paper);
   background-image:
-    radial-gradient(ellipse at 20% 50%, rgba(226, 217, 199, 0.15) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 20%, rgba(191, 212, 183, 0.08) 0%, transparent 50%);
+    radial-gradient(ellipse at 20% 50%, var(--c-bg-spot-warm, rgba(226, 217, 199, 0.15)) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, var(--c-bg-spot-sage, rgba(191, 212, 183, 0.08)) 0%, transparent 50%);
   min-height: 100vh;
 }
 

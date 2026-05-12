@@ -17,6 +17,36 @@ import '@fontsource/jetbrains-mono/500.css'
 import './index.css'
 import App from './App.tsx'
 
+// ── Pre-paint theme bootstrap (no FOUC) ──────────────────────────────────────
+// Runs synchronously before createRoot so the correct data-theme is on <html>
+// before the first paint. Reads from localStorage; server source-of-truth
+// (GET /api/settings) overrides later once the settings store hydrates (F3).
+;(function applyBootTheme() {
+  const VALID = ['paper', 'parchment', 'meadow', 'dusk', 'loam', 'moss']
+  try {
+    const raw = localStorage.getItem('seedbank.ui.theme')
+    if (!raw) return
+    const prefs = JSON.parse(raw) as { name?: string; matchSystem?: boolean }
+    let name = prefs.name ?? 'paper'
+    if (prefs.matchSystem) {
+      name = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'loam' : 'paper'
+    }
+    if (VALID.includes(name)) document.documentElement.dataset.theme = name
+  } catch { /* ignore — defaults to paper via :root selector in themes.css */ }
+
+  // Also subscribe for subsequent system changes when matchSystem is active.
+  try {
+    const raw = localStorage.getItem('seedbank.ui.theme')
+    if (!raw) return
+    const prefs = JSON.parse(raw) as { matchSystem?: boolean }
+    if (!prefs.matchSystem) return
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+      document.documentElement.dataset.theme = e.matches ? 'loam' : 'paper'
+    })
+  } catch { /* ignore */ }
+})()
+// ─────────────────────────────────────────────────────────────────────────────
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>

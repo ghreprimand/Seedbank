@@ -1,0 +1,485 @@
+/*
+ * Seedbank — Theme token definitions
+ *
+ * Each theme overrides the --c-* custom properties. The @theme block in index.css
+ * maps every Tailwind color token onto var(--c-*), so all utility classes
+ * (bg-paper, text-sage-700, etc.) update automatically when data-theme changes.
+ *
+ * Scale conventions:
+ *   Light themes (paper, parchment, meadow, dusk): low numbers = lighter, high = darker
+ *   Dark themes (loam, moss): scale is INVERTED — low numbers = dark overlay/border,
+ *     high numbers = bright/readable. This is intentional — components that write
+ *     "text-ink-800" get primary-body-text in both modes.
+ *
+ * Theming is palette-only. Typography, radii, and keyframe animations are shared.
+ * Shadows use a --c-shadow-* layer so they're visible in both light and dark themes.
+ */
+
+/* ═══════════════════════════════════════════════════════════
+   THEME 1 — Paper (default, current)
+   Off-white paper, sage greens, clay/terracotta CTA, warm amber.
+   ═══════════════════════════════════════════════════════════ */
+:root,
+:root[data-theme="paper"] {
+  /* Paper backgrounds */
+  --c-paper:      #faf8f4;
+  --c-paper-warm: #f4efe5;
+  --c-paper-dim:  #eee9df;
+
+  /* Sage (growth, stages, action) */
+  --c-sage-50:  #f2f5f0;
+  --c-sage-100: #e0e8dc;
+  --c-sage-200: #bfd4b7;
+  --c-sage-300: #97b88c;
+  --c-sage-400: #739e66;
+  --c-sage-500: #567d4a;
+  --c-sage-600: #43623a;
+  --c-sage-700: #354d2e;
+  --c-sage-800: #273a22;
+  --c-sage-900: #1a2717;
+
+  /* Ink (text, borders) */
+  --c-ink-50:  #f5f5f4;
+  --c-ink-100: #e7e5e2;
+  --c-ink-200: #ccc9c4;
+  --c-ink-300: #a8a49e;
+  --c-ink-400: #857f78;
+  --c-ink-500: #6b655e;
+  --c-ink-600: #514c46;
+  --c-ink-700: #3d3935;
+  --c-ink-800: #2a2725;
+  --c-ink-900: #1a1816;
+
+  /* Clay / Terracotta (CTA, accents) */
+  --c-clay-50:  #fdf5f0;
+  --c-clay-100: #f9e5d6;
+  --c-clay-200: #f0c9a8;
+  --c-clay-300: #e5a878;
+  --c-clay-400: #d4864e;
+  --c-clay-500: #c06a33;
+  --c-clay-600: #a05328;
+  --c-clay-700: #7d4020;
+  --c-clay-800: #5e3119;
+  --c-clay-900: #3f2112;
+
+  /* Amber (energy, excitement) */
+  --c-amber-50:  #fefbe8;
+  --c-amber-100: #fef3c7;
+  --c-amber-200: #fde68a;
+  --c-amber-300: #fcd34d;
+  --c-amber-400: #fbbf24;
+  --c-amber-500: #f59e0b;
+  --c-amber-600: #d97706;
+  --c-amber-700: #b45309;
+  --c-amber-800: #92400e;
+  --c-amber-900: #78350f;
+
+  /* Frost (shelved, cold-storage) */
+  --c-frost-50:  #f0f4f8;
+  --c-frost-100: #dce4ed;
+  --c-frost-200: #b8c9da;
+  --c-frost-300: #8fabc4;
+  --c-frost-400: #6b8dad;
+  --c-frost-500: #4e7191;
+  --c-frost-600: #3d5a74;
+  --c-frost-700: #30465a;
+  --c-frost-800: #243442;
+  --c-frost-900: #19242e;
+
+  /* Shadows (light-mode: warm-ink tint) */
+  --c-shadow-xs: rgba(26, 24, 22, 0.04);
+  --c-shadow-sm: rgba(26, 24, 22, 0.06);
+  --c-shadow-md: rgba(26, 24, 22, 0.09);
+  --c-shadow-lg: rgba(26, 24, 22, 0.14);
+
+  /* Body bg gradient overlays — paper-warm glow + sage glow */
+  --c-bg-spot-warm: rgba(226, 217, 199, 0.15);
+  --c-bg-spot-sage: rgba(191, 212, 183, 0.08);
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   THEME 2 — Parchment
+   Warmer cream, aged amber tones, deeper terracotta, dustier sage.
+   ═══════════════════════════════════════════════════════════ */
+:root[data-theme="parchment"] {
+  --c-paper:      #f7f1e3;
+  --c-paper-warm: #ede4cf;
+  --c-paper-dim:  #e2d7be;
+
+  --c-sage-50:  #f0f2ed;
+  --c-sage-100: #dde4d8;
+  --c-sage-200: #baceb2;
+  --c-sage-300: #90af87;
+  --c-sage-400: #6b9262;
+  --c-sage-500: #4f734a;
+  --c-sage-600: #3d5c39;
+  --c-sage-700: #2f472c;
+  --c-sage-800: #22341f;
+  --c-sage-900: #162214;
+
+  --c-ink-50:  #f5f2ea;
+  --c-ink-100: #e6e0d4;
+  --c-ink-200: #ccc3b2;
+  --c-ink-300: #a89e8c;
+  --c-ink-400: #857a6a;
+  --c-ink-500: #6b6054;
+  --c-ink-600: #51473e;
+  --c-ink-700: #3d352e;
+  --c-ink-800: #2a231c;
+  --c-ink-900: #1a1510;
+
+  /* Deeper terracotta */
+  --c-clay-50:  #fdf3ec;
+  --c-clay-100: #f7dfca;
+  --c-clay-200: #edc29a;
+  --c-clay-300: #df9e6a;
+  --c-clay-400: #cc7c40;
+  --c-clay-500: #b05e28;
+  --c-clay-600: #924a1e;
+  --c-clay-700: #703818;
+  --c-clay-800: #522912;
+  --c-clay-900: #381a0b;
+
+  --c-amber-50:  #fdfae4;
+  --c-amber-100: #faf0be;
+  --c-amber-200: #f5de80;
+  --c-amber-300: #eec840;
+  --c-amber-400: #e0ae18;
+  --c-amber-500: #c49408;
+  --c-amber-600: #a47804;
+  --c-amber-700: #825e04;
+  --c-amber-800: #664808;
+  --c-amber-900: #50360a;
+
+  --c-frost-50:  #eef2f6;
+  --c-frost-100: #d8e2ec;
+  --c-frost-200: #b3c9de;
+  --c-frost-300: #88aace;
+  --c-frost-400: #628cb8;
+  --c-frost-500: #486ea0;
+  --c-frost-600: #375680;
+  --c-frost-700: #2a4262;
+  --c-frost-800: #1e3048;
+  --c-frost-900: #152030;
+
+  --c-shadow-xs: rgba(28, 20, 10, 0.04);
+  --c-shadow-sm: rgba(28, 20, 10, 0.07);
+  --c-shadow-md: rgba(28, 20, 10, 0.10);
+  --c-shadow-lg: rgba(28, 20, 10, 0.15);
+  --c-bg-spot-warm: rgba(210, 195, 160, 0.18);
+  --c-bg-spot-sage: rgba(175, 200, 160, 0.09);
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   THEME 3 — Meadow
+   Light, greener. Cool green-tinted paper, sage prominent, clay stays CTA.
+   ═══════════════════════════════════════════════════════════ */
+:root[data-theme="meadow"] {
+  --c-paper:      #f0f6ee;
+  --c-paper-warm: #e4f0e0;
+  --c-paper-dim:  #d5e8d0;
+
+  --c-sage-50:  #e8f2e5;
+  --c-sage-100: #d0e8c8;
+  --c-sage-200: #a8d49e;
+  --c-sage-300: #7ab870;
+  --c-sage-400: #5aa050;
+  --c-sage-500: #4a8040;
+  --c-sage-600: #3a6632;
+  --c-sage-700: #2c5028;
+  --c-sage-800: #203c1e;
+  --c-sage-900: #152815;
+
+  /* Ink with a subtle cool-green tint */
+  --c-ink-50:  #f0f4f0;
+  --c-ink-100: #e0e6e0;
+  --c-ink-200: #c2ccc0;
+  --c-ink-300: #9cab98;
+  --c-ink-400: #7a8d78;
+  --c-ink-500: #60705e;
+  --c-ink-600: #485646;
+  --c-ink-700: #364235;
+  --c-ink-800: #242e24;
+  --c-ink-900: #161e16;
+
+  /* Clay stays identical — CTA must pop on any light bg */
+  --c-clay-50:  #fdf5f0;
+  --c-clay-100: #f9e5d6;
+  --c-clay-200: #f0c9a8;
+  --c-clay-300: #e5a878;
+  --c-clay-400: #d4864e;
+  --c-clay-500: #c06a33;
+  --c-clay-600: #a05328;
+  --c-clay-700: #7d4020;
+  --c-clay-800: #5e3119;
+  --c-clay-900: #3f2112;
+
+  --c-amber-50:  #fefbe8;
+  --c-amber-100: #fef3c7;
+  --c-amber-200: #fde68a;
+  --c-amber-300: #fcd34d;
+  --c-amber-400: #fbbf24;
+  --c-amber-500: #f59e0b;
+  --c-amber-600: #d97706;
+  --c-amber-700: #b45309;
+  --c-amber-800: #92400e;
+  --c-amber-900: #78350f;
+
+  /* Frost: slightly bluer/crisper for contrast on green surfaces */
+  --c-frost-50:  #eef4f8;
+  --c-frost-100: #d8eaf4;
+  --c-frost-200: #b0d0e8;
+  --c-frost-300: #80b2d6;
+  --c-frost-400: #5892c0;
+  --c-frost-500: #4074a8;
+  --c-frost-600: #305c88;
+  --c-frost-700: #264870;
+  --c-frost-800: #1c3454;
+  --c-frost-900: #14233a;
+
+  --c-shadow-xs: rgba(20, 36, 18, 0.04);
+  --c-shadow-sm: rgba(20, 36, 18, 0.06);
+  --c-shadow-md: rgba(20, 36, 18, 0.09);
+  --c-shadow-lg: rgba(20, 36, 18, 0.14);
+  --c-bg-spot-warm: rgba(180, 220, 170, 0.16);
+  --c-bg-spot-sage: rgba(150, 210, 140, 0.10);
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   THEME 4 — Dusk
+   Warm taupe surfaces (evening field journal). Not dark, not light.
+   Deep moss sage, warm clay, amber feels warmer.
+   ═══════════════════════════════════════════════════════════ */
+:root[data-theme="dusk"] {
+  --c-paper:      #ece4d8;
+  --c-paper-warm: #e0d4c0;
+  --c-paper-dim:  #d2c4aa;
+
+  /* Deep moss */
+  --c-sage-50:  #edf2e8;
+  --c-sage-100: #d4e2cc;
+  --c-sage-200: #a8c8a0;
+  --c-sage-300: #78a86e;
+  --c-sage-400: #528a44;
+  --c-sage-500: #3e7034;
+  --c-sage-600: #2e5a28;
+  --c-sage-700: #22451e;
+  --c-sage-800: #183216;
+  --c-sage-900: #10210e;
+
+  /* Ink — warm dark brown */
+  --c-ink-50:  #f0ebe0;
+  --c-ink-100: #e0d6c4;
+  --c-ink-200: #c4b89e;
+  --c-ink-300: #a09076;
+  --c-ink-400: #7e7058;
+  --c-ink-500: #625844;
+  --c-ink-600: #4a4232;
+  --c-ink-700: #363024;
+  --c-ink-800: #261e14;
+  --c-ink-900: #16100a;
+
+  /* Earthy clay */
+  --c-clay-50:  #fdf4ec;
+  --c-clay-100: #f8e2c8;
+  --c-clay-200: #edc09a;
+  --c-clay-300: #de9e6a;
+  --c-clay-400: #c87a40;
+  --c-clay-500: #b05f26;
+  --c-clay-600: #924a1e;
+  --c-clay-700: #703816;
+  --c-clay-800: #522810;
+  --c-clay-900: #38190a;
+
+  /* Amber warmer, more golden */
+  --c-amber-50:  #fefbec;
+  --c-amber-100: #fef2cc;
+  --c-amber-200: #fce48a;
+  --c-amber-300: #f7d04e;
+  --c-amber-400: #f0bc28;
+  --c-amber-500: #d8a00e;
+  --c-amber-600: #b48006;
+  --c-amber-700: #906208;
+  --c-amber-800: #72480a;
+  --c-amber-900: #58360c;
+
+  --c-frost-50:  #f0f2f6;
+  --c-frost-100: #d8deec;
+  --c-frost-200: #b0bed8;
+  --c-frost-300: #8098c4;
+  --c-frost-400: #5a7aac;
+  --c-frost-500: #3e5e96;
+  --c-frost-600: #2e4878;
+  --c-frost-700: #22385c;
+  --c-frost-800: #1a2844;
+  --c-frost-900: #101a2e;
+
+  --c-shadow-xs: rgba(22, 16, 8, 0.05);
+  --c-shadow-sm: rgba(22, 16, 8, 0.08);
+  --c-shadow-md: rgba(22, 16, 8, 0.12);
+  --c-shadow-lg: rgba(22, 16, 8, 0.18);
+  --c-bg-spot-warm: rgba(200, 185, 155, 0.20);
+  --c-bg-spot-sage: rgba(160, 185, 145, 0.10);
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   THEME 5 — Loam  (DARK)
+   Deep earth-brown surfaces. Scale INVERTED: ink-800 = near-white body text,
+   ink-100 = dark border. Sage brightened for dark bg. Clay = bright terracotta CTA.
+   ═══════════════════════════════════════════════════════════ */
+:root[data-theme="loam"] {
+  --c-paper:      #1c1812;
+  --c-paper-warm: #242018;
+  --c-paper-dim:  #2c2820;
+
+  /* Sage — inverted: low = dark subtle, high = bright readable */
+  --c-sage-50:  #1e2a1a;  /* dark sage bg for badges */
+  --c-sage-100: #2a3c22;
+  --c-sage-200: #3e5a30;
+  --c-sage-300: #567a42;
+  --c-sage-400: #729e5c;
+  --c-sage-500: #8aba76;  /* main action — bright sage on dark */
+  --c-sage-600: #6c9c58;  /* button bg */
+  --c-sage-700: #bce2a0;  /* badge text on sage-50 dark bg */
+  --c-sage-800: #d4f0c0;
+  --c-sage-900: #eaf8e0;
+
+  /* Ink — inverted: ink-800 = primary text (light cream) */
+  --c-ink-50:  #28241c;  /* subtle dark surface / active bg */
+  --c-ink-100: #3a3428;  /* border */
+  --c-ink-200: #6a6050;  /* muted interactive elements (inactive stars, etc.) */
+  --c-ink-300: #7a7062;  /* muted text */
+  --c-ink-400: #a09280;  /* secondary text */
+  --c-ink-500: #bfb09e;  /* body text */
+  --c-ink-600: #d4c8b8;  /* medium text */
+  --c-ink-700: #e2d8cc;  /* high contrast */
+  --c-ink-800: #ede8e0;  /* primary text — warm near-white */
+  --c-ink-900: #f6f2ec;  /* maximum contrast */
+
+  /* Clay — bright terracotta CTA visible on dark earth */
+  --c-clay-50:  #2a1a10;  /* dark clay bg for badges */
+  --c-clay-100: #3e2618;
+  --c-clay-200: #5e3c24;
+  --c-clay-300: #845440;
+  --c-clay-400: #b07858;
+  --c-clay-500: #d4926a;  /* bright CTA */
+  --c-clay-600: #c07848;  /* hover */
+  --c-clay-700: #e8b898;  /* badge text on clay-50 dark bg */
+  --c-clay-800: #f0d0b8;
+  --c-clay-900: #f8e8d8;
+
+  /* Amber — brighter for dark bg */
+  --c-amber-50:  #221c0a;  /* dark badge bg for pitch */
+  --c-amber-100: #3a2e0e;
+  --c-amber-200: #5c481c;
+  --c-amber-300: #826830;
+  --c-amber-400: #b09050;
+  --c-amber-500: #d4b468;
+  --c-amber-600: #bca040;
+  --c-amber-700: #e0c87a;
+  --c-amber-800: #f0dc9c;  /* badge text on amber-50 dark bg */
+  --c-amber-900: #f8ecbc;
+
+  /* Frost — blue-dark bg, lighter text for shelved/cold-storage badges */
+  --c-frost-50:  #141c28;  /* dark frost bg for badges */
+  --c-frost-100: #1e2c3e;
+  --c-frost-200: #2e4458;
+  --c-frost-300: #406070;
+  --c-frost-400: #567e94;
+  --c-frost-500: #6e9cac;
+  --c-frost-600: #90b8c8;  /* text visible on dark */
+  --c-frost-700: #b0d0e0;  /* badge text on frost-50 dark bg */
+  --c-frost-800: #c8e2f0;
+  --c-frost-900: #deeef8;
+
+  /* Shadows — stronger on dark surfaces */
+  --c-shadow-xs: rgba(0, 0, 0, 0.18);
+  --c-shadow-sm: rgba(0, 0, 0, 0.28);
+  --c-shadow-md: rgba(0, 0, 0, 0.40);
+  --c-shadow-lg: rgba(0, 0, 0, 0.55);
+  --c-bg-spot-warm: rgba(120, 100, 60, 0.08);
+  --c-bg-spot-sage: rgba(80, 120, 60, 0.06);
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   THEME 6 — Moss  (DARK, green-dominant)
+   Charcoal-green surfaces, paler sage for type, copper clay accents.
+   Scale INVERTED same as Loam.
+   ═══════════════════════════════════════════════════════════ */
+:root[data-theme="moss"] {
+  --c-paper:      #131c17;
+  --c-paper-warm: #1a2620;
+  --c-paper-dim:  #22302a;
+
+  /* Sage — green-dominant, bright for action on dark green */
+  --c-sage-50:  #182614;  /* dark badge bg */
+  --c-sage-100: #223818;
+  --c-sage-200: #305222;
+  --c-sage-300: #446e32;
+  --c-sage-400: #5e9048;
+  --c-sage-500: #7ab462;  /* main action */
+  --c-sage-600: #5e9048;  /* button bg */
+  --c-sage-700: #b8e09a;  /* badge text on sage-50 dark bg */
+  --c-sage-800: #d0eec0;
+  --c-sage-900: #e8f8dc;
+
+  /* Ink — inverted, cool green tint */
+  --c-ink-50:  #1a261e;  /* subtle dark surface */
+  --c-ink-100: #283a2e;  /* border */
+  --c-ink-200: #5a7868;  /* muted interactive elements (inactive stars, etc.) */
+  --c-ink-300: #587a64;  /* muted text */
+  --c-ink-400: #7ea090;  /* secondary text */
+  --c-ink-500: #a0c0b4;  /* body text */
+  --c-ink-600: #b8d4c8;  /* medium text */
+  --c-ink-700: #cce4da;  /* high contrast */
+  --c-ink-800: #deeee6;  /* primary text — cool near-white */
+  --c-ink-900: #eef8f2;  /* maximum contrast */
+
+  /* Clay → copper accents (warm on green-tinted dark) */
+  --c-clay-50:  #1c1208;  /* dark badge bg */
+  --c-clay-100: #301e0e;
+  --c-clay-200: #4e3018;
+  --c-clay-300: #6e4828;
+  --c-clay-400: #986040;
+  --c-clay-500: #c07e58;  /* copper CTA */
+  --c-clay-600: #a86238;  /* hover */
+  --c-clay-700: #d8a07a;  /* badge text on clay-50 dark bg */
+  --c-clay-800: #ecbea0;
+  --c-clay-900: #f5d4bc;
+
+  /* Amber — warm gold on charcoal-green */
+  --c-amber-50:  #1c1808;  /* dark pitch badge bg */
+  --c-amber-100: #30280e;
+  --c-amber-200: #4c3e1a;
+  --c-amber-300: #6c582c;
+  --c-amber-400: #927840;
+  --c-amber-500: #be9c58;
+  --c-amber-600: #a88040;
+  --c-amber-700: #d8bc84;  /* badge text */
+  --c-amber-800: #ecce98;  /* amber-800 on amber-50 badge */
+  --c-amber-900: #f5e0b0;
+
+  /* Frost — for shelved/cold-storage on dark green */
+  --c-frost-50:  #0c1820;  /* dark frost badge bg */
+  --c-frost-100: #162432;
+  --c-frost-200: #22384e;
+  --c-frost-300: #305068;
+  --c-frost-400: #406882;
+  --c-frost-500: #5284a0;
+  --c-frost-600: #6ea0bc;  /* text visible on dark */
+  --c-frost-700: #90bcd4;  /* badge text on frost-50 dark bg */
+  --c-frost-800: #aed2e8;
+  --c-frost-900: #c8e6f4;
+
+  --c-shadow-xs: rgba(0, 0, 0, 0.20);
+  --c-shadow-sm: rgba(0, 0, 0, 0.32);
+  --c-shadow-md: rgba(0, 0, 0, 0.44);
+  --c-shadow-lg: rgba(0, 0, 0, 0.60);
+  --c-bg-spot-warm: rgba(80, 100, 70, 0.08);
+  --c-bg-spot-sage: rgba(60, 110, 70, 0.06);
+}
