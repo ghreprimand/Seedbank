@@ -22,7 +22,7 @@ Seedbank v2.2.0 completes the theme catalog, adds a comprehensive searchable in-
 - **28 sections across 8 groups:** Getting Started, Garden, Idea Editor, Health & AI, Settings, Integrations, API & Automation, Troubleshooting. Covers every major feature including: stage/category badges, score pickers, health check, Thinking Partner, prompt modes, agent runs, theme match system, token budgets, API tokens (all four scopes including `mcp:read`), webhooks, MCP, backups, import/export, version history, compost, and integrations.
 - **Deep-link support** — contextual help popovers can open the manual to a specific section without breaking the current route.
 - **Accessibility** — focus trap, Escape close, labelled `role="dialog"`, keyboard-navigable index/search/results.
-- **Platform-neutral language** — integration sections explain generic adapters, external project roots, REST/OpenAPI, webhooks, MCP, and CLI agents. Archon is referenced only as an optional adapter example.
+- **Platform-neutral language** — integration sections explain generic adapters, external project roots, REST/OpenAPI, webhooks, MCP, and CLI agents without referencing private tools.
 
 ### Contextual help system
 
@@ -138,8 +138,8 @@ Seedbank v2.0.0 turns the original browser-only idea sketchpad into a durable lo
 - **Soft delete / Compost** with restore, purge, and 30-day retention.
 - **Automatic backups** with startup database backups, scheduled daily/weekly backups, manual backup, and JSON archive exports.
 - **Project graduation framework** with plugin-style integrations.
-- **Archon integration** for creating project folders and context files.
-- **Generic project scaffold integration** for local project creation without Archon.
+- **Graduation adapter plugins** — built-in generic local project scaffold; optional custom adapters can target specific local tools.
+- **Generic project scaffold** for local project creation using any directory.
 - **Graduation UI** with readiness checks and post-graduation badges.
 - **AI service layer** with OpenAI, Anthropic, and Ollama provider support.
 - **Streaming AI chat** endpoint for per-idea Thinking Partner conversations.

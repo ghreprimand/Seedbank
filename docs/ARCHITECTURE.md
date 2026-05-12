@@ -53,7 +53,7 @@ Primary DB tables:
 - `ai.config` (legacy `ai:config` migrated on startup)
 - `api.webhooks`
 - `agents.config`
-- `integration:<adapter-id>` (for example `integration:generic-project`, optional `integration:archon`)
+- `integration:<adapter-id>` (one namespaced key per registered adapter; for example `integration:generic-project`)
 - backup keys (`backup.config`, `backup.lastRun`)
 
 ## Settings Architecture
@@ -173,8 +173,8 @@ This keeps the agent role as a constrained assistant that proposes changes and r
 ## Integration Architecture
 
 Integrations live under `server/src/integrations/` and implement a shared adapter interface. The registry currently provides:
-- `generic-project` (general-purpose built-in adapter)
-- `archon` (optional adapter for Archon-specific workflows)
+- `generic-project` (general-purpose built-in adapter; works with any local directory)
+- Optional custom adapters can be registered by implementing `Integration` from `types.ts` and adding them to `registry.ts`.
 
 Graduation is server-side because it performs local filesystem writes and then updates idea lifecycle fields (`graduatedTo`, `stage`).
 

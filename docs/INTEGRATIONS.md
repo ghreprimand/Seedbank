@@ -8,12 +8,13 @@ Integration settings are managed in the app at:
 - `Settings -> Integrations`
 
 Built-in adapters:
-- `Local Project` (`generic-project`) — general-purpose external project scaffold
-- `Archon` (`archon`) — optional adapter for Archon-specific workflows
+- `Local Project` (`generic-project`) — general-purpose external project scaffold; works with any local directory and development workflow.
+
+Optional custom adapters are registered in `server/src/integrations/registry.ts`. An adapter that is only useful for a specific private tool should not be documented here as a public feature; see [Adding a Custom Integration](#adding-a-custom-integration) below.
 
 The Settings tab stores adapter configuration in the server `settings` table under namespaced keys:
 - `integration:generic-project`
-- `integration:archon` (optional adapter-specific)
+- `integration:<your-adapter-id>` (one key per registered adapter)
 
 ## Graduation Flow
 
@@ -41,21 +42,25 @@ All integration routes are authenticated through the standard API middleware and
 ### Local Project (`server/src/integrations/genericProject.ts`)
 
 Config fields:
-- `projectRoot` (default external project root; set in Settings)
+- `projectRoot` (external project root; set in Settings)
 
 Behavior:
 - creates a standalone scaffold in a configured external project root
-- chooses target stage based on category helper logic
+- generates `README.md`, `CLAUDE.md`, and a seed context file from the idea
+- chooses target stage based on category
 
-### Archon (optional adapter) (`server/src/integrations/archon.ts`)
+### Custom Local Adapters
 
-Config fields:
-- `archonRoot`
-- `projectRoot` (typically `<archonRoot>/projects`)
+Any private or workflow-specific adapter can be added by implementing the `Integration` interface. Custom adapters follow the same configuration and graduation API as the built-in adapter.
 
-Behavior:
-- validates Archon workspace roots
-- scaffolds project files with Archon-specific context artifacts
+Example fields a custom local adapter might use:
+- `projectRoot` (where new project directories are created)
+- `workspaceRoot` (a tool-specific workspace directory, if required)
+
+A custom adapter should:
+- validate that its required root paths exist before reporting `isConfigured()`
+- write only inside configured roots
+- produce `filesCreated` output so the graduation response is informative
 
 ## Continue With Agent Handoff
 
@@ -63,9 +68,9 @@ After graduation, the UI can launch "Continue with agent" using the returned `pa
 
 The backend enforces that continue-mode agent runs (`POST /api/agents/runs` with `projectPath`) are constrained to configured integration roots:
 - configured `projectRoot` values for enabled adapters
-- adapter-specific derived roots when applicable (for example optional Archon project directories)
+- adapter-specific derived roots when applicable
 
-If `projectPath` is outside configured roots, the run is rejected.
+If `projectPath` is outside all configured roots, the run is rejected.
 
 ## Safety Expectations
 

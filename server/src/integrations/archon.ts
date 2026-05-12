@@ -18,8 +18,8 @@ interface ArchonConfig {
 
 export class ArchonIntegration implements Integration {
   readonly id = 'archon';
-  readonly name = 'Archon';
-  readonly description = 'Graduate an idea into an Archon-ready project workspace.';
+  readonly name = 'Custom local adapter';
+  readonly description = 'An optional adapter for a local project workflow tool. Configure a workspace root to enable graduation to this adapter.';
   readonly icon = 'Network';
 
   constructor(private readonly configStore: IntegrationConfigStore) {}

@@ -20,8 +20,8 @@ function IconFor({ icon }: { icon: string }) {
 }
 
 function configPlaceholder(id: string, field: 'root' | 'archon') {
-  if (field === 'archon') return '/path/to/your/archon-workspace';
-  if (id === 'archon') return '/path/to/your/archon-workspace/projects';
+  if (field === 'archon') return '/path/to/your/adapter-workspace';
+  if (id === 'archon') return '/path/to/your/adapter-workspace/projects';
   return '/path/to/your/projects';
 }
 
@@ -130,7 +130,7 @@ export default function IntegrationsTab() {
               {integration.id === 'archon' && (
                 <label className="block">
                   <span className="block text-[11px] font-mono uppercase text-ink-400 mb-1 tracking-wider">
-                    Archon root
+                    Workspace root
                   </span>
                   <input
                     value={state.archonRoot}
