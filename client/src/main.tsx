@@ -22,7 +22,7 @@ import App from './App.tsx'
 // before the first paint. Reads from localStorage; server source-of-truth
 // (GET /api/settings) overrides later once the settings store hydrates (F3).
 ;(function applyBootTheme() {
-  const VALID = ['paper', 'parchment', 'meadow', 'dusk', 'loam', 'moss']
+  const VALID = ['paper', 'parchment', 'meadow', 'dusk', 'loam', 'moss', 'hearth', 'rainwash', 'peat', 'canopy']
   try {
     const raw = localStorage.getItem('seedbank.ui.theme')
     if (!raw) return
