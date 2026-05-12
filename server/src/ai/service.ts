@@ -22,6 +22,9 @@ const DEFAULT_CONFIG: AiStoredConfig = {
   dailyTokenBudget: 200000,
 };
 
+const AI_CONFIG_KEY = 'ai.config';
+const LEGACY_AI_CONFIG_KEY = 'ai:config';
+
 class SimpleRateLimiter {
   private readonly hits = new Map<string, number[]>();
 
@@ -146,9 +149,11 @@ export class AiService {
   ) {}
 
   getConfig(): AiStoredConfig {
+    const current = this.repository.getSetting<Partial<AiStoredConfig>>(AI_CONFIG_KEY);
+    const legacy = this.repository.getSetting<Partial<AiStoredConfig>>(LEGACY_AI_CONFIG_KEY);
     return {
       ...DEFAULT_CONFIG,
-      ...this.repository.getSetting<Partial<AiStoredConfig>>('ai:config'),
+      ...(current ?? legacy ?? {}),
     };
   }
 
@@ -169,7 +174,7 @@ export class AiService {
       openaiApiKeyEncrypted: input.openaiApiKey?.trim() ? encryptSecret(input.openaiApiKey.trim()) : current.openaiApiKeyEncrypted,
       anthropicApiKeyEncrypted: input.anthropicApiKey?.trim() ? encryptSecret(input.anthropicApiKey.trim()) : current.anthropicApiKeyEncrypted,
     };
-    this.repository.setSetting('ai:config', next);
+    this.repository.setSetting(AI_CONFIG_KEY, next);
     return publicConfig(next);
   }
 

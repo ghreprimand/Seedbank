@@ -261,6 +261,81 @@ export interface AiPublicConfig {
   hasAnthropicKey: boolean;
 }
 
+export interface UiThemeConfig {
+  name: string;
+  matchSystem: boolean;
+}
+
+export interface AgentsPublicConfig {
+  claudeLinked: boolean;
+  codexLinked: boolean;
+}
+
+export interface WebhooksConfig {
+  url: string | null;
+  events: string[];
+}
+
+export interface PublicToken {
+  id: string;
+  name: string;
+  scopes: string[];
+  createdAt: string;
+  lastUsedAt: string | null;
+}
+
+export interface ServerInfo {
+  port: number;
+  version: string;
+  uptimeMs: number;
+  dbPath: string;
+}
+
+export type BackupFrequency = 'off' | 'daily' | 'weekly';
+
+export interface BackupConfig {
+  frequency: BackupFrequency;
+  exportJson: boolean;
+}
+
+export interface BackupRunRecord {
+  timestamp: string;
+  backupPath: string | null;
+  exportPath: string | null;
+  reason: string;
+}
+
+export interface FileTimestampInfo {
+  path: string;
+  timestamp: string;
+}
+
+export interface BackupStatus {
+  config: BackupConfig;
+  lastRun: BackupRunRecord | null;
+  latestDatabaseBackup: FileTimestampInfo | null;
+  latestJsonExport: FileTimestampInfo | null;
+  paths: {
+    backupsDir: string;
+    exportsDir: string;
+  };
+}
+
+export interface AggregateSettings {
+  ui: {
+    theme: UiThemeConfig;
+  };
+  ai: AiPublicConfig;
+  api: {
+    tokens: PublicToken[];
+    webhooks: WebhooksConfig;
+  };
+  agents: AgentsPublicConfig;
+  backups: BackupStatus;
+  integrations: IntegrationSummary[];
+  server: ServerInfo;
+}
+
 export interface AiConfigInput {
   provider?: AiProviderId;
   openaiModel?: string;

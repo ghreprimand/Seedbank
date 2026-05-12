@@ -1,10 +1,13 @@
 import cors from 'cors';
 import express, { type NextFunction, type Request, type Response } from 'express';
+import fs from 'node:fs';
+import path from 'node:path';
 import { AiService } from './ai/service.js';
 import { AiStore } from './ai/store.js';
 import {
   backupsDir,
   createDatabaseBackup,
+  dbPath,
   exportsDir,
   latestFileInfo,
   openDatabase,
@@ -13,7 +16,21 @@ import {
 import { IntegrationRegistry } from './integrations/registry.js';
 import { archiveToMarkdown, parseMarkdownArchive } from './markdown.js';
 import { SeedbankRepository, type ImportArchive, type ListIdeasOptions } from './repository.js';
-import type { Category, Stage } from '../../shared/types.js';
+import type { AiConfigPatch } from './ai/types.js';
+import type {
+  AgentsPublicConfig,
+  AggregateSettings,
+  BackupConfig,
+  BackupFrequency,
+  BackupRunRecord,
+  BackupStatus,
+  Category,
+  PublicToken,
+  ServerInfo,
+  Stage,
+  UiThemeConfig,
+  WebhooksConfig,
+} from '../../shared/types.js';
 
 const PORT = Number(process.env.PORT ?? 4800);
 const app = express();
@@ -22,24 +39,61 @@ const repository = new SeedbankRepository(database);
 const integrations = new IntegrationRegistry(repository);
 const aiService = new AiService(repository, new AiStore(database));
 
-type BackupFrequency = 'off' | 'daily' | 'weekly';
-
-interface BackupConfig {
-  frequency: BackupFrequency;
-  exportJson: boolean;
-}
-
-interface BackupRunRecord {
-  timestamp: string;
-  backupPath: string | null;
-  exportPath: string | null;
-  reason: string;
-}
-
 const DEFAULT_BACKUP_CONFIG: BackupConfig = {
   frequency: 'daily',
   exportJson: true,
 };
+
+interface AgentStoredConfig {
+  claudeLinked: boolean;
+  codexLinked: boolean;
+  claudeCliPath?: string;
+  codexCliPath?: string;
+}
+
+interface StoredApiToken extends PublicToken {
+  hash: string;
+}
+
+const SETTINGS_KEYS = {
+  uiTheme: 'ui.theme',
+  aiConfig: 'ai.config',
+  aiConfigLegacy: 'ai:config',
+  apiTokens: 'api.tokens',
+  apiWebhooks: 'api.webhooks',
+  agentsConfig: 'agents.config',
+} as const;
+
+const DEFAULT_THEME_CONFIG: UiThemeConfig = {
+  name: 'paper',
+  matchSystem: false,
+};
+
+const DEFAULT_AGENTS_CONFIG: AgentStoredConfig = {
+  claudeLinked: false,
+  codexLinked: false,
+};
+
+function readServerVersion(): string {
+  const candidates = [
+    path.resolve(process.cwd(), 'server/package.json'),
+    path.resolve(process.cwd(), 'package.json'),
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      const raw = fs.readFileSync(candidate, 'utf8');
+      const parsed = JSON.parse(raw) as { version?: unknown };
+      if (typeof parsed.version === 'string' && parsed.version.trim()) return parsed.version;
+    } catch {
+      // ignore and try next candidate
+    }
+  }
+
+  return '0.0.0';
+}
+
+const SERVER_VERSION = readServerVersion();
 
 function backupConfig(): BackupConfig {
   return {
@@ -71,7 +125,7 @@ function runBackup(reason: string): BackupRunRecord {
   return record;
 }
 
-function backupStatus() {
+function backupStatus(): BackupStatus {
   return {
     config: backupConfig(),
     lastRun: repository.getSetting<BackupRunRecord>('backup.lastRun') ?? null,
@@ -82,6 +136,104 @@ function backupStatus() {
       exportsDir,
     },
   };
+}
+
+function uiThemeConfig(): UiThemeConfig {
+  return {
+    ...DEFAULT_THEME_CONFIG,
+    ...(repository.getSetting<Partial<UiThemeConfig>>(SETTINGS_KEYS.uiTheme) ?? {}),
+  };
+}
+
+function webhooksConfig(): WebhooksConfig {
+  const stored = repository.getSetting<Partial<WebhooksConfig>>(SETTINGS_KEYS.apiWebhooks) ?? {};
+  const url = typeof stored.url === 'string' ? stored.url : null;
+  const events = Array.isArray(stored.events)
+    ? stored.events.filter((event): event is string => typeof event === 'string' && event.trim().length > 0)
+    : [];
+  return { url, events };
+}
+
+function isStoredApiToken(value: unknown): value is StoredApiToken {
+  if (!value || typeof value !== 'object') return false;
+  const token = value as Record<string, unknown>;
+  return typeof token.id === 'string'
+    && typeof token.name === 'string'
+    && Array.isArray(token.scopes)
+    && token.scopes.every((scope) => typeof scope === 'string')
+    && typeof token.hash === 'string'
+    && typeof token.createdAt === 'string'
+    && (typeof token.lastUsedAt === 'string' || token.lastUsedAt === null || typeof token.lastUsedAt === 'undefined');
+}
+
+function storedApiTokens(): StoredApiToken[] {
+  const stored = repository.getSetting<unknown>(SETTINGS_KEYS.apiTokens);
+  if (!Array.isArray(stored)) return [];
+
+  return stored
+    .filter(isStoredApiToken)
+    .map((token) => ({
+      id: token.id,
+      name: token.name,
+      scopes: token.scopes.filter((scope) => scope.trim().length > 0),
+      hash: token.hash,
+      createdAt: token.createdAt,
+      lastUsedAt: typeof token.lastUsedAt === 'string' ? token.lastUsedAt : null,
+    }));
+}
+
+function publicTokens(): PublicToken[] {
+  return storedApiTokens().map(({ hash: _hash, ...token }) => token);
+}
+
+function agentsStoredConfig(): AgentStoredConfig {
+  const stored = repository.getSetting<Partial<AgentStoredConfig>>(SETTINGS_KEYS.agentsConfig) ?? {};
+  return {
+    ...DEFAULT_AGENTS_CONFIG,
+    ...stored,
+    claudeLinked: Boolean(stored.claudeLinked ?? stored.claudeCliPath),
+    codexLinked: Boolean(stored.codexLinked ?? stored.codexCliPath),
+  };
+}
+
+function agentsPublicConfig(): AgentsPublicConfig {
+  const stored = agentsStoredConfig();
+  return {
+    claudeLinked: Boolean(stored.claudeLinked),
+    codexLinked: Boolean(stored.codexLinked),
+  };
+}
+
+function serverInfo(): ServerInfo {
+  return {
+    port: PORT,
+    version: SERVER_VERSION,
+    uptimeMs: Math.round(process.uptime() * 1000),
+    dbPath,
+  };
+}
+
+function aggregateSettings(): AggregateSettings {
+  return {
+    ui: { theme: uiThemeConfig() },
+    ai: aiService.getPublicConfig(),
+    api: {
+      tokens: publicTokens(),
+      webhooks: webhooksConfig(),
+    },
+    agents: agentsPublicConfig(),
+    backups: backupStatus(),
+    integrations: integrations.list(),
+    server: serverInfo(),
+  };
+}
+
+function migrateLegacySettings(): void {
+  const legacyAiConfig = repository.getSetting<unknown>(SETTINGS_KEYS.aiConfigLegacy);
+  const nextAiConfig = repository.getSetting<unknown>(SETTINGS_KEYS.aiConfig);
+  if (legacyAiConfig !== undefined && nextAiConfig === undefined) {
+    repository.setSetting(SETTINGS_KEYS.aiConfig, legacyAiConfig);
+  }
 }
 
 function runScheduledBackupIfDue() {
@@ -223,6 +375,98 @@ function listOptionsFromQuery(query: Request['query']): ListIdeasOptions {
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, port: PORT });
 });
+
+app.get('/api/settings', asyncRoute((_req, res) => {
+  res.json(aggregateSettings());
+}));
+
+app.patch('/api/settings/:section', asyncRoute((req, res) => {
+  const section = routeParam(req, 'section');
+
+  if (section === 'ui') {
+    const body = req.body as { theme?: Partial<UiThemeConfig> };
+    const current = uiThemeConfig();
+    const nextTheme: UiThemeConfig = {
+      name: typeof body?.theme?.name === 'string' && body.theme.name.trim()
+        ? body.theme.name.trim()
+        : current.name,
+      matchSystem: typeof body?.theme?.matchSystem === 'boolean'
+        ? body.theme.matchSystem
+        : current.matchSystem,
+    };
+    repository.setSetting(SETTINGS_KEYS.uiTheme, nextTheme);
+    res.json(aggregateSettings());
+    return;
+  }
+
+  if (section === 'ai') {
+    aiService.configure((req.body ?? {}) as AiConfigPatch);
+    res.json(aggregateSettings());
+    return;
+  }
+
+  if (section === 'api') {
+    const body = req.body as { webhooks?: Partial<WebhooksConfig>; tokens?: unknown };
+    if (body?.tokens !== undefined) {
+      res.status(400).json({ error: 'Tokens are managed via dedicated API endpoints.' });
+      return;
+    }
+    if (body?.webhooks) {
+      const current = webhooksConfig();
+      const next: WebhooksConfig = {
+        url: body.webhooks.url === null
+          ? null
+          : (typeof body.webhooks.url === 'string' ? body.webhooks.url : current.url),
+        events: Array.isArray(body.webhooks.events)
+          ? body.webhooks.events
+            .filter((event): event is string => typeof event === 'string' && event.trim().length > 0)
+          : current.events,
+      };
+      repository.setSetting(SETTINGS_KEYS.apiWebhooks, next);
+    }
+    res.json(aggregateSettings());
+    return;
+  }
+
+  if (section === 'agents') {
+    const body = req.body as { claudeCliPath?: unknown; codexCliPath?: unknown };
+    const current = agentsStoredConfig();
+    const claudeCliPath = typeof body.claudeCliPath === 'string' && body.claudeCliPath.trim()
+      ? body.claudeCliPath.trim()
+      : undefined;
+    const codexCliPath = typeof body.codexCliPath === 'string' && body.codexCliPath.trim()
+      ? body.codexCliPath.trim()
+      : undefined;
+
+    const next: AgentStoredConfig = {
+      ...current,
+      claudeCliPath: body.claudeCliPath === undefined ? current.claudeCliPath : claudeCliPath,
+      codexCliPath: body.codexCliPath === undefined ? current.codexCliPath : codexCliPath,
+    };
+    next.claudeLinked = body.claudeCliPath === undefined ? current.claudeLinked : Boolean(next.claudeCliPath);
+    next.codexLinked = body.codexCliPath === undefined ? current.codexLinked : Boolean(next.codexCliPath);
+    repository.setSetting(SETTINGS_KEYS.agentsConfig, next);
+    res.json(aggregateSettings());
+    return;
+  }
+
+  if (section === 'backups') {
+    const body = req.body as { config?: Partial<BackupConfig> };
+    const current = backupConfig();
+    const requested = body?.config ?? {};
+    const frequency = requested.frequency === 'off' || requested.frequency === 'daily' || requested.frequency === 'weekly'
+      ? requested.frequency
+      : current.frequency;
+    const exportJson = typeof requested.exportJson === 'boolean'
+      ? requested.exportJson
+      : current.exportJson;
+    repository.setSetting('backup.config', { frequency, exportJson });
+    res.json(aggregateSettings());
+    return;
+  }
+
+  res.status(400).json({ error: `Unsupported settings section: ${section}` });
+}));
 
 app.get('/api/ideas', asyncRoute((req, res) => {
   res.json(repository.listIdeas(listOptionsFromQuery(req.query)));
@@ -497,6 +741,7 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 app.listen(PORT, () => {
+  migrateLegacySettings();
   runScheduledBackupIfDue();
   setInterval(runScheduledBackupIfDue, 5 * 60 * 1000).unref();
   console.log(`Seedbank server listening on http://localhost:${PORT}`);
