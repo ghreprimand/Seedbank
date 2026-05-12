@@ -513,6 +513,7 @@ export class AgentService {
     if (!Array.isArray(input.paths) || input.paths.length === 0) throw new Error('paths[] is required.');
 
     const workspace = this.scratchWorkspace(run.ideaId, run.id);
+    const resolvedWorkspace = fs.realpathSync(workspace);
     const appliedPaths: string[] = [];
 
     const targetDir = path.join(attachmentsRoot, run.ideaId, run.id);
@@ -522,7 +523,14 @@ export class AgentService {
       const relPath = sanitizeAttachmentPath(rawPath);
       const source = path.resolve(path.join(workspace, relPath));
       const lstat = fs.lstatSync(source, { throwIfNoEntry: false });
-      if (!insideRoot(source, workspace) || !lstat || lstat.isSymbolicLink() || !lstat.isFile()) {
+      const resolvedSource = lstat ? fs.realpathSync(source) : source;
+      if (
+        !insideRoot(source, workspace)
+        || !insideRoot(resolvedSource, resolvedWorkspace)
+        || !lstat
+        || lstat.isSymbolicLink()
+        || !lstat.isFile()
+      ) {
         throw new Error(`File not found in run workspace: ${rawPath}`);
       }
 
