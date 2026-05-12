@@ -5,7 +5,7 @@
  *   1. Sets document.documentElement.dataset.theme immediately (live, no reload).
  *   2. Persists { name, matchSystem } to localStorage via themeUtils.
  *
- * Match system: auto-pairs Paper ↔ Loam via prefers-color-scheme.
+ * Match system: auto-pairs Paper ↔ Peat via prefers-color-scheme.
  * Keyboard: arrow keys (←→↑↓) move focus, Enter applies selection.
  */
 import { useEffect, useRef, useState } from 'react';

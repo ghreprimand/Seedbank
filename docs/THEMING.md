@@ -45,7 +45,7 @@ The browser resolves the chain `text-ink-800` → `var(--color-ink-800)` → `va
 
 ### The golden rule for new components
 
-**Never hardcode hex colors.** Always use Tailwind token classes (`bg-paper`, `text-ink-600`, `border-sage-200`, etc.). Every token class works correctly across all ten themes. A hardcoded `#2c2a26` will look correct in Paper and broken in Loam.
+**Never hardcode hex colors.** Always use Tailwind token classes (`bg-paper`, `text-ink-600`, `border-sage-200`, etc.). Every token class works correctly across all ten themes. A hardcoded `#2c2a26` will look correct in Paper and broken in any dark theme (Woad, Moss, Peat, Canopy).
 
 ---
 
@@ -115,7 +115,7 @@ In-between — not dark, not light. Warm taupe surfaces with deep moss and amber
 
 ### 5. Hearth (mid-depth)
 
-Warm clay/adobe surfaces — not as dark as Loam but not a light theme. Earthy and warm for evening reading.
+Warm clay/adobe surfaces — mid-depth between the light themes and the full-dark themes. Earthy and warm for evening reading.
 
 | Role | Character |
 |------|-----------|
