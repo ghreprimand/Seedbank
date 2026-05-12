@@ -17,11 +17,13 @@ function parseArgs(argv) {
     apiUrl: DEFAULT_API_URL,
     outDir: DEFAULT_OUT_DIR,
     seed: true,
+    replaceData: false,
     strictHelp: false,
   };
 
   for (const arg of argv) {
     if (arg === '--skip-seed') out.seed = false;
+    else if (arg === '--replace-data') out.replaceData = true;
     else if (arg === '--strict-help') out.strictHelp = true;
     else if (arg.startsWith('--base-url=')) out.baseUrl = arg.split('=')[1] || DEFAULT_BASE_URL;
     else if (arg.startsWith('--api-url=')) out.apiUrl = arg.split('=')[1] || DEFAULT_API_URL;
@@ -35,6 +37,7 @@ Options:
   --api-url=<url>      API URL (default: ${DEFAULT_API_URL})
   --out-dir=<path>     Output directory (default: ${DEFAULT_OUT_DIR})
   --skip-seed          Do not seed deterministic demo data
+  --replace-data       Allow destructive /api/import mode=replace seeding
   --strict-help        Fail if Help/Manual overlay cannot be captured
   -h, --help           Show this help
 `);
@@ -322,7 +325,19 @@ async function main() {
   const config = parseArgs(process.argv.slice(2));
   console.log(`screenshot baseUrl=${config.baseUrl} apiUrl=${config.apiUrl} outDir=${config.outDir}`);
 
+  if (config.seed && !config.replaceData) {
+    console.error(`Refusing to seed demo data without --replace-data.
+Seeding uses POST /api/import with mode=replace and will overwrite the target instance data.
+Re-run with --replace-data to allow replacement, or use --skip-seed to capture against existing data.`);
+    process.exit(1);
+  }
+
+  if (!config.seed && config.replaceData) {
+    console.warn('--replace-data ignored because --skip-seed was provided.');
+  }
+
   if (config.seed) {
+    console.warn(`WARNING: replacing all data at ${config.apiUrl} via /api/import mode=replace`);
     console.log('seeding deterministic demo data...');
     await seedDemoData(config.apiUrl);
   }

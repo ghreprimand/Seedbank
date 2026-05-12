@@ -166,7 +166,7 @@ Quick endpoint groups: ideas, versions, integrations, AI (chat, suggest, usage),
 | Document | Contents |
 |----------|----------|
 | [docs/SETTINGS.md](docs/SETTINGS.md) | Every Settings tab explained — what's stored where, offline behavior, server vs localStorage. |
-| [docs/THEMING.md](docs/THEMING.md) | Token model, the six themes, dark-mode scale inversion, custom theme authoring. |
+| [docs/THEMING.md](docs/THEMING.md) | Token model, the ten themes, dark-mode scale inversion, custom theme authoring. |
 | [docs/API.md](docs/API.md) | Full REST reference — endpoint list, token auth, webhook payloads, MCP surface. |
 | [docs/AGENTS.md](docs/AGENTS.md) | Claude Code / Codex CLI linkage, "Develop with agent" and "Continue with agent" surfaces, safety rails, transcript storage. |
 | [docs/AI_GUIDE.md](docs/AI_GUIDE.md) | Thinking Partner posture, provider setup, prompt modes, field suggestions, usage readout. |

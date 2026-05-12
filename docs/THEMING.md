@@ -45,7 +45,7 @@ The browser resolves the chain `text-ink-800` → `var(--color-ink-800)` → `va
 
 ### The golden rule for new components
 
-**Never hardcode hex colors.** Always use Tailwind token classes (`bg-paper`, `text-ink-600`, `border-sage-200`, etc.). Every token class works correctly across all six themes. A hardcoded `#2c2a26` will look correct in Paper and broken in Loam.
+**Never hardcode hex colors.** Always use Tailwind token classes (`bg-paper`, `text-ink-600`, `border-sage-200`, etc.). Every token class works correctly across all ten themes. A hardcoded `#2c2a26` will look correct in Paper and broken in Loam.
 
 ---
 
