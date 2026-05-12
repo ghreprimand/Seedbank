@@ -1,5 +1,5 @@
 /**
- * Settings → Integrations: configure Archon and generic project-root integrations.
+ * Settings → Integrations: configure external project adapters and graduation paths.
  *
  * Data: reads integration list from the settings store (hydrated on boot).
  * Mutations: configureIntegration goes direct to POST /api/integrations/:id/configure
@@ -20,9 +20,9 @@ function IconFor({ icon }: { icon: string }) {
 }
 
 function configPlaceholder(id: string, field: 'root' | 'archon') {
-  if (field === 'archon') return '~/Projects/Archon';
-  if (id === 'archon') return '~/Projects/Archon/projects';
-  return '~/Projects/Seedbank-Graduated';
+  if (field === 'archon') return '/path/to/your/archon-workspace';
+  if (id === 'archon') return '/path/to/your/archon-workspace/projects';
+  return '/path/to/your/projects';
 }
 
 interface CardState {
@@ -86,8 +86,8 @@ export default function IntegrationsTab() {
   return (
     <div className="space-y-6 max-w-xl">
       <p className="text-sm text-ink-400">
-        Configure where Seedbank graduates ideas. These paths are used when you graduate an idea
-        to a project scaffold.
+        Configure where Seedbank creates project scaffolds when you graduate an idea.
+        Set a project root for any adapter you plan to use.
       </p>
 
       {offline && integrations.length === 0 && (

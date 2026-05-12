@@ -76,7 +76,7 @@ const TABS: TabDef[] = [
   {
     id: 'integrations',
     label: 'Integrations',
-    kicker: 'Archon, generic project root, graduation paths',
+    kicker: 'External projects, adapters, graduation paths',
     icon: Plug,
     component: IntegrationsTab,
   },

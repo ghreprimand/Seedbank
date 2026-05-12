@@ -1,6 +1,6 @@
 # Theming
 
-Seedbank's theming system lets you switch between six named palettes from **Settings → Theme** without reloading. Theme tokens are CSS custom properties resolved at runtime, so every Tailwind utility class automatically reacts to the active theme.
+Seedbank's theming system lets you switch between ten named palettes from **Settings → Theme** without reloading. Theme tokens are CSS custom properties resolved at runtime, so every Tailwind utility class automatically reacts to the active theme.
 
 ---
 
@@ -53,7 +53,7 @@ The browser resolves the chain `text-ink-800` → `var(--color-ink-800)` → `va
 
 Tailwind's default semantic scale reads `ink-800` as very dark, `ink-50` as very light. This direction is preserved in all four light themes.
 
-The two dark themes (**Loam** and **Moss**) invert the scale:
+The four dark themes (**Loam**, **Moss**, **Peat**, **Canopy**) and two mid-depth themes (**Hearth**, **Rainwash**) all invert the scale:
 
 | Token | Light themes | Dark themes |
 |-------|-------------|-------------|
@@ -65,7 +65,7 @@ This means UI code written for light mode (`text-ink-800` for primary text, `bg-
 
 ---
 
-## The six themes
+## The ten themes
 
 ### 1. Paper (default)
 
@@ -113,7 +113,29 @@ In-between — not dark, not light. Warm taupe surfaces with deep moss and amber
 | Accent | Amber |
 | Type | Warm near-dark |
 
-### 5. Loam (dark)
+### 5. Hearth (mid-depth)
+
+Warm clay/adobe surfaces — not as dark as Loam but not a light theme. Earthy and warm for evening reading.
+
+| Role | Character |
+|------|-----------|
+| Surface | Warm clay / terracotta-brown |
+| Action color | Golden ochre |
+| Accent | Terracotta |
+| Type | Warm near-white (`ink-800` inverted) |
+
+### 6. Rainwash (mid-depth)
+
+Cool sage/stone surfaces — the garden after rain. Quieter and more muted than the light themes.
+
+| Role | Character |
+|------|-----------|
+| Surface | Cool sage-stone |
+| Action color | Rainy sage-teal |
+| Accent | Warm stone / terracotta contrast |
+| Type | Cool near-white (`ink-800` inverted) |
+
+### 7. Loam (dark)
 
 Full dark. Deep earth-brown surfaces. Sage stays the action color; clay becomes brighter terracotta for contrast against dark backgrounds.
 
@@ -124,7 +146,7 @@ Full dark. Deep earth-brown surfaces. Sage stays the action color; clay becomes 
 | Accent | Bright terracotta |
 | Type | Warm near-white (`ink-800` inverted) |
 
-### 6. Moss (dark)
+### 8. Moss (dark)
 
 Full dark, green-dominant. Charcoal-green surfaces, paler sage type, copper accents.
 
@@ -135,14 +157,36 @@ Full dark, green-dominant. Charcoal-green surfaces, paler sage type, copper acce
 | Accent | Copper / amber |
 | Type | Cool near-white (`ink-800` inverted) |
 
+### 9. Peat (dark)
+
+The darkest warm theme. Deep black-soil umber with muted lichen (desaturated olive) action colour. Stark and focused.
+
+| Role | Character |
+|------|-----------|
+| Surface | Black-soil umber |
+| Action color | Muted lichen (desaturated olive) |
+| Accent | Terracotta |
+| Type | Warm near-white (`ink-800` inverted) |
+
+### 10. Canopy (dark)
+
+Forest-understory charcoal-green. Rich forest-green action color; bark and copper clay accents.
+
+| Role | Character |
+|------|-----------|
+| Surface | Charcoal forest-green |
+| Action color | Rich forest sage-green |
+| Accent | Bark / copper |
+| Type | Cool near-white (`ink-800` inverted) |
+
 ---
 
 ## Theme picker
 
-**Settings → Theme** shows six mini-preview cards. Each card contains an inline swatch — a tiny simulated header bar and a card — rendered with `style` attributes that directly reference the theme's CSS variables. This means the swatch colors are always accurate regardless of which theme is currently active.
+**Settings → Theme** shows ten mini-preview cards. Each card contains an inline swatch — a tiny simulated header bar and a card — rendered with `style` attributes that directly reference the theme's CSS variables. This means the swatch colors are always accurate regardless of which theme is currently active.
 
 - **Keyboard navigation:** arrow keys move between cards; Enter selects.
-- **Match system:** a toggle below the cards enables automatic dark/light pairing — **Paper** when `prefers-color-scheme: light`, **Loam** when `prefers-color-scheme: dark`. The system preference is watched live; if you change your OS theme while Seedbank is open, the active theme updates immediately.
+- **Match system:** a toggle below the cards enables automatic dark/light pairing — **Paper** when `prefers-color-scheme: light`, **Loam** when `prefers-color-scheme: dark`. Picking any theme manually overrides this. The system preference is watched live; if you change your OS theme while Seedbank is open, the active theme updates immediately.
 - **Persistence:** the selection is saved to `PATCH /api/settings/ui` and mirrored to `localStorage` (`seedbank.ui.theme` key, JSON `{ name, matchSystem }`). The localStorage mirror is what the pre-paint bootstrap reads.
 
 ---
@@ -186,4 +230,4 @@ The theme system uses standard CSS custom properties, so a custom theme can be i
 
 4. The server validates theme names on `PATCH /api/settings/ui`. Add `'myTheme'` to the `VALID_THEMES` list in `server/src/index.ts`.
 
-> All six built-in themes preserve the serif (`Lora`) + humanist sans (`Inter`) + mono (`JetBrains Mono`) font stack and the established card/badge/pill border-radius tokens. Custom themes should do the same to avoid visual inconsistency.
+> All ten built-in themes preserve the serif (`Lora`) + humanist sans (`Inter`) + mono (`JetBrains Mono`) font stack and the established card/badge/pill border-radius tokens. Custom themes should do the same to avoid visual inconsistency.

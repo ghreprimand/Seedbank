@@ -92,7 +92,7 @@ export default function BackupsTab() {
           <HelpButton
             helpId="backup-schedule"
             title="Backup Schedule"
-            summary="Seedbank keeps the latest 10 database backups and prunes older ones automatically. A startup backup always runs regardless of schedule. Backups go to ~/.seedbank/backups/."
+            summary="Seedbank keeps the latest 10 database backups and prunes older ones automatically. A startup backup always runs regardless of schedule. Backup location shown in Settings → API & Server."
             manualSection="settings-backups"
             alwaysShow
           />

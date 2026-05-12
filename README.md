@@ -32,7 +32,7 @@ The server runs on `http://localhost:4800`. If Vite finds `5173` occupied, it wi
 - **Persistent SQLite storage** — ideas live in `<seedbank-data-dir>/seedbank.db`, not only in browser storage.
 - **Version history** — meaningful edits create snapshots that can be inspected and restored.
 - **AI thinking partner** — chat, field suggestions, organic prompt modes, health checks, and archive insights.
-- **Six runtime themes** — Paper, Parchment, Meadow, Dusk, Loam, and Moss; switchable live from Settings → Theme, with system dark/light auto-pairing.
+- **Ten runtime themes** — Paper, Parchment, Meadow, Dusk (light), Hearth, Rainwash (mid-depth), and Loam, Moss, Peat, Canopy (dark); switchable live from Settings → Theme, with system dark/light auto-pairing.
 - **Settings page** — a permanent `/settings` home for every configuration option: AI providers, agents, theme, API tokens, webhooks, backups, integrations, and app info.
 - **Personal access tokens** — generate scoped bearer tokens (`read:ideas`, `write:ideas`, `ai:suggest`) for local scripting. Tokens are hashed at rest; creation is localhost-only.
 - **Outbound webhooks** — fire a JSON payload to any URL on `idea.created`, `idea.graduated`, or `idea.shipped`. Useful for Zapier, n8n, or local automation.
