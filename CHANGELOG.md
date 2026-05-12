@@ -51,7 +51,7 @@ Seedbank v2.2.0 completes the theme catalog, adds a comprehensive searchable in-
 
 ### Platform-neutral documentation
 
-- `docs/INTEGRATIONS.md` rewritten generic-first — no Archon-specific framing.
+- `docs/INTEGRATIONS.md` rewritten integration-neutral — removed private-tool-specific framing.
 - All `~/.seedbank/` paths in docs generalised to `<seedbank-data-dir>`.
 - `docs/SETTINGS.md` updated: six themes → ten themes; theme names listed; Paper ↔ Peat noted for match-system default.
 - `docs/AI_GUIDE.md`, `docs/API.md`, `docs/AGENTS.md` refreshed with v2.2 accuracy fixes.

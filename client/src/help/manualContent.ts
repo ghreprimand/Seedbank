@@ -44,7 +44,7 @@ export const MANUAL_GROUPS: ManualGroup[] = [
         title: 'What is Seedbank?',
         keywords: ['overview', 'about', 'intro', 'what is', 'seedbank', 'start'],
         blocks: [
-          { type: 'p', text: 'Seedbank is a personal idea vault for people who collect more sparks than they can build immediately. Ideas are stored in a local SQLite database, backed up automatically, and cached in the browser for offline use.' },
+          { type: 'p', text: 'Seedbank is a personal idea vault for people who collect more sparks than they can build immediately. Ideas are stored in a local SQLite database, backed up automatically, and cached in the browser as an offline fallback when the server is unreachable.' },
           { type: 'p', text: 'The app is built around the way ideas actually mature. A seed can start as a title and a messy paragraph, then gain a pitch, hook, risks, tech-stack notes, links, related ideas, scores, and version history.' },
           { type: 'h3', text: 'Key concepts' },
           { type: 'ul', items: [
