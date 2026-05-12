@@ -1,5 +1,5 @@
 /**
- * Settings → Theme: six swatched theme cards + "Match system" toggle.
+ * Settings → Theme: ten swatched theme cards + "Match system" toggle.
  *
  * Selecting a theme:
  *   1. Sets document.documentElement.dataset.theme immediately (live, no reload).

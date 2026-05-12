@@ -9,7 +9,7 @@
  *   - Focus trap + restore on close
  *   - Deep-link support: open to a specific section via initialSection prop
  */
-import { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { X, Search, BookOpen, ChevronRight } from 'lucide-react';
 import { HelpModeToggle } from './HelpPopover';
 import {
@@ -87,6 +87,21 @@ function SectionView({ section }: { section: ManualSection }) {
 
 // ── Search results ────────────────────────────────────────────────────────────
 
+/** Highlight words from `query` found in `text`. Returns an array of spans. */
+function highlightTitle(text: string, query: string): React.ReactNode {
+  const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return text;
+
+  // Build a regex that matches any of the query words (case-insensitive)
+  const pattern = new RegExp(`(${words.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi');
+  const parts = text.split(pattern);
+  return parts.map((part, i) =>
+    pattern.test(part)
+      ? <mark key={i} className="bg-sage-100 text-sage-700 rounded px-0.5 not-italic">{part}</mark>
+      : part,
+  );
+}
+
 function SearchResults({
   query,
   onSelect,
@@ -118,7 +133,9 @@ function SearchResults({
           className="w-full text-left px-3 py-2.5 rounded-card hover:bg-paper-warm border border-transparent
                      hover:border-ink-100 transition-colors"
         >
-          <div className="text-sm font-medium text-ink-700">{section.title}</div>
+          <div className="text-sm font-medium text-ink-700">
+            {highlightTitle(section.title, query)}
+          </div>
           <div className="text-xs text-ink-500 mt-0.5 line-clamp-2">
             {section.keywords.slice(0, 4).join(' · ')}
           </div>
@@ -223,10 +240,10 @@ export default function ManualModal({ onClose, initialSection }: ManualModalProp
             />
           </div>
 
-          {/* Help mode toggle + keyboard hint */}
-          <div className="hidden sm:flex items-center gap-3 ml-auto mr-2">
+          {/* Help mode toggle (always visible) + keyboard hint (sm+) */}
+          <div className="flex items-center gap-3 ml-auto mr-2">
             <HelpModeToggle />
-            <span className="text-xs text-ink-300 font-mono">Esc to close</span>
+            <span className="hidden sm:inline text-xs text-ink-300 font-mono">Esc to close</span>
           </div>
 
           <button
