@@ -1,16 +1,25 @@
 /** App shell — sticky header with search, nav, and CTA. Hosts modals and global keyboard shortcuts. */
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
-import { Search, Compass, Trash2, X, Settings } from 'lucide-react';
+import { Search, Compass, Trash2, X, Settings, BookOpen } from 'lucide-react';
 import QuickCapture from './QuickCapture';
 import ConnectionStatus from './ConnectionStatus';
 import DataMigrationDialog from './DataMigrationDialog';
 import BackupStatus from './BackupStatus';
+import ManualModal from '@/help/ManualModal';
+import { HelpProvider } from '@/help/HelpContext';
 import { useFilterStore } from '@/stores/filters';
 
 export default function Layout() {
   const [isCaptureOpen, setIsCaptureOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualSection, setManualSection] = useState<string | undefined>();
+
+  const openManual = (sectionId?: string) => {
+    setManualSection(sectionId);
+    setManualOpen(true);
+  };
   const mobileSearchRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
@@ -35,6 +44,7 @@ export default function Layout() {
 
       // Esc — close any open modal or mobile search
       if (e.key === 'Escape') {
+        if (manualOpen) { setManualOpen(false); return; }
         if (isCaptureOpen) { setIsCaptureOpen(false); return; }
         if (mobileSearchOpen) { setMobileSearchOpen(false); return; }
         // Blur focused search input on Esc
@@ -61,12 +71,20 @@ export default function Layout() {
         setIsCaptureOpen(true);
         return;
       }
+
+      // "?" — open manual
+      if (e.key === '?') {
+        e.preventDefault();
+        setManualOpen(true);
+        return;
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [isCaptureOpen, mobileSearchOpen]);
+  }, [isCaptureOpen, mobileSearchOpen, manualOpen]);
 
   return (
+    <HelpProvider onOpenManual={openManual}>
     <div className="min-h-screen bg-paper text-ink-800 font-sans antialiased">
       {/* ── Top bar ──────────────────────────────────────── */}
       <header className="sticky top-0 z-30 bg-paper/85 backdrop-blur-lg border-b border-ink-100 px-4 sm:px-6 h-14 flex items-center justify-between">
@@ -152,6 +170,16 @@ export default function Layout() {
             <Trash2 className="w-[18px] h-[18px]" />
           </Link>
 
+          {/* Manual / Help */}
+          <button
+            onClick={() => setManualOpen(true)}
+            title="Manual (press ?)"
+            aria-label="Open manual"
+            className="p-2 rounded-card transition-all duration-200 text-ink-400 hover:text-ink-600 hover:bg-ink-50"
+          >
+            <BookOpen className="w-[18px] h-[18px]" />
+          </button>
+
           {/* Settings gear */}
           <Link
             to="/settings"
@@ -229,6 +257,15 @@ export default function Layout() {
       )}
 
       <DataMigrationDialog />
+
+      {/* Manual modal */}
+      {manualOpen && (
+        <ManualModal
+          onClose={() => { setManualOpen(false); setManualSection(undefined); }}
+          initialSection={manualSection}
+        />
+      )}
     </div>
+    </HelpProvider>
   );
 }

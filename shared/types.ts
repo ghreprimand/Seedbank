@@ -261,7 +261,10 @@ export interface AiPublicConfig {
   hasAnthropicKey: boolean;
 }
 
-export type ThemeName = 'paper' | 'parchment' | 'meadow' | 'dusk' | 'loam' | 'moss';
+export type ThemeName =
+  | 'paper' | 'parchment' | 'meadow' | 'dusk'   // light themes
+  | 'hearth' | 'rainwash'                         // mid-depth themes
+  | 'loam' | 'moss' | 'peat' | 'canopy';          // dark themes
 
 export interface UiThemeConfig {
   name: ThemeName;

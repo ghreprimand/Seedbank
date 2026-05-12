@@ -140,6 +140,74 @@ const THEMES: ThemeMeta[] = [
       amber800:  '#ecce98',
     },
   },
+  {
+    id: 'hearth',
+    label: 'Hearth',
+    description: 'Mid-depth warm clay/adobe. Golden ochre accents.',
+    dark: true,
+    preview: {
+      paper:     '#5c4838',
+      paperWarm: '#503e2c',
+      ink800:    '#f4ece0',
+      ink400:    '#b89e86',
+      sage500:   '#c09870',
+      sage50:    '#301e0e',
+      clay500:   '#c88460',
+      amber100:  '#382210',
+      amber800:  '#eccc9c',
+    },
+  },
+  {
+    id: 'rainwash',
+    label: 'Rainwash',
+    description: 'Mid-depth cool sage/stone. After-rain palette.',
+    dark: true,
+    preview: {
+      paper:     '#485a52',
+      paperWarm: '#3e5048',
+      ink800:    '#e8f2ec',
+      ink400:    '#a0b4ac',
+      sage500:   '#7eb4a8',
+      sage50:    '#243630',
+      clay500:   '#c49080',
+      amber100:  '#342e16',
+      amber800:  '#e0da98',
+    },
+  },
+  {
+    id: 'peat',
+    label: 'Peat',
+    description: 'Full dark. Black-soil umber, muted lichen action.',
+    dark: true,
+    preview: {
+      paper:     '#1a1510',
+      paperWarm: '#221c14',
+      ink800:    '#f0e8de',
+      ink400:    '#a8967e',
+      sage500:   '#90a064',
+      sage50:    '#1c2014',
+      clay500:   '#c88a62',
+      amber100:  '#302610',
+      amber800:  '#e8cc98',
+    },
+  },
+  {
+    id: 'canopy',
+    label: 'Canopy',
+    description: 'Full dark. Forest understory, bark/copper accents.',
+    dark: true,
+    preview: {
+      paper:     '#111610',
+      paperWarm: '#181e14',
+      ink800:    '#e0eadc',
+      ink400:    '#8a9e80',
+      sage500:   '#72a058',
+      sage50:    '#142010',
+      clay500:   '#b07850',
+      amber100:  '#2c2610',
+      amber800:  '#dcc898',
+    },
+  },
 ];
 
 // ── Sub-component: ThemeCard ──────────────────────────────────────────────────
@@ -307,7 +375,7 @@ export default function ThemeTab() {
             <div>
               <div className="text-sm font-medium text-ink-800">Match system</div>
               <div className="text-xs text-ink-400 mt-0.5">
-                Auto-select Paper (light) or Loam (dark) based on your OS preference.
+                Auto-select Paper (light) or Loam (dark) based on your OS preference. Pick any theme manually to override.
               </div>
             </div>
             <button

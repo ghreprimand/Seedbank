@@ -12,7 +12,9 @@ import type { ThemeName } from '@/lib/types';
 export const THEME_STORAGE_KEY = 'seedbank.ui.theme';
 
 export const VALID_THEME_NAMES: readonly ThemeName[] = [
-  'paper', 'parchment', 'meadow', 'dusk', 'loam', 'moss',
+  'paper', 'parchment', 'meadow', 'dusk',
+  'hearth', 'rainwash',
+  'loam', 'moss', 'peat', 'canopy',
 ];
 
 export interface ThemePrefs {
