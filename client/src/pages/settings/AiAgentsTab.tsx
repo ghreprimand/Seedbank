@@ -202,7 +202,7 @@ function ProviderProbe({
           >
             <option value="" disabled>Choose discovered model</option>
             {models.slice(0, 80).map((model) => (
-              <option key={model.id} value={model.id}>{model.name ?? model.id}</option>
+              <option key={model.id} value={model.id}>{model.displayName ?? model.name ?? model.id}</option>
             ))}
           </select>
         )}
@@ -1620,7 +1620,7 @@ function FeatureRoutingSection({ ai, onSave }: FeatureRoutingSectionProps) {
                   })}
                 </select>
                 <span className="mt-1 block text-[11px] text-ink-400">
-                  Claude account and Codex account routing will unlock after account login/runtime support lands.
+                  Codex account routing will unlock after account login/runtime support lands.
                 </span>
               </label>
               <label className="block text-xs text-ink-500">
@@ -1663,6 +1663,7 @@ function ClaudeAccountDetail({
   const [manualUrl, setManualUrl] = useState('');
   const [logoutLoading, setLogoutLoading] = useState(false);
   const [error, setError] = useState('');
+  const refreshSettings = useSettingsStore((s) => s.refresh);
 
   const handleLogin = async () => {
     setLoginLoading(true);
@@ -1672,6 +1673,21 @@ function ClaudeAccountDetail({
       setLoginResult(result);
       // Open the authorization URL in a new tab
       window.open(result.authorizationUrl, '_blank', 'noopener');
+      // Poll for automatic callback completion (server updates cache on success)
+      if (!result.manualFallback) {
+        const pollInterval = setInterval(async () => {
+          try {
+            const status = await getClaudeAccountStatus();
+            if (status.authenticated) {
+              clearInterval(pollInterval);
+              setLoginResult(null);
+              await refreshSettings();
+            }
+          } catch { /* keep polling */ }
+        }, 2000);
+        // Stop polling after 5 minutes
+        setTimeout(() => clearInterval(pollInterval), 5 * 60 * 1000);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -1686,8 +1702,7 @@ function ClaudeAccountDetail({
       await completeClaudeAccountLogin(manualUrl.trim());
       setLoginResult(null);
       setManualUrl('');
-      // Trigger a config refresh by re-saving model
-      await onSave(localModel);
+      await refreshSettings();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -1699,6 +1714,7 @@ function ClaudeAccountDetail({
     try {
       await logoutClaudeAccount();
       setLoginResult(null);
+      await refreshSettings();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
