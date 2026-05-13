@@ -172,11 +172,13 @@ export function HelpButton({
         aria-expanded={open}
         aria-controls={`help-pop-${uid}`}
         onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
-        className={`rounded-full p-0.5 transition-colors focus-visible:outline-none
+        className={`rounded-full p-0.5 transition-all focus-visible:outline-none
                     focus-visible:ring-2 focus-visible:ring-sage-400
                     ${open
-                      ? 'text-sage-600 bg-sage-50'
-                      : 'text-ink-300 hover:text-sage-500 hover:bg-sage-50'
+                      ? 'text-sage-600 bg-sage-50 ring-2 ring-sage-300'
+                      : helpMode
+                        ? 'text-sage-500 bg-sage-50 ring-2 ring-sage-300 shadow-sm hover:ring-sage-400 hover:text-sage-600'
+                        : 'text-ink-300 hover:text-sage-500 hover:bg-sage-50'
                     }`}
         id={`help-btn-${helpId}-${uid}`}
       >
