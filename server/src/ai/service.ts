@@ -141,6 +141,17 @@ const AI_FEATURE_IDS: AiFeatureId[] = [
   'default',
 ];
 
+const FEATURE_ROUTABLE_PROVIDERS: ReadonlySet<AiProviderId> = new Set([
+  'openai',
+  'anthropic',
+  'ollama',
+  'openai-compatible',
+]);
+
+function isFeatureRoutableProvider(provider: AiProviderId): boolean {
+  return FEATURE_ROUTABLE_PROVIDERS.has(provider);
+}
+
 function defaultFeatureRoutes(): Record<AiFeatureId, AiFeatureRoute> {
   return {
     'thinking-partner': { provider: 'default' },
@@ -153,7 +164,10 @@ function defaultFeatureRoutes(): Record<AiFeatureId, AiFeatureRoute> {
 
 function sanitizeFeatureRoute(value: unknown): AiFeatureRoute | undefined {
   const route = value as { provider?: unknown; model?: unknown } | undefined;
-  if (!route || (route.provider !== 'default' && !isProvider(route.provider))) return undefined;
+  if (!route) return undefined;
+  if (route.provider === 'default') return { provider: 'default' };
+  if (!isProvider(route.provider)) return undefined;
+  if (!isFeatureRoutableProvider(route.provider)) return { provider: 'default' };
   return {
     provider: route.provider,
     ...(typeof route.model === 'string' && route.model.trim() ? { model: route.model.trim() } : {}),
@@ -162,7 +176,12 @@ function sanitizeFeatureRoute(value: unknown): AiFeatureRoute | undefined {
 
 function sanitizeFeatureRoutes(input: unknown, current?: Record<AiFeatureId, AiFeatureRoute>): Record<AiFeatureId, AiFeatureRoute> {
   const source = input as Partial<Record<AiFeatureId, AiFeatureRoute>> | undefined;
-  const next = { ...defaultFeatureRoutes(), ...(current ?? {}) };
+  const next = defaultFeatureRoutes();
+  const currentRoutes: Partial<Record<AiFeatureId, AiFeatureRoute>> = current ?? {};
+  for (const feature of AI_FEATURE_IDS) {
+    const route = sanitizeFeatureRoute(currentRoutes[feature]);
+    if (route) next[feature] = route;
+  }
   if (!source || typeof source !== 'object') return next;
   for (const feature of AI_FEATURE_IDS) {
     const route = sanitizeFeatureRoute(source[feature]);
