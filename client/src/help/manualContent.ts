@@ -648,7 +648,7 @@ export const MANUAL_GROUPS: ManualGroup[] = [
     label: 'API & Automation',
     sections: [
       {
-        id: 'integrations-overview',
+        id: 'api-automation-overview',
         title: 'API & Automation Overview',
         indexLabel: 'Overview',
         keywords: ['api', 'automation', 'external', 'rest', 'webhook', 'mcp', 'openapi', 'token', 'agent'],
@@ -668,7 +668,7 @@ export const MANUAL_GROUPS: ManualGroup[] = [
         ],
       },
       {
-        id: 'integrations-rest',
+        id: 'api-automation-rest',
         title: 'REST API & OpenAPI',
         indexLabel: 'REST API',
         keywords: ['rest', 'api', 'openapi', 'endpoint', 'curl', 'http', 'json', 'bearer', 'token', 'auth'],
@@ -693,7 +693,7 @@ export const MANUAL_GROUPS: ManualGroup[] = [
         ],
       },
       {
-        id: 'integrations-webhooks',
+        id: 'api-automation-webhooks',
         title: 'Outbound Webhooks',
         indexLabel: 'Webhooks',
         keywords: ['webhook', 'outbound', 'http', 'post', 'event', 'automation', 'zapier', 'n8n', 'idea.created', 'idea.graduated', 'idea.shipped'],
@@ -711,7 +711,7 @@ export const MANUAL_GROUPS: ManualGroup[] = [
         ],
       },
       {
-        id: 'integrations-mcp',
+        id: 'api-automation-mcp',
         title: 'MCP Context Endpoints',
         indexLabel: 'MCP',
         keywords: ['mcp', 'model context protocol', 'claude', 'codex', 'llm', 'context', 'search', 'read-only', 'bearer', 'token'],
