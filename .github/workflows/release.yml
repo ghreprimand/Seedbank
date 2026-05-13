@@ -168,7 +168,3 @@ jobs:
             .release/publish/seedbank-${{ needs.prepare.outputs.release_tag }}-macos.tar.gz
             .release/publish/seedbank-${{ needs.prepare.outputs.release_tag }}-windows-x64.zip
             .release/publish/manifest-${{ needs.prepare.outputs.release_tag }}.json
-
-  # Future phase: add a dedicated self-hosted macOS signing/notarization job, e.g.
-  # runs-on: [self-hosted, macOS, ARM64, seedbank-release]
-  # Keep Apple credentials limited to that signing runner only.
