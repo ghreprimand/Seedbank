@@ -35,6 +35,8 @@ import type {
   BackupFrequency,
   BackupRunRecord,
   BackupStatus,
+  CategoryDefinition,
+  CategorySettings,
   AiFieldAssistMessage,
   AiFieldAssistChatRequest,
   AiFieldSuggestionRequest,
@@ -49,6 +51,7 @@ import type {
   UiThemeConfig,
   WebhooksConfig,
 } from '../../shared/types.js';
+import { DEFAULT_CATEGORY_DEFINITIONS } from '../../shared/types.js';
 
 const PORT = Number(process.env.PORT ?? 4800);
 const app = express();
@@ -84,6 +87,7 @@ const SETTINGS_KEYS = {
   backupConfig: 'backup.config',
   apiWebhooks: 'api.webhooks',
   agentsConfig: 'agents.config',
+  categoryConfig: 'categories.config',
 } as const;
 
 const DEFAULT_THEME_CONFIG: UiThemeConfig = {
@@ -124,6 +128,11 @@ function migrateServerThemeName(name: string | undefined): ThemeName {
 const DEFAULT_AGENTS_CONFIG: AgentStoredConfig = {
   claudeLinked: false,
   codexLinked: false,
+};
+
+const DEFAULT_CATEGORY_CONFIG: CategorySettings = {
+  schemaVersion: 1,
+  items: DEFAULT_CATEGORY_DEFINITIONS,
 };
 
 function readServerVersion(): string {
@@ -718,6 +727,52 @@ function agentsPublicConfig(): AgentsPublicConfig {
   };
 }
 
+function normalizeCategoryDefinition(input: unknown, index: number): CategoryDefinition | null {
+  if (!input || typeof input !== 'object') return null;
+  const row = input as Record<string, unknown>;
+  const id = typeof row.id === 'string' ? row.id.trim() : '';
+  if (!id) return null;
+
+  const builtIn = DEFAULT_CATEGORY_DEFINITIONS.find((category) => category.id === id);
+  const label = typeof row.label === 'string' && row.label.trim()
+    ? row.label.trim()
+    : builtIn?.label ?? id;
+  const sortOrder = typeof row.sortOrder === 'number' && Number.isFinite(row.sortOrder)
+    ? Math.floor(row.sortOrder)
+    : builtIn?.sortOrder ?? DEFAULT_CATEGORY_DEFINITIONS.length + index;
+  const normalized: CategoryDefinition = {
+    id,
+    label,
+    sortOrder,
+    builtIn: builtIn ? true : row.builtIn === true,
+    archived: row.archived === true,
+  };
+  if (typeof row.color === 'string' && row.color.trim()) normalized.color = row.color.trim();
+  if (typeof row.icon === 'string' && row.icon.trim()) normalized.icon = row.icon.trim();
+  return normalized;
+}
+
+function categoryConfig(input?: Partial<CategorySettings>): CategorySettings {
+  const stored = input ?? repository.getSetting<Partial<CategorySettings>>(SETTINGS_KEYS.categoryConfig) ?? {};
+  const definitions = new Map<string, CategoryDefinition>();
+
+  for (const category of DEFAULT_CATEGORY_CONFIG.items) {
+    definitions.set(category.id, { ...category });
+  }
+
+  if (Array.isArray(stored.items)) {
+    stored.items.forEach((item, index) => {
+      const normalized = normalizeCategoryDefinition(item, index);
+      if (normalized) definitions.set(normalized.id, normalized);
+    });
+  }
+
+  return {
+    schemaVersion: 1,
+    items: [...definitions.values()].sort((a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label)),
+  };
+}
+
 function serverInfo(): ServerInfo {
   return {
     port: PORT,
@@ -730,6 +785,7 @@ function serverInfo(): ServerInfo {
 function aggregateSettings(): AggregateSettings {
   return {
     ui: { theme: uiThemeConfig() },
+    categories: categoryConfig(),
     ai: aiService.getPublicConfig(),
     api: {
       tokens: publicTokens(),
@@ -766,6 +822,12 @@ function migrateLegacySettings(): void {
       ...storedTheme,
       name: LEGACY_THEME_MIGRATIONS[storedTheme.name]!,
     });
+  }
+
+  const storedCategories = repository.getSetting<Partial<CategorySettings>>(SETTINGS_KEYS.categoryConfig);
+  const normalizedCategories = categoryConfig(storedCategories);
+  if (storedCategories === undefined || JSON.stringify(storedCategories) !== JSON.stringify(normalizedCategories)) {
+    repository.setSetting(SETTINGS_KEYS.categoryConfig, normalizedCategories);
   }
 }
 
@@ -1212,6 +1274,15 @@ app.patch('/api/settings/:section', requireScope('write:ideas'), asyncRoute((req
     const next = mergeBackupConfig(current, body?.config);
     repository.setSetting(SETTINGS_KEYS.backupConfig, next);
     clearRcloneProbeCache();
+    res.json(aggregateSettings());
+    return;
+  }
+
+  if (section === 'categories') {
+    const body = req.body as { config?: Partial<CategorySettings>; items?: CategoryDefinition[] };
+    const requested = body?.config ?? (Array.isArray(body?.items) ? { items: body.items } : {});
+    const next = categoryConfig(requested);
+    repository.setSetting(SETTINGS_KEYS.categoryConfig, next);
     res.json(aggregateSettings());
     return;
   }

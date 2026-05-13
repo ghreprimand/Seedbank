@@ -14,7 +14,7 @@
  * subsequent server call) failed. Tabs should show a sage-toned hint.
  */
 import { create } from 'zustand';
-import type { AggregateSettings, ThemeName } from '@/lib/types';
+import { DEFAULT_CATEGORY_DEFINITIONS, type AggregateSettings, type ThemeName } from '@/lib/types';
 import {
   getAggregateSettings,
   patchSettings,
@@ -34,6 +34,10 @@ import {
 const DEFAULT_SETTINGS: AggregateSettings = {
   ui: {
     theme: { name: 'paper', matchSystem: false },
+  },
+  categories: {
+    schemaVersion: 1,
+    items: DEFAULT_CATEGORY_DEFINITIONS,
   },
   ai: {
     provider: 'openai',

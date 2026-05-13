@@ -7,7 +7,7 @@ import type {
   IdeaVersion,
   Stage,
 } from '../../shared/types.js';
-import { CATEGORIES, STAGES } from '../../shared/types.js';
+import { STAGES } from '../../shared/types.js';
 
 type DateInput = Date | string | null | undefined;
 
@@ -21,8 +21,10 @@ export type VersionInput = Partial<Omit<IdeaVersion, 'timestamp'>> & {
   timestamp?: DateInput;
 };
 
-function isCategory(value: unknown): value is Category {
-  return typeof value === 'string' && CATEGORIES.includes(value as Category);
+export function normalizeCategoryId(value: unknown): Category | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
 }
 
 function isStage(value: unknown): value is Stage {
@@ -64,7 +66,7 @@ export function newIdea(partial: IdeaInput = {}): Idea {
     id: typeof partial.id === 'string' && partial.id ? partial.id : uuid(),
     title: stringFrom(partial.title),
     pitch: stringFrom(partial.pitch),
-    category: isCategory(partial.category) ? partial.category : 'app',
+    category: normalizeCategoryId(partial.category) ?? 'app',
     stage: isStage(partial.stage) ? partial.stage : 'seed',
     tags: arrayFrom<string>(partial.tags),
     moodLabels: arrayFrom<string>(partial.moodLabels),

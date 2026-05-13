@@ -860,7 +860,7 @@ export async function getAggregateSettings(): Promise<AggregateSettings> {
   return request<AggregateSettings>('/api/settings');
 }
 
-export type SettingsSection = 'ui' | 'ai' | 'api' | 'agents' | 'backups';
+export type SettingsSection = 'ui' | 'ai' | 'api' | 'agents' | 'backups' | 'categories';
 
 export async function patchSettings(
   section: SettingsSection,

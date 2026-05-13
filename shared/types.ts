@@ -19,10 +19,11 @@ export const CATEGORIES = [
   'open-source-utility',
 ] as const;
 
-export type Category = (typeof CATEGORIES)[number];
+export type BuiltInCategory = (typeof CATEGORIES)[number];
+export type Category = string;
 
 /** Human-readable labels for categories */
-export const CATEGORY_LABELS: Record<Category, string> = {
+export const CATEGORY_LABELS: Record<string, string> = {
   'game': 'Game',
   'app': 'App',
   'tool': 'Tool',
@@ -32,6 +33,28 @@ export const CATEGORY_LABELS: Record<Category, string> = {
   'browser': 'Browser',
   'open-source-utility': 'Open-Source Utility',
 };
+
+export interface CategoryDefinition {
+  id: Category;
+  label: string;
+  color?: string;
+  icon?: string;
+  archived?: boolean;
+  sortOrder: number;
+  builtIn?: boolean;
+}
+
+export interface CategorySettings {
+  schemaVersion: 1;
+  items: CategoryDefinition[];
+}
+
+export const DEFAULT_CATEGORY_DEFINITIONS: CategoryDefinition[] = CATEGORIES.map((id, index) => ({
+  id,
+  label: CATEGORY_LABELS[id],
+  sortOrder: index,
+  builtIn: true,
+}));
 
 /**
  * Idea stages — gardening-themed lifecycle.
@@ -730,6 +753,7 @@ export interface AggregateSettings {
   ui: {
     theme: UiThemeConfig;
   };
+  categories: CategorySettings;
   ai: AiPublicConfig;
   api: {
     tokens: PublicToken[];
