@@ -395,7 +395,7 @@ export const AI_PROVIDER_DISPLAY: Record<AiProviderId, Pick<AiProviderDescriptor
     dataResidency: 'local',
   },
   'openai-compatible': {
-    label: 'OpenRouter / custom endpoint',
+    label: 'Custom / OpenAI-compatible endpoint',
     shortLabel: 'Custom endpoint',
     family: 'custom-endpoint',
     authMode: 'api-key',
