@@ -226,12 +226,39 @@ export interface GraduationReadiness {
   score: number;
 }
 
+/** Describes a single field in an integration's configuration form. */
+export type ConfigFieldType = 'path' | 'url' | 'port' | 'text' | 'secret' | 'boolean';
+
+export interface ConfigFieldDescriptor {
+  /** Matches a key in the configure() config object. */
+  key: string;
+  label: string;
+  type: ConfigFieldType;
+  placeholder?: string;
+  helpText?: string;
+  required?: boolean;
+}
+
+export type IntegrationHealthStatus = 'ok' | 'degraded' | 'unreachable' | 'unconfigured';
+
+export interface IntegrationHealthResult {
+  status: IntegrationHealthStatus;
+  message?: string;
+  latencyMs?: number;
+}
+
 export interface IntegrationSummary {
   id: string;
   name: string;
   description: string;
   icon: string;
   configured: boolean;
+  /** Schema driving the dynamic config form in the UI. */
+  configSchema: ConfigFieldDescriptor[];
+  /** Current non-secret config values for pre-populating the form. */
+  configValues: Record<string, string>;
+  /** Manual section to deep-link help buttons to. */
+  helpSectionId?: string;
 }
 
 export interface GraduationResult {
@@ -248,7 +275,165 @@ export interface GraduationResult {
 
 // ── AI assistance types ────────────────────────────────────────────
 
-export type AiProviderId = 'openai' | 'anthropic' | 'ollama';
+export type AiProviderId = 'openai' | 'anthropic' | 'ollama' | 'openai-compatible';
+
+export type AiOpenAICompatiblePresetId =
+  | 'openrouter'
+  | 'groq'
+  | 'mistral'
+  | 'together'
+  | 'fireworks'
+  | 'lm-studio'
+  | 'vllm'
+  | 'llama-cpp'
+  | 'localai'
+  | 'custom';
+
+export type AiProviderCapability =
+  | 'chat'
+  | 'streaming'
+  | 'model-discovery'
+  | 'local'
+  | 'api-key';
+
+export type AiProviderErrorCode =
+  | 'not_configured'
+  | 'bad_url'
+  | 'unreachable'
+  | 'model_missing'
+  | 'http_error'
+  | 'parse_error'
+  | 'unknown';
+
+export interface AiProviderDescriptor {
+  id: AiProviderId;
+  label: string;
+  transport: 'openai-responses' | 'anthropic-messages' | 'ollama-chat' | 'openai-chat-completions';
+  defaultModel: string;
+  capabilities: AiProviderCapability[];
+  requiresApiKey: boolean;
+  local: boolean;
+  modelDiscovery: boolean;
+  baseUrl?: string;
+  presetId?: AiOpenAICompatiblePresetId;
+}
+
+export interface AiProviderHealth {
+  provider: AiProviderId;
+  ok: boolean;
+  code: 'ok' | AiProviderErrorCode;
+  message: string;
+  status?: number;
+  model?: string;
+  normalizedBaseUrl?: string;
+}
+
+export interface AiModelInfo {
+  id: string;
+  name?: string;
+}
+
+export interface AiModelListResult {
+  provider: AiProviderId;
+  ok: boolean;
+  models: AiModelInfo[];
+  code?: AiProviderErrorCode;
+  message?: string;
+  normalizedBaseUrl?: string;
+}
+
+export type AiFeatureId =
+  | 'thinking-partner'
+  | 'field-suggestions'
+  | 'health-check'
+  | 'discover-insights'
+  | 'default';
+
+export interface AiFeatureRoute {
+  provider: AiProviderId | 'default';
+  model?: string;
+}
+
+export interface AiEffectiveFeatureRoute {
+  provider: AiProviderId;
+  model: string;
+  inherited: boolean;
+}
+
+export type AiBudgetScope = 'global' | 'feature' | 'provider' | 'model';
+
+export interface AiBudgetState {
+  scope: AiBudgetScope;
+  id: string;
+  limit: number;
+  used: number;
+  remaining: number | null;
+  window: 'day';
+  enabled: boolean;
+}
+
+export interface AiGuardrailsConfig {
+  featureEnabled: Partial<Record<AiFeatureId, boolean>>;
+  providerEnabled: Partial<Record<AiProviderId, boolean>>;
+  allowedModels: string[];
+  featureDailyTokenBudgets: Partial<Record<AiFeatureId, number>>;
+  providerDailyTokenBudgets: Partial<Record<AiProviderId, number>>;
+  modelDailyTokenBudgets: Record<string, number>;
+  warnOnRemoteProvider: boolean;
+  requireConfirmationForRemoteProvider: boolean;
+}
+
+export interface AiPreflightRequest {
+  feature: AiFeatureId;
+}
+
+export interface AiPreflightResult {
+  feature: AiFeatureId;
+  provider: AiProviderId;
+  model: string;
+  local: boolean;
+  contentLeavesMachine: boolean;
+  allowed: boolean;
+  requiresConfirmation: boolean;
+  warnings: string[];
+  blockers: string[];
+  budgets: AiBudgetState[];
+  confirmationToken?: string;
+}
+
+export interface AiUsageBucket {
+  key: string;
+  feature?: string;
+  provider?: string;
+  model?: string;
+  count: number;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  lastUsedAt: string | null;
+}
+
+export interface AiAuditEvent {
+  id: string;
+  type: 'guardrail_denied' | 'provider_error';
+  feature: string;
+  provider: string;
+  model: string;
+  message: string;
+  createdAt: string;
+}
+
+export interface AiUsageDetail {
+  windows: {
+    last24h: number;
+    last7d: number;
+  };
+  byRoute24h: AiUsageBucket[];
+  byFeature: AiUsageBucket[];
+  byProvider: AiUsageBucket[];
+  byModel: AiUsageBucket[];
+  recentAuditEvents: AiAuditEvent[];
+}
 
 export interface AiPublicConfig {
   provider: AiProviderId;
@@ -256,9 +441,16 @@ export interface AiPublicConfig {
   anthropicModel: string;
   ollamaModel: string;
   ollamaBaseUrl: string;
+  openaiCompatiblePreset: AiOpenAICompatiblePresetId;
+  openaiCompatibleModel: string;
+  openaiCompatibleBaseUrl: string;
   dailyTokenBudget: number;
+  featureRoutes: Record<AiFeatureId, AiFeatureRoute>;
+  effectiveFeatureRoutes: Record<AiFeatureId, AiEffectiveFeatureRoute>;
+  guardrails: AiGuardrailsConfig;
   hasOpenAIKey: boolean;
   hasAnthropicKey: boolean;
+  hasOpenAICompatibleKey: boolean;
 }
 
 export type ThemeName =
@@ -335,9 +527,54 @@ export interface ServerInfo {
 
 export type BackupFrequency = 'off' | 'daily' | 'weekly';
 
+export type BackupDestinationType = 'local-path' | 'rclone-remote';
+
+interface BackupDestinationBase {
+  id: string;
+  type: BackupDestinationType;
+  label: string;
+  enabled: boolean;
+  includeDatabase: boolean;
+  includeJsonExport: boolean;
+}
+
+export interface LocalPathBackupDestination extends BackupDestinationBase {
+  type: 'local-path';
+  localPath: string;
+}
+
+export interface RcloneBackupDestination extends BackupDestinationBase {
+  type: 'rclone-remote';
+  remotePath: string;
+}
+
+export type BackupDestinationConfig =
+  | LocalPathBackupDestination
+  | RcloneBackupDestination;
+
 export interface BackupConfig {
   frequency: BackupFrequency;
   exportJson: boolean;
+  retentionCount: number;
+  destinations: BackupDestinationConfig[];
+}
+
+export interface BackupArtifactResult {
+  type: 'database' | 'json-export';
+  attempted: boolean;
+  ok: boolean;
+  path: string | null;
+  error?: string;
+}
+
+export interface BackupDestinationResult {
+  destinationId: string;
+  label: string;
+  type: BackupDestinationType;
+  attempted: boolean;
+  ok: boolean;
+  copiedPaths: string[];
+  error?: string;
 }
 
 export interface BackupRunRecord {
@@ -345,6 +582,8 @@ export interface BackupRunRecord {
   backupPath: string | null;
   exportPath: string | null;
   reason: string;
+  artifacts?: BackupArtifactResult[];
+  destinations?: BackupDestinationResult[];
 }
 
 export interface FileTimestampInfo {
@@ -357,6 +596,11 @@ export interface BackupStatus {
   lastRun: BackupRunRecord | null;
   latestDatabaseBackup: FileTimestampInfo | null;
   latestJsonExport: FileTimestampInfo | null;
+  rclone: {
+    available: boolean;
+    version?: string;
+    error?: string;
+  };
   paths: {
     backupsDir: string;
     exportsDir: string;
@@ -384,9 +628,15 @@ export interface AiConfigInput {
   anthropicModel?: string;
   ollamaModel?: string;
   ollamaBaseUrl?: string;
+  openaiCompatiblePreset?: AiOpenAICompatiblePresetId;
+  openaiCompatibleModel?: string;
+  openaiCompatibleBaseUrl?: string;
+  featureRoutes?: Partial<Record<AiFeatureId, AiFeatureRoute>>;
+  guardrails?: Partial<AiGuardrailsConfig>;
   dailyTokenBudget?: number;
   openaiApiKey?: string;
   anthropicApiKey?: string;
+  openaiCompatibleApiKey?: string;
 }
 
 export interface AiChatMessage {
@@ -395,6 +645,8 @@ export interface AiChatMessage {
   role: 'user' | 'assistant';
   content: string;
   createdAt: Date;
+  provider?: string;
+  model?: string;
 }
 
 export type AiSuggestionField = 'pitch' | 'risks' | 'techStack' | 'hook' | 'whyItMightWork';
@@ -403,4 +655,27 @@ export interface AiSuggestion {
   field: AiSuggestionField;
   suggestion: string;
   rationale: string;
+}
+
+export interface AiFieldSuggestionRequest {
+  ideaId: string;
+  field: AiSuggestionField;
+  currentValue: string;
+  prompt?: string;
+  omitCurrentValue?: boolean;
+  aiConfirmationToken?: string;
+}
+
+export interface AiFieldAssistMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface AiFieldAssistChatRequest {
+  ideaId: string;
+  field: AiSuggestionField;
+  currentValue?: string;
+  message: string;
+  history?: AiFieldAssistMessage[];
+  aiConfirmationToken?: string;
 }
