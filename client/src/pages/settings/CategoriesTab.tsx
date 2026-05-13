@@ -101,8 +101,9 @@ function AddCategoryForm({ existingIds, onAdd, onCancel }: AddCategoryFormProps)
   }, []);
 
   const candidateId = slugify(label);
-  const duplicate = candidateId && existingIds.has(candidateId);
-  const canSave = label.trim().length > 0 && !duplicate;
+  const duplicate = !!candidateId && existingIds.has(candidateId);
+  const emptySlug = label.trim().length > 0 && !candidateId;
+  const canSave = label.trim().length > 0 && !!candidateId && !duplicate;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -137,6 +138,11 @@ function AddCategoryForm({ existingIds, onAdd, onCancel }: AddCategoryFormProps)
           {duplicate && (
             <p className="mt-1 text-[11px] text-amber-600 font-mono">
               ID <code>{candidateId}</code> already exists — choose a different name.
+            </p>
+          )}
+          {emptySlug && (
+            <p className="mt-1 text-[11px] text-amber-600 font-mono">
+              Name must contain at least one letter or number.
             </p>
           )}
           {candidateId && !duplicate && (
