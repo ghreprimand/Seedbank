@@ -1,9 +1,41 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Bot, ChevronDown, Send, Settings, X } from 'lucide-react';
-import type { AiChatMessage, Idea } from '@/lib/types';
-import { getAiConversation, streamAiChat } from '@/api/client';
+import { AlertTriangle, Bot, ChevronDown, ExternalLink, Send, Settings, Shield, X } from 'lucide-react';
+import type { AiChatMessage, AiFeatureId, AiPreflightResult, Idea } from '@/lib/types';
+import { getAiConversation, preflightAiRequest, streamAiChat } from '@/api/client';
 import { useAiSettings } from '@/stores/settings';
+
+function isGuardrailError(msg: string): boolean {
+  return msg.startsWith('Guardrails:') ||
+    msg.includes('disabled by guardrails') ||
+    msg.includes('budget') ||
+    msg.includes('rate limit');
+}
+
+/**
+ * Distinct from isGuardrailError — this is a 403 that means the confirmation
+ * token has expired or is missing. The right response is to re-preflight and
+ * re-show the confirmation banner, not send the user to Settings.
+ */
+function isConfirmationRequiredError(msg: string): boolean {
+  return msg.includes('requires preflight confirmation') ||
+    msg.includes('confirmation token') ||
+    msg.includes('confirmationToken');
+}
+
+function GuardrailSettingsLink() {
+  return (
+    <Link
+      to="/settings/ai"
+      className="inline-flex items-center gap-1 text-[11px] font-medium text-sage-700
+                 hover:text-sage-900 underline underline-offset-2"
+    >
+      <Settings className="w-3 h-3" />
+      Settings → AI &amp; Agents → Usage &amp; Guardrails
+      <ExternalLink className="w-2.5 h-2.5" />
+    </Link>
+  );
+}
 
 interface AiThinkingPanelProps {
   idea: Idea;
@@ -46,6 +78,16 @@ export default function AiThinkingPanel({ idea, onApply }: AiThinkingPanelProps)
   const [error, setError] = useState<string | null>(null);
   const localMessageCounter = useRef(0);
 
+  /**
+   * Preflight for Thinking Partner — fired when the panel opens.
+   * Stores the confirmationToken so streamAiChat can include it,
+   * and surfaces a one-time inline banner when requiresConfirmation=true.
+   */
+  const [preflight, setPreflight] = useState<AiPreflightResult | null>(null);
+  const [preflightToken, setPreflightToken] = useState<string | undefined>();
+  const [showConfirmBanner, setShowConfirmBanner] = useState(false);
+  const [pendingMessage, setPendingMessage] = useState<string | null>(null);
+
   // Read provider config from the settings store (A2 — single source of truth).
   const aiConfig = useAiSettings();
 
@@ -64,16 +106,32 @@ export default function AiThinkingPanel({ idea, onApply }: AiThinkingPanelProps)
     return () => { cancelled = true; };
   }, [open, idea.id]);
 
-  const submit = async (override?: string) => {
-    const content = (override ?? input).trim();
-    if (!content || busy) return;
-    setInput('');
+  // Fire preflight when panel opens to get the confirmation token and surface warnings.
+  // The token expires after 10 min; for long sessions the server's 403 will re-prompt.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    preflightAiRequest({ feature: 'thinking-partner' as AiFeatureId })
+      .then((pf) => {
+        if (cancelled) return;
+        setPreflight(pf);
+        setPreflightToken(pf.confirmationToken);
+        // If requiresConfirmation, the banner will ask the user to confirm before first send.
+        if (pf.requiresConfirmation || pf.warnings.length > 0) {
+          setShowConfirmBanner(true);
+        }
+      })
+      .catch(() => { /* preflight unavailable — proceed without gating */ });
+    return () => { cancelled = true; };
+  }, [open, idea.id]);
+
+  const doSubmit = async (content: string, token?: string) => {
     setBusy(true);
     setError(null);
     setStreamingText('');
-    localMessageCounter.current += 1;
+    const msgId = `local-${idea.id}-${++localMessageCounter.current}`;
     const optimistic: AiChatMessage = {
-      id: `local-${idea.id}-${localMessageCounter.current}`,
+      id: msgId,
       ideaId: idea.id,
       role: 'user',
       content,
@@ -81,16 +139,50 @@ export default function AiThinkingPanel({ idea, onApply }: AiThinkingPanelProps)
     };
     setMessages((current) => [...current, optimistic]);
     try {
-      const assistant = await streamAiChat(idea.id, content, (delta) => {
-        setStreamingText((current) => current + delta);
-      });
+      const assistant = await streamAiChat(
+        idea.id,
+        content,
+        (delta) => { setStreamingText((current) => current + delta); },
+        { aiConfirmationToken: token },
+      );
       setMessages((current) => [...current, assistant]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      const msg = err instanceof Error ? err.message : String(err);
+
+      if (isConfirmationRequiredError(msg)) {
+        // Token expired or missing — remove the optimistic message, re-fire
+        // preflight, and re-show the confirmation banner with the message queued.
+        setMessages((current) => current.filter((m) => m.id !== msgId));
+        setPendingMessage(content);
+        // Re-fire preflight to get a fresh token.
+        try {
+          const pf = await preflightAiRequest({ feature: 'thinking-partner' as AiFeatureId });
+          setPreflight(pf);
+          setPreflightToken(pf.confirmationToken);
+        } catch { /* preflight unavailable — show error below */ }
+        setShowConfirmBanner(true);
+      } else {
+        setError(msg);
+      }
     } finally {
       setStreamingText('');
       setBusy(false);
     }
+  };
+
+  const submit = (override?: string) => {
+    const content = (override ?? input).trim();
+    if (!content || busy) return;
+    setInput('');
+
+    // If a confirmation banner is showing and the user hasn't acknowledged it,
+    // hold the message until they click "Got it / Proceed".
+    if (showConfirmBanner && preflight?.requiresConfirmation) {
+      setPendingMessage(content);
+      return;
+    }
+
+    void doSubmit(content, preflightToken);
   };
 
   const applyMessage = (field: keyof Idea, content: string) => {
@@ -126,6 +218,49 @@ export default function AiThinkingPanel({ idea, onApply }: AiThinkingPanelProps)
               <Settings className="w-3 h-3" /> AI settings
             </Link>
           </div>
+
+          {/* Preflight confirmation banner */}
+          {showConfirmBanner && preflight && (
+            <div className="rounded-card border border-amber-200 bg-amber-50 p-3 space-y-2">
+              <div className="flex items-start gap-2">
+                <Shield className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                <div className="flex-1 space-y-1">
+                  {preflight.warnings.map((w, i) => (
+                    <p key={i} className="text-xs text-amber-800 leading-relaxed">{w}</p>
+                  ))}
+                  {preflight.requiresConfirmation && (
+                    <p className="text-xs text-amber-800 leading-relaxed">
+                      Your guardrail settings require confirmation before sending idea content to{' '}
+                      <span className="font-medium">{preflight.provider}</span> ({preflight.model}).
+                    </p>
+                  )}
+                  {preflight.contentLeavesMachine && (
+                    <p className="text-xs text-amber-700">
+                      Idea content will be sent off-device.
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowConfirmBanner(false);
+                    if (pendingMessage) {
+                      const msg = pendingMessage;
+                      setPendingMessage(null);
+                      void doSubmit(msg, preflightToken);
+                    }
+                  }}
+                  className="px-3 py-1.5 text-xs font-semibold bg-amber-600 hover:bg-amber-700
+                             text-white rounded-card transition-colors"
+                >
+                  {preflight.requiresConfirmation ? 'Got it — proceed' : 'Dismiss'}
+                </button>
+                <GuardrailSettingsLink />
+              </div>
+            </div>
+          )}
 
           <div className="space-y-3 max-h-96 overflow-y-auto">
             {messages.length === 0 && !streamingText && (
@@ -176,9 +311,25 @@ export default function AiThinkingPanel({ idea, onApply }: AiThinkingPanelProps)
           </div>
 
           {error && (
-            <div className="flex items-start justify-between gap-2 px-3 py-2 bg-red-50 border border-red-100 rounded-card text-xs text-red-700">
-              <span>{error}</span>
-              <button type="button" onClick={() => setError(null)}><X className="w-3 h-3" /></button>
+            <div className="flex items-start justify-between gap-2 px-3 py-2.5 bg-red-50
+                            border border-red-100 rounded-card text-xs text-red-700">
+              <div className="space-y-1.5 flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  {isGuardrailError(error) && (
+                    <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
+                  )}
+                  <span className="leading-relaxed">{error}</span>
+                </div>
+                {isGuardrailError(error) && (
+                  <div className="pt-1 border-t border-red-100">
+                    <p className="text-red-600 mb-1">To adjust limits or re-enable features:</p>
+                    <GuardrailSettingsLink />
+                  </div>
+                )}
+              </div>
+              <button type="button" onClick={() => setError(null)} className="shrink-0 mt-0.5">
+                <X className="w-3 h-3" />
+              </button>
             </div>
           )}
 

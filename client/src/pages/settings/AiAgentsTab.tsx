@@ -7,22 +7,38 @@
  * A4  Linked-agent cards — Claude Code, Codex CLI
  */
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { HelpButton } from '@/help/HelpPopover';
 import {
+  AlertTriangle,
   Bot,
   Check,
   ChevronDown,
   ChevronRight,
   ExternalLink,
+  Info,
   Loader2,
+  Lock,
   Radio,
   RotateCcw,
+  Shield,
   Terminal,
   Unlink,
   Zap,
 } from 'lucide-react';
-import type { AgentProvider, AiProviderId } from '@/lib/types';
+import type {
+  AgentProvider,
+  AiAuditEvent,
+  AiConfigInput,
+  AiFeatureId,
+  AiFeatureRoute,
+  AiGuardrailsConfig,
+  AiModelInfo,
+  AiOpenAICompatiblePresetId,
+  AiPreflightResult,
+  AiProviderId,
+  AiPublicConfig,
+  AiUsageBucket,
+} from '@/lib/types';
 import {
   useAiSettings,
   useAgentsSettings,
@@ -31,8 +47,13 @@ import {
 } from '@/stores/settings';
 import {
   getAiUsage,
+  getAiUsageDetail,
+  preflightAiRequest,
+  listAiModels,
   linkAgent,
+  testAiProvider,
   unlinkAgent,
+  type AiUsageDetail,
   type AiUsageSummary,
 } from '@/api/client';
 
@@ -44,17 +65,129 @@ function fmtTokens(n: number): string {
   return String(n);
 }
 
+const OPENAI_COMPATIBLE_PRESETS: Array<{
+  id: AiOpenAICompatiblePresetId;
+  label: string;
+  baseUrl: string;
+  model: string;
+  requiresKey: boolean;
+}> = [
+  { id: 'openrouter', label: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', model: 'openai/gpt-4o-mini', requiresKey: true },
+  { id: 'groq', label: 'Groq', baseUrl: 'https://api.groq.com/openai/v1', model: 'llama-3.3-70b-versatile', requiresKey: true },
+  { id: 'mistral', label: 'Mistral', baseUrl: 'https://api.mistral.ai/v1', model: 'mistral-small-latest', requiresKey: true },
+  { id: 'together', label: 'Together', baseUrl: 'https://api.together.xyz/v1', model: '', requiresKey: true },
+  { id: 'fireworks', label: 'Fireworks', baseUrl: 'https://api.fireworks.ai/inference/v1', model: '', requiresKey: true },
+  { id: 'lm-studio', label: 'LM Studio', baseUrl: 'http://localhost:1234/v1', model: '', requiresKey: false },
+  { id: 'vllm', label: 'vLLM', baseUrl: 'http://localhost:8000/v1', model: '', requiresKey: false },
+  { id: 'llama-cpp', label: 'llama.cpp', baseUrl: 'http://localhost:8080/v1', model: '', requiresKey: false },
+  { id: 'localai', label: 'LocalAI', baseUrl: 'http://localhost:8080/v1', model: '', requiresKey: false },
+  { id: 'custom', label: 'Custom endpoint', baseUrl: 'http://localhost:1234/v1', model: '', requiresKey: false },
+];
+
+function presetFor(id: AiOpenAICompatiblePresetId) {
+  return OPENAI_COMPATIBLE_PRESETS.find((preset) => preset.id === id) ?? OPENAI_COMPATIBLE_PRESETS[0];
+}
+
+interface ProviderProbeProps {
+  buildConfig: () => AiConfigInput;
+  onPickModel?: (model: string) => void;
+  onStatusChange?: (status: ProviderCardStatus) => void;
+  testLabel?: string;
+  listLabel?: string;
+}
+
+function ProviderProbe({
+  buildConfig,
+  onPickModel,
+  onStatusChange,
+  testLabel = 'Test',
+  listLabel = 'List models',
+}: ProviderProbeProps) {
+  const [busy, setBusy] = useState<'test' | 'models' | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [models, setModels] = useState<AiModelInfo[]>([]);
+
+  const test = async () => {
+    setBusy('test');
+    setMessage(null);
+    try {
+      const result = await testAiProvider(buildConfig());
+      setMessage(result.ok ? `Connection OK${result.normalizedBaseUrl ? ` · ${result.normalizedBaseUrl}` : ''}` : result.message);
+      onStatusChange?.(result.ok ? 'connected' : result.code === 'not_configured' ? 'key-needed' : 'unreachable');
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const list = async () => {
+    setBusy('models');
+    setMessage(null);
+    try {
+      const result = await listAiModels(buildConfig());
+      setModels(result.models);
+      setMessage(result.ok ? `${result.models.length} models found${result.normalizedBaseUrl ? ` · ${result.normalizedBaseUrl}` : ''}` : result.message ?? 'Model discovery failed.');
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 flex-wrap">
+        <button
+          type="button"
+          onClick={test}
+          disabled={busy !== null}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-ink-200 text-ink-600 hover:border-sage-300 hover:text-sage-700 hover:bg-sage-50 rounded-card transition-colors disabled:opacity-50"
+        >
+          {busy === 'test' ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+          {testLabel}
+        </button>
+        <button
+          type="button"
+          onClick={list}
+          disabled={busy !== null}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-ink-200 text-ink-600 hover:border-sage-300 hover:text-sage-700 hover:bg-sage-50 rounded-card transition-colors disabled:opacity-50"
+        >
+          {busy === 'models' ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+          {listLabel}
+        </button>
+        {models.length > 0 && onPickModel && (
+          <select
+            onChange={(event) => onPickModel(event.target.value)}
+            defaultValue=""
+            className="min-w-0 max-w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-xs text-ink-700"
+          >
+            <option value="" disabled>Choose discovered model</option>
+            {models.slice(0, 80).map((model) => (
+              <option key={model.id} value={model.id}>{model.name ?? model.id}</option>
+            ))}
+          </select>
+        )}
+      </div>
+      {message && <p className="text-[11px] text-ink-500 font-mono break-words">{message}</p>}
+    </div>
+  );
+}
+
 // ── Provider card ─────────────────────────────────────────────────────────────
 
 interface ProviderCardProps {
   label: string;
   icon: string;
   isDefault: boolean;
-  status: 'connected' | 'key-needed' | 'unreachable' | 'local';
+  status: ProviderCardStatus;
   modelLabel: string;
   onSetDefault: () => void;
+  actions?: React.ReactNode;
   children?: React.ReactNode; // expandable detail row
 }
+
+type ProviderCardStatus = 'connected' | 'key-needed' | 'unreachable' | 'local' | 'not-tested';
 
 function StatusPill({ status }: { status: ProviderCardProps['status'] }) {
   const cfg: Record<ProviderCardProps['status'], { label: string; classes: string }> = {
@@ -62,6 +195,7 @@ function StatusPill({ status }: { status: ProviderCardProps['status'] }) {
     'key-needed': { label: 'key needed', classes: 'bg-amber-50 text-amber-700 border-amber-200' },
     unreachable: { label: 'unreachable', classes: 'bg-red-50 text-red-600 border-red-200' },
     local:       { label: 'local',       classes: 'bg-sage-50 text-sage-700 border-sage-200' },
+    'not-tested': { label: 'not tested', classes: 'bg-ink-50 text-ink-500 border-ink-200' },
   };
   const { label, classes } = cfg[status];
   return (
@@ -72,7 +206,7 @@ function StatusPill({ status }: { status: ProviderCardProps['status'] }) {
 }
 
 function ProviderCard({
-  label, icon, isDefault, status, modelLabel, onSetDefault, children,
+  label, icon, isDefault, status, modelLabel, onSetDefault, actions, children,
 }: ProviderCardProps) {
   const [expanded, setExpanded] = useState(false);
 
@@ -116,7 +250,12 @@ function ProviderCard({
         </div>
       </div>
 
-      {/* Expandable detail row */}
+      {actions && (
+        <div className="border-t border-ink-100 px-4 py-3 bg-paper">
+          {actions}
+        </div>
+      )}
+
       {expanded && (
         <div className="border-t border-ink-100 px-4 py-3 bg-paper-warm">
           {children}
@@ -187,6 +326,12 @@ function OpenAIDetail({ model, hasKey, onSave }: OpenAIDetailProps) {
         {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : saved ? <Check className="w-3 h-3" /> : null}
         {saved ? 'Saved' : 'Save'}
       </button>
+      <ProviderProbe
+        buildConfig={() => ({ provider: 'openai', openaiModel: m, ...(key ? { openaiApiKey: key } : {}) })}
+        onPickModel={setM}
+        testLabel="Test draft"
+        listLabel="List draft models"
+      />
       {saveError && <p className="text-[11px] text-red-600 font-mono">{saveError}</p>}
     </div>
   );
@@ -230,9 +375,15 @@ function AnthropicDetail({ model, hasKey, onSave }: AnthropicDetailProps) {
         <input
           value={m}
           onChange={(e) => setM(e.target.value)}
+          placeholder="List models, then choose one"
           className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800"
         />
       </label>
+      {!m.trim() && (
+        <p className="text-[11px] text-ink-400">
+          This endpoint needs a model ID before chat requests can run. Use List models when the service is available.
+        </p>
+      )}
       <label className="block text-xs text-ink-500">
         API key
         <input
@@ -253,6 +404,12 @@ function AnthropicDetail({ model, hasKey, onSave }: AnthropicDetailProps) {
         {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : saved ? <Check className="w-3 h-3" /> : null}
         {saved ? 'Saved' : 'Save'}
       </button>
+      <ProviderProbe
+        buildConfig={() => ({ provider: 'anthropic', anthropicModel: m, ...(key ? { anthropicApiKey: key } : {}) })}
+        onPickModel={setM}
+        testLabel="Test draft"
+        listLabel="List draft models"
+      />
       {saveError && <p className="text-[11px] text-red-600 font-mono">{saveError}</p>}
     </div>
   );
@@ -316,6 +473,127 @@ function OllamaDetail({ model, baseUrl, onSave }: OllamaDetailProps) {
         {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : saved ? <Check className="w-3 h-3" /> : null}
         {saved ? 'Saved' : 'Save'}
       </button>
+      <ProviderProbe
+        buildConfig={() => ({ provider: 'ollama', ollamaModel: m, ollamaBaseUrl: url })}
+        onPickModel={setM}
+        testLabel="Test draft"
+        listLabel="List draft models"
+      />
+      {saveError && <p className="text-[11px] text-red-600 font-mono">{saveError}</p>}
+    </div>
+  );
+}
+
+// ── OpenAI-compatible detail form ────────────────────────────────────────────
+
+interface OpenAICompatibleDetailProps {
+  preset: AiOpenAICompatiblePresetId;
+  model: string;
+  baseUrl: string;
+  hasKey: boolean;
+  onSave: (preset: AiOpenAICompatiblePresetId, model: string, baseUrl: string, key?: string) => Promise<void>;
+}
+
+function OpenAICompatibleDetail({ preset, model, baseUrl, hasKey, onSave }: OpenAICompatibleDetailProps) {
+  const [selectedPreset, setSelectedPreset] = useState<AiOpenAICompatiblePresetId>(preset);
+  const [m, setM] = useState(model);
+  const [url, setUrl] = useState(baseUrl);
+  const [key, setKey] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const selected = presetFor(selectedPreset);
+
+  const changePreset = (next: AiOpenAICompatiblePresetId) => {
+    const presetConfig = presetFor(next);
+    setSelectedPreset(next);
+    setUrl(presetConfig.baseUrl);
+    setM(presetConfig.model);
+  };
+
+  const save = async () => {
+    setSaving(true);
+    setSaved(false);
+    setSaveError(null);
+    try {
+      await onSave(selectedPreset, m, url, key || undefined);
+      setKey('');
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <label className="block text-xs text-ink-500">
+        Preset
+        <select
+          value={selectedPreset}
+          onChange={(event) => changePreset(event.target.value as AiOpenAICompatiblePresetId)}
+          className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800"
+        >
+          {OPENAI_COMPATIBLE_PRESETS.map((item) => (
+            <option key={item.id} value={item.id}>{item.label}</option>
+          ))}
+        </select>
+      </label>
+      <label className="block text-xs text-ink-500">
+        Base URL
+        <input
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800"
+        />
+      </label>
+      <label className="block text-xs text-ink-500">
+        Model
+        <input
+          value={m}
+          onChange={(e) => setM(e.target.value)}
+          placeholder="List models, then choose one"
+          className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800"
+        />
+      </label>
+      {!m.trim() && (
+        <p className="text-[11px] text-ink-400">
+          This endpoint needs a model ID before chat requests can run. Use List draft models when the service is available.
+        </p>
+      )}
+      <label className="block text-xs text-ink-500">
+        API key
+        <input
+          type="password"
+          value={key}
+          onChange={(e) => setKey(e.target.value)}
+          placeholder={hasKey ? '(stored — enter new value to update)' : selected.requiresKey ? 'required for this preset' : 'optional'}
+          className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800 placeholder:text-ink-300"
+        />
+      </label>
+      <button
+        type="button"
+        onClick={save}
+        disabled={saving}
+        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-sage-600 hover:bg-sage-700 disabled:bg-ink-300 text-white rounded-card transition-colors"
+      >
+        {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : saved ? <Check className="w-3 h-3" /> : null}
+        {saved ? 'Saved' : 'Save'}
+      </button>
+      <ProviderProbe
+        buildConfig={() => ({
+          provider: 'openai-compatible',
+          openaiCompatiblePreset: selectedPreset,
+          openaiCompatibleModel: m,
+          openaiCompatibleBaseUrl: url,
+          ...(key ? { openaiCompatibleApiKey: key } : {}),
+        })}
+        onPickModel={setM}
+        testLabel="Test draft"
+        listLabel="List draft models"
+      />
       {saveError && <p className="text-[11px] text-red-600 font-mono">{saveError}</p>}
     </div>
   );
@@ -469,6 +747,556 @@ function AgentCard({
   );
 }
 
+// ── Privacy notice ────────────────────────────────────────────────────────────
+
+const LOCAL_COMPATIBLE_PRESETS = new Set(['lm-studio', 'vllm', 'llama-cpp', 'localai']);
+const CLOUD_COMPATIBLE_PRESETS = new Set(['openrouter', 'groq', 'mistral', 'together', 'fireworks']);
+
+type DataResidency = 'local' | 'cloud' | 'mixed';
+
+function dataResidency(ai: AiPublicConfig): DataResidency {
+  if (ai.provider === 'ollama') return 'local';
+  if (ai.provider === 'openai-compatible') {
+    const preset = ai.openaiCompatiblePreset as string;
+    if (LOCAL_COMPATIBLE_PRESETS.has(preset)) return 'local';
+    if (CLOUD_COMPATIBLE_PRESETS.has(preset)) return 'cloud';
+    return 'mixed'; // custom endpoint — unknown
+  }
+  return 'cloud';
+}
+
+function cloudProviderLabel(ai: AiPublicConfig): string {
+  if (ai.provider === 'openai') return 'OpenAI';
+  if (ai.provider === 'anthropic') return 'Anthropic';
+  if (ai.provider === 'openai-compatible') {
+    const preset = presetFor(ai.openaiCompatiblePreset);
+    return preset.label;
+  }
+  return 'the AI provider';
+}
+
+function PrivacyNotice({ ai, preflight }: { ai: AiPublicConfig; preflight?: AiPreflightResult | null }) {
+  // If preflight is available, trust its authoritative `contentLeavesMachine` field.
+  const residency: DataResidency = preflight != null
+    ? (preflight.local ? 'local' : preflight.contentLeavesMachine ? 'cloud' : 'mixed')
+    : dataResidency(ai);
+
+  if (residency === 'local') {
+    return (
+      <div className="flex items-start gap-2.5 px-3 py-2.5 bg-sage-50 border border-sage-200 rounded-card">
+        <Lock className="w-4 h-4 text-sage-600 mt-0.5 shrink-0" />
+        <div>
+          <p className="text-sm font-medium text-sage-800">All AI runs locally</p>
+          <p className="text-xs text-sage-700 mt-0.5 leading-relaxed">
+            Your idea content never leaves this machine. The current provider ({' '}
+            <span className="font-semibold">{ai.provider === 'ollama' ? 'Ollama' : presetFor(ai.openaiCompatiblePreset).label}</span>
+            ) runs inference locally.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (residency === 'cloud') {
+    return (
+      <div className="flex items-start gap-2.5 px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-card">
+        <Shield className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+        <div>
+          <p className="text-sm font-medium text-amber-800">
+            Idea content is sent to {cloudProviderLabel(ai)}
+          </p>
+          <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
+            When AI features run, field content from your ideas is sent to{' '}
+            <span className="font-semibold">{cloudProviderLabel(ai)}'s</span> servers for processing.
+            To keep all inference local, switch to Ollama or a local OpenAI-compatible endpoint (LM Studio, vLLM, llama.cpp).
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // mixed (custom endpoint)
+  return (
+    <div className="flex items-start gap-2.5 px-3 py-2.5 bg-ink-50 border border-ink-200 rounded-card">
+      <Shield className="w-4 h-4 text-ink-400 mt-0.5 shrink-0" />
+      <div>
+        <p className="text-sm font-medium text-ink-700">Custom endpoint — data residency unknown</p>
+        <p className="text-xs text-ink-500 mt-0.5 leading-relaxed">
+          A custom OpenAI-compatible endpoint is configured. Whether idea content stays on-machine
+          or leaves depends on where that endpoint runs. Verify with your endpoint's operator.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ── Usage audit section ───────────────────────────────────────────────────────
+
+const ROUTE_LABELS: Record<string, string> = {
+  'thinking-partner': 'Thinking Partner',
+  'field-suggestions': 'Field suggestions',
+  'field-suggestions:conversation': 'Field suggestions (chat)',
+  'health-check': 'Health Check',
+  'discover-insights': 'Discover insights',
+};
+
+function routeLabel(route: string): string {
+  return ROUTE_LABELS[route] ?? route;
+}
+
+interface UsageAuditSectionProps {
+  detail: AiUsageDetail | null;
+  basicUsage: AiUsageSummary | null;
+}
+
+type UsageTab = 'feature' | 'provider' | 'events';
+
+function UsageBucketTable({ rows }: { rows: AiUsageBucket[] }) {
+  if (!rows.length) return <p className="text-[11px] text-ink-400 italic">No activity in this window.</p>;
+  return (
+    <div className="border border-ink-100 rounded-card overflow-hidden">
+      <table className="w-full text-[11px]">
+        <thead className="bg-paper-warm">
+          <tr>
+            <th className="text-left px-3 py-1.5 font-mono font-semibold text-ink-500 uppercase tracking-wide">Name</th>
+            <th className="text-right px-3 py-1.5 font-mono font-semibold text-ink-500 uppercase tracking-wide">Reqs</th>
+            <th className="text-right px-3 py-1.5 font-mono font-semibold text-ink-500 uppercase tracking-wide">Tokens</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-ink-50">
+          {rows.map((row, i) => (
+            <tr key={i} className="hover:bg-paper-warm transition-colors">
+              <td className="px-3 py-1.5 text-ink-700 font-medium">
+                {routeLabel(row.feature ?? row.provider ?? row.model ?? row.key)}
+              </td>
+              <td className="px-3 py-1.5 text-ink-500 font-mono text-right">{row.count}</td>
+              <td className="px-3 py-1.5 text-ink-700 text-right font-mono">{fmtTokens(row.totalTokens)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function AuditEventTable({ events }: { events: AiAuditEvent[] }) {
+  if (!events.length) return <p className="text-[11px] text-ink-400 italic">No recent guardrail events.</p>;
+  return (
+    <div className="border border-ink-100 rounded-card overflow-hidden">
+      <table className="w-full text-[11px]">
+        <thead className="bg-paper-warm">
+          <tr>
+            <th className="text-left px-3 py-1.5 font-mono font-semibold text-ink-500 uppercase tracking-wide">Event</th>
+            <th className="text-left px-3 py-1.5 font-mono font-semibold text-ink-500 uppercase tracking-wide">Feature · Provider</th>
+            <th className="text-left px-3 py-1.5 font-mono font-semibold text-ink-500 uppercase tracking-wide">Message</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-ink-50">
+          {events.map((ev) => (
+            <tr key={ev.id} className="hover:bg-paper-warm transition-colors">
+              <td className="px-3 py-1.5 font-mono">
+                <span className={ev.type === 'guardrail_denied' ? 'text-amber-700' : 'text-red-600'}>
+                  {ev.type === 'guardrail_denied' ? 'denied' : 'error'}
+                </span>
+              </td>
+              <td className="px-3 py-1.5 text-ink-500">
+                {routeLabel(ev.feature)} · {ev.provider}
+              </td>
+              <td className="px-3 py-1.5 text-ink-600 max-w-[200px] truncate" title={ev.message}>
+                {ev.message}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function UsageAuditSection({ detail, basicUsage }: UsageAuditSectionProps) {
+  const [activeTab, setActiveTab] = useState<UsageTab>('feature');
+
+  const last24h = detail ? detail.raw.windows.last24h : (basicUsage?.last24h ?? 0);
+  const last7d  = detail ? detail.raw.windows.last7d  : (basicUsage?.last7d  ?? 0);
+  if (!detail && !basicUsage) return null;
+
+  const byFeature = detail?.raw.byFeature ?? [];
+  const byProvider = detail?.raw.byProvider ?? [];
+  const auditEvents = detail?.raw.recentAuditEvents ?? [];
+  const hasDetail = Boolean(detail);
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs font-mono uppercase tracking-wider text-ink-500">Usage · Last 24 h / 7 d</p>
+      <div className="font-mono text-[11px] text-ink-400 space-y-0.5">
+        <div><span className="text-ink-700 font-semibold">{fmtTokens(last24h)}</span> tokens · 24 h</div>
+        <div><span className="text-ink-700 font-semibold">{fmtTokens(last7d)}</span> tokens · 7 d</div>
+      </div>
+
+      {hasDetail ? (
+        <div className="space-y-2">
+          {/* Tab bar */}
+          <div className="flex gap-0 border border-ink-100 rounded-card overflow-hidden w-fit">
+            {(['feature', 'provider', 'events'] as UsageTab[]).map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setActiveTab(tab)}
+                className={`px-3 py-1 text-[11px] font-medium transition-colors
+                  ${activeTab === tab
+                    ? 'bg-sage-100 text-sage-800 border-r border-ink-100'
+                    : 'bg-paper-warm text-ink-400 hover:text-ink-700 border-r border-ink-100'
+                  } last:border-r-0`}
+              >
+                {tab === 'feature' ? 'By feature' : tab === 'provider' ? 'By provider' : `Events${auditEvents.length ? ` (${auditEvents.length})` : ''}`}
+              </button>
+            ))}
+          </div>
+          {activeTab === 'feature'   && <UsageBucketTable rows={byFeature} />}
+          {activeTab === 'provider'  && <UsageBucketTable rows={byProvider} />}
+          {activeTab === 'events'    && <AuditEventTable events={auditEvents} />}
+        </div>
+      ) : (
+        <p className="text-[11px] text-ink-400">
+          Feature-level breakdown requires the server's <code className="font-mono">GET /api/ai/usage/detail</code> endpoint.
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ── Advanced guardrails section ───────────────────────────────────────────────
+
+const FEATURE_LABELS: Record<AiFeatureId, string> = {
+  'thinking-partner': 'Thinking Partner',
+  'field-suggestions': 'Field suggestions',
+  'health-check': 'Health Check',
+  'discover-insights': 'Discover insights',
+  'default': 'Other / default',
+};
+
+const PROVIDER_LABELS: Record<AiProviderId, string> = {
+  openai: 'OpenAI',
+  anthropic: 'Anthropic',
+  ollama: 'Ollama (local)',
+  'openai-compatible': 'OpenAI-compatible',
+};
+
+const REMOTE_PROVIDERS: AiProviderId[] = ['openai', 'anthropic', 'openai-compatible'];
+const FEATURE_IDS: AiFeatureId[] = ['thinking-partner', 'field-suggestions', 'health-check', 'discover-insights'];
+const PROVIDER_IDS: AiProviderId[] = ['openai', 'anthropic', 'ollama', 'openai-compatible'];
+
+interface AdvancedGuardrailsSectionProps {
+  guardrails: AiGuardrailsConfig;
+  onSave: (patch: Partial<AiGuardrailsConfig>) => Promise<void>;
+}
+
+function AdvancedGuardrailsSection({ guardrails, onSave }: AdvancedGuardrailsSectionProps) {
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Local drafts
+  const [featureEnabled, setFeatureEnabled] = useState<Partial<Record<AiFeatureId, boolean>>>(guardrails.featureEnabled);
+  const [providerEnabled, setProviderEnabled] = useState<Partial<Record<AiProviderId, boolean>>>(guardrails.providerEnabled);
+  const [warnOnRemote, setWarnOnRemote] = useState(guardrails.warnOnRemoteProvider);
+  const [requireConfirm, setRequireConfirm] = useState(guardrails.requireConfirmationForRemoteProvider);
+  const [featureBudgets, setFeatureBudgets] = useState<Partial<Record<AiFeatureId, number>>>(guardrails.featureDailyTokenBudgets);
+  const [allowedModelsText, setAllowedModelsText] = useState(guardrails.allowedModels.join(', '));
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const privacyModeOn = warnOnRemote && requireConfirm && REMOTE_PROVIDERS.every(p => providerEnabled[p] === false);
+
+  function togglePrivacyMode() {
+    if (privacyModeOn) {
+      // turn off: re-enable remote providers, clear warn+confirm
+      setProviderEnabled(prev => {
+        const next = { ...prev };
+        REMOTE_PROVIDERS.forEach(p => { next[p] = true; });
+        return next;
+      });
+      setWarnOnRemote(false);
+      setRequireConfirm(false);
+    } else {
+      // turn on: disable remote providers, set warn+confirm
+      setProviderEnabled(prev => {
+        const next = { ...prev };
+        REMOTE_PROVIDERS.forEach(p => { next[p] = false; });
+        return next;
+      });
+      setWarnOnRemote(true);
+      setRequireConfirm(true);
+    }
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    setSaveError(null);
+    const models = allowedModelsText
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
+    try {
+      await onSave({
+        featureEnabled,
+        providerEnabled,
+        warnOnRemoteProvider: warnOnRemote,
+        requireConfirmationForRemoteProvider: requireConfirm,
+        featureDailyTokenBudgets: featureBudgets,
+        allowedModels: models,
+      });
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Save failed.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1.5 text-xs font-medium text-ink-400
+                   hover:text-sage-700 transition-colors"
+      >
+        <ChevronRight className={`w-3 h-3 transition-transform ${open ? 'rotate-90' : ''}`} />
+        Advanced controls
+      </button>
+
+      {open && (
+        <div className="mt-3 space-y-5">
+
+          {/* Privacy mode quick-toggle */}
+          <div className="flex items-start gap-3 p-3 bg-paper-warm border border-ink-100 rounded-card">
+            <Lock className="w-4 h-4 text-sage-600 mt-0.5 shrink-0" />
+            <div className="flex-1">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-ink-700">Local-only mode</p>
+                  <p className="text-[11px] text-ink-500 leading-relaxed mt-0.5">
+                    Blocks all cloud providers. Only Ollama and local compatible endpoints will run.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={togglePrivacyMode}
+                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full
+                    border-2 border-transparent transition-colors
+                    ${privacyModeOn ? 'bg-sage-500' : 'bg-ink-200'}`}
+                  aria-checked={privacyModeOn}
+                  role="switch"
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow
+                    transition-transform ${privacyModeOn ? 'translate-x-4' : 'translate-x-0'}`} />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Remote-provider warning toggles */}
+          <div className="space-y-2">
+            <p className="text-[11px] font-mono uppercase tracking-wider text-ink-400">Cloud provider alerts</p>
+            <p className="text-[10px] text-ink-400 leading-relaxed">
+              These affect the AI Assistance modal (✨ buttons on idea fields).
+              When a cloud provider is about to be used, the modal will pause with a warning
+              or ask for confirmation before running.
+            </p>
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={warnOnRemote}
+                onChange={e => setWarnOnRemote(e.target.checked)}
+                className="w-3.5 h-3.5 accent-sage-600"
+              />
+              <span className="text-xs text-ink-700">Show a warning in the AI modal before sending to a cloud provider</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={requireConfirm}
+                onChange={e => setRequireConfirm(e.target.checked)}
+                className="w-3.5 h-3.5 accent-sage-600"
+              />
+              <span className="text-xs text-ink-700">Require a "Confirm & run" click in the AI modal before each cloud request</span>
+            </label>
+          </div>
+
+          {/* Feature enable/disable */}
+          <div className="space-y-2">
+            <p className="text-[11px] font-mono uppercase tracking-wider text-ink-400">Feature enable</p>
+            <div className="space-y-1.5">
+              {FEATURE_IDS.map((fid) => {
+                const enabled = featureEnabled[fid] !== false;
+                return (
+                  <label key={fid} className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={enabled}
+                      onChange={e => setFeatureEnabled(prev => ({ ...prev, [fid]: e.target.checked }))}
+                      className="w-3.5 h-3.5 accent-sage-600"
+                    />
+                    <span className="text-xs text-ink-700">{FEATURE_LABELS[fid]}</span>
+                    {!enabled && (
+                      <span className="text-[10px] text-amber-600 font-medium">disabled</span>
+                    )}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Provider enable/disable */}
+          <div className="space-y-2">
+            <p className="text-[11px] font-mono uppercase tracking-wider text-ink-400">Provider enable</p>
+            <div className="space-y-1.5">
+              {PROVIDER_IDS.map((pid) => {
+                const enabled = providerEnabled[pid] !== false;
+                return (
+                  <label key={pid} className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={enabled}
+                      onChange={e => setProviderEnabled(prev => ({ ...prev, [pid]: e.target.checked }))}
+                      className="w-3.5 h-3.5 accent-sage-600"
+                    />
+                    <span className="text-xs text-ink-700">{PROVIDER_LABELS[pid]}</span>
+                    {!enabled && (
+                      <span className="text-[10px] text-amber-600 font-medium">disabled</span>
+                    )}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Per-feature daily token budgets */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-1.5">
+              <p className="text-[11px] font-mono uppercase tracking-wider text-ink-400">Per-feature daily token caps</p>
+              <span title="0 = inherits global budget"><Info className="w-3 h-3 text-ink-300" /></span>
+            </div>
+            <div className="space-y-2">
+              {FEATURE_IDS.map((fid) => (
+                <label key={fid} className="flex items-center gap-2">
+                  <span className="text-[11px] text-ink-600 w-36 shrink-0">{FEATURE_LABELS[fid]}</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1000}
+                    placeholder="0 = global"
+                    value={featureBudgets[fid] ?? 0}
+                    onChange={e => {
+                      const v = parseInt(e.target.value, 10);
+                      setFeatureBudgets(prev => ({ ...prev, [fid]: isNaN(v) ? 0 : v }));
+                    }}
+                    className="w-28 px-2 py-1 text-[11px] font-mono border border-ink-100 rounded
+                               bg-white text-ink-700 focus:outline-none focus:border-sage-400"
+                  />
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Model allowlist */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-1.5">
+              <p className="text-[11px] font-mono uppercase tracking-wider text-ink-400">Model allowlist</p>
+              <span title="Comma-separated. Empty = all models allowed."><Info className="w-3 h-3 text-ink-300" /></span>
+            </div>
+            <input
+              type="text"
+              value={allowedModelsText}
+              onChange={e => setAllowedModelsText(e.target.value)}
+              placeholder="gpt-4.1-mini, claude-3-haiku-20240307 … (empty = all)"
+              className="w-full px-2 py-1.5 text-[11px] font-mono border border-ink-100 rounded
+                         bg-white text-ink-700 focus:outline-none focus:border-sage-400"
+            />
+            <p className="text-[10px] text-ink-400">
+              Comma-separated model IDs. When set, AI requests using any other model will be blocked.
+            </p>
+          </div>
+
+          {/* Save */}
+          {saveError && (
+            <div className="flex items-center gap-1.5 text-[11px] text-red-600">
+              <AlertTriangle className="w-3 h-3 shrink-0" />
+              {saveError}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => void handleSave()}
+            disabled={saving}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium
+                       bg-sage-500 text-white rounded hover:bg-sage-600
+                       disabled:opacity-50 transition-colors"
+          >
+            {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+            Save advanced settings
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Guardrails wrapper section ────────────────────────────────────────────────
+
+interface GuardrailsSectionProps {
+  ai: AiPublicConfig;
+  onSaveBudget: (budget: number) => Promise<void>;
+  onSaveGuardrails: (patch: Partial<AiGuardrailsConfig>) => Promise<void>;
+}
+
+function GuardrailsSection({ ai, onSaveBudget, onSaveGuardrails }: GuardrailsSectionProps) {
+  const [detail, setDetail] = useState<AiUsageDetail | null>(null);
+  const [basicUsage, setBasicUsage] = useState<AiUsageSummary | null>(null);
+  const [preflight, setPreflight] = useState<AiPreflightResult | null>(null);
+
+  useEffect(() => {
+    // Try detail endpoint; fall back to basic totals.
+    void getAiUsageDetail()
+      .then(setDetail)
+      .catch(() => void getAiUsage().then(setBasicUsage).catch(() => {}));
+
+    // Fire a preflight against the global default route to confirm data residency.
+    void preflightAiRequest({ feature: 'default' })
+      .then(setPreflight)
+      .catch(() => {});
+  }, []);
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center gap-1.5">
+        <h3 className="text-xs font-mono uppercase tracking-wider text-ink-500">Usage & Guardrails</h3>
+        <HelpButton
+          helpId="guardrails"
+          title="Usage & Guardrails"
+          summary="Controls how much AI Seedbank uses and where your data goes. The token budget caps spending. The privacy notice shows whether idea content leaves this machine."
+          details="Local providers (Ollama, LM Studio, vLLM, llama.cpp) keep all inference on-device. Cloud providers (OpenAI, Anthropic, OpenRouter, Groq) send field content to their servers. Use Advanced controls to set per-feature budgets, provider/model allowlists, and local-only mode."
+          manualSection="settings-ai"
+          alwaysShow
+        />
+      </div>
+
+      {/* Privacy / data-flow notice — enriched by preflight when available */}
+      <PrivacyNotice ai={ai} preflight={preflight} />
+
+      {/* Token budget */}
+      <BudgetSection budget={ai.dailyTokenBudget} onSave={onSaveBudget} />
+
+      {/* Usage / audit (tabs: by-feature, by-provider, events) */}
+      <UsageAuditSection detail={detail} basicUsage={basicUsage} />
+
+      {/* Live advanced guardrails controls */}
+      <AdvancedGuardrailsSection
+        guardrails={ai.guardrails}
+        onSave={onSaveGuardrails}
+      />
+    </div>
+  );
+}
+
 // ── Token budget + usage (A3) ─────────────────────────────────────────────────
 
 interface BudgetSectionProps {
@@ -524,13 +1352,20 @@ function BudgetSection({ budget, onSave }: BudgetSectionProps) {
           Daily token limit
           <input
             type="number"
-            min={1000}
+            min={0}
             step={10000}
             value={draft}
             onChange={(e) => setLocalDraft(Number(e.target.value))}
             className="mt-1 w-36 px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800"
           />
         </label>
+        <button
+          type="button"
+          onClick={() => setLocalDraft(0)}
+          className="mb-0.5 px-3 py-1.5 text-xs font-medium border border-ink-200 text-ink-600 hover:border-sage-300 hover:text-sage-700 hover:bg-sage-50 rounded-card transition-colors"
+        >
+          No limit
+        </button>
         <button
           type="button"
           onClick={save}
@@ -543,6 +1378,7 @@ function BudgetSection({ budget, onSave }: BudgetSectionProps) {
         </button>
       </div>
       {saveError && <p className="text-[11px] text-red-600 font-mono">{saveError}</p>}
+      {draft === 0 && <p className="text-[11px] text-ink-400">Daily budget enforcement is disabled. Per-minute rate limiting still applies.</p>}
       {usage !== null && (
         <div className="font-mono text-[11px] text-ink-400 space-y-0.5">
           <div>
@@ -562,6 +1398,140 @@ function BudgetSection({ budget, onSave }: BudgetSectionProps) {
   );
 }
 
+// ── Per-feature routing ──────────────────────────────────────────────────────
+
+const AI_FEATURE_ROWS: Array<{ id: AiFeatureId; label: string; detail: string; secondary?: boolean }> = [
+  { id: 'thinking-partner',  label: 'Thinking Partner',  detail: 'Idea chat' },
+  { id: 'field-suggestions', label: 'Field suggestions', detail: 'Ask AI on idea fields' },
+  { id: 'health-check',      label: 'Health Check',      detail: 'AI summary on idea readiness' },
+  { id: 'discover-insights', label: 'Discover insights', detail: 'Pattern analysis and cross-pollination' },
+  // 'default' only applies to AI features not listed above — it does NOT cascade to or
+  // override the known features. Listed last with secondary styling to avoid confusion.
+  { id: 'default', label: 'Other features (fallback)', detail: 'Applies only to unnamed or future AI features — does not affect the features above', secondary: true },
+];
+
+const AI_PROVIDER_OPTIONS: Array<{ id: AiProviderId; label: string }> = [
+  { id: 'openai', label: 'OpenAI' },
+  { id: 'anthropic', label: 'Anthropic' },
+  { id: 'ollama', label: 'Ollama' },
+  { id: 'openai-compatible', label: 'OpenAI-compatible' },
+];
+
+function providerModel(ai: AiPublicConfig, provider: AiProviderId): string {
+  if (provider === 'openai') return ai.openaiModel;
+  if (provider === 'anthropic') return ai.anthropicModel;
+  if (provider === 'openai-compatible') return ai.openaiCompatibleModel;
+  return ai.ollamaModel;
+}
+
+function providerLabel(provider: AiProviderId): string {
+  return AI_PROVIDER_OPTIONS.find((option) => option.id === provider)?.label ?? provider;
+}
+
+interface FeatureRoutingSectionProps {
+  ai: AiPublicConfig;
+  onSave: (routes: AiPublicConfig['featureRoutes']) => Promise<void>;
+}
+
+function FeatureRoutingSection({ ai, onSave }: FeatureRoutingSectionProps) {
+  const [routes, setRoutes] = useState(ai.featureRoutes);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const updateRoute = (feature: AiFeatureId, route: AiFeatureRoute) => {
+    setRoutes((current) => ({ ...current, [feature]: route }));
+  };
+
+  const save = async () => {
+    setSaving(true);
+    setSaved(false);
+    setSaveError(null);
+    try {
+      await onSave(routes);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h3 className="text-xs font-mono uppercase tracking-wider text-ink-500">Feature Defaults</h3>
+          <p className="text-xs text-ink-400 mt-1">Route each AI feature to the global provider or a specific provider/model.</p>
+        </div>
+        <button
+          type="button"
+          onClick={save}
+          disabled={saving}
+          className="shrink-0 flex items-center gap-1 px-3 py-1.5 text-xs font-semibold bg-sage-600 hover:bg-sage-700 disabled:bg-ink-300 text-white rounded-card transition-colors"
+        >
+          {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : saved ? <Check className="w-3 h-3" /> : null}
+          {saved ? 'Saved' : 'Save'}
+        </button>
+      </div>
+
+      <div className="divide-y divide-ink-100 border border-ink-100 rounded-card bg-paper overflow-hidden">
+        {AI_FEATURE_ROWS.map((feature) => {
+          const route = routes[feature.id] ?? { provider: 'default' as const };
+          const effective = ai.effectiveFeatureRoutes[feature.id];
+          const selectedProvider = route.provider === 'default' ? 'default' : route.provider;
+          return (
+            <div
+              key={feature.id}
+              className={`grid gap-3 p-3 md:grid-cols-[1.2fr_1fr_1fr] md:items-center ${
+                feature.secondary ? 'opacity-60' : ''
+              }`}
+            >
+              <div className="min-w-0">
+                <p className={`text-sm text-ink-800 ${feature.secondary ? 'font-normal italic' : 'font-semibold'}`}>
+                  {feature.label}
+                </p>
+                <p className="text-xs text-ink-400">{feature.detail}</p>
+              </div>
+              <label className="block text-xs text-ink-500">
+                Provider
+                <select
+                  value={selectedProvider}
+                  onChange={(event) => {
+                    const provider = event.target.value as AiProviderId | 'default';
+                    updateRoute(feature.id, provider === 'default' ? { provider } : { provider });
+                  }}
+                  className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800"
+                >
+                  <option value="default">Use global default</option>
+                  {AI_PROVIDER_OPTIONS.map((provider) => (
+                    <option key={provider.id} value={provider.id}>{provider.label}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-xs text-ink-500">
+                Model
+                <input
+                  value={route.provider === 'default' ? '' : route.model ?? ''}
+                  disabled={route.provider === 'default'}
+                  onChange={(event) => updateRoute(feature.id, { ...route, model: event.target.value })}
+                  placeholder={route.provider === 'default' ? providerModel(ai, ai.provider) : providerModel(ai, route.provider)}
+                  className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800 disabled:bg-ink-50 disabled:text-ink-400"
+                />
+                <span className="mt-1 block text-[11px] text-ink-400">
+                  Effective: {providerLabel(effective.provider)} · {effective.model || 'choose a model'}
+                </span>
+              </label>
+            </div>
+          );
+        })}
+      </div>
+      {saveError && <p className="text-[11px] text-red-600 font-mono">{saveError}</p>}
+    </div>
+  );
+}
+
 // ── Main tab ──────────────────────────────────────────────────────────────────
 
 export default function AiAgentsTab() {
@@ -569,12 +1539,19 @@ export default function AiAgentsTab() {
   const agents = useAgentsSettings();
   const offline = useSettingsOffline();
   const patch = useSettingsStore((s) => s.patch);
+  const [probeStatuses, setProbeStatuses] = useState<Partial<Record<AiProviderId, ProviderCardStatus>>>({});
+
+  const setProbeStatus = (provider: AiProviderId, status: ProviderCardStatus) => {
+    setProbeStatuses((current) => ({ ...current, [provider]: status }));
+  };
 
   // Determine provider connection status
-  const openaiStatus: ProviderCardProps['status'] = ai.hasOpenAIKey ? 'connected' : 'key-needed';
-  const anthropicStatus: ProviderCardProps['status'] = ai.hasAnthropicKey ? 'connected' : 'key-needed';
-  // Ollama is local — always show "local" (actual reachability is tested server-side)
-  const ollamaStatus: ProviderCardProps['status'] = 'local';
+  const openaiStatus: ProviderCardProps['status'] = probeStatuses.openai ?? (ai.hasOpenAIKey ? 'connected' : 'key-needed');
+  const anthropicStatus: ProviderCardProps['status'] = probeStatuses.anthropic ?? (ai.hasAnthropicKey ? 'connected' : 'key-needed');
+  const ollamaStatus: ProviderCardProps['status'] = probeStatuses.ollama ?? 'not-tested';
+  const compatiblePreset = presetFor(ai.openaiCompatiblePreset);
+  const compatibleStatus: ProviderCardProps['status'] = probeStatuses['openai-compatible']
+    ?? (compatiblePreset.requiresKey && !ai.hasOpenAICompatibleKey ? 'key-needed' : 'not-tested');
 
   const setDefaultProvider = async (provider: AiProviderId) => {
     await patch('ai', { provider });
@@ -592,8 +1569,26 @@ export default function AiAgentsTab() {
     await patch('ai', { ollamaModel: model, ollamaBaseUrl: baseUrl });
   };
 
+  const saveOpenAICompatible = async (
+    preset: AiOpenAICompatiblePresetId,
+    model: string,
+    baseUrl: string,
+    key?: string,
+  ) => {
+    await patch('ai', {
+      openaiCompatiblePreset: preset,
+      openaiCompatibleModel: model,
+      openaiCompatibleBaseUrl: baseUrl,
+      ...(key ? { openaiCompatibleApiKey: key } : {}),
+    });
+  };
+
   const saveBudget = async (budget: number) => {
     await patch('ai', { dailyTokenBudget: budget });
+  };
+
+  const saveFeatureRoutes = async (featureRoutes: AiPublicConfig['featureRoutes']) => {
+    await patch('ai', { featureRoutes });
   };
 
   // ── Agent link/unlink ────────────────────────────────────────────────────────
@@ -630,18 +1625,14 @@ export default function AiAgentsTab() {
       <section className="space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-mono uppercase tracking-wider text-ink-500">
-            Thinking Partner · Providers
+            AI Providers
           </h3>
-          <Link
-            to="/settings/ai-agents"
-            className="text-[11px] text-ink-400 hover:text-sage-700 transition-colors"
-          >
-            {/* placeholder — actual link target is this page */}
-          </Link>
         </div>
         <p className="text-xs text-ink-400">
-          Select a default provider. The Thinking Partner on each idea uses this choice.
-          Expand a card to update model names or API keys.
+          Select a global default provider. All AI features — Thinking Partner, field suggestions,
+          health checks, and Discover insights — use this provider unless you override them
+          individually in <span className="font-medium text-ink-500">Feature Defaults</span> below.
+          Expand a provider card to edit the model or API key; use Test / List models to verify.
         </p>
 
         <div className="space-y-2">
@@ -653,6 +1644,14 @@ export default function AiAgentsTab() {
             status={openaiStatus}
             modelLabel={ai.openaiModel}
             onSetDefault={() => void setDefaultProvider('openai')}
+            actions={(
+              <ProviderProbe
+                buildConfig={() => ({ provider: 'openai', openaiModel: ai.openaiModel })}
+                onStatusChange={(status) => setProbeStatus('openai', status)}
+                testLabel="Test saved"
+                listLabel="List saved models"
+              />
+            )}
           >
             <OpenAIDetail
               model={ai.openaiModel}
@@ -669,6 +1668,14 @@ export default function AiAgentsTab() {
             status={anthropicStatus}
             modelLabel={ai.anthropicModel}
             onSetDefault={() => void setDefaultProvider('anthropic')}
+            actions={(
+              <ProviderProbe
+                buildConfig={() => ({ provider: 'anthropic', anthropicModel: ai.anthropicModel })}
+                onStatusChange={(status) => setProbeStatus('anthropic', status)}
+                testLabel="Test saved"
+                listLabel="List saved models"
+              />
+            )}
           >
             <AnthropicDetail
               model={ai.anthropicModel}
@@ -685,6 +1692,14 @@ export default function AiAgentsTab() {
             status={ollamaStatus}
             modelLabel={`${ai.ollamaModel} · ${ai.ollamaBaseUrl}`}
             onSetDefault={() => void setDefaultProvider('ollama')}
+            actions={(
+              <ProviderProbe
+                buildConfig={() => ({ provider: 'ollama', ollamaModel: ai.ollamaModel, ollamaBaseUrl: ai.ollamaBaseUrl })}
+                onStatusChange={(status) => setProbeStatus('ollama', status)}
+                testLabel="Test saved"
+                listLabel="List saved models"
+              />
+            )}
           >
             <OllamaDetail
               model={ai.ollamaModel}
@@ -692,12 +1707,55 @@ export default function AiAgentsTab() {
               onSave={saveOllama}
             />
           </ProviderCard>
+
+          {/* OpenAI-compatible */}
+          <ProviderCard
+            label="OpenAI-compatible"
+            icon="🔌"
+            isDefault={ai.provider === 'openai-compatible'}
+            status={compatibleStatus}
+            modelLabel={`${compatiblePreset.label} · ${ai.openaiCompatibleModel || 'choose a model'}`}
+            onSetDefault={() => void setDefaultProvider('openai-compatible')}
+            actions={(
+              <ProviderProbe
+                buildConfig={() => ({
+                  provider: 'openai-compatible',
+                  openaiCompatiblePreset: ai.openaiCompatiblePreset,
+                  openaiCompatibleModel: ai.openaiCompatibleModel,
+                  openaiCompatibleBaseUrl: ai.openaiCompatibleBaseUrl,
+                })}
+                onStatusChange={(status) => setProbeStatus('openai-compatible', status)}
+                testLabel="Test saved"
+                listLabel="List saved models"
+              />
+            )}
+          >
+            <OpenAICompatibleDetail
+              preset={ai.openaiCompatiblePreset}
+              model={ai.openaiCompatibleModel}
+              baseUrl={ai.openaiCompatibleBaseUrl}
+              hasKey={ai.hasOpenAICompatibleKey}
+              onSave={saveOpenAICompatible}
+            />
+          </ProviderCard>
         </div>
       </section>
 
-      {/* ── A3: Token budget + usage ────────────────────────────────────────── */}
+      {/* key is intentionally absent — key-based remount caused unsaved route
+          drafts to be discarded whenever any other AI setting was saved. */}
       <section className="p-4 bg-paper-warm border border-ink-100 rounded-card">
-        <BudgetSection budget={ai.dailyTokenBudget} onSave={saveBudget} />
+        <FeatureRoutingSection ai={ai} onSave={saveFeatureRoutes} />
+      </section>
+
+      {/* ── A3: Guardrails (privacy + budget + usage + advanced controls) ─── */}
+      <section className="p-4 bg-paper-warm border border-ink-100 rounded-card">
+        <GuardrailsSection
+          ai={ai}
+          onSaveBudget={saveBudget}
+          onSaveGuardrails={async (guardrailsPatch) => {
+            await patch('ai', { guardrails: guardrailsPatch });
+          }}
+        />
       </section>
 
       {/* ── A4: Linked agents ───────────────────────────────────────────────── */}
