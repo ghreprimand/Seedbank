@@ -829,7 +829,9 @@ function AgentCard({
 
 // ── Privacy notice ────────────────────────────────────────────────────────────
 
-const LOCAL_COMPATIBLE_PRESETS = new Set(['lm-studio', 'vllm', 'llama-cpp', 'localai']);
+// 'custom' is grouped with local: its default URL is localhost and it requires no key.
+// Users who point it at a remote host should understand they control that endpoint.
+const LOCAL_COMPATIBLE_PRESETS = new Set(['lm-studio', 'vllm', 'llama-cpp', 'localai', 'custom']);
 const CLOUD_COMPATIBLE_PRESETS = new Set(['openrouter', 'groq', 'mistral', 'together', 'fireworks']);
 
 type DataResidency = 'local' | 'cloud' | 'mixed';
@@ -2361,7 +2363,7 @@ export default function AiAgentsTab() {
                 status={claudeAccountStatus}
                 modelLabel={ai.claudeAccountModel || 'claude-sonnet-latest'}
                 onSetDefault={() => void setDefaultProvider('claude-account')}
-                canSetDefault={ai.claudeAccountAuthenticated}
+                canSetDefault={claudeAccountStatus === 'connected'}
               >
                 <ClaudeAccountDetail
                   model={ai.claudeAccountModel || 'claude-sonnet-latest'}
@@ -2379,6 +2381,7 @@ export default function AiAgentsTab() {
                 status={codexAccountStatus}
                 modelLabel={ai.codexAccountModel || 'codex-recommended'}
                 onSetDefault={() => void setDefaultProvider('codex-account')}
+                canSetDefault={ai.codexAccountAuthenticated && codexAccountStatus === 'connected'}
               >
                 <CodexAccountDetail
                   model={ai.codexAccountModel || 'codex-recommended'}
