@@ -133,6 +133,11 @@ export interface BackupStatus {
   latestJsonExport: { path: string; timestamp: string } | null;
   rclone: {
     available: boolean;
+    installed: boolean;
+    configured: boolean;
+    remoteCount: number;
+    status: 'not-installed' | 'no-remotes' | 'ready' | 'error';
+    message: string;
     version?: string;
     error?: string;
   };
