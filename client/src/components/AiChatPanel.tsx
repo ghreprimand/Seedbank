@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, Bot, ChevronDown, ExternalLink, Send, Settings, Shield, X } from 'lucide-react';
-import type { AiChatMessage, AiFeatureId, AiPreflightResult, Idea } from '@/lib/types';
+import { aiProviderLabel, type AiChatMessage, type AiFeatureId, type AiPreflightResult, type Idea } from '@/lib/types';
 import { getAiConversation, preflightAiRequest, streamAiChat } from '@/api/client';
 import { useAiSettings } from '@/stores/settings';
 
@@ -92,8 +92,9 @@ export default function AiThinkingPanel({ idea, onApply }: AiThinkingPanelProps)
   const aiConfig = useAiSettings();
 
   const providerStatus = (() => {
-    if (aiConfig.provider === 'openai') return aiConfig.hasOpenAIKey ? aiConfig.openaiModel : 'OpenAI key needed';
-    if (aiConfig.provider === 'anthropic') return aiConfig.hasAnthropicKey ? aiConfig.anthropicModel : 'Anthropic key needed';
+    if (aiConfig.provider === 'openai') return aiConfig.hasOpenAIKey ? aiConfig.openaiModel : 'OpenAI API key needed';
+    if (aiConfig.provider === 'anthropic') return aiConfig.hasAnthropicKey ? aiConfig.anthropicModel : 'Anthropic API key needed';
+    if (aiConfig.provider === 'openai-compatible') return aiConfig.openaiCompatibleModel || `${aiProviderLabel('openai-compatible')} model needed`;
     return aiConfig.ollamaModel;
   })();
 
@@ -231,7 +232,7 @@ export default function AiThinkingPanel({ idea, onApply }: AiThinkingPanelProps)
                   {preflight.requiresConfirmation && (
                     <p className="text-xs text-amber-800 leading-relaxed">
                       Your guardrail settings require confirmation before sending idea content to{' '}
-                      <span className="font-medium">{preflight.provider}</span> ({preflight.model}).
+                      <span className="font-medium">{aiProviderLabel(preflight.provider, 'short')}</span> ({preflight.model}).
                     </p>
                   )}
                   {preflight.contentLeavesMachine && (

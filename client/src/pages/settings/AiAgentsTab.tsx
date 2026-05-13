@@ -1,7 +1,7 @@
 /**
  * Settings → AI & Agents
  *
- * A1  Provider cards — OpenAI, Anthropic, Ollama
+ * A1  Provider cards — OpenAI API, Anthropic API, Ollama, OpenRouter / custom endpoint
  * A2  Default-provider radio (built into cards)
  * A3  Token budget + usage readout
  * A4  Linked-agent cards — Claude Code, Codex CLI
@@ -25,6 +25,7 @@ import {
   Unlink,
   Zap,
 } from 'lucide-react';
+import { aiProviderLabel, isAiProviderId } from '@/lib/types';
 import type {
   AgentProvider,
   AiAuditEvent,
@@ -484,7 +485,7 @@ function OllamaDetail({ model, baseUrl, onSave }: OllamaDetailProps) {
   );
 }
 
-// ── OpenAI-compatible detail form ────────────────────────────────────────────
+// ── OpenRouter / custom endpoint detail form ─────────────────────────────────
 
 interface OpenAICompatibleDetailProps {
   preset: AiOpenAICompatiblePresetId;
@@ -529,6 +530,10 @@ function OpenAICompatibleDetail({ preset, model, baseUrl, hasKey, onSave }: Open
 
   return (
     <div className="space-y-3">
+      <p className="text-[11px] text-ink-500 leading-relaxed">
+        Use this for OpenRouter, Groq, Mistral, Together, Fireworks, LM Studio,
+        vLLM, llama.cpp, LocalAI, or another service that accepts OpenAI Chat Completions requests.
+      </p>
       <label className="block text-xs text-ink-500">
         Preset
         <select
@@ -766,8 +771,8 @@ function dataResidency(ai: AiPublicConfig): DataResidency {
 }
 
 function cloudProviderLabel(ai: AiPublicConfig): string {
-  if (ai.provider === 'openai') return 'OpenAI';
-  if (ai.provider === 'anthropic') return 'Anthropic';
+  if (ai.provider === 'openai') return aiProviderLabel('openai');
+  if (ai.provider === 'anthropic') return aiProviderLabel('anthropic');
   if (ai.provider === 'openai-compatible') {
     const preset = presetFor(ai.openaiCompatiblePreset);
     return preset.label;
@@ -808,7 +813,7 @@ function PrivacyNotice({ ai, preflight }: { ai: AiPublicConfig; preflight?: AiPr
           <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
             When AI features run, field content from your ideas is sent to{' '}
             <span className="font-semibold">{cloudProviderLabel(ai)}'s</span> servers for processing.
-            To keep all inference local, switch to Ollama or a local OpenAI-compatible endpoint (LM Studio, vLLM, llama.cpp).
+            To keep all inference local, switch to Ollama or a local custom endpoint (LM Studio, vLLM, llama.cpp).
           </p>
         </div>
       </div>
@@ -820,9 +825,9 @@ function PrivacyNotice({ ai, preflight }: { ai: AiPublicConfig; preflight?: AiPr
     <div className="flex items-start gap-2.5 px-3 py-2.5 bg-ink-50 border border-ink-200 rounded-card">
       <Shield className="w-4 h-4 text-ink-400 mt-0.5 shrink-0" />
       <div>
-        <p className="text-sm font-medium text-ink-700">Custom endpoint — data residency unknown</p>
+        <p className="text-sm font-medium text-ink-700">Custom endpoint - data residency unknown</p>
         <p className="text-xs text-ink-500 mt-0.5 leading-relaxed">
-          A custom OpenAI-compatible endpoint is configured. Whether idea content stays on-machine
+          A custom endpoint is configured. Whether idea content stays on-machine
           or leaves depends on where that endpoint runs. Verify with your endpoint's operator.
         </p>
       </div>
@@ -841,6 +846,7 @@ const ROUTE_LABELS: Record<string, string> = {
 };
 
 function routeLabel(route: string): string {
+  if (isAiProviderId(route)) return aiProviderLabel(route);
   return ROUTE_LABELS[route] ?? route;
 }
 
@@ -976,10 +982,10 @@ const FEATURE_LABELS: Record<AiFeatureId, string> = {
 };
 
 const PROVIDER_LABELS: Record<AiProviderId, string> = {
-  openai: 'OpenAI',
-  anthropic: 'Anthropic',
-  ollama: 'Ollama (local)',
-  'openai-compatible': 'OpenAI-compatible',
+  openai: aiProviderLabel('openai'),
+  anthropic: aiProviderLabel('anthropic'),
+  ollama: aiProviderLabel('ollama'),
+  'openai-compatible': aiProviderLabel('openai-compatible'),
 };
 
 const REMOTE_PROVIDERS: AiProviderId[] = ['openai', 'anthropic', 'openai-compatible'];
@@ -1074,7 +1080,7 @@ function AdvancedGuardrailsSection({ guardrails, onSave }: AdvancedGuardrailsSec
                 <div>
                   <p className="text-xs font-semibold text-ink-700">Local-only mode</p>
                   <p className="text-[11px] text-ink-500 leading-relaxed mt-0.5">
-                    Blocks all cloud providers. Only Ollama and local compatible endpoints will run.
+                    Blocks cloud provider routes. Only Ollama runs until you manually re-enable a trusted local custom endpoint.
                   </p>
                 </div>
                 <button
@@ -1411,10 +1417,10 @@ const AI_FEATURE_ROWS: Array<{ id: AiFeatureId; label: string; detail: string; s
 ];
 
 const AI_PROVIDER_OPTIONS: Array<{ id: AiProviderId; label: string }> = [
-  { id: 'openai', label: 'OpenAI' },
-  { id: 'anthropic', label: 'Anthropic' },
-  { id: 'ollama', label: 'Ollama' },
-  { id: 'openai-compatible', label: 'OpenAI-compatible' },
+  { id: 'openai', label: aiProviderLabel('openai') },
+  { id: 'anthropic', label: aiProviderLabel('anthropic') },
+  { id: 'ollama', label: aiProviderLabel('ollama') },
+  { id: 'openai-compatible', label: aiProviderLabel('openai-compatible') },
 ];
 
 function providerModel(ai: AiPublicConfig, provider: AiProviderId): string {
@@ -1425,7 +1431,7 @@ function providerModel(ai: AiPublicConfig, provider: AiProviderId): string {
 }
 
 function providerLabel(provider: AiProviderId): string {
-  return AI_PROVIDER_OPTIONS.find((option) => option.id === provider)?.label ?? provider;
+  return aiProviderLabel(provider);
 }
 
 interface FeatureRoutingSectionProps {
@@ -1638,7 +1644,7 @@ export default function AiAgentsTab() {
         <div className="space-y-2">
           {/* OpenAI */}
           <ProviderCard
-            label="OpenAI"
+            label={aiProviderLabel('openai')}
             icon="🤖"
             isDefault={ai.provider === 'openai'}
             status={openaiStatus}
@@ -1662,7 +1668,7 @@ export default function AiAgentsTab() {
 
           {/* Anthropic */}
           <ProviderCard
-            label="Anthropic"
+            label={aiProviderLabel('anthropic')}
             icon="🧠"
             isDefault={ai.provider === 'anthropic'}
             status={anthropicStatus}
@@ -1686,7 +1692,7 @@ export default function AiAgentsTab() {
 
           {/* Ollama */}
           <ProviderCard
-            label="Ollama"
+            label={aiProviderLabel('ollama')}
             icon="🦙"
             isDefault={ai.provider === 'ollama'}
             status={ollamaStatus}
@@ -1708,9 +1714,9 @@ export default function AiAgentsTab() {
             />
           </ProviderCard>
 
-          {/* OpenAI-compatible */}
+          {/* OpenRouter / custom endpoint */}
           <ProviderCard
-            label="OpenAI-compatible"
+            label={aiProviderLabel('openai-compatible')}
             icon="🔌"
             isDefault={ai.provider === 'openai-compatible'}
             status={compatibleStatus}

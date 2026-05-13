@@ -1,3 +1,4 @@
+import { aiProviderLabel, isAiProviderId } from '../../../shared/types.js';
 import type {
   AiChatMessage,
   AiEffectiveFeatureRoute,
@@ -482,7 +483,7 @@ function parseSuggestion(field: AiSuggestionField, text: string): AiSuggestion {
 }
 
 function isProvider(value: unknown): value is AiProviderId {
-  return value === 'openai' || value === 'anthropic' || value === 'ollama' || value === 'openai-compatible';
+  return isAiProviderId(value);
 }
 
 function isOpenAICompatiblePreset(value: unknown): value is AiOpenAICompatiblePresetId {
@@ -531,9 +532,14 @@ function descriptorForConfig(config: AiStoredConfig): AiProviderDescriptor | und
   return AI_PROVIDER_DESCRIPTORS.find((descriptor) => descriptor.id === config.provider && !descriptor.presetId);
 }
 
+function providerLabelForConfig(config: AiStoredConfig): string {
+  if (config.provider === 'openai-compatible') return openAICompatiblePreset(config.openaiCompatiblePreset).label;
+  return aiProviderLabel(config.provider);
+}
+
 function providerIsLocal(config: AiStoredConfig): boolean {
   const descriptor = descriptorForConfig(config);
-  if (descriptor?.local) return true;
+  if (descriptor?.dataResidency === 'local' || descriptor?.local) return true;
   if (config.provider === 'ollama') return true;
   if (config.provider === 'openai-compatible') return isLikelyLocalUrl(config.openaiCompatibleBaseUrl);
   return false;
@@ -772,11 +778,12 @@ export class AiService {
     const guardrails = sanitizeGuardrails(config.guardrails);
     const model = modelFor(config);
     const local = providerIsLocal(config);
+    const providerLabel = providerLabelForConfig(config);
     const blockers: string[] = [];
     const warnings: string[] = [];
 
     if (guardrails.featureEnabled[feature] === false) blockers.push(`${feature} is disabled by AI guardrails.`);
-    if (guardrails.providerEnabled[config.provider] === false) blockers.push(`${config.provider} is disabled by AI guardrails.`);
+    if (guardrails.providerEnabled[config.provider] === false) blockers.push(`${providerLabel} is disabled by AI guardrails.`);
     if (guardrails.allowedModels.length > 0 && !guardrails.allowedModels.includes(model)) {
       blockers.push(`${model} is not in the AI model allowlist.`);
     }
@@ -787,7 +794,7 @@ export class AiService {
         warnings.push(`${budget.scope} budget ${budget.id} is nearly exhausted (${budget.remaining} tokens left today).`);
       }
     }
-    if (!local && guardrails.warnOnRemoteProvider) warnings.push('This route uses a non-local provider, so idea content may leave this machine.');
+    if (!local && guardrails.warnOnRemoteProvider) warnings.push(`This route uses ${providerLabel}, so idea content may leave this machine.`);
 
     return {
       feature,
@@ -809,6 +816,7 @@ export class AiService {
   private checkGuardrails(config: AiStoredConfig, feature: AiFeatureId, key: string, options: AiGuardrailCheckOptions = {}): void {
     const guardrails = sanitizeGuardrails(config.guardrails);
     const model = modelFor(config);
+    const providerLabel = providerLabelForConfig(config);
     const deny = (message: string, statusCode: number) => {
       this.store.recordAuditEvent('guardrail_denied', feature, config.provider, model, message);
       throw guardrailError(message, statusCode);
@@ -822,12 +830,12 @@ export class AiService {
     }
 
     if (guardrails.featureEnabled[feature] === false) deny(`AI feature "${feature}" is disabled by guardrails. ${GUARDRAIL_SETTINGS_HINT}`, 403);
-    if (guardrails.providerEnabled[config.provider] === false) deny(`AI provider "${config.provider}" is disabled by guardrails. ${GUARDRAIL_SETTINGS_HINT}`, 403);
+    if (guardrails.providerEnabled[config.provider] === false) deny(`AI provider "${providerLabel}" is disabled by guardrails. ${GUARDRAIL_SETTINGS_HINT}`, 403);
     if (guardrails.allowedModels.length > 0 && !guardrails.allowedModels.includes(model)) {
       deny(`AI model "${model}" is not allowed by guardrails. ${GUARDRAIL_SETTINGS_HINT}`, 403);
     }
     if (!providerIsLocal(config) && guardrails.requireConfirmationForRemoteProvider && !validConfirmationToken(options.confirmationToken, feature, config.provider, model)) {
-      deny(`Remote AI provider "${config.provider}" requires preflight confirmation before sending idea content. ${GUARDRAIL_SETTINGS_HINT}`, 403);
+      deny(`Remote AI provider "${providerLabel}" requires preflight confirmation before sending idea content. ${GUARDRAIL_SETTINGS_HINT}`, 403);
     }
 
     for (const budget of this.budgetStates(config, feature)) {
