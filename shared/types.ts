@@ -480,6 +480,8 @@ export interface AiClaudeAccountDiagnostics {
 
 export interface AiCodexAccountDiagnostics {
   authenticated: boolean;
+  available?: boolean;
+  unavailableReason?: string;
   catalogFresh?: boolean;
   accountEmail?: string;
   planType?: string;
