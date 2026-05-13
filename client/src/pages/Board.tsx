@@ -71,9 +71,18 @@ export default function Board() {
     return (
       <div className="space-y-6 animate-fade-in">
         <div>
-          <h1 className="text-3xl font-serif font-semibold text-ink-900 tracking-tight">
-            The Garden
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-serif font-semibold text-ink-900 tracking-tight">
+              The Garden
+            </h1>
+            <HelpButton
+              helpId="garden-header"
+              title="The Garden"
+              summary="Your main idea board. Filter by stage, category, or tag. Search across title, pitch, notes, and tags. Multiple filters combine with AND logic."
+              details="Press N to capture a new idea. Press / to focus search. Shelved and Cold Storage ideas are hidden by default — use the stage filter to find them."
+              manualSection="garden"
+            />
+          </div>
           <p className="text-ink-400 text-sm mt-1">Your project seed collection.</p>
         </div>
         <EmptyState

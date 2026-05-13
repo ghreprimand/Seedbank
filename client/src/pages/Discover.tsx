@@ -355,7 +355,15 @@ export default function Discover() {
     return (
       <div className="space-y-6 animate-fade-in">
         <div>
-          <h1 className="text-3xl font-serif font-semibold text-ink-900 tracking-tight">Discover</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-serif font-semibold text-ink-900 tracking-tight">Discover</h1>
+            <HelpButton
+              helpId="discover-header"
+              title="Discover"
+              summary="Surfaces ideas and connections you might miss while looking at the full board. Daily Seed, Cross-Pollinate, Draw from Storage, Pattern Insights, and Idea Weather."
+              manualSection="discover"
+            />
+          </div>
           <p className="text-ink-400 text-sm mt-1">Rediscover and recombine your ideas.</p>
         </div>
         <div className="flex flex-col items-center justify-center py-16 text-center">

@@ -184,7 +184,7 @@ export const MANUAL_GROUPS: ManualGroup[] = [
           { type: 'p', text: 'Deleted ideas go to Compost, not permanent deletion. They stay there for 30 days before being purged.' },
           { type: 'h3', text: 'Access Compost' },
           { type: 'p', text: 'Click the trash icon in the header. You can restore any idea or permanently delete it before the 30-day window.' },
-          { type: 'tip', text: 'Compost is purged automatically on server startup and periodically while the server is running.' },
+          { type: 'tip', text: 'Compost is purged automatically when Seedbank starts and periodically while it is running.' },
         ],
       },
     ],
