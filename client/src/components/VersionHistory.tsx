@@ -143,7 +143,7 @@ function SnapshotViewer({
           <SnapshotField label="Title" value={s.title} />
           <SnapshotField label="Pitch" value={s.pitch} />
           <SnapshotField label="Stage" value={STAGE_LABELS[s.stage]} />
-          <SnapshotField label="Category" value={CATEGORY_LABELS[s.category]} />
+          <SnapshotField label="Category" value={CATEGORY_LABELS[s.category] ?? s.category} />
           <SnapshotField label="Full Notes" value={s.fullNotes} multiline />
           <SnapshotField label="Hook" value={s.hook} multiline />
           <SnapshotField label="Why It Might Work" value={s.whyItMightWork} multiline />

@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import Database from 'better-sqlite3';
 import { newIdea, snapshotFrom } from '../src/domain.js';
-import { parseMarkdownIdea } from '../src/markdown.js';
+import { ideaToMarkdown, parseMarkdownIdea } from '../src/markdown.js';
 import { SeedbankRepository } from '../src/repository.js';
 import { CATEGORIES, DEFAULT_CATEGORY_DEFINITIONS } from '../../shared/types.js';
 
@@ -62,6 +62,24 @@ test('version snapshots preserve custom category IDs', () => {
   });
 
   assert.equal(snapshotFrom(idea).category, 'research-hardware');
+});
+
+test('markdown export preserves custom category ID (never writes undefined)', () => {
+  const idea = newIdea({
+    id: 'idea-md-export',
+    title: 'Custom category export',
+    category: 'hardware-project',
+  });
+
+  const md = ideaToMarkdown(idea);
+
+  // The exported markdown must contain the raw category ID, not "undefined"
+  assert.ok(md.includes('**Category:** hardware-project'), `Expected raw ID in export, got:\n${md}`);
+  assert.ok(!md.includes('undefined'), `Markdown must not contain "undefined", got:\n${md}`);
+
+  // Re-importing must round-trip the category correctly
+  const reimported = parseMarkdownIdea(md);
+  assert.equal(reimported.category, 'hardware-project');
 });
 
 test('markdown imports preserve unknown category IDs while keeping built-in label compatibility', () => {

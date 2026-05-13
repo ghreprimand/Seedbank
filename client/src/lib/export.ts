@@ -74,7 +74,7 @@ export function ideaToMarkdown(idea: Idea): string {
 
   // Metadata block
   lines.push(`> **Stage:** ${STAGE_ICONS[idea.stage]} ${STAGE_LABELS[idea.stage]}  `);
-  lines.push(`> **Category:** ${CATEGORY_LABELS[idea.category]}  `);
+  lines.push(`> **Category:** ${CATEGORY_LABELS[idea.category] ?? idea.category}  `);
   if (idea.tags.length) {
     lines.push(`> **Tags:** ${idea.tags.join(', ')}  `);
   }
