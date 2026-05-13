@@ -362,6 +362,10 @@ function publicConfig(config: AiStoredConfig): AiPublicConfig {
     hasAnthropicKey: Boolean(config.anthropicApiKeyEncrypted),
     hasOpenAICompatibleKey: Boolean(config.openaiCompatibleApiKeyEncrypted),
     claudeAccountAuthenticated: claudeAccountAuthenticatedCache,
+    codexAccountAvailable: (() => {
+      const raw = process.env.SEEDBANK_ENABLE_CODEX_ACCOUNT?.trim().toLowerCase();
+      return raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on';
+    })(),
     codexAccountAuthenticated: codexAccountAuthenticatedCache,
   };
 }

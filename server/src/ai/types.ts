@@ -9,7 +9,7 @@ import type {
   Idea,
 } from '../../../shared/types.js';
 
-export interface AiStoredConfig extends Omit<AiPublicConfig, 'hasOpenAIKey' | 'hasAnthropicKey' | 'hasOpenAICompatibleKey' | 'effectiveFeatureRoutes'> {
+export interface AiStoredConfig extends Omit<AiPublicConfig, 'hasOpenAIKey' | 'hasAnthropicKey' | 'hasOpenAICompatibleKey' | 'effectiveFeatureRoutes' | 'codexAccountAvailable'> {
   openaiApiKeyEncrypted?: string;
   anthropicApiKeyEncrypted?: string;
   openaiCompatibleApiKeyEncrypted?: string;
