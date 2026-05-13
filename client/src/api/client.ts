@@ -9,14 +9,24 @@ import type {
   AgentRunState,
   AiChatMessage,
   AiConfigInput,
+  AiFieldAssistChatRequest,
+  AiFieldAssistMessage,
+  AiFieldSuggestionRequest,
+  AiModelListResult,
+  AiProviderDescriptor,
+  AiProviderHealth,
+  AiPreflightRequest,
+  AiPreflightResult,
   AiPublicConfig,
   AiSuggestion,
   AiSuggestionField,
+  AiUsageDetail as AiUsageDetailResponse,
   GraduationReadiness,
   GraduationResult,
   Idea,
   IdeaFilters,
   IdeaVersion,
+  IntegrationHealthResult,
   IntegrationSummary,
   PublicToken,
 } from '@/lib/types';
@@ -61,23 +71,104 @@ export interface CompostResponse {
 }
 
 export type BackupFrequency = 'off' | 'daily' | 'weekly';
+export type BackupDestinationType = 'local-path' | 'rclone-remote';
+
+interface BackupDestinationBase {
+  id: string;
+  type: BackupDestinationType;
+  label: string;
+  enabled: boolean;
+  includeDatabase: boolean;
+  includeJsonExport: boolean;
+}
+
+export interface LocalPathBackupDestination extends BackupDestinationBase {
+  type: 'local-path';
+  localPath: string;
+}
+
+export interface RcloneBackupDestination extends BackupDestinationBase {
+  type: 'rclone-remote';
+  remotePath: string;
+}
+
+export type BackupDestinationConfig =
+  | LocalPathBackupDestination
+  | RcloneBackupDestination;
+
+export interface BackupArtifactResult {
+  type: 'database' | 'json-export';
+  attempted: boolean;
+  ok: boolean;
+  path: string | null;
+  error?: string;
+}
+
+export interface BackupDestinationResult {
+  destinationId: string;
+  label: string;
+  type: BackupDestinationType;
+  attempted: boolean;
+  ok: boolean;
+  copiedPaths: string[];
+  error?: string;
+}
 
 export interface BackupStatus {
   config: {
     frequency: BackupFrequency;
     exportJson: boolean;
+    retentionCount: number;
+    destinations: BackupDestinationConfig[];
   };
   lastRun: {
     timestamp: string;
     backupPath: string | null;
     exportPath: string | null;
     reason: string;
+    artifacts?: BackupArtifactResult[];
+    destinations?: BackupDestinationResult[];
   } | null;
   latestDatabaseBackup: { path: string; timestamp: string } | null;
   latestJsonExport: { path: string; timestamp: string } | null;
+  rclone: {
+    available: boolean;
+    version?: string;
+    error?: string;
+  };
   paths: {
     backupsDir: string;
     exportsDir: string;
+  };
+}
+
+export interface BackupDestinationTestResult {
+  destinationId: string;
+  label: string;
+  type: BackupDestinationType;
+  ok: boolean;
+  message: string;
+  detail?: string;
+}
+
+export interface BackupRestoreValidationResult {
+  testedAt: string;
+  ok: boolean;
+  database: {
+    path: string;
+    ok: boolean;
+    sizeBytes: number | null;
+    ideaCount?: number;
+    versionCount?: number;
+    error?: string;
+  };
+  jsonExport: {
+    path: string;
+    ok: boolean;
+    sizeBytes: number | null;
+    ideaCount?: number;
+    versionCount?: number;
+    error?: string;
   };
 }
 
@@ -150,12 +241,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!response.ok) {
     setConnectionStatus(response.status >= 500 ? 'offline' : 'online');
-    let message = response.statusText;
-    try {
-      const body = await response.json() as Record<string, unknown>;
-      if (typeof body?.error === 'string') message = body.error;
-      else if (typeof body?.message === 'string') message = body.message;
-    } catch { /* non-JSON error body — keep statusText */ }
+    const message = await readApiErrorMessage(response);
     throw new Error(`Seedbank API ${response.status}: ${message}`);
   }
 
@@ -165,6 +251,24 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const text = await response.text();
   const contentType = response.headers.get('content-type') ?? '';
   return text && contentType.includes('application/json') ? JSON.parse(text) as T : text as T;
+}
+
+async function readApiErrorMessage(response: Response): Promise<string> {
+  let message = response.statusText;
+  try {
+    const contentType = response.headers.get('content-type') ?? '';
+    if (contentType.includes('application/json')) {
+      const body = await response.json() as Record<string, unknown>;
+      if (typeof body?.error === 'string') return body.error;
+      if (typeof body?.message === 'string') return body.message;
+      return message;
+    }
+    const text = (await response.text()).trim();
+    if (text) message = text;
+  } catch {
+    // Keep statusText when body is unreadable.
+  }
+  return message;
 }
 
 function hydrateIdea(raw: Idea): Idea {
@@ -446,10 +550,11 @@ export async function aiSuggest(
   mode: string,
   context: Record<string, unknown>,
   prompt?: string,
+  options: { aiConfirmationToken?: string } = {},
 ): Promise<AiSuggestResponse> {
   return request<AiSuggestResponse>('/api/ai/suggest', {
     method: 'POST',
-    body: JSON.stringify({ mode, context, prompt }),
+    body: JSON.stringify({ mode, context, prompt, ...options }),
   });
 }
 
@@ -464,6 +569,25 @@ export async function updateAiConfig(config: AiConfigInput): Promise<AiPublicCon
   });
 }
 
+export async function getAiProviders(): Promise<AiProviderDescriptor[]> {
+  const response = await request<{ providers: AiProviderDescriptor[] }>('/api/ai/providers');
+  return response.providers;
+}
+
+export async function testAiProvider(config: AiConfigInput): Promise<AiProviderHealth> {
+  return request<AiProviderHealth>('/api/ai/test', {
+    method: 'POST',
+    body: JSON.stringify(config),
+  });
+}
+
+export async function listAiModels(config: AiConfigInput): Promise<AiModelListResult> {
+  return request<AiModelListResult>('/api/ai/models', {
+    method: 'POST',
+    body: JSON.stringify(config),
+  });
+}
+
 export async function getAiConversation(ideaId: string): Promise<AiChatMessage[]> {
   const response = await request<AiConversationResponse>(`/api/ai/conversations/${encodeURIComponent(ideaId)}`);
   return response.messages.map(hydrateAiMessage);
@@ -473,30 +597,55 @@ export async function suggestIdeaField(
   ideaId: string,
   field: AiSuggestionField,
   currentValue: string,
+  options: Pick<AiFieldSuggestionRequest, 'prompt' | 'omitCurrentValue' | 'aiConfirmationToken'> = {},
 ): Promise<AiSuggestion> {
   return request<AiSuggestion>('/api/ai/suggest', {
     method: 'POST',
-    body: JSON.stringify({ ideaId, field, currentValue }),
+    body: JSON.stringify({ ideaId, field, currentValue, ...options }),
   });
+}
+
+export async function streamFieldAssistChat(
+  requestBody: AiFieldAssistChatRequest,
+  onDelta: (delta: string) => void,
+): Promise<AiChatMessage> {
+  return streamAiMessage('/api/ai/field-chat', requestBody, onDelta);
 }
 
 export async function streamAiChat(
   ideaId: string,
   message: string,
   onDelta: (delta: string) => void,
+  options: { aiConfirmationToken?: string } = {},
 ): Promise<AiChatMessage> {
-  const response = await fetch(apiUrl('/api/ai/chat'), {
+  return streamAiMessage('/api/ai/chat', { ideaId, message, ...options }, onDelta);
+}
+
+async function streamAiMessage(
+  path: string,
+  requestBody: {
+    ideaId: string;
+    message: string;
+    history?: AiFieldAssistMessage[];
+    field?: AiSuggestionField;
+    currentValue?: string;
+    aiConfirmationToken?: string;
+  },
+  onDelta: (delta: string) => void,
+): Promise<AiChatMessage> {
+  const response = await fetch(apiUrl(path), {
     method: 'POST',
     headers: {
       Accept: 'text/event-stream',
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ ideaId, message }),
+    body: JSON.stringify(requestBody),
   });
 
   if (!response.ok || !response.body) {
     setConnectionStatus(response.status >= 500 ? 'offline' : 'online');
-    throw new Error(`Seedbank API ${response.status}: ${response.statusText}`);
+    const message = await readApiErrorMessage(response);
+    throw new Error(`Seedbank API ${response.status}: ${message}`);
   }
 
   setConnectionStatus('online');
@@ -538,6 +687,44 @@ export interface AiUsageSummary {
 
 export async function getAiUsage(): Promise<AiUsageSummary> {
   return request<AiUsageSummary>('/api/ai/usage');
+}
+
+export interface AiUsageByRoute {
+  route: string;
+  provider: string;
+  model: string;
+  totalTokens: number;
+  requests: number;
+}
+
+export interface AiUsageDetail {
+  last24h: number;
+  last7d: number;
+  byRoute24h: AiUsageByRoute[];
+  raw: AiUsageDetailResponse;
+}
+
+export async function getAiUsageDetail(): Promise<AiUsageDetail> {
+  const detail = await request<AiUsageDetailResponse>('/api/ai/usage/detail');
+  return {
+    last24h: detail.windows.last24h,
+    last7d: detail.windows.last7d,
+    byRoute24h: detail.byRoute24h.map((bucket) => ({
+      route: bucket.key,
+      provider: bucket.provider ?? '',
+      model: bucket.model ?? '',
+      totalTokens: bucket.totalTokens,
+      requests: bucket.count,
+    })),
+    raw: detail,
+  };
+}
+
+export async function preflightAiRequest(input: AiPreflightRequest): Promise<AiPreflightResult> {
+  return request<AiPreflightResult>('/api/ai/preflight', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
 }
 
 // ── Agent linking + runs ──────────────────────────────────────────────────────
@@ -699,6 +886,26 @@ export async function runBackupNow(): Promise<{ run: BackupStatus['lastRun']; st
   });
 }
 
+export async function testBackupDestination(payload: {
+  id?: string;
+  destination?: BackupDestinationConfig;
+}): Promise<BackupDestinationTestResult> {
+  return request<BackupDestinationTestResult>('/api/backups/destinations/test', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function testBackupRestore(payload?: {
+  backupPath?: string;
+  exportPath?: string;
+}): Promise<BackupRestoreValidationResult> {
+  return request<BackupRestoreValidationResult>('/api/backups/test-restore', {
+    method: 'POST',
+    body: JSON.stringify(payload ?? {}),
+  });
+}
+
 // ── API Tokens ────────────────────────────────────────────────────────────────
 
 export interface TokenCreateRequest {
@@ -752,6 +959,10 @@ export async function configureIntegration(
     method: 'POST',
     body: JSON.stringify({ config }),
   });
+}
+
+export async function checkIntegrationHealth(integrationId: string): Promise<IntegrationHealthResult> {
+  return request<IntegrationHealthResult>(`/api/integrations/${encodeURIComponent(integrationId)}/health`);
 }
 
 export async function graduateIdea(

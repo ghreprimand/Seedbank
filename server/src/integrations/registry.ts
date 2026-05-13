@@ -2,7 +2,7 @@ import type { GraduationResult, Idea, IntegrationSummary } from '../../../shared
 import type { SeedbankRepository } from '../repository.js';
 import { CustomLocalIntegration } from './customLocal.js';
 import { GenericProjectIntegration } from './genericProject.js';
-import type { Integration, IntegrationConfigStore } from './types.js';
+import type { HealthResult, Integration, IntegrationConfigStore } from './types.js';
 
 const LEGACY_INTEGRATION_IDS = new Map<string, string>([
   ['archon', 'custom-local'],
@@ -63,12 +63,28 @@ export class IntegrationRegistry {
       description: integration.description,
       icon: integration.icon,
       configured: integration.isConfigured(),
+      configSchema: integration.configSchema,
+      configValues: integration.currentConfigValues(),
+      ...(integration.helpSectionId ? { helpSectionId: integration.helpSectionId } : {}),
     }));
   }
 
   get(id: string): Integration | undefined {
     const normalizedId = normalizeIntegrationId(id);
     return this.integrations.find((integration) => integration.id === normalizedId);
+  }
+
+  async healthCheck(id: string): Promise<HealthResult | undefined> {
+    const integration = this.get(id);
+    if (!integration) return undefined;
+    return integration.healthCheck();
+  }
+
+  /** Stub for future user-dropped connector modules. */
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  scanUserPlugins(): void {
+    // Future: scan <data-dir>/integrations/ for user connector modules.
+    // Requires --allow-plugins flag. Not implemented yet.
   }
 
   configure(id: string, config: Record<string, string>): IntegrationSummary | undefined {

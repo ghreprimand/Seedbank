@@ -1,8 +1,18 @@
-import type { AiChatMessage, AiConfigInput, AiProviderId, AiPublicConfig, AiSuggestionField, Idea } from '../../../shared/types.js';
+import type {
+  AiChatMessage,
+  AiConfigInput,
+  AiModelListResult,
+  AiProviderHealth,
+  AiProviderId,
+  AiPublicConfig,
+  AiSuggestionField,
+  Idea,
+} from '../../../shared/types.js';
 
-export interface AiStoredConfig extends Omit<AiPublicConfig, 'hasOpenAIKey' | 'hasAnthropicKey'> {
+export interface AiStoredConfig extends Omit<AiPublicConfig, 'hasOpenAIKey' | 'hasAnthropicKey' | 'hasOpenAICompatibleKey' | 'effectiveFeatureRoutes'> {
   openaiApiKeyEncrypted?: string;
   anthropicApiKeyEncrypted?: string;
+  openaiCompatibleApiKeyEncrypted?: string;
 }
 
 export interface AiProviderMessage {
@@ -25,6 +35,8 @@ export interface AiProvider {
   id: AiProviderId;
   complete(messages: AiProviderMessage[], config: AiStoredConfig): Promise<AiProviderResult>;
   stream(messages: AiProviderMessage[], config: AiStoredConfig, onDelta: (delta: string) => void): Promise<AiProviderResult>;
+  health(config: AiStoredConfig): Promise<AiProviderHealth>;
+  listModels(config: AiStoredConfig): Promise<AiModelListResult>;
 }
 
 export interface AiChatRequest {

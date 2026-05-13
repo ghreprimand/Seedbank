@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { GraduationResult, Idea } from '../../../shared/types.js';
+import type { ConfigFieldDescriptor, GraduationResult, Idea } from '../../../shared/types.js';
 import {
   claudeFor,
   expandHome,
@@ -8,7 +8,7 @@ import {
   uniqueProjectDir,
   writeBaseScaffold,
 } from './scaffold.js';
-import type { Integration, IntegrationConfigStore } from './types.js';
+import type { ConnectorAction, HealthResult, Integration, IntegrationConfigStore } from './types.js';
 
 interface CustomLocalConfig {
   workspaceRoot?: string;
@@ -29,6 +29,27 @@ export class CustomLocalIntegration implements Integration {
   readonly name = 'Custom local adapter';
   readonly description = 'An optional adapter for a local project workflow tool. Configure a workspace root to enable graduation to this adapter.';
   readonly icon = 'Network';
+  readonly kind = 'filesystem' as const;
+  readonly helpSectionId = 'settings-integrations';
+
+  readonly configSchema: ConfigFieldDescriptor[] = [
+    {
+      key: 'workspaceRoot',
+      label: 'Workspace root',
+      type: 'path',
+      placeholder: '/path/to/your/adapter-workspace',
+      helpText: 'Root directory of your local workflow tool workspace. Required to enable graduation to this adapter.',
+      required: true,
+    },
+    {
+      key: 'projectRoot',
+      label: 'Project root (optional)',
+      type: 'path',
+      placeholder: 'Defaults to <workspace>/projects',
+      helpText: 'Override where project scaffolds are created inside the workspace. Defaults to <workspaceRoot>/projects when left blank.',
+      required: false,
+    },
+  ];
 
   constructor(private readonly configStore: IntegrationConfigStore) {}
 
@@ -60,6 +81,35 @@ export class CustomLocalIntegration implements Integration {
   configure(config: Record<string, string>): void {
     const normalized = normalizeConfig({ ...this.config(), ...config });
     this.configStore.setConfig(this.id, normalized as Record<string, string>);
+  }
+
+  currentConfigValues(): Record<string, string> {
+    const config = this.config();
+    return {
+      workspaceRoot: config.workspaceRoot?.trim() ?? '',
+      projectRoot: config.projectRoot?.trim() ?? '',
+    };
+  }
+
+  async healthCheck(): Promise<HealthResult> {
+    const start = Date.now();
+    const config = this.config();
+    if (!config.workspaceRoot?.trim()) {
+      return { status: 'unconfigured', message: 'Workspace root not configured.' };
+    }
+    const workspaceRoot = this.workspaceRoot();
+    if (!fs.existsSync(workspaceRoot)) {
+      return { status: 'unreachable', message: `Workspace root not found: ${workspaceRoot}`, latencyMs: Date.now() - start };
+    }
+    const stat = fs.statSync(workspaceRoot);
+    if (!stat.isDirectory()) {
+      return { status: 'degraded', message: `${workspaceRoot} exists but is not a directory.`, latencyMs: Date.now() - start };
+    }
+    return { status: 'ok', message: workspaceRoot, latencyMs: Date.now() - start };
+  }
+
+  actions(): ConnectorAction[] {
+    return [];
   }
 
   canGraduate(idea: Idea) {

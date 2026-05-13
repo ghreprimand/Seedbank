@@ -169,8 +169,20 @@ export const openApiSpec: OpenAPIObject = {
       get: { summary: 'Get AI config', security: [{ bearerAuth: [] }] },
       post: { summary: 'Update AI config (legacy)', security: [{ bearerAuth: [] }], deprecated: true },
     },
+    '/api/ai/usage': {
+      get: { summary: 'AI usage summary', security: [{ bearerAuth: [] }] },
+    },
+    '/api/ai/usage/detail': {
+      get: { summary: 'AI usage breakdown and audit events', security: [{ bearerAuth: [] }] },
+    },
+    '/api/ai/preflight': {
+      post: { summary: 'Preview AI route guardrails and privacy metadata', security: [{ bearerAuth: [] }] },
+    },
     '/api/ai/suggest': {
-      post: { summary: 'AI suggestions', security: [{ bearerAuth: [] }] },
+      post: { summary: 'AI suggestions and field-assist prompts', security: [{ bearerAuth: [] }] },
+    },
+    '/api/ai/field-chat': {
+      post: { summary: 'Streaming modal-local field assistance chat', security: [{ bearerAuth: [] }] },
     },
     '/api/ai/chat': {
       post: { summary: 'Streaming AI chat', security: [{ bearerAuth: [] }] },
@@ -218,6 +230,12 @@ export const openApiSpec: OpenAPIObject = {
     },
     '/api/backups/run': {
       post: { summary: 'Run backup now', security: [{ bearerAuth: [] }] },
+    },
+    '/api/backups/destinations/test': {
+      post: { summary: 'Test backup destination', security: [{ bearerAuth: [] }] },
+    },
+    '/api/backups/test-restore': {
+      post: { summary: 'Validate backups without restoring', security: [{ bearerAuth: [] }] },
     },
     '/api/integrations': {
       get: { summary: 'List integrations', security: [{ bearerAuth: [] }] },

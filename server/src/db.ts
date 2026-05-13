@@ -21,15 +21,22 @@ function ensureDataDirs() {
   fs.mkdirSync(exportsDir, { recursive: true });
 }
 
-function backupExistingDatabase() {
-  if (!fs.existsSync(dbPath) || fs.statSync(dbPath).size === 0) return;
-
-  createDatabaseBackup();
-}
-
-export function createDatabaseBackup(date = new Date()): string | null {
+export function createDatabaseBackup(date = new Date(), retentionCount = 10): string | null {
   ensureDataDirs();
   if (!fs.existsSync(dbPath) || fs.statSync(dbPath).size === 0) return null;
+
+  // SQLite runs in WAL mode; checkpoint before copying so the snapshot includes
+  // schema/data pages that may still be in the WAL sidecar.
+  try {
+    const checkpointDb = new Database(dbPath, { fileMustExist: true });
+    try {
+      checkpointDb.pragma('wal_checkpoint(TRUNCATE)');
+    } finally {
+      checkpointDb.close();
+    }
+  } catch {
+    // Backup should still attempt a copy even if checkpointing is unavailable.
+  }
 
   const backupPath = path.join(backupsDir, `seedbank-${timestampForFilename(date)}.db`);
   fs.copyFileSync(dbPath, backupPath);
@@ -39,7 +46,10 @@ export function createDatabaseBackup(date = new Date()): string | null {
     .sort()
     .reverse();
 
-  for (const oldBackup of backups.slice(10)) {
+  const keep = Number.isFinite(retentionCount)
+    ? Math.min(500, Math.max(1, Math.floor(retentionCount)))
+    : 10;
+  for (const oldBackup of backups.slice(keep)) {
     fs.rmSync(path.join(backupsDir, oldBackup), { force: true });
   }
 
@@ -107,11 +117,12 @@ function runMigrations(db: Database.Database) {
 
 export function openDatabase(): Database.Database {
   ensureDataDirs();
-  backupExistingDatabase();
-
   const db = new Database(dbPath);
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
   runMigrations(db);
+  // Keep startup backup behavior, but snapshot the post-migration schema so
+  // restore-validation reflects the active Seedbank database structure.
+  createDatabaseBackup();
   return db;
 }
