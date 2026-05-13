@@ -825,7 +825,7 @@ function PrivacyNotice({ ai, preflight }: { ai: AiPublicConfig; preflight?: AiPr
     <div className="flex items-start gap-2.5 px-3 py-2.5 bg-ink-50 border border-ink-200 rounded-card">
       <Shield className="w-4 h-4 text-ink-400 mt-0.5 shrink-0" />
       <div>
-        <p className="text-sm font-medium text-ink-700">Custom endpoint - data residency unknown</p>
+        <p className="text-sm font-medium text-ink-700">Custom endpoint — data residency unknown</p>
         <p className="text-xs text-ink-500 mt-0.5 leading-relaxed">
           A custom endpoint is configured. Whether idea content stays on-machine
           or leaves depends on where that endpoint runs. Verify with your endpoint's operator.
@@ -1080,7 +1080,7 @@ function AdvancedGuardrailsSection({ guardrails, onSave }: AdvancedGuardrailsSec
                 <div>
                   <p className="text-xs font-semibold text-ink-700">Local-only mode</p>
                   <p className="text-[11px] text-ink-500 leading-relaxed mt-0.5">
-                    Blocks cloud provider routes. Only Ollama runs until you manually re-enable a trusted local custom endpoint.
+                    Blocks all cloud and custom endpoint routes. Only Ollama can run. Re-enabling any other provider exits this mode.
                   </p>
                 </div>
                 <button
@@ -1279,7 +1279,7 @@ function GuardrailsSection({ ai, onSaveBudget, onSaveGuardrails }: GuardrailsSec
           helpId="guardrails"
           title="Usage & Guardrails"
           summary="Controls how much AI Seedbank uses and where your data goes. The token budget caps spending. The privacy notice shows whether idea content leaves this machine."
-          details="Local providers (Ollama, LM Studio, vLLM, llama.cpp) keep all inference on-device. Cloud providers (OpenAI, Anthropic, OpenRouter, Groq) send field content to their servers. Use Advanced controls to set per-feature budgets, provider/model allowlists, and local-only mode."
+          details="Local providers (Ollama, LM Studio, vLLM, llama.cpp) keep all inference on-device. Cloud providers (OpenAI API, Anthropic API, OpenRouter, Groq) send field content to their servers. Use Advanced controls to set per-feature budgets, provider/model allowlists, and local-only mode."
           manualSection="settings-ai"
           alwaysShow
         />
