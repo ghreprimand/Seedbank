@@ -70,13 +70,13 @@ On Linux/macOS (bash launcher), if port `5173` is occupied the launcher will pic
 - **Version history** — meaningful edits create snapshots that can be inspected and restored.
 - **AI thinking partner** — chat, field suggestions, organic prompt modes, health checks, and archive insights.
 - **Ten runtime themes** — Paper, Chalk, Meadow, Dusk (light), Hearth, Rainwash (mid-depth), and Woad, Moss, Peat, Canopy (dark); switchable live from Settings → Theme, with system dark/light auto-pairing (Paper ↔ Peat).
-- **Settings page** — a permanent `/settings` home for every configuration option: AI providers, agents, theme, API tokens, webhooks, backups, integrations, and app info.
+- **Settings page** — a permanent `/settings` home for every configuration option: AI providers, agents, theme, API tokens, webhooks, backups, project graduation, and app info.
 - **Personal access tokens** — generate scoped bearer tokens (`read:ideas`, `write:ideas`, `ai:suggest`) for local scripting. Tokens are hashed at rest; creation is localhost-only.
 - **Outbound webhooks** — fire a JSON payload to any URL on `idea.created`, `idea.graduated`, or `idea.shipped`. Useful for Zapier, n8n, or local automation.
 - **Read-only MCP endpoints** — `/api/mcp/ideas` and `/api/mcp/search` expose seeds as context for external Claude or Codex sessions; token-gated.
 - **OpenAPI spec** — machine-readable at `/api/openapi.json`; browsable from Settings → API & Server.
 - **Local CLI agent runs** — link a Claude Code or Codex CLI binary in Settings → AI & Agents; launch a "Develop with agent" run from any idea in a per-idea scratch workspace. Transcript streamed live; proposed files reviewed and accepted before anything is saved. Runtime capped; kill switch always present.
-- **Project graduation** — turn a mature idea into an external project scaffold via integration adapters.
+- **Project graduation** — turn a mature idea into an external project scaffold via project-graduation adapters.
 - **Import/export** — full archive export to JSON or Markdown, plus import from Seedbank archives and Markdown.
 - **Compost bin** — deleted ideas are soft-deleted, recoverable for 30 days, then purged.
 - **Auto-backups** — scheduled SQLite backups and JSON archive exports under `<seedbank-data-dir>/`.
