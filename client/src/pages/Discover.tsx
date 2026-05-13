@@ -10,6 +10,7 @@
 
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { HelpButton } from '@/help/HelpPopover';
 import {
   Sprout,
   Shuffle,
@@ -385,7 +386,15 @@ export default function Discover() {
     <div className="space-y-10 max-w-3xl mx-auto animate-fade-in">
       {/* Page header */}
       <div>
-        <h1 className="text-3xl font-serif font-semibold text-ink-900 tracking-tight">Discover</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-3xl font-serif font-semibold text-ink-900 tracking-tight">Discover</h1>
+          <HelpButton
+            helpId="discover-header"
+            title="Discover"
+            summary="Surfaces ideas and connections you might miss while looking at the full board. Daily Seed, Cross-Pollinate, Draw from Storage, Pattern Insights, and Idea Weather."
+            manualSection="discover"
+          />
+        </div>
         <p className="text-ink-400 text-sm mt-1">Rediscover, recombine, and reflect on your ideas.</p>
       </div>
 
@@ -604,9 +613,17 @@ export default function Discover() {
         <div className="bg-paper border border-ink-100 rounded-card p-4 shadow-card">
           <div className="flex items-start justify-between gap-3 mb-3">
             <div>
-              <h3 className="text-[11px] font-medium text-ink-400 uppercase tracking-wider font-mono">
-                Pattern Insight
-              </h3>
+              <div className="flex items-center gap-1.5">
+                <h3 className="text-[11px] font-medium text-ink-400 uppercase tracking-wider font-mono">
+                  Pattern Insight
+                </h3>
+                <HelpButton
+                  helpId="discover-pattern-insight"
+                  title="Pattern Insight"
+                  summary="AI analysis of themes, constraints, and gaps across your whole garden. Spots common tags, lopsided stage distributions, and repeated idea patterns."
+                  manualSection="discover"
+                />
+              </div>
               <p className="text-sm text-ink-500 mt-1 leading-relaxed">
                 {patternLoading
                   ? 'Reading the archive...'

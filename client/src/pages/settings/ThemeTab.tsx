@@ -18,6 +18,7 @@ import {
   currentAppliedTheme,
 } from '@/theme/themeUtils';
 import { useUiSettings, useSettingsStore } from '@/stores/settings';
+import { HelpButton } from '@/help/HelpPopover';
 
 interface ThemeMeta {
   id: ThemeName;
@@ -401,9 +402,19 @@ export default function ThemeTab() {
 
       {/* Theme grid */}
       <section role="radiogroup" aria-label="Theme">
-        <h3 className="text-sm font-mono uppercase tracking-wider text-ink-400 mb-3">
-          Choose a theme
-        </h3>
+        <div className="flex items-center gap-2 mb-3">
+          <h3 className="text-sm font-mono uppercase tracking-wider text-ink-400">
+            Choose a theme
+          </h3>
+          <HelpButton
+            helpId="theme-picker"
+            title="Themes"
+            summary="Choose from 10 palettes — 4 light, 2 mid-depth, and 4 dark. All switch instantly without a reload."
+            details="Match system auto-selects Paper (light) or Peat (dark) based on your OS preference. Picking a theme manually overrides it."
+            manualSection="settings-theme"
+            alwaysShow
+          />
+        </div>
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
           {THEMES.map((theme, idx) => (
             <ThemeCard

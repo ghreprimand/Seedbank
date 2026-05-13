@@ -853,31 +853,165 @@ export class ClaudeAccountProvider implements AiProvider {
     return config.claudeAccountModel?.trim() || 'claude-sonnet-latest';
   }
 
-  async complete(_messages: AiProviderMessage[], _config: AiStoredConfig): Promise<AiProviderResult> {
-    throw new AccountProviderNotConfiguredError(this.id, aiProviderLabel(this.id));
+  private async requireTokens(): Promise<string> {
+    const { ensureLiveTokens } = await import('./claude-account/oauth.js');
+    const tokens = await ensureLiveTokens();
+    if (!tokens) {
+      throw new AiProviderError(
+        this.id,
+        'not_configured',
+        'Claude account is not logged in. Open Settings → AI & Agents and click "Log in with Claude" to authenticate.',
+      );
+    }
+    return tokens.accessToken;
+  }
+
+  async complete(messages: AiProviderMessage[], config: AiStoredConfig): Promise<AiProviderResult> {
+    const accessToken = await this.requireTokens();
+    const model = this.configuredModel(config);
+    try {
+      const response = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'anthropic-version': '2023-06-01',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: 800,
+          system: systemPrompt(messages),
+          messages: messages.filter((m) => m.role !== 'system').map((m) => ({
+            role: m.role,
+            content: m.content,
+          })),
+        }),
+      });
+      await assertOk(this.id, response, 'Claude account request');
+      const payload = await response.json() as {
+        content?: Array<{ text?: string }>;
+        usage?: { input_tokens?: number; output_tokens?: number };
+      };
+      const inputTokens = payload.usage?.input_tokens ?? 0;
+      const outputTokens = payload.usage?.output_tokens ?? 0;
+      return {
+        text: payload.content?.map((c) => c.text ?? '').join('') ?? '',
+        usage: { inputTokens, outputTokens, totalTokens: inputTokens + outputTokens },
+      };
+    } catch (error) {
+      throw providerFetchError(this.id, error);
+    }
   }
 
   async stream(
-    _messages: AiProviderMessage[],
-    _config: AiStoredConfig,
-    _onDelta: (delta: string) => void,
+    messages: AiProviderMessage[],
+    config: AiStoredConfig,
+    onDelta: (delta: string) => void,
   ): Promise<AiProviderResult> {
-    throw new AccountProviderNotConfiguredError(this.id, aiProviderLabel(this.id));
+    const accessToken = await this.requireTokens();
+    const model = this.configuredModel(config);
+    try {
+      const response = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'anthropic-version': '2023-06-01',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: 800,
+          system: systemPrompt(messages),
+          messages: messages.filter((m) => m.role !== 'system').map((m) => ({
+            role: m.role,
+            content: m.content,
+          })),
+          stream: true,
+        }),
+      });
+      await assertOk(this.id, response, 'Claude account stream');
+      let text = '';
+      let usage: AiUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+      await parseSse(response, (_event, data) => {
+        const payload = JSON.parse(data) as {
+          type?: string;
+          delta?: { text?: string };
+          message?: { usage?: { input_tokens?: number; output_tokens?: number } };
+          usage?: { output_tokens?: number };
+        };
+        if (payload.type === 'content_block_delta' && payload.delta?.text) {
+          text += payload.delta.text;
+          onDelta(payload.delta.text);
+        }
+        if (payload.message?.usage) {
+          const inputTokens = payload.message.usage.input_tokens ?? 0;
+          const outputTokens = payload.message.usage.output_tokens ?? 0;
+          usage = { inputTokens, outputTokens, totalTokens: inputTokens + outputTokens };
+        }
+        if (payload.usage?.output_tokens) {
+          usage = { ...usage, outputTokens: payload.usage.output_tokens, totalTokens: usage.inputTokens + payload.usage.output_tokens };
+        }
+      });
+      return { text, usage };
+    } catch (error) {
+      throw providerFetchError(this.id, error);
+    }
   }
 
   async health(config: AiStoredConfig): Promise<AiProviderHealth> {
-    return providerHealth(this.id, this.configuredModel(config), new AccountProviderNotConfiguredError(this.id, aiProviderLabel(this.id)));
+    const model = this.configuredModel(config);
+    try {
+      const models = await this.listModels(config);
+      if (!models.ok) {
+        throw new AiProviderError(this.id, models.code ?? 'unknown', models.message ?? 'Claude account model discovery failed.');
+      }
+      if (models.models.length > 0 && !models.models.some((m) => m.id === model)) {
+        throw new AiProviderError(this.id, 'model_missing', `Claude account model "${model}" was not returned by the model catalog.`);
+      }
+      return providerHealth(this.id, model);
+    } catch (error) {
+      return providerHealth(this.id, model, error);
+    }
   }
 
   async listModels(_config: AiStoredConfig): Promise<AiModelListResult> {
-    const err = new AccountProviderNotConfiguredError(this.id, aiProviderLabel(this.id));
-    return {
-      provider: this.id,
-      ok: false,
-      models: [],
-      code: err.code,
-      message: err.message,
-    };
+    try {
+      const { getCatalog, getBundledModels } = await import('./claude-account/catalog.js');
+      const { ensureLiveTokens } = await import('./claude-account/oauth.js');
+      const tokens = await ensureLiveTokens();
+      if (!tokens) {
+        // Not authenticated — return bundled models with clear labeling
+        const bundled = getBundledModels();
+        return {
+          provider: this.id,
+          ok: true,
+          models: bundled.map((m) => ({
+            id: m.id,
+            displayName: m.friendlyAlias ?? m.displayName,
+          })),
+          claudeAccount: { authenticated: false, catalogFresh: false },
+        };
+      }
+      const catalog = await getCatalog();
+      return {
+        provider: this.id,
+        ok: true,
+        models: catalog.models.map((m) => ({
+          id: m.id,
+          displayName: m.friendlyAlias ?? m.displayName,
+        })),
+        claudeAccount: { authenticated: true, catalogFresh: catalog.fresh },
+      };
+    } catch (error) {
+      const normalized = providerFetchError(this.id, error);
+      return {
+        provider: this.id,
+        ok: false,
+        models: [],
+        code: normalized.code,
+        message: normalized.message,
+      };
+    }
   }
 }
 

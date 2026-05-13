@@ -9,6 +9,7 @@ import FilterBar from '@/components/FilterBar';
 import { collectTags } from '@/lib/collectTags';
 import EmptyState from '@/components/EmptyState';
 import { seedDatabase } from '@/lib/import';
+import { HelpButton } from '@/help/HelpPopover';
 
 export default function Board() {
   const navigate = useNavigate();
@@ -90,9 +91,18 @@ export default function Board() {
     <div className="space-y-5">
       {/* Page header */}
       <div className="animate-fade-in">
-        <h1 className="text-3xl font-serif font-semibold text-ink-900 tracking-tight">
-          The Garden
-        </h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-3xl font-serif font-semibold text-ink-900 tracking-tight">
+            The Garden
+          </h1>
+          <HelpButton
+            helpId="garden-header"
+            title="The Garden"
+            summary="Your main idea board. Filter by stage, category, or tag. Search across title, pitch, notes, and tags. Multiple filters combine with AND logic."
+            details="Press N to capture a new idea. Press / to focus search. Shelved and Cold Storage ideas are hidden by default — use the stage filter to find them."
+            manualSection="garden"
+          />
+        </div>
         <p className="text-ink-400 text-sm mt-0.5 font-mono">
           {allIdeas.length} seed{allIdeas.length !== 1 ? 's' : ''} planted
         </p>

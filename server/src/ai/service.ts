@@ -99,6 +99,7 @@ const DEFAULT_CONFIG: AiStoredConfig = {
     warnOnRemoteProvider: true,
     requireConfirmationForRemoteProvider: false,
   },
+  claudeAccountAuthenticated: false,
 };
 
 const AI_CONFIG_KEY = 'ai.config';
@@ -324,6 +325,14 @@ function migrateKnownStaleModelDefaults(config: AiStoredConfig): AiStoredConfig 
   };
 }
 
+// Cached Claude account auth status — refreshed by async calls.
+// Defaults to false; updated when config is loaded or auth endpoints run.
+let claudeAccountAuthenticatedCache = false;
+
+export function setCachedClaudeAccountAuth(authenticated: boolean): void {
+  claudeAccountAuthenticatedCache = authenticated;
+}
+
 function publicConfig(config: AiStoredConfig): AiPublicConfig {
   const routes = sanitizeFeatureRoutes(config.featureRoutes);
   return {
@@ -344,6 +353,7 @@ function publicConfig(config: AiStoredConfig): AiPublicConfig {
     hasOpenAIKey: Boolean(config.openaiApiKeyEncrypted),
     hasAnthropicKey: Boolean(config.anthropicApiKeyEncrypted),
     hasOpenAICompatibleKey: Boolean(config.openaiCompatibleApiKeyEncrypted),
+    claudeAccountAuthenticated: claudeAccountAuthenticatedCache,
   };
 }
 
