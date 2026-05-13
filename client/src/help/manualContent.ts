@@ -541,6 +541,9 @@ export const MANUAL_GROUPS: ManualGroup[] = [
           { type: 'p', text: 'Click "Run backup now" to trigger an immediate backup regardless of schedule.' },
           { type: 'h3', text: 'Test restore (safe validation)' },
           { type: 'p', text: 'Restore validation reads and checks your latest local backup files — it does not replace live data. It validates the local copies Seedbank has stored on this machine. Rclone remote destinations are delivery targets; to verify a remote backup, download the files from the remote first, then validate them locally.' },
+          { type: 'ul', items: [
+            'Remote restore-check recipe: 1) download the backup DB/JSON from your rclone destination, 2) place those files in your local backup/export folder on this machine, 3) run Test restore to validate the local copy.',
+          ]},
           { type: 'tip', text: 'A startup backup is always taken when the server starts, regardless of schedule settings.' },
         ],
       },
