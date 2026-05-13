@@ -23,6 +23,7 @@ import {
 import type { Idea, Stage } from '@/lib/types';
 import { STAGE_ICONS, CATEGORY_LABELS } from '@/lib/types';
 import { aiSuggest, getAllIdeas, getStageStats, getIdeaCount } from '@/api/client';
+import { useCategoriesSettings } from '@/stores/settings';
 import StageBadge from '@/components/StageBadge';
 import CategoryBadge from '@/components/CategoryBadge';
 
@@ -124,6 +125,7 @@ function SectionHeader({
 // ── Main component ──────────────────────────────────────────────────
 
 export default function Discover() {
+  const categorySettings = useCategoriesSettings();
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -563,7 +565,7 @@ export default function Discover() {
                   key={category}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-paper-warm border border-ink-100 rounded-pill text-xs text-ink-600"
                 >
-                  {CATEGORY_LABELS[category as keyof typeof CATEGORY_LABELS] ?? category}
+                  {categorySettings.items.find((c) => c.id === category)?.label ?? CATEGORY_LABELS[category as keyof typeof CATEGORY_LABELS] ?? category}
                   <span className="text-ink-300 font-medium font-mono">{count}</span>
                 </span>
               ))}

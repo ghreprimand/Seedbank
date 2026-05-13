@@ -727,13 +727,29 @@ function agentsPublicConfig(): AgentsPublicConfig {
   };
 }
 
+/** Normalise a raw category ID to a URL/file-safe lowercase hyphen slug. */
+function normalizeCategoryId(raw: string): string {
+  return raw
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 function normalizeCategoryDefinition(input: unknown, index: number): CategoryDefinition | null {
   if (!input || typeof input !== 'object') return null;
   const row = input as Record<string, unknown>;
-  const id = typeof row.id === 'string' ? row.id.trim() : '';
-  if (!id) return null;
+  const rawId = typeof row.id === 'string' ? row.id.trim() : '';
+  if (!rawId) return null;
 
-  const builtIn = DEFAULT_CATEGORY_DEFINITIONS.find((category) => category.id === id);
+  // Look up by the exact stored ID first; for custom IDs also try the normalised form
+  // so import round-trips work even when the on-disk value slightly diverges.
+  const builtIn = DEFAULT_CATEGORY_DEFINITIONS.find((category) => category.id === rawId);
+
+  // For custom (non-built-in) IDs, normalize to lowercase-hyphen convention.
+  // Built-in IDs are always stored as-is (they already conform).
+  const id = builtIn ? rawId : normalizeCategoryId(rawId) || rawId;
+
   const label = typeof row.label === 'string' && row.label.trim()
     ? row.label.trim()
     : builtIn?.label ?? id;
@@ -744,7 +760,9 @@ function normalizeCategoryDefinition(input: unknown, index: number): CategoryDef
     id,
     label,
     sortOrder,
-    builtIn: builtIn ? true : row.builtIn === true,
+    // Only mark as built-in when the ID genuinely matches a built-in definition.
+    // Ignore any client-supplied builtIn: true for non-built-in IDs.
+    builtIn: !!builtIn,
     archived: row.archived === true,
   };
   if (typeof row.color === 'string' && row.color.trim()) normalized.color = row.color.trim();
