@@ -93,7 +93,7 @@ export default function Compost() {
             helpId="compost-header"
             title="Compost Bin"
             summary="Deleted ideas stay here for a recovery window before being purged permanently. Restore any idea or delete it immediately."
-            details="Compost is purged automatically on server startup and periodically while the server is running."
+            details="Compost is purged automatically when Seedbank starts and periodically while it is running."
             manualSection="compost"
           />
         </div>
