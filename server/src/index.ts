@@ -151,8 +151,12 @@ const webhookEmitter = new WebhookEmitter(SERVER_VERSION, () => webhooksConfig()
 const MAX_BACKUP_RETENTION = 500;
 const MIN_BACKUP_RETENTION = 1;
 const MAX_RESTORE_JSON_BYTES = 25 * 1024 * 1024;
+const RCLONE_PROBE_TIMEOUT_MS = 10_000;
+const RCLONE_PROBE_MAX_BUFFER = 64 * 1024;
 
-let rcloneProbeCache: { available: boolean; version?: string; error?: string } | null = null;
+type RcloneReadinessStatus = BackupStatus['rclone'];
+
+let rcloneProbeCache: RcloneReadinessStatus | null = null;
 
 function normalizeBackupFrequency(input: unknown, fallback: BackupFrequency): BackupFrequency {
   return input === 'off' || input === 'daily' || input === 'weekly' ? input : fallback;
@@ -208,19 +212,80 @@ function mergeBackupConfig(current: BackupConfig, requested: Partial<BackupConfi
   };
 }
 
-function rcloneAvailability(): { available: boolean; version?: string; error?: string } {
+function firstNonEmptyLine(output: string): string | undefined {
+  return output.split('\n').find((line) => line.trim().length > 0)?.trim();
+}
+
+function safeRcloneProbeError(err: unknown, fallback: string): string {
+  if (err instanceof Error && err.name === 'AbortError') {
+    return 'Timed out while checking rclone.';
+  }
+  return fallback;
+}
+
+function isCommandNotFound(err: unknown): boolean {
+  return Boolean(err && typeof err === 'object' && 'code' in err && (err as { code?: unknown }).code === 'ENOENT');
+}
+
+function rcloneAvailability(): RcloneReadinessStatus {
   if (rcloneProbeCache) return rcloneProbeCache;
+  let version: string | undefined;
   try {
     const output = execFileSync('rclone', ['version'], {
       stdio: ['ignore', 'pipe', 'pipe'],
       encoding: 'utf8',
-      timeout: 10_000,
+      timeout: RCLONE_PROBE_TIMEOUT_MS,
+      maxBuffer: RCLONE_PROBE_MAX_BUFFER,
     });
-    const version = output.split('\n').find((line) => line.trim().length > 0)?.trim();
-    rcloneProbeCache = { available: true, version };
+    version = firstNonEmptyLine(output);
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'rclone is not available in PATH.';
-    rcloneProbeCache = { available: false, error: message };
+    const notInstalled = isCommandNotFound(err);
+    const message = notInstalled
+      ? 'rclone is not installed or not on PATH.'
+      : safeRcloneProbeError(err, 'Could not run rclone.');
+    rcloneProbeCache = {
+      available: false,
+      installed: false,
+      configured: false,
+      remoteCount: 0,
+      status: notInstalled ? 'not-installed' : 'error',
+      message,
+      error: message,
+    };
+    return rcloneProbeCache;
+  }
+
+  try {
+    const output = execFileSync('rclone', ['listremotes'], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      encoding: 'utf8',
+      timeout: RCLONE_PROBE_TIMEOUT_MS,
+      maxBuffer: RCLONE_PROBE_MAX_BUFFER,
+    });
+    const remoteCount = output.split('\n').map((line) => line.trim()).filter(Boolean).length;
+    rcloneProbeCache = {
+      available: true,
+      installed: true,
+      configured: remoteCount > 0,
+      remoteCount,
+      status: remoteCount > 0 ? 'ready' : 'no-remotes',
+      message: remoteCount > 0
+        ? `${remoteCount} rclone remote${remoteCount === 1 ? '' : 's'} configured.`
+        : 'rclone is installed, but no remotes are configured.',
+      ...(version ? { version } : {}),
+    };
+  } catch (err) {
+    const message = safeRcloneProbeError(err, 'Could not check configured rclone remotes.');
+    rcloneProbeCache = {
+      available: true,
+      installed: true,
+      configured: false,
+      remoteCount: 0,
+      status: 'error',
+      message,
+      error: message,
+      ...(version ? { version } : {}),
+    };
   }
   return rcloneProbeCache;
 }
