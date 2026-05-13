@@ -72,12 +72,12 @@ echo.>> "%LOG_FILE%"
 echo === %DATE% %TIME% - seedbank start client=%SEEDBANK_CLIENT_PORT% server=%SEEDBANK_SERVER_PORT% ===>> "%LOG_FILE%"
 
 pushd "%SEEDBANK_DIR%" >nul
-start "Seedbank Server" /b cmd /c "set PORT=%SEEDBANK_SERVER_PORT%&& npm run dev -w server >> ^"%LOG_FILE%^" 2>&1"
+start "Seedbank Server" /b cmd /c "set PORT=%SEEDBANK_SERVER_PORT%&& npm run start -w server >> ^"%LOG_FILE%^" 2>&1"
 timeout /t 2 /nobreak >nul
 call :port_pid %SEEDBANK_SERVER_PORT%
 if not "!FOUND_PID!"=="" echo !FOUND_PID!> "%SERVER_PID_FILE%"
 
-start "Seedbank Client" /b cmd /c "set VITE_SEEDBANK_API_URL=http://localhost:%SEEDBANK_SERVER_PORT%&& npm run dev -w client -- --host 127.0.0.1 --port %SEEDBANK_CLIENT_PORT% --strictPort >> ^"%LOG_FILE%^" 2>&1"
+start "Seedbank Client" /b cmd /c "set VITE_SEEDBANK_API_URL=http://localhost:%SEEDBANK_SERVER_PORT%&& npm run preview -w client -- --host 127.0.0.1 --port %SEEDBANK_CLIENT_PORT% --strictPort >> ^"%LOG_FILE%^" 2>&1"
 timeout /t 2 /nobreak >nul
 call :port_pid %SEEDBANK_CLIENT_PORT%
 if not "!FOUND_PID!"=="" echo !FOUND_PID!> "%CLIENT_PID_FILE%"
