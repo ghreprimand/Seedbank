@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { RefreshCw, Archive, HardDrive, Cloud, CircleCheck, CircleAlert } from 'lucide-react';
+import { RefreshCw, Archive, HardDrive, Cloud, CircleCheck, CircleAlert, Info, AlertTriangle } from 'lucide-react';
 import {
   runBackupNow,
   testBackupDestination,
@@ -58,6 +58,57 @@ function statusIcon(ok: boolean) {
   return ok
     ? <CircleCheck className="w-4 h-4 text-sage-700" />
     : <CircleAlert className="w-4 h-4 text-amber-700" />;
+}
+
+// ── Rclone status panel ───────────────────────────────────────────────────────
+
+interface RcloneInfo {
+  available: boolean;
+  installed: boolean;
+  configured: boolean;
+  remoteCount: number;
+  status: 'not-installed' | 'no-remotes' | 'ready' | 'error';
+  message: string;
+  version?: string;
+  error?: string;
+}
+
+function RcloneStatusBadge({ rclone }: { rclone: RcloneInfo }) {
+  if (rclone.status === 'ready') {
+    return (
+      <div className="flex items-center gap-1.5 text-[11px] text-sage-700">
+        <CircleCheck className="w-3.5 h-3.5 shrink-0" />
+        <span>
+          Rclone ready
+          {rclone.remoteCount > 0 && ` · ${rclone.remoteCount} remote${rclone.remoteCount !== 1 ? 's' : ''} configured`}
+          {rclone.version && ` · ${rclone.version}`}
+        </span>
+      </div>
+    );
+  }
+  if (rclone.status === 'no-remotes') {
+    return (
+      <div className="flex items-center gap-1.5 text-[11px] text-amber-700">
+        <CircleAlert className="w-3.5 h-3.5 shrink-0" />
+        <span>Rclone installed but no remotes configured — run <code className="font-mono">rclone config</code> to add one</span>
+      </div>
+    );
+  }
+  if (rclone.status === 'not-installed') {
+    return (
+      <div className="flex items-center gap-1.5 text-[11px] text-ink-400">
+        <Info className="w-3.5 h-3.5 shrink-0" />
+        <span>Rclone not installed — needed only if you use <em>Rclone remote</em> destinations</span>
+      </div>
+    );
+  }
+  // error state
+  return (
+    <div className="flex items-center gap-1.5 text-[11px] text-amber-700">
+      <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+      <span>Rclone error — {rclone.message}</span>
+    </div>
+  );
 }
 
 export default function BackupsTab() {
@@ -226,9 +277,7 @@ export default function BackupsTab() {
             <div className="truncate">Latest DB: {backups.latestDatabaseBackup?.path ?? backups.paths.backupsDir}</div>
             <div className="truncate">Latest JSON: {backups.latestJsonExport?.path ?? backups.paths.exportsDir}</div>
           </div>
-          <div className="text-[11px] font-mono text-ink-500">
-            Rclone: {backups.rclone.available ? `available${backups.rclone.version ? ` (${backups.rclone.version})` : ''}` : 'not detected'}
-          </div>
+          <RcloneStatusBadge rclone={backups.rclone} />
         </div>
       </section>
 
@@ -305,14 +354,24 @@ export default function BackupsTab() {
 
       <section className="space-y-3">
         <div className="flex items-center justify-between gap-3">
-          <h3 className="text-base font-serif font-semibold text-ink-800">Offsite destinations</h3>
+          <div className="flex items-center gap-1.5">
+            <h3 className="text-base font-serif font-semibold text-ink-800">Offsite destinations</h3>
+            <HelpButton
+              helpId="backup-destinations"
+              title="Offsite Backup Destinations"
+              summary="Copy backups to a local folder, a network share, or an rclone remote after each run. Local folder is the easiest option — no extra software required."
+              details="Rclone is separate software that must be installed and configured on the Seedbank machine before Rclone remote destinations work. Visit rclone.org to install, then run 'rclone config' to add a remote."
+              manualSection="settings-backups"
+              alwaysShow
+            />
+          </div>
           <div className="flex gap-2">
             <button
               type="button"
               onClick={() => setDestinationsDraft((current) => [...current, newDestination('local-path')])}
               className="px-3 py-1.5 text-xs rounded-card border border-ink-200 text-ink-700 hover:bg-ink-50"
             >
-              + Local path
+              + Local / network folder
             </button>
             <button
               type="button"
@@ -325,8 +384,9 @@ export default function BackupsTab() {
         </div>
 
         {destinationsDraft.length === 0 && (
-          <div className="text-xs text-ink-500 border border-dashed border-ink-200 rounded-card p-3">
-            No offsite destinations configured. Local backups still run on schedule.
+          <div className="text-xs text-ink-500 border border-dashed border-ink-200 rounded-card p-3 space-y-1">
+            <p>No destinations configured. Seedbank backups are stored locally on this machine.</p>
+            <p className="text-ink-400">Add a <strong className="font-medium text-ink-500">Local / network folder</strong> to copy backups to another drive or network share — no extra software needed. Add a <strong className="font-medium text-ink-500">Rclone remote</strong> to send backups to cloud storage (requires rclone installed and configured separately).</p>
           </div>
         )}
 
@@ -372,23 +432,50 @@ export default function BackupsTab() {
                           ? { ...current, localPath: event.target.value }
                           : current
                       ))}
+                      placeholder="/Volumes/Backup/Seedbank or /mnt/nas/seedbank"
                       className="mt-1 w-full px-2 py-1.5 text-sm border border-ink-200 rounded-card bg-paper"
                     />
                   </label>
                 ) : (
-                  <label className="text-xs text-ink-500">
-                    Remote path (`remote:path`)
-                    <input
-                      type="text"
-                      value={destination.remotePath}
-                      onChange={(event) => updateDestination(destination.id, (current) => (
-                        current.type === 'rclone-remote'
-                          ? { ...current, remotePath: event.target.value }
-                          : current
-                      ))}
-                      className="mt-1 w-full px-2 py-1.5 text-sm border border-ink-200 rounded-card bg-paper"
-                    />
-                  </label>
+                  <div className="space-y-1">
+                    <label className="text-xs text-ink-500">
+                      Remote path
+                      <input
+                        type="text"
+                        value={destination.remotePath}
+                        onChange={(event) => updateDestination(destination.id, (current) => (
+                          current.type === 'rclone-remote'
+                            ? { ...current, remotePath: event.target.value }
+                            : current
+                        ))}
+                        placeholder="myremote:seedbank-backups"
+                        className="mt-1 w-full px-2 py-1.5 text-sm border border-ink-200 rounded-card bg-paper"
+                      />
+                    </label>
+                    <p className="text-[11px] text-ink-400">
+                      Format: <code className="font-mono">remote-name:folder-path</code>
+                      {' '}(e.g. <code className="font-mono">mys3:seedbank</code> or <code className="font-mono">gdrive:backups/seedbank</code>).
+                      Run <code className="font-mono">rclone listremotes</code> to see your configured remotes.
+                    </p>
+                    {!backups.rclone.installed && (
+                      <div className="flex items-start gap-1.5 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                        <span>
+                          Rclone is not installed on this machine. Install it from{' '}
+                          <a href="https://rclone.org/install/" target="_blank" rel="noopener noreferrer" className="underline hover:text-amber-800">rclone.org</a>
+                          {' '}and run <code className="font-mono">rclone config</code> to add a remote before using this destination type.
+                        </span>
+                      </div>
+                    )}
+                    {backups.rclone.installed && !backups.rclone.configured && (
+                      <div className="flex items-start gap-1.5 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                        <span>
+                          Rclone is installed but no remotes are configured yet. Run <code className="font-mono">rclone config</code> in a terminal to add a remote, then come back and enter the remote path above.
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -490,8 +577,19 @@ export default function BackupsTab() {
       </section>
 
       <section className="space-y-2">
-        <h3 className="text-base font-serif font-semibold text-ink-800">Test restore (safe validation)</h3>
-        <p className="text-sm text-ink-400">Validates your latest backup files without replacing live data.</p>
+        <div className="flex items-center gap-1.5">
+          <h3 className="text-base font-serif font-semibold text-ink-800">Test restore (safe validation)</h3>
+          <HelpButton
+            helpId="backup-restore-validation"
+            title="Restore Validation"
+            summary="Checks that your latest local backup files are readable and valid — without touching your live data. This validates the local copies Seedbank has made, not files stored on rclone remotes."
+            manualSection="settings-backups"
+          />
+        </div>
+        <p className="text-sm text-ink-400">
+          Reads and validates your latest local backup files without replacing live data.
+          {' '}Rclone remote destinations are delivery targets — to verify those, restore locally first using files copied there.
+        </p>
         <button
           type="button"
           onClick={() => { void runRestoreValidation(); }}

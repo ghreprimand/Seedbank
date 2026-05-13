@@ -154,16 +154,19 @@ Read-only endpoints for external Claude or Codex sessions to pull seeds as conte
 
 ## Backups
 
-All backup settings that were previously in the header popover live here.
+All backup settings live here. Backups are written to `<seedbank-data-dir>/backups/` and can optionally be copied to offsite destinations after each run.
 
-- **Backup frequency** — off, daily, or weekly.
-- **Retention count** — choose how many database backup files to keep locally before pruning.
-- **JSON archive export** — toggle full archive JSON snapshots on each backup run.
-- **Backup directory** — defaults to `<seedbank-data-dir>/backups/` (or `$SEEDBANK_DATA_DIR/backups/`).
-- **Offsite destinations** — configure local/network folder targets and optional `rclone` remote targets.
+- **Backup frequency** — off, daily, or weekly. A startup backup is always taken on server start.
+- **Retention count** — how many database backup files to keep locally before pruning.
+- **JSON archive export** — toggle full JSON archive snapshots on each backup run (written to `<seedbank-data-dir>/exports/`).
+- **Offsite destinations** — copy backups to additional locations after each run. Two types:
+  - **Local / network folder** — a folder on this machine or a mounted network share. No extra software required; the easiest option.
+  - **Rclone remote** — copy to cloud storage or a remote server via [rclone](https://rclone.org). **Rclone is separate software** that must be installed and configured on the Seedbank machine before this destination type works. Install rclone, run `rclone config` to add a named remote, then enter the path here as `remote-name:folder` (e.g. `mys3:seedbank-backups` or `gdrive:backups/seedbank`). Run `rclone listremotes` to see configured remotes.
 - **Test destination** — run a connectivity/writeability check before relying on a destination.
 - **Manual backup** — runs a backup immediately.
-- **Test restore (safe validation)** — validates latest DB/export backup files without replacing live data; validation is limited to Seedbank backup/export directories and configured local backup destinations.
+- **Test restore (safe validation)** — reads and validates the latest local backup files without replacing live data. Validates what Seedbank has stored locally; rclone remote destinations are delivery targets and are not directly validated by this tool.
+
+The rclone status indicator in the backup summary shows whether rclone is installed and how many remotes are configured on this machine.
 
 The header status pill continues to show last-backup time and links to this tab.
 
