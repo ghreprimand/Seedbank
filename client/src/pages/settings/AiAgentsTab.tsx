@@ -2080,7 +2080,12 @@ export default function AiAgentsTab() {
   const openaiStatus: ProviderCardProps['status'] = probeStatuses.openai ?? (ai.hasOpenAIKey ? 'connected' : 'key-needed');
   const anthropicStatus: ProviderCardProps['status'] = probeStatuses.anthropic ?? (ai.hasAnthropicKey ? 'connected' : 'key-needed');
   const claudeAccountStatus: ProviderCardProps['status'] = probeStatuses['claude-account'] ?? (ai.claudeAccountAuthenticated ? 'connected' : 'upcoming');
-  const codexAccountStatus: ProviderCardProps['status'] = probeStatuses['codex-account'] ?? (ai.codexAccountAuthenticated ? 'connected' : 'key-needed');
+  // When the Codex opt-in env var is not set, treat as 'upcoming' (not 'key-needed') so the
+  // status pill accurately reflects unavailability rather than implying a key entry is needed.
+  const codexAccountStatus: ProviderCardProps['status'] = probeStatuses['codex-account']
+    ?? (ai.codexAccountAvailable
+      ? (ai.codexAccountAuthenticated ? 'connected' : 'key-needed')
+      : 'upcoming');
   const ollamaStatus: ProviderCardProps['status'] = probeStatuses.ollama ?? 'not-tested';
   const compatiblePreset = presetFor(ai.openaiCompatiblePreset);
   const compatibleStatus: ProviderCardProps['status'] = probeStatuses['openai-compatible']
@@ -2381,7 +2386,7 @@ export default function AiAgentsTab() {
                 status={codexAccountStatus}
                 modelLabel={ai.codexAccountModel || 'codex-recommended'}
                 onSetDefault={() => void setDefaultProvider('codex-account')}
-                canSetDefault={ai.codexAccountAuthenticated && codexAccountStatus === 'connected'}
+                canSetDefault={ai.codexAccountAvailable && ai.codexAccountAuthenticated && codexAccountStatus === 'connected'}
               >
                 <CodexAccountDetail
                   model={ai.codexAccountModel || 'codex-recommended'}
