@@ -609,7 +609,7 @@ function providerIsLocal(config: AiStoredConfig): boolean {
   return false;
 }
 
-function metadataForConfig(config: AiStoredConfig, resolvedModelId = modelFor(config)): AiExecutionMetadata {
+function metadataForConfig(config: AiStoredConfig, resolvedModelId?: string): AiExecutionMetadata {
   const descriptor = descriptorForConfig(config);
   const requestedModel = modelFor(config);
   const contentLeavesDevice = !providerIsLocal(config);
@@ -620,6 +620,16 @@ function metadataForConfig(config: AiStoredConfig, resolvedModelId = modelFor(co
     resolvedModelId,
     contentLeavesDevice,
   };
+}
+
+function preflightResolvedModelId(config: AiStoredConfig, requestedModel: string): string | undefined {
+  if (config.provider === 'codex-account' && (requestedModel === 'codex-recommended' || requestedModel === 'codex-fast')) {
+    return undefined;
+  }
+  if (config.provider === 'claude-account' && /^claude-.+-latest$/.test(requestedModel)) {
+    return undefined;
+  }
+  return requestedModel;
 }
 
 async function resolveExecutionModel(config: AiStoredConfig): Promise<string> {
@@ -889,7 +899,7 @@ export class AiService {
     const config = resolveFeatureConfig(this.getConfig(), feature);
     const guardrails = sanitizeGuardrails(config.guardrails);
     const model = modelFor(config);
-    const metadata = metadataForConfig(config, model);
+    const metadata = metadataForConfig(config, preflightResolvedModelId(config, model));
     const local = providerIsLocal(config);
     const providerLabel = providerLabelForConfig(config);
     const blockers: string[] = [];
@@ -916,7 +926,7 @@ export class AiService {
       providerFamily: metadata.providerFamily,
       transport: metadata.transport,
       requestedModel: metadata.requestedModel,
-      resolvedModelId: metadata.resolvedModelId,
+      ...(metadata.resolvedModelId ? { resolvedModelId: metadata.resolvedModelId } : {}),
       local,
       contentLeavesDevice: metadata.contentLeavesDevice,
       contentLeavesMachine: !local,
