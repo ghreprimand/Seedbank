@@ -497,9 +497,6 @@ export class OllamaProvider implements AiProvider {
     if (typeof capabilities.contextWindow === 'number' && capabilities.contextWindow < 2048) {
       return `Selected model context window (${capabilities.contextWindow}) is small and may truncate longer idea context.`;
     }
-    if (!capabilities.thinking) {
-      return 'Selected model does not advertise thinking capability; Thinking Partner quality may vary for deep reasoning prompts.';
-    }
     return undefined;
   }
 
@@ -622,9 +619,17 @@ export class OllamaProvider implements AiProvider {
       ]);
       if (!psResponse.ok) return { up: false };
       const psPayload = await psResponse.json() as { models?: Array<{ name?: string; expires_at?: string }> };
+      const normalizeExpiresAt = (value: string | undefined): string | null => {
+        if (!value) return null;
+        const trimmed = value.trim();
+        if (!trimmed) return null;
+        // Ollama uses an all-zero timestamp when no unload timer is set.
+        if (trimmed === '0001-01-01T00:00:00Z') return null;
+        return trimmed;
+      };
       const loaded = (psPayload.models ?? [])
         .filter((item): item is { name: string; expires_at?: string } => typeof item?.name === 'string' && item.name.length > 0)
-        .map((item) => ({ name: item.name, expiresAt: typeof item.expires_at === 'string' ? item.expires_at : null }));
+        .map((item) => ({ name: item.name, expiresAt: normalizeExpiresAt(item.expires_at) }));
       let version: string | undefined;
       if (versionResponse && versionResponse.ok) {
         try {
@@ -683,11 +688,12 @@ export class OllamaProvider implements AiProvider {
 
   async health(config: AiStoredConfig): Promise<AiProviderHealth> {
     let normalizedBaseUrl = '';
+    let modelList: AiModelListResult | undefined;
     try {
       normalizedBaseUrl = this.baseUrl(config);
-      const models = await this.listModels(config);
-      if (!models.ok) throw new AiProviderError(this.id, models.code ?? 'unknown', models.message ?? 'Ollama model discovery failed.');
-      if (models.models.length > 0 && !models.models.some((model) => this.modelMatches(model.id, config.ollamaModel))) {
+      modelList = await this.listModels(config);
+      if (!modelList.ok) throw new AiProviderError(this.id, modelList.code ?? 'unknown', modelList.message ?? 'Ollama model discovery failed.');
+      if (modelList.models.length > 0 && !modelList.models.some((model) => this.modelMatches(model.id, config.ollamaModel))) {
         throw new AiProviderError(this.id, 'model_missing', `Ollama model "${config.ollamaModel}" is not installed. Pull it in Ollama or choose an installed model.`);
       }
 
@@ -707,16 +713,13 @@ export class OllamaProvider implements AiProvider {
         );
       }
 
-      const [modelMeta, live] = await Promise.all([
-        this.probeModelCapabilities(normalizedBaseUrl, config.ollamaModel),
-        this.probeDaemonLive(normalizedBaseUrl, config.ollamaModel),
-      ]);
+      const selectedModel = modelList.models.find((model) => this.modelMatches(config.ollamaModel, model.id));
       const diagnostics: AiOllamaDiagnostics = {
         endpoint: `${normalizedBaseUrl}/api/chat`,
-        ...(modelMeta.responseDetail ? { responseDetail: modelMeta.responseDetail } : {}),
-        ...(modelMeta.warning ? { capabilityWarning: modelMeta.warning } : {}),
-        ...(modelMeta.capabilities ? { modelCapabilities: modelMeta.capabilities } : {}),
-        live,
+        ...(modelList.ollama?.responseDetail ? { responseDetail: modelList.ollama.responseDetail } : {}),
+        ...(modelList.ollama?.capabilityWarning ? { capabilityWarning: modelList.ollama.capabilityWarning } : {}),
+        ...(selectedModel?.capabilities ? { modelCapabilities: selectedModel.capabilities } : {}),
+        ...(modelList.ollama?.live ? { live: modelList.ollama.live } : {}),
       };
       return {
         provider: this.id,
@@ -739,6 +742,10 @@ export class OllamaProvider implements AiProvider {
         normalizedBaseUrl: normalizedBaseUrl || undefined,
         ollama: {
           endpoint: normalizedBaseUrl ? `${normalizedBaseUrl}/api/chat` : undefined,
+          ...(modelList?.ollama?.responseDetail ? { responseDetail: modelList.ollama.responseDetail } : {}),
+          ...(modelList?.ollama?.capabilityWarning ? { capabilityWarning: modelList.ollama.capabilityWarning } : {}),
+          ...(modelList?.ollama?.modelCapabilities ? { modelCapabilities: modelList.ollama.modelCapabilities } : {}),
+          ...(modelList?.ollama?.live ? { live: modelList.ollama.live } : {}),
         },
       };
     }

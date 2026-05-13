@@ -131,6 +131,7 @@ function ProviderProbe({
   const [message, setMessage] = useState<string | null>(null);
   const [models, setModels] = useState<AiModelInfo[]>([]);
   const [ollama, setOllama] = useState<AiOllamaDiagnostics | null>(null);
+  const capabilitySummary = summarizeOllamaCapabilities(ollama);
 
   const applyDiagnostics = (result: AiProviderHealth | AiModelListResult) => {
     setOllama(result.provider === 'ollama' ? result.ollama ?? null : null);
@@ -214,7 +215,7 @@ function ProviderProbe({
               {ollama.live.selectedModelResidency ? ` · selected: ${describeOllamaResidency(ollama.live.selectedModelResidency)}` : ''}
             </p>
           )}
-          {summarizeOllamaCapabilities(ollama) && <p>Capabilities: {summarizeOllamaCapabilities(ollama)}</p>}
+          {capabilitySummary && <p>Capabilities: {capabilitySummary}</p>}
           {ollama.capabilityWarning && <p className="text-amber-700">{ollama.capabilityWarning}</p>}
           {ollama.responseDetail && <p className="text-amber-700">Detail: {ollama.responseDetail}</p>}
         </div>
