@@ -1521,7 +1521,17 @@ function FeatureRoutingSection({ ai, onSave }: FeatureRoutingSectionProps) {
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h3 className="text-xs font-mono uppercase tracking-wider text-ink-500">Feature Defaults</h3>
+          <div className="flex items-center gap-1.5">
+            <h3 className="text-xs font-mono uppercase tracking-wider text-ink-500">Feature Defaults</h3>
+            <HelpButton
+              helpId="feature-defaults"
+              title="Feature Defaults"
+              summary="Route each AI feature to a specific provider and model, independently of the global default. 'Use global default' means a feature follows whatever provider you set as default."
+              details="The Effective readout below each row shows exactly which provider and model will run — accounting for inheritance. Useful when you want a fast/cheap model for field suggestions but a smarter one for Thinking Partner."
+              manualSection="settings-ai"
+              alwaysShow
+            />
+          </div>
           <p className="text-xs text-ink-400 mt-1">Route each AI feature to the global provider or a specific provider/model.</p>
         </div>
         <button
@@ -1683,9 +1693,19 @@ export default function AiAgentsTab() {
       {/* ── A1 + A2: Provider cards ─────────────────────────────────────────── */}
       <section className="space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-xs font-mono uppercase tracking-wider text-ink-500">
-            AI Providers
-          </h3>
+          <div className="flex items-center gap-1.5">
+            <h3 className="text-xs font-mono uppercase tracking-wider text-ink-500">
+              AI Providers
+            </h3>
+            <HelpButton
+              helpId="ai-providers"
+              title="Choosing an AI Provider"
+              summary="Not sure which to pick? Use the Thinking Partner with any provider — OpenAI and Anthropic use API keys, Ollama runs locally, OpenRouter works with many services."
+              details="I have a Claude subscription → Anthropic API (claude.ai subscriptions and API keys are separate). I run Ollama → Ollama provider, no key needed. I use OpenRouter/Groq/LM Studio → OpenRouter / custom endpoint."
+              manualSection="provider-chooser"
+              alwaysShow
+            />
+          </div>
         </div>
         <p className="text-xs text-ink-400">
           Select a global default provider. All AI features — Thinking Partner, field suggestions,
