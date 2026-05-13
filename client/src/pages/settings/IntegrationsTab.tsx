@@ -393,7 +393,7 @@ export default function IntegrationsTab() {
           helpId="integrations-tab"
           title="Project Graduation"
           summary="Graduating a seed creates a project folder with README.md and CLAUDE.md pre-filled with your idea's context. Set the project root to tell Seedbank where to create these folders."
-          details="Seedbank always creates README.md and CLAUDE.md. For all ideas except games it also adds a package.json and starter file. For game ideas it adds a project.godot stub instead. Test connection checks that the path exists and is accessible — the directory is created on first graduation."
+          details="Seedbank always creates README.md and CLAUDE.md. For all ideas except games it also adds a package.json and starter file. For game ideas it adds a project.godot stub instead. Test connection checks that the saved path can be found or created later — it passes when the path exists as a directory, or when the parent folder exists."
           manualSection="settings-integrations"
           alwaysShow
         />
