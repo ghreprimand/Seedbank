@@ -162,6 +162,9 @@ const MIN_BACKUP_RETENTION = 1;
 const MAX_RESTORE_JSON_BYTES = 25 * 1024 * 1024;
 const RCLONE_PROBE_TIMEOUT_MS = 10_000;
 const RCLONE_PROBE_MAX_BUFFER = 64 * 1024;
+const REDACTED_DATA_DIR_LABEL = '<seedbank-data-dir>';
+const REDACTED_BACKUPS_DIR = `${REDACTED_DATA_DIR_LABEL}/backups`;
+const REDACTED_EXPORTS_DIR = `${REDACTED_DATA_DIR_LABEL}/exports`;
 
 type RcloneReadinessStatus = BackupStatus['rclone'];
 
@@ -225,8 +228,16 @@ function firstNonEmptyLine(output: string): string | undefined {
   return output.split('\n').find((line) => line.trim().length > 0)?.trim();
 }
 
+function isExecTimeout(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const row = err as { code?: unknown; killed?: unknown; signal?: unknown; message?: unknown };
+  if (row.code === 'ETIMEDOUT') return true;
+  if (row.killed === true && row.signal === 'SIGTERM') return true;
+  return typeof row.message === 'string' && row.message.toLowerCase().includes('timed out');
+}
+
 function safeRcloneProbeError(err: unknown, fallback: string): string {
-  if (err instanceof Error && err.name === 'AbortError') {
+  if ((err instanceof Error && err.name === 'AbortError') || isExecTimeout(err)) {
     return 'Timed out while checking rclone.';
   }
   return fallback;
@@ -234,6 +245,86 @@ function safeRcloneProbeError(err: unknown, fallback: string): string {
 
 function isCommandNotFound(err: unknown): boolean {
   return Boolean(err && typeof err === 'object' && 'code' in err && (err as { code?: unknown }).code === 'ENOENT');
+}
+
+function errorCode(err: unknown): string | undefined {
+  return err && typeof err === 'object' && 'code' in err && typeof (err as { code?: unknown }).code === 'string'
+    ? (err as { code: string }).code
+    : undefined;
+}
+
+function rawCommandErrorText(err: unknown): string {
+  if (err && typeof err === 'object') {
+    const stderr = (err as { stderr?: unknown }).stderr;
+    if (stderr instanceof Buffer) {
+      const text = stderr.toString('utf8').trim();
+      if (text) return text;
+    }
+    if (typeof stderr === 'string' && stderr.trim()) return stderr.trim();
+  }
+  return err instanceof Error ? err.message : 'Command failed.';
+}
+
+function safeFileAccessError(err: unknown): string {
+  const code = errorCode(err);
+  if (code === 'ENOENT') return 'File does not exist.';
+  if (code === 'EACCES' || code === 'EPERM') return 'Permission denied reading file.';
+  return 'Path is not accessible.';
+}
+
+function safeLocalDestinationError(err: unknown): string {
+  const code = errorCode(err);
+  if (code === 'EACCES' || code === 'EPERM') return 'Permission denied writing to destination folder.';
+  if (code === 'ENOENT') return 'Destination folder does not exist or is not reachable.';
+  return 'Could not write to destination folder. Check path and permissions.';
+}
+
+function safeRcloneCommandError(err: unknown): string {
+  if (isExecTimeout(err)) return 'Timed out while contacting the rclone destination.';
+  if (isCommandNotFound(err)) return 'rclone is not installed or not on PATH.';
+
+  const detail = rawCommandErrorText(err).toLowerCase();
+  if (
+    detail.includes('didn\'t find section in config file')
+    || detail.includes('did not find section in config file')
+    || detail.includes('not found in config')
+  ) {
+    return 'Rclone remote name was not found. Check the configured remote name.';
+  }
+  if (
+    detail.includes('authentication')
+    || detail.includes('unauthorized')
+    || detail.includes('forbidden')
+    || detail.includes('access denied')
+    || detail.includes('permission denied')
+    || detail.includes('invalid credentials')
+    || detail.includes('token')
+  ) {
+    return 'Rclone authentication or permissions failed. Check remote credentials and access.';
+  }
+  if (
+    detail.includes('no such file or directory')
+    || detail.includes('directory not found')
+    || detail.includes('object not found')
+    || detail.includes('path not found')
+    || detail.includes('does not exist')
+  ) {
+    return 'Rclone remote path was not found. Check the remote path and retry.';
+  }
+  if (
+    detail.includes('dial tcp')
+    || detail.includes('connection refused')
+    || detail.includes('network is unreachable')
+    || detail.includes('tls handshake timeout')
+    || detail.includes('i/o timeout')
+  ) {
+    return 'Could not reach the rclone destination. Check network connectivity and remote availability.';
+  }
+  return 'Rclone command failed. Verify remote path and configuration.';
+}
+
+function safeDestinationCopyError(destination: BackupDestinationConfig, err: unknown): string {
+  return destination.type === 'local-path' ? safeLocalDestinationError(err) : safeRcloneCommandError(err);
 }
 
 function rcloneAvailability(): RcloneReadinessStatus {
@@ -303,18 +394,6 @@ function clearRcloneProbeCache(): void {
   rcloneProbeCache = null;
 }
 
-function commandErrorMessage(err: unknown): string {
-  if (err && typeof err === 'object') {
-    const stderr = (err as { stderr?: unknown }).stderr;
-    if (stderr instanceof Buffer) {
-      const text = stderr.toString('utf8').trim();
-      if (text) return text;
-    }
-    if (typeof stderr === 'string' && stderr.trim()) return stderr.trim();
-  }
-  return err instanceof Error ? err.message : 'Command failed.';
-}
-
 function joinRemotePath(base: string, fileName: string): string {
   return base.endsWith('/') ? `${base}${fileName}` : `${base}/${fileName}`;
 }
@@ -358,7 +437,7 @@ function testBackupDestination(destination: BackupDestinationConfig): {
       return {
         ok: false,
         message: 'Local destination is not writable.',
-        detail: err instanceof Error ? err.message : 'Write test failed.',
+        detail: safeLocalDestinationError(err),
       };
     }
   }
@@ -380,7 +459,7 @@ function testBackupDestination(destination: BackupDestinationConfig): {
     return {
       ok: false,
       message: 'Could not reach remote destination via rclone.',
-      detail: commandErrorMessage(err),
+      detail: safeRcloneCommandError(err),
     };
   }
 }
@@ -421,7 +500,7 @@ function resolveReadableFile(filePath: string): { path?: string; error?: string 
     return { path: resolved };
   } catch (err) {
     return {
-      error: err instanceof Error ? err.message : 'Path is not accessible.',
+      error: safeFileAccessError(err),
     };
   }
 }
@@ -457,16 +536,15 @@ function chooseRestoreValidationPath(input: {
   }
 
   if (!pathAllowedForRestoreValidation(resolved.path, allowedRoots)) {
-    const allowedSummary = allowedRoots.join(', ');
     if (requestedPath) {
       return {
         path: '',
-        badRequest: `${kindLabel} path is not allowed. Use a file inside Seedbank backup/export directories or configured local backup destinations. Allowed roots: ${allowedSummary}`,
+        badRequest: `${kindLabel} path is not allowed. Use a file inside Seedbank backup/export directories or configured local backup destinations.`,
       };
     }
     return {
       path: '',
-      error: `Latest ${kindLabel} file is outside allowed restore roots. Allowed roots: ${allowedSummary}`,
+      error: `Latest ${kindLabel} file is outside allowed restore roots.`,
     };
   }
 
@@ -641,7 +719,7 @@ function runBackup(reason: string): BackupRunRecord {
         copyArtifactToDestination(destination, artifact.path);
         copiedPaths.push(destinationCopyTarget(destination, artifact.path));
       } catch (err) {
-        const reasonText = commandErrorMessage(err);
+        const reasonText = safeDestinationCopyError(destination, err);
         destinationErrors.push(`${artifact.type}: ${reasonText}`);
       }
     }
@@ -669,17 +747,71 @@ function runBackup(reason: string): BackupRunRecord {
   return record;
 }
 
-function backupStatus(): BackupStatus {
+function redactedPath(pathValue: string): string {
+  const resolved = path.resolve(pathValue);
+  const normalizedBackupsRoot = path.resolve(backupsDir);
+  const normalizedExportsRoot = path.resolve(exportsDir);
+
+  if (isSubPath(normalizedBackupsRoot, resolved)) {
+    const relative = path.relative(normalizedBackupsRoot, resolved).split(path.sep).filter(Boolean).join('/');
+    return relative ? `${REDACTED_BACKUPS_DIR}/${relative}` : REDACTED_BACKUPS_DIR;
+  }
+  if (isSubPath(normalizedExportsRoot, resolved)) {
+    const relative = path.relative(normalizedExportsRoot, resolved).split(path.sep).filter(Boolean).join('/');
+    return relative ? `${REDACTED_EXPORTS_DIR}/${relative}` : REDACTED_EXPORTS_DIR;
+  }
+  return path.basename(resolved) || 'file';
+}
+
+function redactedCopyTarget(pathValue: string): string {
+  const normalized = pathValue.replace(/\\/g, '/');
+  const isWindowsAbsolute = /^[a-zA-Z]:\//.test(normalized);
+  const isRemotePath = normalized.includes(':') && !normalized.startsWith('/') && !isWindowsAbsolute;
+  if (!isRemotePath) return redactedPath(pathValue);
+
+  const afterColon = normalized.slice(normalized.indexOf(':') + 1);
+  const fileName = afterColon.split('/').filter(Boolean).at(-1);
+  return fileName ? `remote:.../${fileName}` : 'remote destination';
+}
+
+function redactedBackupRunRecord(record: BackupRunRecord): BackupRunRecord {
+  return {
+    ...record,
+    backupPath: record.backupPath ? redactedPath(record.backupPath) : null,
+    exportPath: record.exportPath ? redactedPath(record.exportPath) : null,
+    artifacts: record.artifacts?.map((artifact) => ({
+      ...artifact,
+      path: artifact.path ? redactedPath(artifact.path) : null,
+    })),
+    destinations: record.destinations?.map((destination) => ({
+      ...destination,
+      copiedPaths: destination.copiedPaths.map((target) => redactedCopyTarget(target)),
+    })),
+  };
+}
+
+function backupStatus(includeSensitivePaths = false): BackupStatus {
   const rclone = rcloneAvailability();
+  const rawLastRun = repository.getSetting<BackupRunRecord>('backup.lastRun') ?? null;
+  const rawLatestDatabaseBackup = latestFileInfo(backupsDir, /^seedbank-.*\.db$/);
+  const rawLatestJsonExport = latestFileInfo(exportsDir, /^seedbank-archive-.*\.json$/);
   return {
     config: backupConfig(),
-    lastRun: repository.getSetting<BackupRunRecord>('backup.lastRun') ?? null,
-    latestDatabaseBackup: latestFileInfo(backupsDir, /^seedbank-.*\.db$/),
-    latestJsonExport: latestFileInfo(exportsDir, /^seedbank-archive-.*\.json$/),
+    lastRun: includeSensitivePaths || !rawLastRun ? rawLastRun : redactedBackupRunRecord(rawLastRun),
+    latestDatabaseBackup: !rawLatestDatabaseBackup
+      ? null
+      : (includeSensitivePaths
+        ? rawLatestDatabaseBackup
+        : { ...rawLatestDatabaseBackup, path: redactedPath(rawLatestDatabaseBackup.path) }),
+    latestJsonExport: !rawLatestJsonExport
+      ? null
+      : (includeSensitivePaths
+        ? rawLatestJsonExport
+        : { ...rawLatestJsonExport, path: redactedPath(rawLatestJsonExport.path) }),
     rclone,
     paths: {
-      backupsDir,
-      exportsDir,
+      backupsDir: includeSensitivePaths ? backupsDir : REDACTED_BACKUPS_DIR,
+      exportsDir: includeSensitivePaths ? exportsDir : REDACTED_EXPORTS_DIR,
     },
   };
 }
@@ -1834,8 +1966,9 @@ app.patch('/api/backups/config', requireScope('write:ideas'), asyncRoute((req, r
 }));
 
 app.post('/api/backups/run', requireScope('write:ideas'), asyncRoute((_req, res) => {
+  const run = runBackup('manual');
   res.json({
-    run: runBackup('manual'),
+    run: redactedBackupRunRecord(run),
     status: backupStatus(),
   });
 }));
@@ -1863,7 +1996,7 @@ app.post('/api/backups/destinations/test', requireScope('write:ideas'), asyncRou
 
 app.post('/api/backups/test-restore', requireScope('write:ideas'), asyncRoute((req, res) => {
   const body = (req.body ?? {}) as { backupPath?: unknown; exportPath?: unknown };
-  const status = backupStatus();
+  const status = backupStatus(true);
   const allowedRoots = restoreValidationRoots();
   const requestedBackupPath = typeof body.backupPath === 'string' ? body.backupPath.trim() : '';
   const requestedExportPath = typeof body.exportPath === 'string' ? body.exportPath.trim() : '';
@@ -1903,11 +2036,20 @@ app.post('/api/backups/test-restore', requireScope('write:ideas'), asyncRoute((r
         error: exportChoice.error ?? 'No JSON export file available to validate.',
       };
 
+  const responseDatabase = {
+    ...database,
+    path: database.path ? redactedPath(database.path) : '',
+  };
+  const responseJsonExport = {
+    ...jsonExport,
+    path: jsonExport.path ? redactedPath(jsonExport.path) : '',
+  };
+
   res.json({
     testedAt: new Date().toISOString(),
     ok: database.ok || jsonExport.ok,
-    database,
-    jsonExport,
+    database: responseDatabase,
+    jsonExport: responseJsonExport,
   });
 }));
 
