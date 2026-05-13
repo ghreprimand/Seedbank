@@ -360,9 +360,11 @@ export const MANUAL_GROUPS: ManualGroup[] = [
         blocks: [
           { type: 'p', text: 'Not sure which provider to pick? Use this guide to match your situation.' },
           { type: 'h3', text: 'I have a Claude subscription (claude.ai)' },
-          { type: 'p', text: 'Native Claude account support is planned. In the meantime, use the Anthropic API provider with an Anthropic API key — visit console.anthropic.com to create one.' },
+          { type: 'p', text: 'A Claude account provider card appears in Settings → AI & Agents. In this version, Claude account login is not yet operational — the card will become active in an upcoming update. Until then, use the Anthropic API provider card with an Anthropic API key to run Claude models. Visit console.anthropic.com to create a key.' },
           { type: 'h3', text: 'I have a ChatGPT or OpenAI account' },
           { type: 'p', text: 'ChatGPT is a separate product from the OpenAI API. To use Seedbank with OpenAI models, create an API key at platform.openai.com and enter it in the OpenAI API provider card. API usage is billed separately from a ChatGPT subscription.' },
+          { type: 'h3', text: 'I have a Codex or ChatGPT Plus account' },
+          { type: 'p', text: 'A Codex account provider card is available in Settings → AI & Agents (beta). This path requires the Codex app-server to be installed on the Seedbank machine and uses your ChatGPT/Codex login. App-server support is in development. If you want OpenAI models without the app-server, use the OpenAI API provider card with an API key from platform.openai.com instead.' },
           { type: 'h3', text: 'I have an Anthropic API key' },
           { type: 'p', text: 'Choose the Anthropic API provider, enter your API key, set a model (e.g. claude-sonnet-4-5 or claude-3-5-haiku-20241022), and set it as the global default. Your idea content is sent to Anthropic\'s servers when AI features run.' },
           { type: 'h3', text: 'I have an OpenAI API key' },
@@ -382,10 +384,12 @@ export const MANUAL_GROUPS: ManualGroup[] = [
         blocks: [
           { type: 'p', text: 'Settings → AI & Agents is where you configure AI providers, per-feature routing, the daily token budget, and linked CLI agents.' },
           { type: 'h3', text: 'Providers' },
-          { type: 'p', text: 'Four provider types are available. The selected global default is used by all AI features unless overridden in Feature Defaults (see below).' },
+          { type: 'p', text: 'Six provider cards are available. The selected global default is used by all AI features unless overridden in Feature Defaults (see below).' },
           { type: 'ul', items: [
-            'OpenAI — enter your API key. Supports GPT-4o and other models. Idea content is sent to OpenAI\'s servers.',
-            'Anthropic — enter your API key. Supports Claude models. Idea content is sent to Anthropic\'s servers.',
+            'OpenAI API — enter your API key. Supports GPT-4o and other models. Idea content is sent to OpenAI\'s servers.',
+            'Anthropic API — enter your API key. Supports Claude models. Idea content is sent to Anthropic\'s servers.',
+            'Claude account (coming soon) — subscription-based provider using your claude.ai account. Login support is not yet available in this version; use the Anthropic API card to access Claude models now.',
+            'Codex account (beta) — requires the Codex app-server installed on the Seedbank machine and uses your ChatGPT/Codex login. App-server support is in development.',
             'Ollama — set the base URL (default: http://localhost:11434). No key required. Calls stay on the configured Ollama host (local machine or a user-provided LAN/server URL).',
             'OpenRouter / custom endpoint — configure OpenRouter or any service that accepts OpenAI Chat Completions requests: Groq, Mistral, LM Studio, vLLM, llama.cpp, LocalAI, or a custom gateway.',
           ]},
