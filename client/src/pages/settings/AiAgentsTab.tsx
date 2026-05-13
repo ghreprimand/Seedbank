@@ -33,10 +33,14 @@ import type {
   AiFeatureId,
   AiFeatureRoute,
   AiGuardrailsConfig,
+  AiModelListResult,
   AiModelInfo,
+  AiOllamaDiagnostics,
+  AiOllamaModelResidency,
   AiOpenAICompatiblePresetId,
   AiPreflightResult,
   AiProviderId,
+  AiProviderHealth,
   AiPublicConfig,
   AiUsageBucket,
 } from '@/lib/types';
@@ -89,6 +93,25 @@ function presetFor(id: AiOpenAICompatiblePresetId) {
   return OPENAI_COMPATIBLE_PRESETS.find((preset) => preset.id === id) ?? OPENAI_COMPATIBLE_PRESETS[0];
 }
 
+function describeOllamaResidency(residency: AiOllamaModelResidency | undefined): string {
+  if (!residency) return 'unknown';
+  if (residency === 'resident') return 'resident';
+  if (residency === 'idle') return 'loaded with unload timer';
+  return 'not loaded';
+}
+
+function summarizeOllamaCapabilities(diag: AiOllamaDiagnostics | null): string | null {
+  const caps = diag?.modelCapabilities;
+  if (!caps) return null;
+  const bits = [
+    `tools: ${caps.tools ? 'yes' : 'no'}`,
+    `vision: ${caps.vision ? 'yes' : 'no'}`,
+    `thinking: ${caps.thinking ? 'yes' : 'no'}`,
+  ];
+  if (typeof caps.contextWindow === 'number') bits.push(`context: ${caps.contextWindow}`);
+  return bits.join(' · ');
+}
+
 interface ProviderProbeProps {
   buildConfig: () => AiConfigInput;
   onPickModel?: (model: string) => void;
@@ -107,13 +130,20 @@ function ProviderProbe({
   const [busy, setBusy] = useState<'test' | 'models' | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [models, setModels] = useState<AiModelInfo[]>([]);
+  const [ollama, setOllama] = useState<AiOllamaDiagnostics | null>(null);
+
+  const applyDiagnostics = (result: AiProviderHealth | AiModelListResult) => {
+    setOllama(result.provider === 'ollama' ? result.ollama ?? null : null);
+  };
 
   const test = async () => {
     setBusy('test');
     setMessage(null);
+    setOllama(null);
     try {
       const result = await testAiProvider(buildConfig());
-      setMessage(result.ok ? `Connection OK${result.normalizedBaseUrl ? ` · ${result.normalizedBaseUrl}` : ''}` : result.message);
+      applyDiagnostics(result);
+      setMessage(result.ok ? `${result.message}${result.normalizedBaseUrl ? ` · ${result.normalizedBaseUrl}` : ''}` : result.message);
       onStatusChange?.(result.ok ? 'connected' : result.code === 'not_configured' ? 'key-needed' : 'unreachable');
     } catch (err) {
       setMessage(err instanceof Error ? err.message : String(err));
@@ -125,8 +155,10 @@ function ProviderProbe({
   const list = async () => {
     setBusy('models');
     setMessage(null);
+    setOllama(null);
     try {
       const result = await listAiModels(buildConfig());
+      applyDiagnostics(result);
       setModels(result.models);
       setMessage(result.ok ? `${result.models.length} models found${result.normalizedBaseUrl ? ` · ${result.normalizedBaseUrl}` : ''}` : result.message ?? 'Model discovery failed.');
     } catch (err) {
@@ -171,6 +203,22 @@ function ProviderProbe({
         )}
       </div>
       {message && <p className="text-[11px] text-ink-500 font-mono break-words">{message}</p>}
+      {ollama && (
+        <div className="text-[11px] text-ink-500 font-mono space-y-1">
+          {ollama.endpoint && <p>Endpoint: {ollama.endpoint}</p>}
+          {ollama.live && (
+            <p>
+              Daemon: {ollama.live.up ? 'up' : 'down'}
+              {ollama.live.version ? ` · v${ollama.live.version}` : ''}
+              {ollama.live.loadedModel ? ` · loaded: ${ollama.live.loadedModel}` : ''}
+              {ollama.live.selectedModelResidency ? ` · selected: ${describeOllamaResidency(ollama.live.selectedModelResidency)}` : ''}
+            </p>
+          )}
+          {summarizeOllamaCapabilities(ollama) && <p>Capabilities: {summarizeOllamaCapabilities(ollama)}</p>}
+          {ollama.capabilityWarning && <p className="text-amber-700">{ollama.capabilityWarning}</p>}
+          {ollama.responseDetail && <p className="text-amber-700">Detail: {ollama.responseDetail}</p>}
+        </div>
+      )}
     </div>
   );
 }
@@ -448,6 +496,10 @@ function OllamaDetail({ model, baseUrl, onSave }: OllamaDetailProps) {
 
   return (
     <div className="space-y-3">
+      <p className="text-[11px] text-ink-500 leading-relaxed">
+        Ollama prompts and responses stay on the configured Ollama host. This can be your local machine,
+        or another host on your LAN/server if you set a remote base URL.
+      </p>
       <label className="block text-xs text-ink-500">
         Model
         <input
@@ -477,7 +529,7 @@ function OllamaDetail({ model, baseUrl, onSave }: OllamaDetailProps) {
       <ProviderProbe
         buildConfig={() => ({ provider: 'ollama', ollamaModel: m, ollamaBaseUrl: url })}
         onPickModel={setM}
-        testLabel="Test draft"
+        testLabel="Run draft smoke test"
         listLabel="List draft models"
       />
       {saveError && <p className="text-[11px] text-red-600 font-mono">{saveError}</p>}
@@ -1279,7 +1331,7 @@ function GuardrailsSection({ ai, onSaveBudget, onSaveGuardrails }: GuardrailsSec
           helpId="guardrails"
           title="Usage & Guardrails"
           summary="Controls how much AI Seedbank uses and where your data goes. The token budget caps spending. The privacy notice shows whether idea content leaves this machine."
-          details="Local providers (Ollama, LM Studio, vLLM, llama.cpp) keep all inference on-device. Cloud providers (OpenAI API, Anthropic API, OpenRouter, Groq) send field content to their servers. Use Advanced controls to set per-feature budgets, provider/model allowlists, and local-only mode."
+          details="Ollama and local custom endpoints send content to the configured host (localhost by default, or a user-provided LAN/server URL). Cloud providers (OpenAI API, Anthropic API, OpenRouter, Groq) send field content to their servers. Use Advanced controls to set per-feature budgets, provider/model allowlists, and local-only mode."
           manualSection="settings-ai"
           alwaysShow
         />
@@ -1702,7 +1754,7 @@ export default function AiAgentsTab() {
               <ProviderProbe
                 buildConfig={() => ({ provider: 'ollama', ollamaModel: ai.ollamaModel, ollamaBaseUrl: ai.ollamaBaseUrl })}
                 onStatusChange={(status) => setProbeStatus('ollama', status)}
-                testLabel="Test saved"
+                testLabel="Run saved smoke test"
                 listLabel="List saved models"
               />
             )}

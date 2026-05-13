@@ -363,7 +363,7 @@ export const MANUAL_GROUPS: ManualGroup[] = [
           { type: 'ul', items: [
             'OpenAI — enter your API key. Supports GPT-4o and other models. Idea content is sent to OpenAI\'s servers.',
             'Anthropic — enter your API key. Supports Claude models. Idea content is sent to Anthropic\'s servers.',
-            'Ollama — set the base URL (default: http://localhost:11434). No key required. All inference stays on your machine.',
+            'Ollama — set the base URL (default: http://localhost:11434). No key required. Calls stay on the configured Ollama host (local machine or a user-provided LAN/server URL).',
             'OpenRouter / custom endpoint — configure OpenRouter or any service that accepts OpenAI Chat Completions requests: Groq, Mistral, LM Studio, vLLM, llama.cpp, LocalAI, or a custom gateway.',
           ]},
           { type: 'h3', text: 'Provider API keys vs. Seedbank tokens' },
@@ -388,11 +388,11 @@ export const MANUAL_GROUPS: ManualGroup[] = [
           { type: 'h3', text: 'Privacy and data flow' },
           { type: 'p', text: 'A notice at the top of the guardrails section shows whether your current global provider keeps inference local or sends field content to a cloud service:' },
           { type: 'ul', items: [
-            'Local providers (Ollama, LM Studio, vLLM, llama.cpp, LocalAI) — all inference runs on your machine. No idea content is transmitted over the network.',
+            'Local providers (Ollama, LM Studio, vLLM, llama.cpp, LocalAI) — inference runs on the configured local host. If you point to a remote host, content is sent only to that host.',
             'Cloud providers (OpenAI API, Anthropic API, OpenRouter, Groq, Mistral, Together, Fireworks) — field content from your ideas is sent to that provider\'s servers when AI features run.',
             'Custom endpoint — data residency depends on where your endpoint runs. Verify with your endpoint\'s operator.',
           ]},
-          { type: 'tip', text: 'To keep all AI inference private and local, configure Ollama or a local custom endpoint (LM Studio, vLLM, or llama.cpp) and set it as the global default.' },
+          { type: 'tip', text: 'To keep AI inference private on this machine, configure Ollama or a local custom endpoint (LM Studio, vLLM, or llama.cpp) with a localhost URL and set it as the global default.' },
           { type: 'h3', text: 'Token budget' },
           { type: 'p', text: 'Set a daily token limit. The limit is enforced server-side; requests that exceed it return an error. Usage is shown for the last 24 h and last 7 d. Setting 0 disables the limit. Per-minute rate limiting still applies regardless of the budget.' },
           { type: 'h3', text: 'Usage history' },
@@ -693,7 +693,7 @@ export const MANUAL_GROUPS: ManualGroup[] = [
             'JSON exports: <seedbank-data-dir>/exports/',
             'No data is sent to any cloud service by Seedbank itself.',
           ]},
-          { type: 'tip', text: 'AI features do send idea content to your chosen AI provider (OpenAI API, Anthropic API, OpenRouter / custom endpoint, or Ollama). With Ollama or a local custom endpoint, everything stays local.' },
+          { type: 'tip', text: 'AI features do send idea content to your chosen AI provider (OpenAI API, Anthropic API, OpenRouter / custom endpoint, or Ollama). With Ollama or a local custom endpoint on localhost, everything stays on this machine.' },
         ],
       },
       {
