@@ -457,7 +457,7 @@ export default function BackupsTab() {
                       {' '}(e.g. <code className="font-mono">mys3:seedbank</code> or <code className="font-mono">gdrive:backups/seedbank</code>).
                       Run <code className="font-mono">rclone listremotes</code> to see your configured remotes.
                     </p>
-                    {!backups.rclone.installed && (
+                    {backups.rclone.status === 'not-installed' && (
                       <div className="flex items-start gap-1.5 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
                         <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                         <span>
@@ -467,11 +467,21 @@ export default function BackupsTab() {
                         </span>
                       </div>
                     )}
-                    {backups.rclone.installed && !backups.rclone.configured && (
+                    {backups.rclone.status === 'no-remotes' && (
                       <div className="flex items-start gap-1.5 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
                         <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                         <span>
                           Rclone is installed but no remotes are configured yet. Run <code className="font-mono">rclone config</code> in a terminal to add a remote, then come back and enter the remote path above.
+                        </span>
+                      </div>
+                    )}
+                    {backups.rclone.status === 'error' && (
+                      <div className="flex items-start gap-1.5 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                        <span>
+                          Seedbank could not check rclone readiness
+                          {backups.rclone.message ? `: ${backups.rclone.message}` : '.'}{' '}
+                          Check the summary above for details, or run <code className="font-mono">rclone version</code> in a terminal to diagnose.
                         </span>
                       </div>
                     )}
