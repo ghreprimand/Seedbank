@@ -597,8 +597,10 @@ function OpenAICompatibleDetail({ preset, model, baseUrl, hasKey, onSave }: Open
   return (
     <div className="space-y-3">
       <p className="text-[11px] text-ink-500 leading-relaxed">
-        Use this for OpenRouter, Groq, Mistral, Together, Fireworks, LM Studio,
-        vLLM, llama.cpp, LocalAI, or another service that accepts OpenAI Chat Completions requests.
+        Supports any service that accepts OpenAI Chat Completions requests.
+        <span className="font-medium"> Local servers</span> (LM Studio, vLLM, llama.cpp, LocalAI) keep inference on
+        this machine. <span className="font-medium">Cloud services</span> (OpenRouter, Groq, Mistral, Together,
+        Fireworks) send content to external servers and typically require an API key.
       </p>
       <label className="block text-xs text-ink-500">
         Preset
@@ -607,9 +609,16 @@ function OpenAICompatibleDetail({ preset, model, baseUrl, hasKey, onSave }: Open
           onChange={(event) => changePreset(event.target.value as AiOpenAICompatiblePresetId)}
           className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800"
         >
-          {OPENAI_COMPATIBLE_PRESETS.map((item) => (
-            <option key={item.id} value={item.id}>{item.label}</option>
-          ))}
+          <optgroup label="Local servers (stays on this machine)">
+            {OPENAI_COMPATIBLE_PRESETS.filter((p) => LOCAL_COMPATIBLE_PRESETS.has(p.id)).map((item) => (
+              <option key={item.id} value={item.id}>{item.label}</option>
+            ))}
+          </optgroup>
+          <optgroup label="Cloud / external services">
+            {OPENAI_COMPATIBLE_PRESETS.filter((p) => CLOUD_COMPATIBLE_PRESETS.has(p.id)).map((item) => (
+              <option key={item.id} value={item.id}>{item.label}</option>
+            ))}
+          </optgroup>
         </select>
       </label>
       <label className="block text-xs text-ink-500">
@@ -859,11 +868,13 @@ function PrivacyNotice({ ai, preflight }: { ai: AiPublicConfig; preflight?: AiPr
       <div className="flex items-start gap-2.5 px-3 py-2.5 bg-sage-50 border border-sage-200 rounded-card">
         <Lock className="w-4 h-4 text-sage-600 mt-0.5 shrink-0" />
         <div>
-          <p className="text-sm font-medium text-sage-800">All AI runs locally</p>
+          <p className="text-sm font-medium text-sage-800">Current default provider runs locally</p>
           <p className="text-xs text-sage-700 mt-0.5 leading-relaxed">
-            Your idea content never leaves this machine. The current provider ({' '}
+            The global default ({' '}
             <span className="font-semibold">{ai.provider === 'ollama' ? 'Ollama' : presetFor(ai.openaiCompatiblePreset).label}</span>
-            ) runs inference locally.
+            ) sends idea content only to the configured local host. Individual Feature Defaults may route to different providers.
+            To keep every AI feature local, set local providers for each Feature Default or enable{' '}
+            <span className="font-medium">Local-only mode</span> in Advanced guardrails.
           </p>
         </div>
       </div>
@@ -888,15 +899,17 @@ function PrivacyNotice({ ai, preflight }: { ai: AiPublicConfig; preflight?: AiPr
     );
   }
 
-  // mixed (custom endpoint)
+  // mixed (custom endpoint — location is user-configured)
   return (
     <div className="flex items-start gap-2.5 px-3 py-2.5 bg-ink-50 border border-ink-200 rounded-card">
       <Shield className="w-4 h-4 text-ink-400 mt-0.5 shrink-0" />
       <div>
-        <p className="text-sm font-medium text-ink-700">Custom endpoint — data residency unknown</p>
+        <p className="text-sm font-medium text-ink-700">Custom endpoint — data residency is user-configured</p>
         <p className="text-xs text-ink-500 mt-0.5 leading-relaxed">
-          A custom endpoint is configured. Whether idea content stays on-machine
-          or leaves depends on where that endpoint runs. Verify with your endpoint's operator.
+          Whether idea content stays on-machine or leaves depends on the configured endpoint URL.
+          Local presets (LM Studio, vLLM, llama.cpp, LocalAI) keep inference on this machine;
+          cloud presets (OpenRouter, Groq, Mistral, Together, Fireworks) send content to external servers.
+          Check the Custom endpoint card to confirm your preset and base URL.
         </p>
       </div>
     </div>
@@ -1426,7 +1439,7 @@ function GuardrailsSection({ ai, onSaveBudget, onSaveGuardrails }: GuardrailsSec
           helpId="guardrails"
           title="Usage & Guardrails"
           summary="Controls how much AI Seedbank uses and where your data goes. The token budget caps spending. The privacy notice shows whether idea content leaves this machine."
-          details="Ollama and local custom endpoints send content to the configured host (localhost by default, or a user-provided LAN/server URL). Cloud providers (OpenAI API, Anthropic API, OpenRouter, Groq) send field content to their servers. Use Advanced controls to set per-feature budgets, provider/model allowlists, and local-only mode."
+          details="Ollama and local custom endpoints (LM Studio, vLLM, llama.cpp, LocalAI) send content only to the configured local host. Cloud providers (OpenAI API, Anthropic API, OpenRouter, Groq, Mistral, and other external endpoints) send field content to their servers. Use Advanced controls to set per-feature budgets, provider/model allowlists, and local-only mode."
           manualSection="settings-ai"
           alwaysShow
         />
@@ -1563,13 +1576,14 @@ const AI_FEATURE_ROWS: Array<{ id: AiFeatureId; label: string; detail: string; s
   { id: 'default', label: 'Other features (fallback)', detail: 'Applies only to unnamed or future AI features — does not affect the features above', secondary: true },
 ];
 
+// Ordered to match provider card grouping: direct API → local → external → account
 const AI_PROVIDER_OPTIONS: Array<{ id: AiProviderId; label: string }> = [
   { id: 'openai', label: aiProviderLabel('openai') },
   { id: 'anthropic', label: aiProviderLabel('anthropic') },
-  { id: 'claude-account', label: aiProviderLabel('claude-account') },
-  { id: 'codex-account', label: aiProviderLabel('codex-account') },
   { id: 'ollama', label: aiProviderLabel('ollama') },
   { id: 'openai-compatible', label: aiProviderLabel('openai-compatible') },
+  { id: 'claude-account', label: aiProviderLabel('claude-account') },
+  { id: 'codex-account', label: aiProviderLabel('codex-account') },
 ];
 
 function providerModel(ai: AiPublicConfig, provider: AiProviderId): string {
@@ -1662,7 +1676,7 @@ function FeatureRoutingSection({ ai, providerStatuses, accountSetupIssues, onSav
                   : selectedProvider === 'openai-compatible'
                     && openAICompatiblePreset.requiresKey
                     && !ai.hasOpenAICompatibleKey
-                    ? 'This OpenRouter/custom preset needs an API key in its provider card.'
+                    ? 'This cloud endpoint preset needs an API key — add it in the Custom endpoint card.'
                     : selectedProvider === 'claude-account' && !ai.claudeAccountAuthenticated
                       ? (accountSetupIssues['claude-account'] ?? 'Claude account is not signed in.')
                       : selectedProvider === 'codex-account' && !ai.codexAccountAuthenticated
@@ -1680,9 +1694,9 @@ function FeatureRoutingSection({ ai, providerStatuses, accountSetupIssues, onSav
                     ? 'Subscription login path (not API-key billing).'
                     : 'Claude account login is not yet available. Use the Anthropic API provider for Claude models.')
                   : selectedProvider === 'codex-account'
-                    ? 'Codex app-server login path (not OpenAI API-key billing).'
+                    ? 'Codex account subscription transport — separate from OpenAI API billing. See the Codex account card for setup.'
                     : selectedProvider === 'openai-compatible'
-                      ? 'Custom/OpenRouter endpoint path; model field accepts manual IDs.'
+                      ? 'Custom endpoint — accepts manual model IDs. Verify whether your preset is a local server or cloud service.'
                       : 'Provider is ready for this feature route.';
           const modelHint =
             selectedProvider === 'default'
@@ -1692,7 +1706,7 @@ function FeatureRoutingSection({ ai, providerStatuses, accountSetupIssues, onSav
                 : selectedProvider === 'codex-account'
                   ? 'Use codex-recommended/codex-fast or a resolved catalog ID from List models.'
                   : selectedProvider === 'openai-compatible'
-                    ? 'Manual model IDs are expected here (for OpenRouter or custom endpoint catalogs).'
+                    ? 'Enter a model ID manually (e.g. from OpenRouter, Groq, or your local server catalog).'
                     : `Effective: ${providerLabel(effective.provider)} · ${effective.model || 'choose a model'}`;
           return (
             <div
@@ -1724,7 +1738,7 @@ function FeatureRoutingSection({ ai, providerStatuses, accountSetupIssues, onSav
                       {provider.id === 'openai' && !ai.hasOpenAIKey ? ' — setup required' : ''}
                       {provider.id === 'anthropic' && !ai.hasAnthropicKey ? ' — setup required' : ''}
                       {provider.id === 'claude-account' && !ai.claudeAccountAuthenticated ? ' — not yet available' : ''}
-                      {provider.id === 'codex-account' && !ai.codexAccountAuthenticated ? ' — sign in required' : ''}
+                      {provider.id === 'codex-account' && !ai.codexAccountAuthenticated ? ' — experimental, setup required' : ''}
                     </option>
                   ))}
                 </select>
@@ -2097,7 +2111,7 @@ export default function AiAgentsTab() {
         if (!cancelled) {
           const message = err instanceof Error ? err.message : String(err);
           next['codex-account'] = /(enoent|not found|app-server|codex)/i.test(message)
-            ? 'Codex CLI/app-server is unavailable. Install or relaunch Codex, then refresh the Codex card status.'
+            ? 'Codex account app-server is not responding. Verify the app-server is installed and running, then refresh the Codex account card.'
             : message;
         }
       }
@@ -2195,8 +2209,8 @@ export default function AiAgentsTab() {
             <HelpButton
               helpId="ai-providers"
               title="Choosing an AI Provider"
-              summary="Pick by billing and runtime: OpenAI/Anthropic API keys, Claude/Codex account login, Ollama local models, or OpenRouter/custom endpoint."
-              details="Claude account and Codex account use subscription/app-server login (beta). OpenAI API and Anthropic API use direct API-key billing. OpenRouter/custom endpoint supports manual model IDs. Project Graduation is separate and only controls file scaffolding."
+              summary="Providers come in four families: direct API-key (OpenAI API, Anthropic API), local inference (Ollama, local custom servers), external cloud endpoints (OpenRouter, Groq, Mistral, and similar), and account/subscription transports (Claude account, Codex account)."
+              details="Direct API providers bill per token and require an API key. Local inference keeps idea content on this machine. External endpoints send content to cloud servers and need an API key. Account transports use subscription login — Claude account is not yet available; Codex account is experimental. Project Graduation is separate and controls only file scaffolding."
               manualSection="provider-chooser"
               alwaysShow
             />
@@ -2209,144 +2223,172 @@ export default function AiAgentsTab() {
           Expand a provider card to edit the model or API key; use Test / List models to verify.
         </p>
 
-        <div className="space-y-2">
-          {/* OpenAI */}
-          <ProviderCard
-            label={aiProviderLabel('openai')}
-            icon="🤖"
-            isDefault={ai.provider === 'openai'}
-            status={openaiStatus}
-            modelLabel={ai.openaiModel}
-            onSetDefault={() => void setDefaultProvider('openai')}
-            actions={(
-              <ProviderProbe
-                buildConfig={() => ({ provider: 'openai', openaiModel: ai.openaiModel })}
-                onStatusChange={(status) => setProbeStatus('openai', status)}
-                testLabel="Test saved"
-                listLabel="List saved models"
-              />
-            )}
-          >
-            <OpenAIDetail
-              model={ai.openaiModel}
-              hasKey={ai.hasOpenAIKey}
-              onSave={saveOpenAI}
-            />
-          </ProviderCard>
+        <div className="space-y-4">
+          {/* ── Direct API providers ──────────────────────────────────────── */}
+          <div>
+            <p className="text-[10px] font-mono uppercase tracking-wider text-ink-400 mb-1.5">Direct API providers</p>
+            <div className="space-y-2">
+              {/* OpenAI */}
+              <ProviderCard
+                label={aiProviderLabel('openai')}
+                icon="🤖"
+                isDefault={ai.provider === 'openai'}
+                status={openaiStatus}
+                modelLabel={ai.openaiModel}
+                onSetDefault={() => void setDefaultProvider('openai')}
+                actions={(
+                  <ProviderProbe
+                    buildConfig={() => ({ provider: 'openai', openaiModel: ai.openaiModel })}
+                    onStatusChange={(status) => setProbeStatus('openai', status)}
+                    testLabel="Test saved"
+                    listLabel="List saved models"
+                  />
+                )}
+              >
+                <OpenAIDetail
+                  model={ai.openaiModel}
+                  hasKey={ai.hasOpenAIKey}
+                  onSave={saveOpenAI}
+                />
+              </ProviderCard>
 
-          {/* Anthropic */}
-          <ProviderCard
-            label={aiProviderLabel('anthropic')}
-            icon="🧠"
-            isDefault={ai.provider === 'anthropic'}
-            status={anthropicStatus}
-            modelLabel={ai.anthropicModel}
-            onSetDefault={() => void setDefaultProvider('anthropic')}
-            actions={(
-              <ProviderProbe
-                buildConfig={() => ({ provider: 'anthropic', anthropicModel: ai.anthropicModel })}
-                onStatusChange={(status) => setProbeStatus('anthropic', status)}
-                testLabel="Test saved"
-                listLabel="List saved models"
-              />
-            )}
-          >
-            <AnthropicDetail
-              model={ai.anthropicModel}
-              hasKey={ai.hasAnthropicKey}
-              onSave={saveAnthropic}
-            />
-          </ProviderCard>
+              {/* Anthropic */}
+              <ProviderCard
+                label={aiProviderLabel('anthropic')}
+                icon="🧠"
+                isDefault={ai.provider === 'anthropic'}
+                status={anthropicStatus}
+                modelLabel={ai.anthropicModel}
+                onSetDefault={() => void setDefaultProvider('anthropic')}
+                actions={(
+                  <ProviderProbe
+                    buildConfig={() => ({ provider: 'anthropic', anthropicModel: ai.anthropicModel })}
+                    onStatusChange={(status) => setProbeStatus('anthropic', status)}
+                    testLabel="Test saved"
+                    listLabel="List saved models"
+                  />
+                )}
+              >
+                <AnthropicDetail
+                  model={ai.anthropicModel}
+                  hasKey={ai.hasAnthropicKey}
+                  onSave={saveAnthropic}
+                />
+              </ProviderCard>
+            </div>
+          </div>
 
-          {/* Claude Account (subscription — coming soon) */}
-          <ProviderCard
-            label={aiProviderLabel('claude-account')}
-            icon="🟣"
-            isDefault={ai.provider === 'claude-account'}
-            status={claudeAccountStatus}
-            modelLabel={ai.claudeAccountModel || 'claude-sonnet-latest'}
-            onSetDefault={() => void setDefaultProvider('claude-account')}
-            canSetDefault={ai.claudeAccountAuthenticated}
-          >
-            <ClaudeAccountDetail
-              model={ai.claudeAccountModel || 'claude-sonnet-latest'}
-              onSave={saveClaudeAccount}
-              authenticated={ai.claudeAccountAuthenticated}
-              onStatusChange={(status) => setProbeStatus('claude-account', status)}
-            />
-          </ProviderCard>
+          {/* ── Local inference ───────────────────────────────────────────── */}
+          <div>
+            <p className="text-[10px] font-mono uppercase tracking-wider text-ink-400 mb-1.5">Local inference</p>
+            <div className="space-y-2">
+              {/* Ollama */}
+              <ProviderCard
+                label={aiProviderLabel('ollama')}
+                icon="🦙"
+                isDefault={ai.provider === 'ollama'}
+                status={ollamaStatus}
+                modelLabel={`${ai.ollamaModel} · ${ai.ollamaBaseUrl}`}
+                onSetDefault={() => void setDefaultProvider('ollama')}
+                actions={(
+                  <ProviderProbe
+                    buildConfig={() => ({ provider: 'ollama', ollamaModel: ai.ollamaModel, ollamaBaseUrl: ai.ollamaBaseUrl })}
+                    onStatusChange={(status) => setProbeStatus('ollama', status)}
+                    testLabel="Run saved smoke test"
+                    listLabel="List saved models"
+                  />
+                )}
+              >
+                <OllamaDetail
+                  model={ai.ollamaModel}
+                  baseUrl={ai.ollamaBaseUrl}
+                  onSave={saveOllama}
+                />
+              </ProviderCard>
+            </div>
+          </div>
 
-          {/* Codex Account (subscription) */}
-          <ProviderCard
-            label={aiProviderLabel('codex-account')}
-            icon="⌁"
-            isDefault={ai.provider === 'codex-account'}
-            status={codexAccountStatus}
-            modelLabel={ai.codexAccountModel || 'codex-recommended'}
-            onSetDefault={() => void setDefaultProvider('codex-account')}
-          >
-            <CodexAccountDetail
-              model={ai.codexAccountModel || 'codex-recommended'}
-              onSave={saveCodexAccount}
-              authenticated={ai.codexAccountAuthenticated}
-              onStatusChange={(status) => setProbeStatus('codex-account', status)}
-            />
-          </ProviderCard>
+          {/* ── External / cloud endpoints ────────────────────────────────── */}
+          <div>
+            <p className="text-[10px] font-mono uppercase tracking-wider text-ink-400 mb-1.5">External &amp; custom endpoints</p>
+            <div className="space-y-2">
+              {/* Custom / OpenAI-compatible endpoint */}
+              <ProviderCard
+                label={aiProviderLabel('openai-compatible')}
+                icon="🔌"
+                isDefault={ai.provider === 'openai-compatible'}
+                status={compatibleStatus}
+                modelLabel={`${compatiblePreset.label} · ${ai.openaiCompatibleModel || 'choose a model'}`}
+                onSetDefault={() => void setDefaultProvider('openai-compatible')}
+                actions={(
+                  <ProviderProbe
+                    buildConfig={() => ({
+                      provider: 'openai-compatible',
+                      openaiCompatiblePreset: ai.openaiCompatiblePreset,
+                      openaiCompatibleModel: ai.openaiCompatibleModel,
+                      openaiCompatibleBaseUrl: ai.openaiCompatibleBaseUrl,
+                    })}
+                    onStatusChange={(status) => setProbeStatus('openai-compatible', status)}
+                    testLabel="Test saved"
+                    listLabel="List saved models"
+                  />
+                )}
+              >
+                <OpenAICompatibleDetail
+                  preset={ai.openaiCompatiblePreset}
+                  model={ai.openaiCompatibleModel}
+                  baseUrl={ai.openaiCompatibleBaseUrl}
+                  hasKey={ai.hasOpenAICompatibleKey}
+                  onSave={saveOpenAICompatible}
+                />
+              </ProviderCard>
+            </div>
+          </div>
 
-          {/* Ollama */}
-          <ProviderCard
-            label={aiProviderLabel('ollama')}
-            icon="🦙"
-            isDefault={ai.provider === 'ollama'}
-            status={ollamaStatus}
-            modelLabel={`${ai.ollamaModel} · ${ai.ollamaBaseUrl}`}
-            onSetDefault={() => void setDefaultProvider('ollama')}
-            actions={(
-              <ProviderProbe
-                buildConfig={() => ({ provider: 'ollama', ollamaModel: ai.ollamaModel, ollamaBaseUrl: ai.ollamaBaseUrl })}
-                onStatusChange={(status) => setProbeStatus('ollama', status)}
-                testLabel="Run saved smoke test"
-                listLabel="List saved models"
-              />
-            )}
-          >
-            <OllamaDetail
-              model={ai.ollamaModel}
-              baseUrl={ai.ollamaBaseUrl}
-              onSave={saveOllama}
-            />
-          </ProviderCard>
+          {/* ── Account / subscription transports ────────────────────────── */}
+          <div>
+            <p className="text-[10px] font-mono uppercase tracking-wider text-ink-400 mb-1.5">Account &amp; subscription transports</p>
+            <p className="text-[11px] text-ink-400 mb-2">
+              These use subscription/account login rather than API-key billing and are separate from the
+              OpenAI API and Anthropic API providers above. Account transports are not linked CLI agents.
+            </p>
+            <div className="space-y-2">
+              {/* Claude Account (subscription — coming soon) */}
+              <ProviderCard
+                label={aiProviderLabel('claude-account')}
+                icon="🟣"
+                isDefault={ai.provider === 'claude-account'}
+                status={claudeAccountStatus}
+                modelLabel={ai.claudeAccountModel || 'claude-sonnet-latest'}
+                onSetDefault={() => void setDefaultProvider('claude-account')}
+                canSetDefault={ai.claudeAccountAuthenticated}
+              >
+                <ClaudeAccountDetail
+                  model={ai.claudeAccountModel || 'claude-sonnet-latest'}
+                  onSave={saveClaudeAccount}
+                  authenticated={ai.claudeAccountAuthenticated}
+                  onStatusChange={(status) => setProbeStatus('claude-account', status)}
+                />
+              </ProviderCard>
 
-          {/* OpenRouter / custom endpoint */}
-          <ProviderCard
-            label={aiProviderLabel('openai-compatible')}
-            icon="🔌"
-            isDefault={ai.provider === 'openai-compatible'}
-            status={compatibleStatus}
-            modelLabel={`${compatiblePreset.label} · ${ai.openaiCompatibleModel || 'choose a model'}`}
-            onSetDefault={() => void setDefaultProvider('openai-compatible')}
-            actions={(
-              <ProviderProbe
-                buildConfig={() => ({
-                  provider: 'openai-compatible',
-                  openaiCompatiblePreset: ai.openaiCompatiblePreset,
-                  openaiCompatibleModel: ai.openaiCompatibleModel,
-                  openaiCompatibleBaseUrl: ai.openaiCompatibleBaseUrl,
-                })}
-                onStatusChange={(status) => setProbeStatus('openai-compatible', status)}
-                testLabel="Test saved"
-                listLabel="List saved models"
-              />
-            )}
-          >
-            <OpenAICompatibleDetail
-              preset={ai.openaiCompatiblePreset}
-              model={ai.openaiCompatibleModel}
-              baseUrl={ai.openaiCompatibleBaseUrl}
-              hasKey={ai.hasOpenAICompatibleKey}
-              onSave={saveOpenAICompatible}
-            />
-          </ProviderCard>
+              {/* Codex Account (subscription — experimental) */}
+              <ProviderCard
+                label={aiProviderLabel('codex-account')}
+                icon="⌁"
+                isDefault={ai.provider === 'codex-account'}
+                status={codexAccountStatus}
+                modelLabel={ai.codexAccountModel || 'codex-recommended'}
+                onSetDefault={() => void setDefaultProvider('codex-account')}
+              >
+                <CodexAccountDetail
+                  model={ai.codexAccountModel || 'codex-recommended'}
+                  onSave={saveCodexAccount}
+                  authenticated={ai.codexAccountAuthenticated}
+                  onStatusChange={(status) => setProbeStatus('codex-account', status)}
+                />
+              </ProviderCard>
+            </div>
+          </div>
         </div>
       </section>
 
