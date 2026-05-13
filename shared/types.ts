@@ -464,7 +464,13 @@ export interface AiOllamaDiagnostics {
 export interface AiModelInfo {
   id: string;
   name?: string;
+  displayName?: string;
   capabilities?: AiOllamaModelCapabilities;
+}
+
+export interface AiClaudeAccountDiagnostics {
+  authenticated: boolean;
+  catalogFresh: boolean;
 }
 
 export interface AiModelListResult {
@@ -475,6 +481,7 @@ export interface AiModelListResult {
   message?: string;
   normalizedBaseUrl?: string;
   ollama?: AiOllamaDiagnostics;
+  claudeAccount?: AiClaudeAccountDiagnostics;
 }
 
 export type AiFeatureId =
@@ -588,6 +595,7 @@ export interface AiPublicConfig {
   hasOpenAIKey: boolean;
   hasAnthropicKey: boolean;
   hasOpenAICompatibleKey: boolean;
+  claudeAccountAuthenticated: boolean;
 }
 
 export type ThemeName =

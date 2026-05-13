@@ -600,6 +600,42 @@ export async function listAiModels(config: AiConfigInput): Promise<AiModelListRe
   });
 }
 
+// ── Claude account auth ────────────────────────────────────────────────────────
+
+export interface ClaudeAccountStatus {
+  authenticated: boolean;
+  expiresAt: number | null;
+  obtainedAt: number | null;
+}
+
+export interface ClaudeAccountLoginResult {
+  authorizationUrl: string;
+  state: string;
+  manualFallback: boolean;
+  manualReason?: string;
+}
+
+export async function getClaudeAccountStatus(): Promise<ClaudeAccountStatus> {
+  return request<ClaudeAccountStatus>('/api/ai/claude-account/status');
+}
+
+export async function startClaudeAccountLogin(): Promise<ClaudeAccountLoginResult> {
+  return request<ClaudeAccountLoginResult>('/api/ai/claude-account/login', { method: 'POST' });
+}
+
+export async function completeClaudeAccountLogin(url: string): Promise<{ ok: true }> {
+  return request<{ ok: true }>('/api/ai/claude-account/login/complete', {
+    method: 'POST',
+    body: JSON.stringify({ url }),
+  });
+}
+
+export async function logoutClaudeAccount(): Promise<{ ok: true }> {
+  return request<{ ok: true }>('/api/ai/claude-account/logout', { method: 'POST' });
+}
+
+// ── AI conversations ──────────────────────────────────────────────────────────
+
 export async function getAiConversation(ideaId: string): Promise<AiChatMessage[]> {
   const response = await request<AiConversationResponse>(`/api/ai/conversations/${encodeURIComponent(ideaId)}`);
   return response.messages.map(hydrateAiMessage);
