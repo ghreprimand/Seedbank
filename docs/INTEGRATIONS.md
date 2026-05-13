@@ -1,25 +1,25 @@
-# Integrations and Graduation
+# Project Graduation Adapters
 
-Seedbank integrations turn mature ideas into real project starting points. Graduation is intentionally server-side because adapters write files and return project paths.
+This guide covers the adapter system behind **Settings -> Project Graduation** and the graduation scaffold flow. Graduation is intentionally server-side because adapters write files and return project paths.
 
-## Where to Configure Integrations
+## Where To Configure Project Graduation
 
-Integration settings are managed in the app at:
-- `Settings -> Integrations`
+Project graduation settings are managed in:
+- `Settings -> Project Graduation` (route remains `/settings/integrations`)
 
-Built-in adapters:
+Built-in adapter:
 - `Local Project` (`generic-project`) — general-purpose external project scaffold; works with any local directory and development workflow.
 
-Optional custom adapters are registered in `server/src/integrations/registry.ts`. An adapter that is only useful for a specific private tool should not be documented here as a public feature; see [Adding a Custom Integration](#adding-a-custom-integration) below.
+Optional custom adapters are registered in `server/src/integrations/registry.ts`. An adapter that is only useful for a specific private tool should not be documented here as a public feature; see [Adding a Custom Adapter](#adding-a-custom-adapter) below.
 
 The Settings tab stores adapter configuration in the server `settings` table under namespaced keys:
 - `integration:generic-project`
 - `integration:<your-adapter-id>` (one key per registered adapter)
 
-## Graduation Flow
+## Graduation Flow (User Task)
 
 1. User opens an idea that is ready to graduate.
-2. Client requests `GET /api/integrations` (optionally with `ideaId` for readiness).
+2. Client requests `GET /api/integrations` (optionally with `ideaId` for readiness checks).
 3. User configures one or more integration roots in Settings.
 4. Client calls `POST /api/integrations/:id/graduate/:ideaId`.
 5. Server adapter creates scaffolded files in the target location.
@@ -28,16 +28,20 @@ The Settings tab stores adapter configuration in the server `settings` table und
    - `stage`
 7. Webhook event `idea.graduated` is emitted when configured.
 
-## API Endpoints
+## Graduation API Endpoints
 
 - `GET /api/integrations`
 - `GET /api/integrations?ideaId=<id>` (includes readiness)
 - `POST /api/integrations/:id/configure`
 - `POST /api/integrations/:id/graduate/:ideaId`
 
-All integration routes are authenticated through the standard API middleware and use `read:ideas` / `write:ideas` scopes for bearer mode.
+All graduation routes are authenticated through the standard API middleware and use `read:ideas` / `write:ideas` scopes for bearer mode.
 
-## Adapter Implementations
+API/webhook/MCP docs now live under the **API & Automation** concept:
+- Settings overview: `docs/SETTINGS.md` (`API & Server` section)
+- REST and endpoint reference: `docs/API.md`
+
+## Adapter Implementations (Developer)
 
 ### Local Project (`server/src/integrations/genericProject.ts`)
 
@@ -82,7 +86,7 @@ Adapters should:
 
 Agent follow-on work remains opt-in and separately controlled through `agents:run` routes and safety rails.
 
-## Adding a Custom Integration
+## Adding a Custom Adapter
 
 1. Create a file under `server/src/integrations/`.
 2. Implement `Integration` from `server/src/integrations/types.ts`.

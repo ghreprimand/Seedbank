@@ -238,11 +238,11 @@ To link a local CLI agent (Claude Code or Codex CLI), point Seedbank at the bina
 
 AI features include the Thinking Partner chat, contextual field suggestions, What If, Devil's Advocate, Scope Down, User Story, Idea Health Check, Smart Cross-Pollinate, and Pattern Insights. All AI features are opt-in. See [docs/AI_GUIDE.md](docs/AI_GUIDE.md).
 
-### Integrations
+### Project Graduation
 
-Graduation integrations live in `server/src/integrations/`. Seedbank is adapter-driven: the built-in generic local adapter works out of the box. Optional custom adapters can target specific local tools or external project workflows — implement the `Integration` interface, register in the registry, and graduate ideas to any local path. A graduated idea stores its destination in `graduatedTo` and advances stage automatically.
+Project Graduation adapters live in `server/src/integrations/`. Seedbank is adapter-driven: the built-in generic local adapter works out of the box. Optional custom adapters can target specific local tools or external project workflows — implement the `Integration` interface, register in the registry, and graduate ideas to any local path. A graduated idea stores its destination in `graduatedTo` and advances stage automatically.
 
-See [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md) for the plugin interface and implementation steps.
+See [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md) for adapter implementation details.
 
 ## API Reference
 
