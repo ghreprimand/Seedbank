@@ -364,7 +364,7 @@ export const MANUAL_GROUPS: ManualGroup[] = [
           { type: 'h3', text: 'I have a ChatGPT or OpenAI account' },
           { type: 'p', text: 'ChatGPT is a separate product from the OpenAI API. To use Seedbank with OpenAI models, create an API key at platform.openai.com and enter it in the OpenAI API provider card. API usage is billed separately from a ChatGPT subscription.' },
           { type: 'h3', text: 'I have a Codex or ChatGPT Plus account' },
-          { type: 'p', text: 'A Codex account provider card is available in Settings → AI & Agents (beta). This path requires the Codex app-server to be installed on the Seedbank machine and uses your ChatGPT/Codex login. App-server support is in development. If you want OpenAI models without the app-server, use the OpenAI API provider card with an API key from platform.openai.com instead.' },
+          { type: 'p', text: 'A Codex account provider card is available in Settings → AI & Agents (beta). This path requires a separate Codex CLI component to be installed and running on the Seedbank machine and uses your ChatGPT/Codex login. This feature is in development. If you want OpenAI models without that component, use the OpenAI API provider card with an API key from platform.openai.com instead.' },
           { type: 'h3', text: 'I have an Anthropic API key' },
           { type: 'p', text: 'Choose the Anthropic API provider, enter your API key, set a model (e.g. claude-sonnet-4-5 or claude-3-5-haiku-20241022), and set it as the global default. Your idea content is sent to Anthropic\'s servers when AI features run.' },
           { type: 'h3', text: 'I have an OpenAI API key' },
@@ -404,7 +404,7 @@ export const MANUAL_GROUPS: ManualGroup[] = [
           { type: 'p', text: 'These use subscription/account login rather than API-key billing. They are separate from the OpenAI API and Anthropic API providers, and separate from linked CLI agents.' },
           { type: 'ul', items: [
             'Claude account (coming soon) — subscription transport using your claude.ai account. Login support is not yet available in this version. Use the Anthropic API card to access Claude models in the meantime.',
-            'Codex account (experimental) — subscription transport for Codex. Requires the Codex app-server to be installed on the Seedbank machine. Enable with the SEEDBANK_ENABLE_CODEX_ACCOUNT environment flag; not enabled by default.',
+            'Codex account (experimental) — subscription transport for Codex. Requires a separate Codex CLI component to be installed and running on the Seedbank machine. Enable with the SEEDBANK_ENABLE_CODEX_ACCOUNT environment flag; not enabled by default.',
           ]},
           { type: 'h3', text: 'Provider API keys vs. Seedbank tokens' },
           { type: 'p', text: 'Provider API keys (OpenAI API, Anthropic API, OpenRouter, or another custom endpoint) are stored server-side, encrypted at rest. The browser never sees the raw value — only a "has key" boolean. These are separate from Seedbank personal access tokens, which are bearer tokens for the Seedbank REST API itself (Settings → API & Server).' },
