@@ -836,6 +836,86 @@ export class OllamaProvider implements AiProvider {
   }
 }
 
+class AccountProviderNotConfiguredError extends AiProviderError {
+  constructor(provider: AiProviderId, label: string) {
+    super(
+      provider,
+      'not_configured',
+      `${label} is not configured yet. Account login and runtime support will land in an upcoming update.`,
+    );
+  }
+}
+
+export class ClaudeAccountProvider implements AiProvider {
+  readonly id = 'claude-account';
+
+  private configuredModel(config: AiStoredConfig): string {
+    return config.claudeAccountModel?.trim() || 'claude-sonnet-latest';
+  }
+
+  async complete(_messages: AiProviderMessage[], _config: AiStoredConfig): Promise<AiProviderResult> {
+    throw new AccountProviderNotConfiguredError(this.id, aiProviderLabel(this.id));
+  }
+
+  async stream(
+    _messages: AiProviderMessage[],
+    _config: AiStoredConfig,
+    _onDelta: (delta: string) => void,
+  ): Promise<AiProviderResult> {
+    throw new AccountProviderNotConfiguredError(this.id, aiProviderLabel(this.id));
+  }
+
+  async health(config: AiStoredConfig): Promise<AiProviderHealth> {
+    return providerHealth(this.id, this.configuredModel(config), new AccountProviderNotConfiguredError(this.id, aiProviderLabel(this.id)));
+  }
+
+  async listModels(config: AiStoredConfig): Promise<AiModelListResult> {
+    const err = new AccountProviderNotConfiguredError(this.id, aiProviderLabel(this.id));
+    return {
+      provider: this.id,
+      ok: false,
+      models: [{ id: this.configuredModel(config), name: 'Configured model (placeholder)' }],
+      code: err.code,
+      message: err.message,
+    };
+  }
+}
+
+export class CodexAccountProvider implements AiProvider {
+  readonly id = 'codex-account';
+
+  private configuredModel(config: AiStoredConfig): string {
+    return config.codexAccountModel?.trim() || 'codex-recommended';
+  }
+
+  async complete(_messages: AiProviderMessage[], _config: AiStoredConfig): Promise<AiProviderResult> {
+    throw new AccountProviderNotConfiguredError(this.id, aiProviderLabel(this.id));
+  }
+
+  async stream(
+    _messages: AiProviderMessage[],
+    _config: AiStoredConfig,
+    _onDelta: (delta: string) => void,
+  ): Promise<AiProviderResult> {
+    throw new AccountProviderNotConfiguredError(this.id, aiProviderLabel(this.id));
+  }
+
+  async health(config: AiStoredConfig): Promise<AiProviderHealth> {
+    return providerHealth(this.id, this.configuredModel(config), new AccountProviderNotConfiguredError(this.id, aiProviderLabel(this.id)));
+  }
+
+  async listModels(config: AiStoredConfig): Promise<AiModelListResult> {
+    const err = new AccountProviderNotConfiguredError(this.id, aiProviderLabel(this.id));
+    return {
+      provider: this.id,
+      ok: false,
+      models: [{ id: this.configuredModel(config), name: 'Configured model (placeholder)' }],
+      code: err.code,
+      message: err.message,
+    };
+  }
+}
+
 export class OpenAICompatibleProvider implements AiProvider {
   readonly id = 'openai-compatible';
 

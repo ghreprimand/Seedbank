@@ -275,13 +275,21 @@ export interface GraduationResult {
 
 // ── AI assistance types ────────────────────────────────────────────
 
-export type AiProviderId = 'openai' | 'anthropic' | 'ollama' | 'openai-compatible';
+export type AiProviderId =
+  | 'openai'
+  | 'anthropic'
+  | 'ollama'
+  | 'openai-compatible'
+  | 'claude-account'
+  | 'codex-account';
 
 export const AI_PROVIDER_IDS: readonly AiProviderId[] = [
   'openai',
   'anthropic',
   'ollama',
   'openai-compatible',
+  'claude-account',
+  'codex-account',
 ] as const;
 
 export type AiProviderFamily = 'api' | 'local' | 'custom-endpoint' | 'account';
@@ -305,7 +313,8 @@ export type AiProviderCapability =
   | 'streaming'
   | 'model-discovery'
   | 'local'
-  | 'api-key';
+  | 'api-key'
+  | 'account-auth';
 
 export type AiProviderErrorCode =
   | 'not_configured'
@@ -321,7 +330,13 @@ export interface AiProviderDescriptor {
   label: string;
   shortLabel: string;
   family: AiProviderFamily;
-  transport: 'openai-responses' | 'anthropic-messages' | 'ollama-chat' | 'openai-chat-completions';
+  transport:
+    | 'openai-responses'
+    | 'anthropic-messages'
+    | 'ollama-chat'
+    | 'openai-chat-completions'
+    | 'claude-account-native'
+    | 'codex-account-app-server';
   authMode: AiProviderAuthMode;
   dataResidency: AiProviderDataResidency;
   defaultModel: string;
@@ -362,6 +377,20 @@ export const AI_PROVIDER_DISPLAY: Record<AiProviderId, Pick<AiProviderDescriptor
     family: 'custom-endpoint',
     authMode: 'api-key',
     dataResidency: 'user-controlled',
+  },
+  'claude-account': {
+    label: 'Claude account (beta)',
+    shortLabel: 'Claude account',
+    family: 'account',
+    authMode: 'account',
+    dataResidency: 'cloud',
+  },
+  'codex-account': {
+    label: 'Codex account (beta)',
+    shortLabel: 'Codex account',
+    family: 'account',
+    authMode: 'account',
+    dataResidency: 'cloud',
   },
 };
 
@@ -522,6 +551,8 @@ export interface AiPublicConfig {
   provider: AiProviderId;
   openaiModel: string;
   anthropicModel: string;
+  claudeAccountModel: string;
+  codexAccountModel: string;
   ollamaModel: string;
   ollamaBaseUrl: string;
   openaiCompatiblePreset: AiOpenAICompatiblePresetId;
@@ -709,6 +740,8 @@ export interface AiConfigInput {
   provider?: AiProviderId;
   openaiModel?: string;
   anthropicModel?: string;
+  claudeAccountModel?: string;
+  codexAccountModel?: string;
   ollamaModel?: string;
   ollamaBaseUrl?: string;
   openaiCompatiblePreset?: AiOpenAICompatiblePresetId;

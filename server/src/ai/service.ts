@@ -23,7 +23,14 @@ import { v4 as uuid } from 'uuid';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { SeedbankRepository } from '../repository.js';
 import { encryptSecret } from './crypto.js';
-import { AnthropicProvider, OllamaProvider, OpenAICompatibleProvider, OpenAIProvider } from './providers.js';
+import {
+  AnthropicProvider,
+  ClaudeAccountProvider,
+  CodexAccountProvider,
+  OllamaProvider,
+  OpenAICompatibleProvider,
+  OpenAIProvider,
+} from './providers.js';
 import { AI_PROVIDER_DESCRIPTORS, openAICompatiblePreset } from './registry.js';
 import type { AiConfigPatch, AiProvider, AiProviderMessage, AiStoredConfig } from './types.js';
 import { AiStore } from './store.js';
@@ -54,6 +61,8 @@ const DEFAULT_CONFIG: AiStoredConfig = {
   provider: 'ollama',
   openaiModel: 'gpt-4.1-mini',
   anthropicModel: 'claude-sonnet-4-20250514',
+  claudeAccountModel: 'claude-sonnet-latest',
+  codexAccountModel: 'codex-recommended',
   ollamaModel: 'llama3.2',
   ollamaBaseUrl: 'http://localhost:11434',
   openaiCompatiblePreset: 'openrouter',
@@ -80,6 +89,8 @@ const DEFAULT_CONFIG: AiStoredConfig = {
       anthropic: true,
       ollama: true,
       'openai-compatible': true,
+      'claude-account': true,
+      'codex-account': true,
     },
     allowedModels: [],
     featureDailyTokenBudgets: {},
@@ -116,6 +127,8 @@ interface AiGuardrailCheckOptions {
 function modelFor(config: AiStoredConfig): string {
   if (config.provider === 'openai') return config.openaiModel;
   if (config.provider === 'anthropic') return config.anthropicModel;
+  if (config.provider === 'claude-account') return config.claudeAccountModel;
+  if (config.provider === 'codex-account') return config.codexAccountModel;
   if (config.provider === 'openai-compatible') return config.openaiCompatibleModel;
   return config.ollamaModel;
 }
@@ -172,6 +185,8 @@ function defaultGuardrails(): AiGuardrailsConfig {
       anthropic: true,
       ollama: true,
       'openai-compatible': true,
+      'claude-account': true,
+      'codex-account': true,
     },
     allowedModels: [],
     featureDailyTokenBudgets: {},
@@ -220,7 +235,11 @@ function sanitizeGuardrails(input: unknown, current?: AiGuardrailsConfig): AiGua
 
   return {
     featureEnabled: sanitizeBooleanMap(source.featureEnabled, defaults.featureEnabled, AI_FEATURE_IDS),
-    providerEnabled: sanitizeBooleanMap(source.providerEnabled, defaults.providerEnabled, ['openai', 'anthropic', 'ollama', 'openai-compatible'] as const),
+    providerEnabled: sanitizeBooleanMap(
+      source.providerEnabled,
+      defaults.providerEnabled,
+      ['openai', 'anthropic', 'ollama', 'openai-compatible', 'claude-account', 'codex-account'] as const,
+    ),
     allowedModels,
     featureDailyTokenBudgets: {
       ...defaults.featureDailyTokenBudgets,
@@ -228,7 +247,10 @@ function sanitizeGuardrails(input: unknown, current?: AiGuardrailsConfig): AiGua
     },
     providerDailyTokenBudgets: {
       ...defaults.providerDailyTokenBudgets,
-      ...sanitizeBudgetMap(source.providerDailyTokenBudgets, ['openai', 'anthropic', 'ollama', 'openai-compatible'] as const),
+      ...sanitizeBudgetMap(
+        source.providerDailyTokenBudgets,
+        ['openai', 'anthropic', 'ollama', 'openai-compatible', 'claude-account', 'codex-account'] as const,
+      ),
     },
     modelDailyTokenBudgets: {
       ...defaults.modelDailyTokenBudgets,
@@ -247,6 +269,8 @@ function applyModelOverride(config: AiStoredConfig, provider: AiProviderId, mode
   if (!model.trim()) return config;
   if (provider === 'openai') return { ...config, openaiModel: model.trim() };
   if (provider === 'anthropic') return { ...config, anthropicModel: model.trim() };
+  if (provider === 'claude-account') return { ...config, claudeAccountModel: model.trim() };
+  if (provider === 'codex-account') return { ...config, codexAccountModel: model.trim() };
   if (provider === 'openai-compatible') return { ...config, openaiCompatibleModel: model.trim() };
   return { ...config, ollamaModel: model.trim() };
 }
@@ -287,6 +311,8 @@ function publicConfig(config: AiStoredConfig): AiPublicConfig {
     provider: config.provider,
     openaiModel: config.openaiModel,
     anthropicModel: config.anthropicModel,
+    claudeAccountModel: config.claudeAccountModel,
+    codexAccountModel: config.codexAccountModel,
     ollamaModel: config.ollamaModel,
     ollamaBaseUrl: config.ollamaBaseUrl,
     openaiCompatiblePreset: config.openaiCompatiblePreset,
@@ -597,6 +623,8 @@ export class AiService {
   private readonly providers = new Map<string, AiProvider>([
     ['openai', new OpenAIProvider()],
     ['anthropic', new AnthropicProvider()],
+    ['claude-account', new ClaudeAccountProvider()],
+    ['codex-account', new CodexAccountProvider()],
     ['ollama', new OllamaProvider()],
     ['openai-compatible', new OpenAICompatibleProvider()],
   ]);
@@ -654,6 +682,8 @@ export class AiService {
       provider,
       openaiModel: input.openaiModel?.trim() || current.openaiModel,
       anthropicModel: input.anthropicModel?.trim() || current.anthropicModel,
+      claudeAccountModel: input.claudeAccountModel?.trim() || current.claudeAccountModel,
+      codexAccountModel: input.codexAccountModel?.trim() || current.codexAccountModel,
       ollamaModel: input.ollamaModel?.trim() || current.ollamaModel,
       ollamaBaseUrl: input.ollamaBaseUrl?.trim() || current.ollamaBaseUrl,
       openaiCompatiblePreset: preset,
