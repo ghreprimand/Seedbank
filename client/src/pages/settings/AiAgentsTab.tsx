@@ -202,9 +202,13 @@ function ProviderProbe({
             className="min-w-0 max-w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-xs text-ink-700"
           >
             <option value="" disabled>Choose discovered model</option>
-            {models.slice(0, 80).map((model) => (
-              <option key={model.id} value={model.id}>{model.displayName ?? model.name ?? model.id}</option>
-            ))}
+            {models.slice(0, 80).map((model) => {
+              const label = model.displayName ?? model.name ?? model.id;
+              const showId = label !== model.id;
+              return (
+                <option key={model.id} value={model.id}>{showId ? `${label} — ${model.id}` : label}</option>
+              );
+            })}
           </select>
         )}
       </div>
