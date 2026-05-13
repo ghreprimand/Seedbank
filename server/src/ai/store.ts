@@ -1,7 +1,21 @@
 import type Database from 'better-sqlite3';
 import { v4 as uuid } from 'uuid';
-import type { AiAuditEvent, AiChatMessage, AiUsageBucket } from '../../../shared/types.js';
+import type {
+  AiAuditEvent,
+  AiChatMessage,
+  AiProviderDescriptor,
+  AiProviderFamily,
+  AiUsageBucket,
+} from '../../../shared/types.js';
 import type { AiUsage } from './types.js';
+
+export interface AiExecutionMetadata {
+  providerFamily?: AiProviderFamily;
+  transport?: AiProviderDescriptor['transport'];
+  requestedModel?: string;
+  resolvedModelId?: string;
+  contentLeavesDevice?: boolean;
+}
 
 interface ConversationRow {
   id: string;
@@ -25,6 +39,11 @@ interface UsageRow {
   feature?: string;
   provider?: string;
   model?: string;
+  provider_family?: AiProviderFamily;
+  transport?: AiProviderDescriptor['transport'];
+  requested_model?: string;
+  resolved_model_id?: string;
+  content_leaves_device?: number | null;
   count: number;
   input_tokens: number;
   output_tokens: number;
@@ -38,6 +57,7 @@ interface AuditRow {
   feature: string;
   provider: string;
   model: string;
+  metadata_json?: string;
   message: string;
   created_at: string;
 }
@@ -103,10 +123,14 @@ export class AiStore {
     };
   }
 
-  recordUsage(provider: string, model: string, route: string, usage: AiUsage): void {
+  recordUsage(provider: string, model: string, route: string, usage: AiUsage, metadata: AiExecutionMetadata = {}): void {
     this.db.prepare(`
-      INSERT INTO ai_usage (id, provider, model, route, input_tokens, output_tokens, total_tokens, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO ai_usage (
+        id, provider, model, route, input_tokens, output_tokens, total_tokens,
+        provider_family, transport, requested_model, resolved_model_id, content_leaves_device,
+        created_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       uuid(),
       provider,
@@ -115,6 +139,11 @@ export class AiStore {
       usage.inputTokens,
       usage.outputTokens,
       usage.totalTokens,
+      metadata.providerFamily ?? null,
+      metadata.transport ?? null,
+      metadata.requestedModel ?? model,
+      metadata.resolvedModelId ?? model,
+      typeof metadata.contentLeavesDevice === 'boolean' ? (metadata.contentLeavesDevice ? 1 : 0) : null,
       new Date().toISOString(),
     );
   }
@@ -156,6 +185,11 @@ export class AiStore {
     return (this.db.prepare(`
       SELECT
         ${expression} AS key,
+        CASE WHEN COUNT(provider_family) = COUNT(*) AND COUNT(DISTINCT provider_family) = 1 THEN MIN(provider_family) ELSE NULL END AS provider_family,
+        CASE WHEN COUNT(transport) = COUNT(*) AND COUNT(DISTINCT transport) = 1 THEN MIN(transport) ELSE NULL END AS transport,
+        CASE WHEN COUNT(requested_model) = COUNT(*) AND COUNT(DISTINCT requested_model) = 1 THEN MIN(requested_model) ELSE NULL END AS requested_model,
+        CASE WHEN COUNT(resolved_model_id) = COUNT(*) AND COUNT(DISTINCT resolved_model_id) = 1 THEN MIN(resolved_model_id) ELSE NULL END AS resolved_model_id,
+        CASE WHEN COUNT(content_leaves_device) = COUNT(*) AND COUNT(DISTINCT content_leaves_device) = 1 THEN MAX(content_leaves_device) ELSE NULL END AS content_leaves_device,
         COUNT(*) AS count,
         COALESCE(SUM(input_tokens), 0) AS input_tokens,
         COALESCE(SUM(output_tokens), 0) AS output_tokens,
@@ -171,6 +205,13 @@ export class AiStore {
       ...(groupBy === 'feature' ? { feature: row.key } : {}),
       ...(groupBy === 'provider' ? { provider: row.key } : {}),
       ...(groupBy === 'model' ? { model: row.key } : {}),
+      ...(row.provider_family ? { providerFamily: row.provider_family } : {}),
+      ...(row.transport ? { transport: row.transport } : {}),
+      ...(row.requested_model ? { requestedModel: row.requested_model } : {}),
+      ...(row.resolved_model_id ? { resolvedModelId: row.resolved_model_id } : {}),
+      ...(row.content_leaves_device !== null && row.content_leaves_device !== undefined
+        ? { contentLeavesDevice: Boolean(row.content_leaves_device) }
+        : {}),
       count: row.count,
       inputTokens: row.input_tokens,
       outputTokens: row.output_tokens,
@@ -186,6 +227,11 @@ export class AiStore {
         CASE WHEN instr(route, ':') > 0 THEN substr(route, 1, instr(route, ':') - 1) ELSE route END AS feature,
         provider,
         model,
+        CASE WHEN COUNT(provider_family) = COUNT(*) AND COUNT(DISTINCT provider_family) = 1 THEN MIN(provider_family) ELSE NULL END AS provider_family,
+        CASE WHEN COUNT(transport) = COUNT(*) AND COUNT(DISTINCT transport) = 1 THEN MIN(transport) ELSE NULL END AS transport,
+        CASE WHEN COUNT(requested_model) = COUNT(*) AND COUNT(DISTINCT requested_model) = 1 THEN MIN(requested_model) ELSE NULL END AS requested_model,
+        CASE WHEN COUNT(resolved_model_id) = COUNT(*) AND COUNT(DISTINCT resolved_model_id) = 1 THEN MIN(resolved_model_id) ELSE NULL END AS resolved_model_id,
+        CASE WHEN COUNT(content_leaves_device) = COUNT(*) AND COUNT(DISTINCT content_leaves_device) = 1 THEN MAX(content_leaves_device) ELSE NULL END AS content_leaves_device,
         COUNT(*) AS count,
         COALESCE(SUM(input_tokens), 0) AS input_tokens,
         COALESCE(SUM(output_tokens), 0) AS output_tokens,
@@ -201,6 +247,13 @@ export class AiStore {
       feature: row.feature,
       provider: row.provider,
       model: row.model,
+      ...(row.provider_family ? { providerFamily: row.provider_family } : {}),
+      ...(row.transport ? { transport: row.transport } : {}),
+      ...(row.requested_model ? { requestedModel: row.requested_model } : {}),
+      ...(row.resolved_model_id ? { resolvedModelId: row.resolved_model_id } : {}),
+      ...(row.content_leaves_device !== null && row.content_leaves_device !== undefined
+        ? { contentLeavesDevice: Boolean(row.content_leaves_device) }
+        : {}),
       count: row.count,
       inputTokens: row.input_tokens,
       outputTokens: row.output_tokens,
@@ -226,7 +279,7 @@ export class AiStore {
     provider: string,
     model: string,
     message: string,
-    metadata: Record<string, unknown> = {},
+    metadata: AiExecutionMetadata | Record<string, unknown> = {},
   ): void {
     const safeMessage = sanitizeAuditMessage(message);
     this.db.prepare(`
@@ -247,18 +300,38 @@ export class AiStore {
 
   recentAuditEvents(limit = 20): AiAuditEvent[] {
     return (this.db.prepare(`
-      SELECT id, type, feature, provider, model, message, created_at
+      SELECT id, type, feature, provider, model, message, metadata_json, created_at
       FROM ai_audit_events
       ORDER BY created_at DESC
       LIMIT ?
-    `).all(limit) as AuditRow[]).map((row) => ({
-      id: row.id,
-      type: row.type,
-      feature: row.feature,
-      provider: row.provider,
-      model: row.model,
-      message: sanitizeAuditMessage(row.message),
-      createdAt: row.created_at,
-    }));
+    `).all(limit) as AuditRow[]).map((row) => {
+      const metadata = parseMetadata(row.metadata_json);
+      return {
+        id: row.id,
+        type: row.type,
+        feature: row.feature,
+        provider: row.provider,
+        model: row.model,
+        ...metadata,
+        message: sanitizeAuditMessage(row.message),
+        createdAt: row.created_at,
+      };
+    });
+  }
+}
+
+function parseMetadata(value: string | undefined): AiExecutionMetadata {
+  if (!value) return {};
+  try {
+    const parsed = JSON.parse(value) as AiExecutionMetadata;
+    return {
+      ...(typeof parsed.providerFamily === 'string' ? { providerFamily: parsed.providerFamily } : {}),
+      ...(typeof parsed.transport === 'string' ? { transport: parsed.transport } : {}),
+      ...(typeof parsed.requestedModel === 'string' ? { requestedModel: parsed.requestedModel } : {}),
+      ...(typeof parsed.resolvedModelId === 'string' ? { resolvedModelId: parsed.resolvedModelId } : {}),
+      ...(typeof parsed.contentLeavesDevice === 'boolean' ? { contentLeavesDevice: parsed.contentLeavesDevice } : {}),
+    };
+  } catch {
+    return {};
   }
 }

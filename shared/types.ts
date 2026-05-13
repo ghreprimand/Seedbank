@@ -433,6 +433,11 @@ export interface AiProviderHealth {
   message: string;
   status?: number;
   model?: string;
+  providerFamily?: AiProviderFamily;
+  transport?: AiProviderDescriptor['transport'];
+  requestedModel?: string;
+  resolvedModelId?: string;
+  contentLeavesDevice?: boolean;
   normalizedBaseUrl?: string;
   ollama?: AiOllamaDiagnostics;
 }
@@ -543,7 +548,12 @@ export interface AiPreflightResult {
   feature: AiFeatureId;
   provider: AiProviderId;
   model: string;
+  providerFamily?: AiProviderFamily;
+  transport?: AiProviderDescriptor['transport'];
+  requestedModel?: string;
+  resolvedModelId?: string;
   local: boolean;
+  contentLeavesDevice?: boolean;
   contentLeavesMachine: boolean;
   allowed: boolean;
   requiresConfirmation: boolean;
@@ -558,6 +568,11 @@ export interface AiUsageBucket {
   feature?: string;
   provider?: string;
   model?: string;
+  providerFamily?: AiProviderFamily;
+  transport?: AiProviderDescriptor['transport'];
+  requestedModel?: string;
+  resolvedModelId?: string;
+  contentLeavesDevice?: boolean;
   count: number;
   inputTokens: number;
   outputTokens: number;
@@ -571,6 +586,11 @@ export interface AiAuditEvent {
   feature: string;
   provider: string;
   model: string;
+  providerFamily?: AiProviderFamily;
+  transport?: AiProviderDescriptor['transport'];
+  requestedModel?: string;
+  resolvedModelId?: string;
+  contentLeavesDevice?: boolean;
   message: string;
   createdAt: string;
 }

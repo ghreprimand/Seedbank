@@ -29,6 +29,7 @@ export interface AiUsage {
 export interface AiProviderResult {
   text: string;
   usage: AiUsage;
+  resolvedModelId?: string;
 }
 
 export interface AiProvider {

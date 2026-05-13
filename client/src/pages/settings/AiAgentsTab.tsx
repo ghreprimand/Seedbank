@@ -918,6 +918,61 @@ function routeLabel(route: string): string {
   return ROUTE_LABELS[route] ?? route;
 }
 
+function transportLabel(transport: string): string {
+  switch (transport) {
+    case 'openai-responses':
+      return 'OpenAI Responses';
+    case 'anthropic-messages':
+      return 'Anthropic Messages';
+    case 'ollama-chat':
+      return 'Ollama chat';
+    case 'openai-chat-completions':
+      return 'OpenAI-compatible chat';
+    case 'claude-account-native':
+      return 'Claude account';
+    case 'codex-account-app-server':
+      return 'Codex app-server';
+    default:
+      return transport;
+  }
+}
+
+function providerFamilyLabel(family: string): string {
+  switch (family) {
+    case 'api':
+      return 'API key';
+    case 'local':
+      return 'Local';
+    case 'custom-endpoint':
+      return 'Custom endpoint';
+    case 'account':
+      return 'Account';
+    default:
+      return family;
+  }
+}
+
+interface ExecutionMetadataDisplay {
+  providerFamily?: string;
+  transport?: string;
+  requestedModel?: string;
+  resolvedModelId?: string;
+  contentLeavesDevice?: boolean;
+}
+
+function executionMetadataLabel(row: ExecutionMetadataDisplay): string | null {
+  const parts: string[] = [];
+  if (row.providerFamily) parts.push(providerFamilyLabel(row.providerFamily));
+  if (row.transport) parts.push(transportLabel(row.transport));
+  if (typeof row.contentLeavesDevice === 'boolean') {
+    parts.push(row.contentLeavesDevice ? 'leaves this device' : 'stays on this device');
+  }
+  if (row.resolvedModelId && row.resolvedModelId !== row.requestedModel) {
+    parts.push(`resolved: ${row.resolvedModelId}`);
+  }
+  return parts.length ? parts.join(' · ') : null;
+}
+
 interface UsageAuditSectionProps {
   detail: AiUsageDetail | null;
   basicUsage: AiUsageSummary | null;
@@ -938,15 +993,19 @@ function UsageBucketTable({ rows }: { rows: AiUsageBucket[] }) {
           </tr>
         </thead>
         <tbody className="divide-y divide-ink-50">
-          {rows.map((row, i) => (
-            <tr key={i} className="hover:bg-paper-warm transition-colors">
-              <td className="px-3 py-1.5 text-ink-700 font-medium">
-                {routeLabel(row.feature ?? row.provider ?? row.model ?? row.key)}
-              </td>
-              <td className="px-3 py-1.5 text-ink-500 font-mono text-right">{row.count}</td>
-              <td className="px-3 py-1.5 text-ink-700 text-right font-mono">{fmtTokens(row.totalTokens)}</td>
-            </tr>
-          ))}
+          {rows.map((row, i) => {
+            const metadata = executionMetadataLabel(row);
+            return (
+              <tr key={i} className="hover:bg-paper-warm transition-colors">
+                <td className="px-3 py-1.5 text-ink-700 font-medium">
+                  <div>{routeLabel(row.feature ?? row.provider ?? row.model ?? row.key)}</div>
+                  {metadata ? <div className="mt-0.5 text-[10px] font-normal text-ink-400">{metadata}</div> : null}
+                </td>
+                <td className="px-3 py-1.5 text-ink-500 font-mono text-right">{row.count}</td>
+                <td className="px-3 py-1.5 text-ink-700 text-right font-mono">{fmtTokens(row.totalTokens)}</td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -966,21 +1025,26 @@ function AuditEventTable({ events }: { events: AiAuditEvent[] }) {
           </tr>
         </thead>
         <tbody className="divide-y divide-ink-50">
-          {events.map((ev) => (
-            <tr key={ev.id} className="hover:bg-paper-warm transition-colors">
-              <td className="px-3 py-1.5 font-mono">
-                <span className={ev.type === 'guardrail_denied' ? 'text-amber-700' : 'text-red-600'}>
-                  {ev.type === 'guardrail_denied' ? 'denied' : 'error'}
-                </span>
-              </td>
-              <td className="px-3 py-1.5 text-ink-500">
-                {routeLabel(ev.feature)} · {ev.provider}
-              </td>
-              <td className="px-3 py-1.5 text-ink-600 max-w-[200px] truncate" title={ev.message}>
-                {ev.message}
-              </td>
-            </tr>
-          ))}
+          {events.map((ev) => {
+            const metadata = executionMetadataLabel(ev);
+            const provider = isAiProviderId(ev.provider) ? aiProviderLabel(ev.provider) : ev.provider;
+            return (
+              <tr key={ev.id} className="hover:bg-paper-warm transition-colors">
+                <td className="px-3 py-1.5 font-mono">
+                  <span className={ev.type === 'guardrail_denied' ? 'text-amber-700' : 'text-red-600'}>
+                    {ev.type === 'guardrail_denied' ? 'denied' : 'error'}
+                  </span>
+                </td>
+                <td className="px-3 py-1.5 text-ink-500">
+                  <div>{routeLabel(ev.feature)} · {provider}</div>
+                  {metadata ? <div className="mt-0.5 text-[10px] text-ink-400">{metadata}</div> : null}
+                </td>
+                <td className="px-3 py-1.5 text-ink-600 max-w-[200px] truncate" title={ev.message}>
+                  {ev.message}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
