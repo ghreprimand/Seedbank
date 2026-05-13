@@ -13,6 +13,7 @@ import type {
   AiProviderHealth,
   AiProviderId,
   AiPublicConfig,
+  AiMethodCapability,
   AiSuggestion,
   AiSuggestionField,
   AiUsageDetail,
@@ -366,6 +367,12 @@ function publicConfig(config: AiStoredConfig): AiPublicConfig {
     codexAccountAvailable: codexAccountEnabledByEnv(),
     codexAccountAuthenticated: codexAccountAuthenticatedCache,
   };
+}
+
+function apiKeyAvailability(connected: boolean, label: string): Pick<AiMethodCapability, 'availability' | 'availabilityReason'> {
+  return connected
+    ? { availability: 'available' }
+    : { availability: 'auth-required', availabilityReason: `${label} key is not configured.` };
 }
 
 function ideaContext(idea: Idea): string {
@@ -737,6 +744,110 @@ export class AiService {
 
   getProviderDescriptors(): AiProviderDescriptor[] {
     return AI_PROVIDER_DESCRIPTORS;
+  }
+
+  getMethodCapabilities(): AiMethodCapability[] {
+    const config = this.getPublicConfig();
+    const presets = ([
+      'openrouter',
+      'groq',
+      'mistral',
+      'together',
+      'fireworks',
+      'lm-studio',
+      'vllm',
+      'llama-cpp',
+      'localai',
+      'custom',
+    ] as const).map((presetId) => {
+      const preset = openAICompatiblePreset(presetId);
+      const local = preset.local;
+      const availability = preset.requiresApiKey
+        ? (config.hasOpenAICompatibleKey
+          ? { availability: 'available' as const }
+          : { availability: 'auth-required' as const, availabilityReason: `${preset.label} key is not configured.` })
+        : { availability: 'available' as const };
+      return {
+        id: `openai-compatible:${presetId}`,
+        label: preset.label,
+        serviceFamily: local ? 'local-inference' : 'external-router',
+        connectionMethod: local ? 'local-server' : 'openai-compatible',
+        channel: 'chat-model',
+        featureRoutable: true,
+        providerId: 'openai-compatible',
+        presetId,
+        local,
+        ...availability,
+      } satisfies AiMethodCapability;
+    });
+
+    const codexAvailability = !config.codexAccountAvailable
+      ? {
+          availability: 'unavailable' as const,
+          availabilityReason: 'Codex account app-server is disabled in this build. Set SEEDBANK_ENABLE_CODEX_ACCOUNT=1 to opt in.',
+        }
+      : config.codexAccountAuthenticated
+        ? { availability: 'available' as const }
+        : { availability: 'auth-required' as const, availabilityReason: 'Sign in with Codex account to enable this method.' };
+
+    return [
+      {
+        id: 'anthropic-api-key',
+        label: 'Anthropic API key',
+        serviceFamily: 'claude',
+        connectionMethod: 'api-key',
+        channel: 'chat-model',
+        featureRoutable: true,
+        providerId: 'anthropic',
+        ...apiKeyAvailability(config.hasAnthropicKey, 'Anthropic API'),
+      },
+      {
+        id: 'claude-account-native',
+        label: 'Claude account (native OAuth)',
+        serviceFamily: 'claude',
+        connectionMethod: 'account',
+        channel: 'chat-model',
+        featureRoutable: true,
+        providerId: 'claude-account',
+        beta: true,
+        ...(config.claudeAccountAuthenticated
+          ? { availability: 'available' as const }
+          : { availability: 'auth-required' as const, availabilityReason: 'Sign in with Claude account to enable this method.' }),
+      },
+      {
+        id: 'openai-api-key',
+        label: 'OpenAI API key',
+        serviceFamily: 'codex-openai',
+        connectionMethod: 'api-key',
+        channel: 'chat-model',
+        featureRoutable: true,
+        providerId: 'openai',
+        ...apiKeyAvailability(config.hasOpenAIKey, 'OpenAI API'),
+      },
+      {
+        id: 'codex-account-app-server',
+        label: 'Codex account (app-server)',
+        serviceFamily: 'codex-openai',
+        connectionMethod: 'account',
+        channel: 'chat-model',
+        featureRoutable: true,
+        providerId: 'codex-account',
+        beta: true,
+        ...codexAvailability,
+      },
+      {
+        id: 'ollama-local',
+        label: 'Ollama / local models',
+        serviceFamily: 'local-inference',
+        connectionMethod: 'local-server',
+        channel: 'chat-model',
+        featureRoutable: true,
+        providerId: 'ollama',
+        local: true,
+        availability: 'available',
+      },
+      ...presets,
+    ];
   }
 
   private mergeConfig(input: AiConfigPatch, current = this.getConfig()): AiStoredConfig {
