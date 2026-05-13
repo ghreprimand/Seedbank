@@ -210,6 +210,7 @@ export function HelpModeToggle({ className = '' }: { className?: string }) {
       type="button"
       onClick={toggleHelpMode}
       aria-pressed={helpMode}
+      aria-label={helpMode ? 'Exit help mode' : 'Enter help mode'}
       title={helpMode ? 'Exit help mode' : 'Enter help mode — reveal hints near UI elements'}
       className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-pill text-xs font-medium
                   transition-colors focus-visible:outline-none focus-visible:ring-2
@@ -220,7 +221,7 @@ export function HelpModeToggle({ className = '' }: { className?: string }) {
                   } ${className}`}
     >
       <HelpCircle className="w-3 h-3" />
-      {helpMode ? 'Help mode on' : 'Help mode'}
+      <span className="hidden md:inline">{helpMode ? 'Help mode on' : 'Help mode'}</span>
     </button>
   );
 }

@@ -8,6 +8,7 @@ import DataMigrationDialog from './DataMigrationDialog';
 import BackupStatus from './BackupStatus';
 import ManualModal from '@/help/ManualModal';
 import { HelpProvider } from '@/help/HelpContext';
+import { HelpModeToggle } from '@/help/HelpPopover';
 import { useFilterStore } from '@/stores/filters';
 
 export default function Layout() {
@@ -179,6 +180,9 @@ export default function Layout() {
           >
             <BookOpen className="w-[18px] h-[18px]" />
           </button>
+
+          {/* Help mode toggle — all screen sizes; icon-only below md, full pill on md+ */}
+          <HelpModeToggle className="flex" />
 
           {/* Settings gear */}
           <Link
