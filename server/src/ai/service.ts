@@ -33,6 +33,7 @@ import {
 } from './providers.js';
 import { AI_PROVIDER_DESCRIPTORS, openAICompatiblePreset } from './registry.js';
 import type { AiConfigPatch, AiProvider, AiProviderMessage, AiStoredConfig } from './types.js';
+import { codexAccountEnabledByEnv } from './codex-account/session.js';
 import { AiStore, type AiExecutionMetadata } from './store.js';
 
 const THINKING_PARTNER_PROMPT = [
@@ -362,10 +363,7 @@ function publicConfig(config: AiStoredConfig): AiPublicConfig {
     hasAnthropicKey: Boolean(config.anthropicApiKeyEncrypted),
     hasOpenAICompatibleKey: Boolean(config.openaiCompatibleApiKeyEncrypted),
     claudeAccountAuthenticated: claudeAccountAuthenticatedCache,
-    codexAccountAvailable: (() => {
-      const raw = process.env.SEEDBANK_ENABLE_CODEX_ACCOUNT?.trim().toLowerCase();
-      return raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on';
-    })(),
+    codexAccountAvailable: codexAccountEnabledByEnv(),
     codexAccountAuthenticated: codexAccountAuthenticatedCache,
   };
 }

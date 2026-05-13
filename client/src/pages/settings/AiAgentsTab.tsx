@@ -289,7 +289,7 @@ function ProviderCard({
           <div className="text-xs text-ink-400 font-mono mt-0.5 truncate">{modelLabel}</div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {!isDefault && canSetDefault && (
+          {!isDefault && canSetDefault === true && (
             <button
               type="button"
               onClick={onSetDefault}
@@ -2386,7 +2386,7 @@ export default function AiAgentsTab() {
                 status={codexAccountStatus}
                 modelLabel={ai.codexAccountModel || 'codex-recommended'}
                 onSetDefault={() => void setDefaultProvider('codex-account')}
-                canSetDefault={ai.codexAccountAvailable && ai.codexAccountAuthenticated && codexAccountStatus === 'connected'}
+                canSetDefault={ai.codexAccountAvailable === true && ai.codexAccountAuthenticated === true && codexAccountStatus === 'connected'}
               >
                 <CodexAccountDetail
                   model={ai.codexAccountModel || 'codex-recommended'}
