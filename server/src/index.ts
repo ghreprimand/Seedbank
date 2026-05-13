@@ -790,13 +790,30 @@ function redactedBackupRunRecord(record: BackupRunRecord): BackupRunRecord {
   };
 }
 
-function backupStatus(includeSensitivePaths = false): BackupStatus {
+function redactedBackupConfig(config: BackupConfig): BackupConfig {
+  return {
+    ...config,
+    destinations: config.destinations.map((destination) => (
+      destination.type === 'local-path'
+        ? { ...destination, localPath: '<configured-local-path>' }
+        : destination
+    )),
+  };
+}
+
+function backupStatus(options?: {
+  includeSensitivePaths?: boolean;
+  includeSensitiveDestinationPaths?: boolean;
+}): BackupStatus {
+  const includeSensitivePaths = options?.includeSensitivePaths ?? false;
+  const includeSensitiveDestinationPaths = options?.includeSensitiveDestinationPaths ?? false;
   const rclone = rcloneAvailability();
+  const rawConfig = backupConfig();
   const rawLastRun = repository.getSetting<BackupRunRecord>('backup.lastRun') ?? null;
   const rawLatestDatabaseBackup = latestFileInfo(backupsDir, /^seedbank-.*\.db$/);
   const rawLatestJsonExport = latestFileInfo(exportsDir, /^seedbank-archive-.*\.json$/);
   return {
-    config: backupConfig(),
+    config: includeSensitiveDestinationPaths ? rawConfig : redactedBackupConfig(rawConfig),
     lastRun: includeSensitivePaths || !rawLastRun ? rawLastRun : redactedBackupRunRecord(rawLastRun),
     latestDatabaseBackup: !rawLatestDatabaseBackup
       ? null
@@ -946,7 +963,7 @@ function aggregateSettings(): AggregateSettings {
       webhooks: webhooksConfig(),
     },
     agents: agentsPublicConfig(),
-    backups: backupStatus(),
+    backups: backupStatus({ includeSensitiveDestinationPaths: true }),
     integrations: integrations.list(),
     server: serverInfo(),
   };
@@ -1996,7 +2013,7 @@ app.post('/api/backups/destinations/test', requireScope('write:ideas'), asyncRou
 
 app.post('/api/backups/test-restore', requireScope('write:ideas'), asyncRoute((req, res) => {
   const body = (req.body ?? {}) as { backupPath?: unknown; exportPath?: unknown };
-  const status = backupStatus(true);
+  const status = backupStatus({ includeSensitivePaths: true, includeSensitiveDestinationPaths: true });
   const allowedRoots = restoreValidationRoots();
   const requestedBackupPath = typeof body.backupPath === 'string' ? body.backupPath.trim() : '';
   const requestedExportPath = typeof body.exportPath === 'string' ? body.exportPath.trim() : '';
