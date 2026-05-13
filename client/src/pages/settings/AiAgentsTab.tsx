@@ -59,15 +59,12 @@ import {
   testAiProvider,
   unlinkAgent,
   getClaudeAccountStatus,
-  startClaudeAccountLogin,
-  completeClaudeAccountLogin,
   logoutClaudeAccount,
   getCodexAccountStatus,
   startCodexAccountLogin,
   logoutCodexAccount,
   type AiUsageDetail,
   type AiUsageSummary,
-  type ClaudeAccountLoginResult,
   type CodexAccountLoginResult,
 } from '@/api/client';
 
@@ -246,11 +243,13 @@ interface ProviderCardProps {
   status: ProviderCardStatus;
   modelLabel: string;
   onSetDefault: () => void;
+  /** When false, the "Set default" button is hidden (e.g. provider not yet available). Default true. */
+  canSetDefault?: boolean;
   actions?: React.ReactNode;
   children?: React.ReactNode; // expandable detail row
 }
 
-type ProviderCardStatus = 'connected' | 'key-needed' | 'unreachable' | 'local' | 'not-tested';
+type ProviderCardStatus = 'connected' | 'key-needed' | 'unreachable' | 'local' | 'not-tested' | 'upcoming';
 
 function StatusPill({ status }: { status: ProviderCardProps['status'] }) {
   const cfg: Record<ProviderCardProps['status'], { label: string; classes: string }> = {
@@ -259,6 +258,7 @@ function StatusPill({ status }: { status: ProviderCardProps['status'] }) {
     unreachable: { label: 'unreachable', classes: 'bg-red-50 text-red-600 border-red-200' },
     local:       { label: 'local',       classes: 'bg-sage-50 text-sage-700 border-sage-200' },
     'not-tested': { label: 'not tested', classes: 'bg-ink-50 text-ink-500 border-ink-200' },
+    upcoming:     { label: 'coming soon', classes: 'bg-violet-50 text-violet-600 border-violet-200' },
   };
   const { label, classes } = cfg[status];
   return (
@@ -269,7 +269,7 @@ function StatusPill({ status }: { status: ProviderCardProps['status'] }) {
 }
 
 function ProviderCard({
-  label, icon, isDefault, status, modelLabel, onSetDefault, actions, children,
+  label, icon, isDefault, status, modelLabel, onSetDefault, canSetDefault = true, actions, children,
 }: ProviderCardProps) {
   const [expanded, setExpanded] = useState(false);
 
@@ -289,7 +289,7 @@ function ProviderCard({
           <div className="text-xs text-ink-400 font-mono mt-0.5 truncate">{modelLabel}</div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {!isDefault && (
+          {!isDefault && canSetDefault && (
             <button
               type="button"
               onClick={onSetDefault}
@@ -1676,7 +1676,9 @@ function FeatureRoutingSection({ ai, providerStatuses, accountSetupIssues, onSav
               : selectedUnavailableReason
                 ? `Unavailable right now: ${selectedUnavailableReason}`
                 : selectedProvider === 'claude-account'
-                  ? 'Subscription login path (not API-key billing).'
+                  ? (ai.claudeAccountAuthenticated
+                    ? 'Subscription login path (not API-key billing).'
+                    : 'Claude account login is not yet available. Use the Anthropic API provider for Claude models.')
                   : selectedProvider === 'codex-account'
                     ? 'Codex app-server login path (not OpenAI API-key billing).'
                     : selectedProvider === 'openai-compatible'
@@ -1721,7 +1723,7 @@ function FeatureRoutingSection({ ai, providerStatuses, accountSetupIssues, onSav
                       {provider.label}
                       {provider.id === 'openai' && !ai.hasOpenAIKey ? ' — setup required' : ''}
                       {provider.id === 'anthropic' && !ai.hasAnthropicKey ? ' — setup required' : ''}
-                      {provider.id === 'claude-account' && !ai.claudeAccountAuthenticated ? ' — sign in required' : ''}
+                      {provider.id === 'claude-account' && !ai.claudeAccountAuthenticated ? ' — not yet available' : ''}
                       {provider.id === 'codex-account' && !ai.codexAccountAuthenticated ? ' — sign in required' : ''}
                     </option>
                   ))}
@@ -1767,62 +1769,15 @@ function ClaudeAccountDetail({
 }) {
   const [localModel, setLocalModel] = useState(model);
   const [saving, setSaving] = useState(false);
-  const [loginLoading, setLoginLoading] = useState(false);
-  const [loginResult, setLoginResult] = useState<ClaudeAccountLoginResult | null>(null);
-  const [manualUrl, setManualUrl] = useState('');
   const [logoutLoading, setLogoutLoading] = useState(false);
   const [error, setError] = useState('');
   const refreshSettings = useSettingsStore((s) => s.refresh);
-
-  const handleLogin = async () => {
-    setLoginLoading(true);
-    setError('');
-    try {
-      const result = await startClaudeAccountLogin();
-      setLoginResult(result);
-      // Open the authorization URL in a new tab
-      window.open(result.authorizationUrl, '_blank', 'noopener');
-      // Poll for automatic callback completion (server updates cache on success)
-      if (!result.manualFallback) {
-        const pollInterval = setInterval(async () => {
-          try {
-            const status = await getClaudeAccountStatus();
-            if (status.authenticated) {
-              clearInterval(pollInterval);
-              setLoginResult(null);
-              await refreshSettings();
-            }
-          } catch { /* keep polling */ }
-        }, 2000);
-        // Stop polling after 5 minutes
-        setTimeout(() => clearInterval(pollInterval), 5 * 60 * 1000);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setLoginLoading(false);
-    }
-  };
-
-  const handleManualComplete = async () => {
-    if (!manualUrl.trim()) return;
-    setError('');
-    try {
-      await completeClaudeAccountLogin(manualUrl.trim());
-      setLoginResult(null);
-      setManualUrl('');
-      await refreshSettings();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
-  };
 
   const handleLogout = async () => {
     setLogoutLoading(true);
     setError('');
     try {
       await logoutClaudeAccount();
-      setLoginResult(null);
       await refreshSettings();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -1842,53 +1797,37 @@ function ClaudeAccountDetail({
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
-        <span className="font-semibold">Beta</span>
-        <span>— Claude account login uses your Anthropic subscription. This transport may change as Anthropic evolves their auth.</span>
+      <div className="flex items-center gap-2 text-[11px] text-ink-600 bg-ink-50 border border-ink-200 rounded px-2 py-1.5">
+        <span className="font-semibold">Coming soon</span>
+        <span>— Claude account login and runtime support are not yet available in this version. This provider will become active in an upcoming update.</span>
       </div>
 
       {!authenticated ? (
         <div className="space-y-2">
-          <p className="text-[12px] text-neutral-600">
-            Log in with your Claude account to use your Anthropic subscription for AI features.
-          </p>
-          <button
-            onClick={handleLogin}
-            disabled={loginLoading}
-            className="px-3 py-1.5 text-[12px] font-medium bg-violet-600 text-white rounded hover:bg-violet-700 disabled:opacity-50"
-          >
-            {loginLoading ? 'Starting…' : 'Log in with Claude'}
-          </button>
-
-          {loginResult && (
-            <div className="space-y-2 p-2 bg-neutral-50 border border-neutral-200 rounded text-[11px]">
-              <p>
-                A browser tab opened for Claude login.{' '}
-                {loginResult.manualFallback
-                  ? 'After granting access, copy the redirect URL and paste it below.'
-                  : 'After granting access, Seedbank will detect the callback automatically.'}
+          <div className="flex items-start gap-2 px-2.5 py-2 bg-paper-warm border border-ink-100 rounded text-[11px] text-ink-700">
+            <Info className="w-3.5 h-3.5 mt-0.5 shrink-0 text-ink-400" />
+            <div>
+              <p className="font-semibold">Login not yet available</p>
+              <p className="mt-0.5 text-ink-600">
+                Claude account login is not operational in this version. Account support
+                will arrive in an upcoming update.
               </p>
-              {loginResult.manualFallback && loginResult.manualReason && (
-                <p className="text-amber-700">{loginResult.manualReason}</p>
-              )}
-              <div className="flex gap-1.5">
-                <input
-                  type="text"
-                  placeholder="Paste callback URL here…"
-                  value={manualUrl}
-                  onChange={(e) => setManualUrl(e.target.value)}
-                  className="flex-1 rounded border border-neutral-300 px-2 py-1 text-[11px] font-mono"
-                />
-                <button
-                  onClick={handleManualComplete}
-                  disabled={!manualUrl.trim()}
-                  className="px-2 py-1 text-[11px] font-medium bg-neutral-700 text-white rounded hover:bg-neutral-800 disabled:opacity-50"
-                >
-                  Complete
-                </button>
-              </div>
             </div>
-          )}
+          </div>
+          <p className="text-[11px] text-ink-500 leading-relaxed">
+            To use Claude models now, use the{' '}
+            <span className="font-semibold text-ink-700">Anthropic API</span>{' '}
+            provider card and enter an Anthropic API key. Get a key at{' '}
+            <a
+              href="https://console.anthropic.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:text-sage-700"
+            >
+              console.anthropic.com
+            </a>
+            .
+          </p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -1931,15 +1870,6 @@ function ClaudeAccountDetail({
             listLabel="List models"
           />
         </div>
-      )}
-
-      {!authenticated && (
-        <ProviderProbe
-          buildConfig={() => ({ provider: 'claude-account', claudeAccountModel: localModel })}
-          onPickModel={setLocalModel}
-          onStatusChange={onStatusChange}
-          listLabel="List known models"
-        />
       )}
 
       {error && <p className="text-[11px] text-red-600">{error}</p>}
@@ -2026,7 +1956,7 @@ function CodexAccountDetail({
     <div className="space-y-3">
       <div className="flex items-center gap-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
         <span className="font-semibold">Beta</span>
-        <span>— Codex account uses the local Codex app-server and your ChatGPT/Codex login. This is separate from OpenAI API billing.</span>
+        <span>— Codex account requires the Codex app-server installed on this machine and uses your ChatGPT/Codex login. App-server support is in development and may not be fully operational. This is separate from OpenAI API billing.</span>
       </div>
 
       {!authenticated ? (
@@ -2133,7 +2063,7 @@ export default function AiAgentsTab() {
   // Determine provider connection status
   const openaiStatus: ProviderCardProps['status'] = probeStatuses.openai ?? (ai.hasOpenAIKey ? 'connected' : 'key-needed');
   const anthropicStatus: ProviderCardProps['status'] = probeStatuses.anthropic ?? (ai.hasAnthropicKey ? 'connected' : 'key-needed');
-  const claudeAccountStatus: ProviderCardProps['status'] = probeStatuses['claude-account'] ?? (ai.claudeAccountAuthenticated ? 'connected' : 'key-needed');
+  const claudeAccountStatus: ProviderCardProps['status'] = probeStatuses['claude-account'] ?? (ai.claudeAccountAuthenticated ? 'connected' : 'upcoming');
   const codexAccountStatus: ProviderCardProps['status'] = probeStatuses['codex-account'] ?? (ai.codexAccountAuthenticated ? 'connected' : 'key-needed');
   const ollamaStatus: ProviderCardProps['status'] = probeStatuses.ollama ?? 'not-tested';
   const compatiblePreset = presetFor(ai.openaiCompatiblePreset);
@@ -2148,7 +2078,7 @@ export default function AiAgentsTab() {
       try {
         const status = await getClaudeAccountStatus();
         if (!cancelled && !status.authenticated) {
-          next['claude-account'] = 'Sign in from the Claude account card before routing features here.';
+          next['claude-account'] = 'Claude account login is not yet available. Route this feature to the Anthropic API provider to use Claude models.';
         }
       } catch (err) {
         if (!cancelled) {
@@ -2328,7 +2258,7 @@ export default function AiAgentsTab() {
             />
           </ProviderCard>
 
-          {/* Claude Account (subscription) */}
+          {/* Claude Account (subscription — coming soon) */}
           <ProviderCard
             label={aiProviderLabel('claude-account')}
             icon="🟣"
@@ -2336,6 +2266,7 @@ export default function AiAgentsTab() {
             status={claudeAccountStatus}
             modelLabel={ai.claudeAccountModel || 'claude-sonnet-latest'}
             onSetDefault={() => void setDefaultProvider('claude-account')}
+            canSetDefault={ai.claudeAccountAuthenticated}
           >
             <ClaudeAccountDetail
               model={ai.claudeAccountModel || 'claude-sonnet-latest'}
