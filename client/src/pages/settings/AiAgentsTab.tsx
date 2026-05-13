@@ -1436,12 +1436,16 @@ function GuardrailsSection({ ai, onSaveBudget, onSaveGuardrails }: GuardrailsSec
     void getAiUsageDetail()
       .then(setDetail)
       .catch(() => void getAiUsage().then(setBasicUsage).catch(() => {}));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // usage counters: mount-only is intentional
 
-    // Fire a preflight against the global default route to confirm data residency.
+  useEffect(() => {
+    // Re-run preflight whenever the global provider or its URL/preset changes so the
+    // PrivacyNotice always reflects the current configuration, not a mount-time snapshot.
     void preflightAiRequest({ feature: 'default' })
       .then(setPreflight)
       .catch(() => {});
-  }, []);
+  }, [ai.provider, ai.openaiCompatibleBaseUrl, ai.openaiCompatiblePreset]);
 
   return (
     <div className="space-y-5">
