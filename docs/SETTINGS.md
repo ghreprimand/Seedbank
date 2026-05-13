@@ -33,22 +33,22 @@ Replaces the settings popover that used to live inside the inline AI chat panel.
 
 ### Provider cards
 
-Three provider cards appear in a column: **OpenAI**, **Anthropic**, and **Ollama**. Each shows:
+Four provider cards appear in a column: **OpenAI API**, **Anthropic API**, **Ollama / local models**, and **OpenRouter / custom endpoint**. Each shows:
 
 - A status pill: `connected` (key stored), `key needed`, `unreachable`, or `local`.
 - The configured model name.
 - A **Set default** button (radio-like) to choose which provider the Thinking Partner uses.
-- An expandable details row for model, API key, and (Ollama only) base URL.
+- An expandable details row for model, API key where needed, and the base URL for local/custom endpoints.
 
 The default provider is stored server-side and read by the Thinking Partner panel on every idea detail page. You no longer configure the provider from within the chat panel itself.
 
-**Provider API keys vs. Seedbank tokens.** Provider API keys (OpenAI, Anthropic) are credentials for external AI services — stored server-side, encrypted at rest, never exposed to the browser. `hasOpenAIKey` / `hasAnthropicKey` booleans in the public config indicate whether a key is stored. These are entirely separate from **Seedbank personal access tokens** (Settings → API & Server), which are bearer tokens for the Seedbank REST API itself.
+**Provider API keys vs. Seedbank tokens.** Provider API keys (OpenAI API, Anthropic API, OpenRouter, Groq, Mistral, Together, Fireworks, or another custom endpoint) are credentials for external AI services — stored server-side, encrypted at rest, never exposed to the browser. `hasOpenAIKey`, `hasAnthropicKey`, and `hasOpenAICompatibleKey` booleans in the public config indicate whether a key is stored. These are entirely separate from **Seedbank personal access tokens** (Settings → API & Server), which are bearer tokens for the Seedbank REST API itself.
 
-> **Data flow:** Ollama calls stay on your machine. OpenAI and Anthropic calls send idea content to those providers' servers. All calls are proxied server-side; the browser communicates only with the local Seedbank server.
+> **Data flow:** Ollama and local custom endpoint calls stay on the configured host. OpenAI API, Anthropic API, OpenRouter, and cloud custom endpoint calls send idea content to those providers' servers. All calls are proxied server-side; the browser communicates only with the local Seedbank server.
 
-### Custom providers (planned)
+### OpenRouter / custom endpoint
 
-A future release will add a **Custom provider** card for any OpenAI-compatible endpoint — including OpenRouter, LM Studio, vLLM, LiteLLM gateways, Groq, Mistral, and locally-hosted inference servers. The planned configuration: base URL, API key, model name, display name, and optional custom headers. For advanced routing, fallback, or multi-model strategies, use a gateway like OpenRouter or LiteLLM as the base URL — Seedbank delegates those concerns rather than implementing native routing.
+Use the **OpenRouter / custom endpoint** card for OpenRouter, Groq, Mistral, Together, Fireworks, LM Studio, vLLM, llama.cpp, LocalAI, or another service that accepts OpenAI Chat Completions requests. Configure the preset, base URL, API key when required, and model name. For advanced routing, fallback, or multi-model strategies, use a gateway like OpenRouter or LiteLLM as the base URL — Seedbank delegates those concerns rather than implementing native routing.
 
 ### Token budget & usage
 

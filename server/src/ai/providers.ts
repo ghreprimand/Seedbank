@@ -1,4 +1,4 @@
-import type { AiModelListResult, AiProviderErrorCode, AiProviderHealth, AiProviderId } from '../../../shared/types.js';
+import { aiProviderLabel, type AiModelListResult, type AiProviderErrorCode, type AiProviderHealth, type AiProviderId } from '../../../shared/types.js';
 import { decryptSecret } from './crypto.js';
 import { openAICompatiblePreset } from './registry.js';
 import type { AiProvider, AiProviderMessage, AiProviderResult, AiStoredConfig, AiUsage } from './types.js';
@@ -108,7 +108,7 @@ async function parseErrorBody(response: Response): Promise<string> {
 function providerFetchError(provider: AiProviderId, error: unknown): AiProviderError {
   if (error instanceof AiProviderError) return error;
   if (error instanceof TypeError || (error instanceof Error && error.name === 'AbortError')) {
-    return new AiProviderError(provider, 'unreachable', `${provider} is unreachable. Check the base URL and whether the service is running.`);
+    return new AiProviderError(provider, 'unreachable', `${aiProviderLabel(provider)} is unreachable. Check the base URL and whether the service is running.`);
   }
   return new AiProviderError(provider, 'unknown', error instanceof Error ? error.message : String(error));
 }
@@ -533,7 +533,7 @@ export class OpenAICompatibleProvider implements AiProvider {
     try {
       const endpoint = this.endpoint(config);
       if (!config.openaiCompatibleModel.trim()) {
-        throw new AiProviderError(this.id, 'not_configured', 'Choose a model for this OpenAI-compatible endpoint.');
+        throw new AiProviderError(this.id, 'not_configured', 'Choose a model for this custom endpoint.');
       }
       const response = await fetchWithTimeout(`${endpoint.baseUrl}/chat/completions`, {
         method: 'POST',
@@ -547,7 +547,7 @@ export class OpenAICompatibleProvider implements AiProvider {
           stream: false,
         }),
       });
-      await assertOk(this.id, response, 'OpenAI-compatible request');
+      await assertOk(this.id, response, 'Custom endpoint request');
       const payload = await response.json() as { usage?: unknown };
       return { text: extractChatCompletionText(payload), usage: usageFrom(payload.usage) };
     } catch (error) {
@@ -559,7 +559,7 @@ export class OpenAICompatibleProvider implements AiProvider {
     try {
       const endpoint = this.endpoint(config);
       if (!config.openaiCompatibleModel.trim()) {
-        throw new AiProviderError(this.id, 'not_configured', 'Choose a model for this OpenAI-compatible endpoint.');
+        throw new AiProviderError(this.id, 'not_configured', 'Choose a model for this custom endpoint.');
       }
       const response = await fetchWithTimeout(`${endpoint.baseUrl}/chat/completions`, {
         method: 'POST',
@@ -573,7 +573,7 @@ export class OpenAICompatibleProvider implements AiProvider {
           stream: true,
         }),
       });
-      await assertOk(this.id, response, 'OpenAI-compatible stream');
+      await assertOk(this.id, response, 'Custom endpoint stream');
       let text = '';
       let usage: AiUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
       await parseSse(response, (_event, data) => {
@@ -619,7 +619,7 @@ export class OpenAICompatibleProvider implements AiProvider {
       const response = await fetchWithTimeout(`${endpoint.baseUrl}/models`, {
         headers: authHeaders(endpoint.apiKey),
       });
-      await assertOk(this.id, response, 'OpenAI-compatible model discovery');
+      await assertOk(this.id, response, 'Custom endpoint model discovery');
       const models = extractModelIds(await response.json()).map((id) => ({ id }));
       return { provider: this.id, ok: true, models, normalizedBaseUrl };
     } catch (error) {

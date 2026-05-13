@@ -277,6 +277,17 @@ export interface GraduationResult {
 
 export type AiProviderId = 'openai' | 'anthropic' | 'ollama' | 'openai-compatible';
 
+export const AI_PROVIDER_IDS: readonly AiProviderId[] = [
+  'openai',
+  'anthropic',
+  'ollama',
+  'openai-compatible',
+] as const;
+
+export type AiProviderFamily = 'api' | 'local' | 'custom-endpoint' | 'account';
+export type AiProviderAuthMode = 'api-key' | 'local-server' | 'account' | 'none';
+export type AiProviderDataResidency = 'cloud' | 'local' | 'user-controlled';
+
 export type AiOpenAICompatiblePresetId =
   | 'openrouter'
   | 'groq'
@@ -308,7 +319,11 @@ export type AiProviderErrorCode =
 export interface AiProviderDescriptor {
   id: AiProviderId;
   label: string;
+  shortLabel: string;
+  family: AiProviderFamily;
   transport: 'openai-responses' | 'anthropic-messages' | 'ollama-chat' | 'openai-chat-completions';
+  authMode: AiProviderAuthMode;
+  dataResidency: AiProviderDataResidency;
   defaultModel: string;
   capabilities: AiProviderCapability[];
   requiresApiKey: boolean;
@@ -316,6 +331,47 @@ export interface AiProviderDescriptor {
   modelDiscovery: boolean;
   baseUrl?: string;
   presetId?: AiOpenAICompatiblePresetId;
+  beta?: boolean;
+}
+
+export const AI_PROVIDER_DISPLAY: Record<AiProviderId, Pick<AiProviderDescriptor, 'label' | 'shortLabel' | 'family' | 'authMode' | 'dataResidency'>> = {
+  openai: {
+    label: 'OpenAI API',
+    shortLabel: 'OpenAI',
+    family: 'api',
+    authMode: 'api-key',
+    dataResidency: 'cloud',
+  },
+  anthropic: {
+    label: 'Anthropic API',
+    shortLabel: 'Anthropic',
+    family: 'api',
+    authMode: 'api-key',
+    dataResidency: 'cloud',
+  },
+  ollama: {
+    label: 'Ollama / local models',
+    shortLabel: 'Ollama',
+    family: 'local',
+    authMode: 'local-server',
+    dataResidency: 'local',
+  },
+  'openai-compatible': {
+    label: 'OpenRouter / custom endpoint',
+    shortLabel: 'Custom endpoint',
+    family: 'custom-endpoint',
+    authMode: 'api-key',
+    dataResidency: 'user-controlled',
+  },
+};
+
+export function aiProviderLabel(provider: AiProviderId, variant: 'full' | 'short' = 'full'): string {
+  const display = AI_PROVIDER_DISPLAY[provider];
+  return variant === 'short' ? display.shortLabel : display.label;
+}
+
+export function isAiProviderId(value: unknown): value is AiProviderId {
+  return typeof value === 'string' && (AI_PROVIDER_IDS as readonly string[]).includes(value);
 }
 
 export interface AiProviderHealth {

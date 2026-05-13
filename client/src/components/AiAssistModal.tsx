@@ -34,7 +34,7 @@ import {
   Sparkles,
   X,
 } from 'lucide-react';
-import type { AiChatMessage, AiFeatureId, AiPreflightResult, AiSuggestionField } from '@/lib/types';
+import { aiProviderLabel, type AiChatMessage, type AiFeatureId, type AiPreflightResult, type AiSuggestionField } from '@/lib/types';
 import { preflightAiRequest, suggestIdeaField, streamFieldAssistChat } from '@/api/client';
 import { useAiSettings } from '@/stores/settings';
 import {
@@ -111,10 +111,10 @@ type ModalView =
 
 function providerName(provider: string): string {
   const names: Record<string, string> = {
-    openai: 'OpenAI',
-    anthropic: 'Anthropic',
-    ollama: 'Ollama',
-    'openai-compatible': 'OpenAI-compat',
+    openai: aiProviderLabel('openai', 'short'),
+    anthropic: aiProviderLabel('anthropic', 'short'),
+    ollama: aiProviderLabel('ollama', 'short'),
+    'openai-compatible': aiProviderLabel('openai-compatible', 'short'),
   };
   return names[provider] ?? provider;
 }
@@ -869,7 +869,7 @@ export default function AiAssistModal({
             {/* Provider info */}
             <div className="px-3 py-2 bg-paper-warm border border-ink-100 rounded-card text-xs text-ink-600">
               <span className="font-medium">Provider:</span>{' '}
-              {pendingPreflight.provider} · {pendingPreflight.model}
+              {providerName(pendingPreflight.provider)} · {pendingPreflight.model}
               {pendingPreflight.contentLeavesMachine && (
                 <span className="ml-2 text-amber-600 font-medium">
                   · idea content will be sent off-device

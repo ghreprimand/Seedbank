@@ -230,7 +230,7 @@ The first time the backend is available, the client can migrate existing browser
 
 ### AI Setup
 
-Built-in providers: **OpenAI**, **Anthropic**, **Ollama** (local), and **OpenAI-compatible endpoints**. OpenRouter, Groq, Mistral, Together, Fireworks, LM Studio, vLLM, llama.cpp, LocalAI, and custom gateways can be configured in Settings → AI & Agents.
+Built-in providers: **OpenAI API**, **Anthropic API**, **Ollama / local models**, and **OpenRouter / custom endpoint**. OpenRouter, Groq, Mistral, Together, Fireworks, LM Studio, vLLM, llama.cpp, LocalAI, and custom gateways can be configured in Settings → AI & Agents.
 
 Provider settings are configured in **Settings → AI & Agents**. Provider API keys (OpenAI, Anthropic) are stored server-side, encrypted at rest; public config responses only expose whether a key exists. These are separate from **Seedbank personal access tokens** (Settings → API & Server), which are bearer tokens for the Seedbank REST API itself.
 
@@ -272,7 +272,7 @@ Seedbank is designed for **single-user, local use only**. It is not a multi-user
 - **Default binding:** `localhost` / `127.0.0.1`. The CORS policy blocks non-loopback origins. Port `4800` is not intended to be exposed to the public internet.
 - **Do not expose the API publicly** without adding a reverse-proxy that enforces authentication and TLS. Seedbank API access from `localhost` does not require a bearer token by design; public exposure without a proxy would give unauthenticated access to your ideas and data.
 - **API tokens** provide scoped bearer access for local scripting. Token creation is restricted to `localhost` browser sessions even if you hold a valid token.
-- **Data:** all idea content stays on your machine. AI features send idea content to your configured AI provider (OpenAI/Anthropic/Ollama). With Ollama, nothing leaves your machine.
+- **Data:** all idea content stays on your machine. AI features send idea content to your configured AI provider (OpenAI API, Anthropic API, OpenRouter / custom endpoint, or Ollama). With Ollama or a local custom endpoint, nothing leaves the configured local host.
 
 For trusted LAN or self-hosted access, place a reverse proxy (nginx, Caddy) in front of port `4800` with HTTP basic auth or mutual TLS, and similarly protect port `5173`.
 

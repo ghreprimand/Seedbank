@@ -10,13 +10,15 @@ Provider configuration lives in **Settings → AI & Agents**. Navigate there via
 
 ### Built-in providers
 
-Three provider cards are available today:
+Four provider cards are available today:
 
-**OpenAI** — enter your API key and model name (e.g. `gpt-4o`). Calls are made server-side to `api.openai.com`. Idea content is sent to OpenAI's servers.
+**OpenAI API** — enter your API key and model name (e.g. `gpt-4.1-mini`). Calls are made server-side to `api.openai.com`. Idea content is sent to OpenAI's servers.
 
-**Anthropic** — enter your API key and model name (e.g. `claude-opus-4-5`). Calls are made server-side to `api.anthropic.com`. Works well for reflective critique and longer contextual responses. Idea content is sent to Anthropic's servers.
+**Anthropic API** — enter your API key and model name (e.g. `claude-sonnet-4-20250514`). Calls are made server-side to `api.anthropic.com`. Works well for reflective critique and longer contextual responses. Idea content is sent to Anthropic's servers.
 
-**Ollama** — configure the base URL (usually `http://localhost:11434`) and model name (e.g. `llama3.2`). No API key required. All calls stay on your machine — idea content never leaves your local network. Useful for local-only experimentation or privacy-sensitive archives.
+**Ollama / local models** — configure the base URL (usually `http://localhost:11434`) and model name (e.g. `llama3.2`). No API key required. Calls stay on the configured Ollama host. Useful for local-only experimentation or privacy-sensitive archives.
+
+**OpenRouter / custom endpoint** — choose a preset or enter a compatible endpoint URL, API key when required, and model name. Use this for OpenRouter, Groq, Mistral, Together, Fireworks, LM Studio, vLLM, llama.cpp, LocalAI, or another service that accepts OpenAI Chat Completions requests.
 
 ### Choosing a default provider
 
@@ -24,23 +26,21 @@ A **Set default** radio button on each provider card determines which provider t
 
 ### Provider API keys vs. Seedbank tokens
 
-**Provider API keys** (OpenAI, Anthropic) are credentials for external AI services. They are stored server-side, encrypted at rest. Public API responses expose only a boolean (`hasOpenAIKey` / `hasAnthropicKey`) — the raw key value is never sent to the browser. All AI calls are proxied through the Seedbank server; the browser has no direct contact with the provider.
+**Provider API keys** (OpenAI API, Anthropic API, OpenRouter, Groq, Mistral, Together, Fireworks, or another custom endpoint) are credentials for external AI services. They are stored server-side, encrypted at rest. Public API responses expose only booleans such as `hasOpenAIKey`, `hasAnthropicKey`, and `hasOpenAICompatibleKey` — the raw key value is never sent to the browser. All AI calls are proxied through the Seedbank server; the browser has no direct contact with the provider.
 
 **Seedbank personal access tokens** are a separate concept. They are bearer tokens you generate in **Settings → API & Server** to call the Seedbank REST API from scripts, external tools, or remote hosts. They do not interact with provider API keys.
 
-### Custom and OpenAI-compatible providers (planned)
+### OpenRouter / custom endpoint
 
-The current built-in cards cover OpenAI, Anthropic, and Ollama. A future release will add a **Custom provider** card that accepts any OpenAI-compatible endpoint. The planned configuration fields are:
+The **OpenRouter / custom endpoint** card accepts any endpoint that uses OpenAI Chat Completions requests. Configure:
 
 | Field | Description |
 |---|---|
 | Base URL | Full endpoint root, e.g. `https://openrouter.ai/api/v1` or `http://localhost:8080/v1` |
 | API key | Optional bearer token for the endpoint |
 | Model | Model identifier string as accepted by the endpoint |
-| Display name | Label shown in the UI (e.g. `OpenRouter`, `LM Studio`, `vLLM`) |
-| Custom headers | Optional extra headers (e.g. `X-Title`, `HTTP-Referer` for OpenRouter) |
 
-This will let you use providers such as OpenRouter, LM Studio, vLLM, LiteLLM gateways, Groq, Mistral, and any locally-hosted inference server that exposes an OpenAI-compatible `/v1/chat/completions` endpoint.
+This lets you use providers such as OpenRouter, LM Studio, vLLM, LiteLLM gateways, Groq, Mistral, and locally-hosted inference servers that expose a `/v1/chat/completions` endpoint.
 
 ### Advanced routing and fallback
 
