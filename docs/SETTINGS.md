@@ -12,7 +12,7 @@ Settings uses a tabbed shell. On desktop (`md+`) a left-rail sidebar lists every
 | AI & Agents | `/settings/ai-agents` | Provider config, agent linking, token budget |
 | Theme | `/settings/theme` | Color palette, system preference toggle |
 | API & Server | `/settings/api` | Server info, personal access tokens, webhooks, MCP |
-| Backups | `/settings/backups` | Backup schedule, path, manual run |
+| Backups | `/settings/backups` | Schedule, retention, JSON export, destinations, manual run, restore validation |
 | Integrations | `/settings/integrations` | External project adapters and integration root configuration |
 | About | `/settings/about` | Version, GitHub link, acknowledgements |
 
@@ -157,9 +157,13 @@ Read-only endpoints for external Claude or Codex sessions to pull seeds as conte
 All backup settings that were previously in the header popover live here.
 
 - **Backup frequency** — off, daily, or weekly.
-- **Max backups to keep** — older backups are pruned automatically.
+- **Retention count** — choose how many database backup files to keep locally before pruning.
+- **JSON archive export** — toggle full archive JSON snapshots on each backup run.
 - **Backup directory** — defaults to `<seedbank-data-dir>/backups/` (or `$SEEDBANK_DATA_DIR/backups/`).
+- **Offsite destinations** — configure local/network folder targets and optional `rclone` remote targets.
+- **Test destination** — run a connectivity/writeability check before relying on a destination.
 - **Manual backup** — runs a backup immediately.
+- **Test restore (safe validation)** — validates latest DB/export backup files without replacing live data; validation is limited to Seedbank backup/export directories and configured local backup destinations.
 
 The header status pill continues to show last-backup time and links to this tab.
 
