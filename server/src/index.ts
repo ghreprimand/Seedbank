@@ -41,6 +41,7 @@ import type {
   AiFieldAssistChatRequest,
   AiFieldSuggestionRequest,
   AiFeatureId,
+  AiMethodCapability,
   AiPreflightRequest,
   AiSuggestionField,
   Category,
@@ -969,6 +970,33 @@ function aggregateSettings(): AggregateSettings {
   };
 }
 
+function aiMethodCapabilities(): AiMethodCapability[] {
+  const agentConfig = agentsPublicConfig();
+  return [
+    ...aiService.getMethodCapabilities(),
+    {
+      id: 'claude-code-cli-agent',
+      label: 'Claude Code CLI',
+      serviceFamily: 'claude',
+      connectionMethod: 'cli-agent',
+      channel: 'file-agent',
+      featureRoutable: false,
+      availability: agentConfig.claudeLinked ? 'available' : 'unavailable',
+      ...(agentConfig.claudeLinked ? {} : { availabilityReason: 'Link Claude Code CLI in Project Graduation → Agents to enable file-producing agent runs.' }),
+    },
+    {
+      id: 'codex-cli-agent',
+      label: 'Codex CLI',
+      serviceFamily: 'codex-openai',
+      connectionMethod: 'cli-agent',
+      channel: 'file-agent',
+      featureRoutable: false,
+      availability: agentConfig.codexLinked ? 'available' : 'unavailable',
+      ...(agentConfig.codexLinked ? {} : { availabilityReason: 'Link Codex CLI in Project Graduation → Agents to enable file-producing agent runs.' }),
+    },
+  ];
+}
+
 function migrateLegacySettings(): void {
   // Migrate AI config key rename (pre-v2.0).
   const legacyAiConfig = repository.getSetting<unknown>(SETTINGS_KEYS.aiConfigLegacy);
@@ -1691,6 +1719,10 @@ app.get('/api/ai/config', requireScope('read:ideas'), asyncRoute((_req, res) => 
 
 app.get('/api/ai/providers', requireScope('read:ideas'), asyncRoute((_req, res) => {
   res.json({ providers: aiService.getProviderDescriptors() });
+}));
+
+app.get('/api/ai/method-capabilities', requireScope('read:ideas'), asyncRoute((_req, res) => {
+  res.json({ methods: aiMethodCapabilities() });
 }));
 
 app.get('/api/ai/usage', requireScope('read:ideas'), asyncRoute((_req, res) => {

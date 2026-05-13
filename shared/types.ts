@@ -372,6 +372,26 @@ export interface AiProviderDescriptor {
   beta?: boolean;
 }
 
+export type AiMethodServiceFamily = 'claude' | 'codex-openai' | 'local-inference' | 'external-router';
+export type AiMethodConnection = 'api-key' | 'account' | 'local-server' | 'openai-compatible' | 'cli-agent';
+export type AiMethodChannel = 'chat-model' | 'file-agent';
+export type AiMethodAvailability = 'available' | 'auth-required' | 'unavailable';
+
+export interface AiMethodCapability {
+  id: string;
+  label: string;
+  serviceFamily: AiMethodServiceFamily;
+  connectionMethod: AiMethodConnection;
+  channel: AiMethodChannel;
+  featureRoutable: boolean;
+  availability: AiMethodAvailability;
+  availabilityReason?: string;
+  providerId?: AiProviderId;
+  presetId?: AiOpenAICompatiblePresetId;
+  local?: boolean;
+  beta?: boolean;
+}
+
 export const AI_PROVIDER_DISPLAY: Record<AiProviderId, Pick<AiProviderDescriptor, 'label' | 'shortLabel' | 'family' | 'authMode' | 'dataResidency'>> = {
   openai: {
     label: 'OpenAI API',
