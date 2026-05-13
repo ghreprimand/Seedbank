@@ -97,7 +97,11 @@ For a desktop launcher, install `scripts/seedbank.desktop`:
 bash scripts/install-desktop.sh
 ```
 
-This launcher runs `scripts/seedbank start` from your cloned repository.
+This installs:
+- the launcher entry under `~/.local/share/applications/seedbank.desktop`
+- the app icon under `~/.local/share/icons/hicolor/scalable/apps/seedbank.svg`
+
+The launcher runs `scripts/seedbank start` from your cloned repository.
 
 For auto-start, create a user systemd service that runs the launcher script from the repository root after login.
 
@@ -128,6 +132,12 @@ bash scripts/seedbank start
 
 You can then pin that wrapper to the Dock. Use `bash scripts/seedbank stop` to stop background processes.
 
+If macOS blocks the launcher because the archive is unsigned, run this inside the extracted folder:
+
+```bash
+xattr -rc .
+```
+
 ### Windows
 
 Use one of the native launcher scripts from PowerShell or Command Prompt:
@@ -154,15 +164,28 @@ scripts\seedbank.bat stop
 
 For a launcher shortcut, point Start Menu/Desktop shortcuts at either script with `start`.
 
+Windows shortcut automation is currently deferred; use a manual shortcut for now.
+
 ## Packaging Roadmap
 
 Seedbank is currently distributed as a local source checkout with launcher scripts (`npm start` or `scripts/seedbank*`).
+Launchers run the built runtime (`server/dist` + `vite preview`) rather than hot-reload dev mode.
 
 Near-term deliverables:
 
 - `npx`/global CLI wrapper for `start|stop|status|logs` around the same local runtime model.
 - Container image for trusted local/LAN self-hosting, with explicit storage volume mapping for `<seedbank-data-dir>`.
 - Installable release archives that bundle launcher scripts and setup guidance per platform.
+
+Current release scaffolding:
+- `npm run release:package` (build all archive targets)
+- `npm run release:package -- --target <linux-x64|macos|windows-x64> --format <tar.gz|zip>`
+- `npm run release:smoke` (smoke-check all discovered release artifacts)
+- `npm run release:smoke -- <artifact-path>`
+- Tag-driven GitHub workflow: `.github/workflows/release.yml` (macOS package job requires a self-hosted runner with labels `[self-hosted, macOS]`)
+- Full release notes: `docs/RELEASING.md`
+
+Public-repo runner safety note: self-hosted runners execute repository workflow code. Seedbank keeps self-hosted usage constrained to trusted release tag/manual paths, not PR/fork workflows.
 
 Deferred packaging:
 
@@ -201,13 +224,13 @@ Seedbank stores durable data in:
 └── exports/
 ```
 
-On server startup, the current database is copied into `backups/` and the newest 10 database backups are retained. The backup UI can run manual backups and configure scheduled backups as daily, weekly, or off. When JSON export backups are enabled, full archive snapshots are written to `exports/`.
+On server startup, the current database is copied into `backups/`. The retention count is configurable in Settings → Backups (default: 10). The backup UI can run manual backups, configure daily/weekly/off scheduling, toggle JSON archive exports, and validate backups with a non-destructive restore test. When JSON export backups are enabled, full archive snapshots are written to `exports/`.
 
 The first time the backend is available, the client can migrate existing browser IndexedDB ideas into SQLite while preserving IDs, timestamps, and versions.
 
 ### AI Setup
 
-Built-in providers: **OpenAI**, **Anthropic**, and **Ollama** (local). Custom OpenAI-compatible endpoints — OpenRouter, LM Studio, vLLM, LiteLLM gateways, and similar — are planned for a future release. For advanced routing or multi-model fallback, point a custom provider at an OpenRouter or LiteLLM gateway URL.
+Built-in providers: **OpenAI**, **Anthropic**, **Ollama** (local), and **OpenAI-compatible endpoints**. OpenRouter, Groq, Mistral, Together, Fireworks, LM Studio, vLLM, llama.cpp, LocalAI, and custom gateways can be configured in Settings → AI & Agents.
 
 Provider settings are configured in **Settings → AI & Agents**. Provider API keys (OpenAI, Anthropic) are stored server-side, encrypted at rest; public config responses only expose whether a key exists. These are separate from **Seedbank personal access tokens** (Settings → API & Server), which are bearer tokens for the Seedbank REST API itself.
 
@@ -240,6 +263,7 @@ Quick endpoint groups: ideas, versions, integrations, AI (chat, suggest, usage),
 | [docs/AI_GUIDE.md](docs/AI_GUIDE.md) | Thinking Partner posture, provider setup, prompt modes, field suggestions, usage readout. |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System diagram, data-flow, settings store, token middleware, theme tokens, agent runner. |
 | [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md) | Graduation adapter interface, built-in adapters, and "Continue with agent" handoff. |
+| [docs/RELEASING.md](docs/RELEASING.md) | Archive-based release flow, packaging commands, workflow notes, smoke checks. |
 
 ## Security and Hosting
 

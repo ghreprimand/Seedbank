@@ -439,10 +439,13 @@ Scope expectations (bearer mode):
 
 - `GET /api/ai/config` (`read:ideas`)
 - `GET /api/ai/usage` (`read:ideas`)
+- `GET /api/ai/usage/detail` (`read:ideas`) - grouped usage plus recent guardrail/provider audit events
 - `POST /api/ai/config` (`write:ideas`, legacy update route)
+- `POST /api/ai/preflight` (`read:ideas`) - resolves feature route, budget state, allowlist blockers, and local/remote privacy metadata
 - `GET /api/ai/conversations/:ideaId` (`read:ideas`)
-- `POST /api/ai/suggest` (`ai:suggest`)
-- `POST /api/ai/chat` (`ai:suggest`, SSE)
+- `POST /api/ai/suggest` (`ai:suggest`) - field suggestions accept an optional `prompt`, `omitCurrentValue`, and `aiConfirmationToken`
+- `POST /api/ai/field-chat` (`ai:suggest`, SSE) - modal-local field assistance using the `field-suggestions` route; accepts `aiConfirmationToken`
+- `POST /api/ai/chat` (`ai:suggest`, SSE) - Thinking Partner chat; accepts `aiConfirmationToken`
 
 ## Backups, Integrations, Import/Export
 
@@ -450,6 +453,8 @@ Scope expectations (bearer mode):
 - `GET /api/backups` (`read:ideas`)
 - `PATCH /api/backups/config` (`write:ideas`)
 - `POST /api/backups/run` (`write:ideas`)
+- `POST /api/backups/destinations/test` (`write:ideas`)
+- `POST /api/backups/test-restore` (`write:ideas`)
 
 ### Integrations
 - `GET /api/integrations` (`read:ideas`)
