@@ -610,7 +610,7 @@ function OpenAICompatibleDetail({ preset, model, baseUrl, hasKey, onSave }: Open
           className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800"
         >
           <optgroup label="Local servers (stays on this machine)">
-            {OPENAI_COMPATIBLE_PRESETS.filter((p) => LOCAL_COMPATIBLE_PRESETS.has(p.id)).map((item) => (
+            {OPENAI_COMPATIBLE_PRESETS.filter((p) => LOCAL_OPTGROUP_PRESETS.has(p.id)).map((item) => (
               <option key={item.id} value={item.id}>{item.label}</option>
             ))}
           </optgroup>
@@ -829,10 +829,14 @@ function AgentCard({
 
 // ── Privacy notice ────────────────────────────────────────────────────────────
 
-// 'custom' is grouped with local: its default URL is localhost and it requires no key.
-// Users who point it at a remote host should understand they control that endpoint.
-const LOCAL_COMPATIBLE_PRESETS = new Set(['lm-studio', 'vllm', 'llama-cpp', 'localai', 'custom']);
+// Used for the dropdown optgroup filter only — 'custom' belongs in the local group
+// because its default URL is localhost and it requires no key.
+const LOCAL_OPTGROUP_PRESETS = new Set(['lm-studio', 'vllm', 'llama-cpp', 'localai', 'custom']);
 const CLOUD_COMPATIBLE_PRESETS = new Set(['openrouter', 'groq', 'mistral', 'together', 'fireworks']);
+
+// Used for data-residency logic only — 'custom' is excluded because users can point it
+// at any URL; we cannot claim local residency without knowing the actual configured host.
+const LOCAL_RESIDENCY_PRESETS = new Set(['lm-studio', 'vllm', 'llama-cpp', 'localai']);
 
 type DataResidency = 'local' | 'cloud' | 'mixed';
 
@@ -840,9 +844,9 @@ function dataResidency(ai: AiPublicConfig): DataResidency {
   if (ai.provider === 'ollama') return 'local';
   if (ai.provider === 'openai-compatible') {
     const preset = ai.openaiCompatiblePreset as string;
-    if (LOCAL_COMPATIBLE_PRESETS.has(preset)) return 'local';
+    if (LOCAL_RESIDENCY_PRESETS.has(preset)) return 'local';
     if (CLOUD_COMPATIBLE_PRESETS.has(preset)) return 'cloud';
-    return 'mixed'; // custom endpoint — unknown
+    return 'mixed'; // custom or unknown endpoint — URL is user-configured
   }
   return 'cloud';
 }
@@ -946,7 +950,7 @@ function transportLabel(transport: string): string {
     case 'claude-account-native':
       return 'Claude account';
     case 'codex-account-app-server':
-      return 'Codex app-server';
+      return 'Codex account';
     default:
       return transport;
   }
@@ -1620,6 +1624,21 @@ function FeatureRoutingSection({ ai, providerStatuses, accountSetupIssues, onSav
   };
 
   const save = async () => {
+    // Synchronous gate: prevent saving routes to providers that are operationally unavailable.
+    // claude-account login is not available in this RC; codex-account requires the opt-in env flag.
+    const unavailableProviders = Object.values(routes).filter((route) => {
+      if (route.provider === 'default') return false;
+      if (route.provider === 'claude-account') return true;
+      if (route.provider === 'codex-account' && !ai.codexAccountAvailable) return true;
+      return false;
+    });
+    if (unavailableProviders.length > 0) {
+      setSaveError(
+        'One or more features are routed to an unavailable provider (Claude account or Codex account). ' +
+        'Change those routes to an available provider before saving.'
+      );
+      return;
+    }
     setSaving(true);
     setSaved(false);
     setSaveError(null);
@@ -1972,7 +1991,7 @@ function CodexAccountDetail({
     <div className="space-y-3">
       <div className="flex items-center gap-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
         <span className="font-semibold">Beta</span>
-        <span>— Codex account requires the Codex app-server installed on this machine and uses your ChatGPT/Codex login. App-server support is in development and may not be fully operational. This is separate from OpenAI API billing.</span>
+        <span>— Codex account requires a separate Codex CLI component to be installed and running on this machine and uses your ChatGPT/Codex login. This feature is in development and may not be fully operational. This is separate from OpenAI API billing.</span>
       </div>
 
       {!authenticated ? (
@@ -2029,7 +2048,7 @@ function CodexAccountDetail({
             />
           </label>
           <p className="text-[10px] text-neutral-500">
-            Use <code>codex-recommended</code> or choose a resolved model from the app-server catalog.
+            Use <code>codex-recommended</code> or choose a resolved model ID from the Codex catalog.
           </p>
           <button
             onClick={handleSave}
@@ -2118,7 +2137,7 @@ export default function AiAgentsTab() {
         if (!cancelled) {
           const message = err instanceof Error ? err.message : String(err);
           next['codex-account'] = /(enoent|not found|app-server|codex)/i.test(message)
-            ? 'Codex account app-server is not responding. Verify the app-server is installed and running, then refresh the Codex account card.'
+            ? 'Codex account component is not responding. Verify it is installed and running, then refresh the Codex account card.'
             : message;
         }
       }
@@ -2495,19 +2514,7 @@ export default function AiAgentsTab() {
         </div>
       </section>
 
-      {/* Link to agent docs */}
-      <div className="flex items-center gap-1 text-[11px] text-ink-400">
-        <ChevronRight className="w-3 h-3" />
-        <a
-          href="https://github.com"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="hover:text-sage-700 transition-colors"
-        >
-          Read the Agents guide
-        </a>
-        <ExternalLink className="w-3 h-3" />
-      </div>
+      {/* Inline help covers the agents guide — external link placeholder removed */}
     </div>
   );
 }
