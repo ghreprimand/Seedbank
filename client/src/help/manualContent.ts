@@ -152,14 +152,15 @@ export const MANUAL_GROUPS: ManualGroup[] = [
       {
         id: 'categories',
         title: 'Categories',
-        keywords: ['category', 'type', 'app', 'game', 'tool', 'art', 'mobile', 'browser', 'open source'],
+        keywords: ['category', 'type', 'app', 'game', 'tool', 'art', 'mobile', 'browser', 'open source', 'custom', 'rename', 'add'],
         blocks: [
-          { type: 'p', text: 'Categories describe what kind of project an idea is. They appear as colour-coded badges on idea cards.' },
+          { type: 'p', text: 'Categories describe what kind of project an idea is. They appear as badges on idea cards and can be used to filter your garden.' },
           { type: 'ul', items: [
             'App, Game, Tool, Art Project',
             'Local AI, Mobile, Browser, Open-Source Utility',
           ]},
-          { type: 'p', text: 'Categories are optional — a seed doesn\'t need one to be valid.' },
+          { type: 'p', text: 'You can add your own categories, rename the built-ins, change their colors and icons, and reorder them. Go to Settings → Categories to manage your taxonomy.' },
+          { type: 'tip', text: 'Categories are optional — a seed doesn\'t need one to be valid.' },
         ],
       },
       {
@@ -524,6 +525,26 @@ export const MANUAL_GROUPS: ManualGroup[] = [
           { type: 'h3', text: 'Test restore (safe validation)' },
           { type: 'p', text: 'Restore validation reads and checks your latest local backup files — it does not replace live data. It validates the local copies Seedbank has stored on this machine. Rclone remote destinations are delivery targets; to verify a remote backup, download the files from the remote first, then validate them locally.' },
           { type: 'tip', text: 'A startup backup is always taken when the server starts, regardless of schedule settings.' },
+        ],
+      },
+      {
+        id: 'settings-categories',
+        title: 'Settings — Categories',
+        indexLabel: 'Categories',
+        keywords: ['settings', 'categories', 'category', 'rename', 'add', 'delete', 'archive', 'reorder', 'color', 'icon', 'taxonomy', 'custom'],
+        blocks: [
+          { type: 'p', text: 'Settings → Categories lets you manage the full list of categories used to label ideas. You can add your own categories, rename or recolor the built-in ones, change their order, and archive categories you no longer need.' },
+          { type: 'h3', text: 'Adding a category' },
+          { type: 'p', text: 'Click "Add category", enter a name, pick an optional color and emoji icon, then click "Add category" to save. The category immediately appears in the idea editor and filter bar.' },
+          { type: 'h3', text: 'Renaming or recoloring' },
+          { type: 'p', text: 'Click the pencil icon on any row. Edit the name, icon, or color, then press Enter or click the checkmark.' },
+          { type: 'h3', text: 'Reordering' },
+          { type: 'p', text: 'Use the ↑/↓ buttons on the left of each row to change the order. The order here is reflected in the category picker and filter bar.' },
+          { type: 'h3', text: 'Archiving and restoring' },
+          { type: 'p', text: 'Archiving hides a category from the picker and filters. Ideas already using an archived category keep their assignment — the category label still shows on the idea card. Click "Archived" at the bottom to see and restore archived categories.' },
+          { type: 'h3', text: 'Deleting a custom category' },
+          { type: 'p', text: 'Custom categories (ones you created) can be permanently deleted if no ideas are currently assigned to them. Built-in categories cannot be deleted — archive them instead.' },
+          { type: 'tip', text: 'If you want to remove a category that is still in use, archive it first. Then update or reassign the affected ideas before deleting.' },
         ],
       },
       {

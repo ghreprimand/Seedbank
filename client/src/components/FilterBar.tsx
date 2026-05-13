@@ -1,9 +1,10 @@
 /** Filter bar with multi-select dropdowns for category, stage, tag, and sort order. */
 import { useState } from 'react';
 import { ChevronDown, X, ArrowUpDown } from 'lucide-react';
-import { CATEGORIES, STAGES, CATEGORY_LABELS, STAGE_LABELS, STAGE_ICONS } from '@/lib/types';
+import { STAGES, STAGE_LABELS, STAGE_ICONS } from '@/lib/types';
 import type { SortField } from '@/lib/types';
 import { useFilterStore } from '@/stores/filters';
+import { useCategoriesSettings } from '@/stores/settings';
 
 const SORT_OPTIONS: { field: SortField; label: string }[] = [
   { field: 'updatedAt', label: 'Recently updated' },
@@ -31,6 +32,12 @@ export default function FilterBar({ availableTags, totalCount, filteredCount }: 
     setSort,
     clearAll,
   } = useFilterStore();
+
+  // Use configured categories from settings (non-archived, in sortOrder)
+  const categorySettings = useCategoriesSettings();
+  const activeCategories = categorySettings.items
+    .filter((c) => !c.archived)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
 
   const [openPanel, setOpenPanel] = useState<'category' | 'stage' | 'tag' | 'sort' | null>(null);
 
@@ -63,12 +70,12 @@ export default function FilterBar({ availableTags, totalCount, filteredCount }: 
           </button>
           {openPanel === 'category' && (
             <DropdownPanel onClose={() => setOpenPanel(null)}>
-              {CATEGORIES.map((c) => (
+              {activeCategories.map((c) => (
                 <FilterChip
-                  key={c}
-                  label={CATEGORY_LABELS[c]}
-                  active={categories.includes(c)}
-                  onClick={() => toggleCategory(c)}
+                  key={c.id}
+                  label={c.icon ? `${c.icon} ${c.label}` : c.label}
+                  active={categories.includes(c.id)}
+                  onClick={() => toggleCategory(c.id)}
                 />
               ))}
             </DropdownPanel>
