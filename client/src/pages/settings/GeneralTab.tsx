@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { ArrowUpDown, Keyboard } from 'lucide-react';
 import ImportExportModal from '@/components/ImportExportModal';
 import { useNavigate } from 'react-router-dom';
+import { HelpButton } from '@/help/HelpPopover';
 
 const SHORTCUTS = [
   { key: '/', description: 'Focus search' },
@@ -18,7 +19,17 @@ export default function GeneralTab() {
     <div className="space-y-8">
       {/* Import / Export */}
       <section>
-        <h3 className="text-base font-serif font-semibold text-ink-800 mb-1">Data</h3>
+        <div className="flex items-center gap-2 mb-1">
+          <h3 className="text-base font-serif font-semibold text-ink-800">Data</h3>
+          <HelpButton
+            helpId="general-data"
+            title="Import & Export"
+            summary="Export your full idea archive as JSON (machine-readable, includes version history) or Markdown (human-readable). Both formats can be imported back."
+            details="JSON is the safest format for backups and migration. Markdown is readable in any text editor or shareable with others."
+            manualSection="import-export"
+            alwaysShow
+          />
+        </div>
         <p className="text-sm text-ink-400 mb-4">
           Export your entire idea archive or import from a previous export.
         </p>

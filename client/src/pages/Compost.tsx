@@ -4,6 +4,7 @@ import type { Idea } from '@/lib/types';
 import { getDeletedIdeas, purgeDeletedIdea, restoreDeletedIdea } from '@/api/client';
 import StageBadge from '@/components/StageBadge';
 import CategoryBadge from '@/components/CategoryBadge';
+import { HelpButton } from '@/help/HelpPopover';
 
 function daysUntilPurge(idea: Idea, retentionDays: number): number {
   if (!idea.deletedAt) return retentionDays;
@@ -84,9 +85,18 @@ export default function Compost() {
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
-        <h1 className="text-3xl font-serif font-semibold text-ink-900 tracking-tight">
-          Compost
-        </h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-3xl font-serif font-semibold text-ink-900 tracking-tight">
+            Compost
+          </h1>
+          <HelpButton
+            helpId="compost-header"
+            title="Compost Bin"
+            summary="Deleted ideas stay here for a recovery window before being purged permanently. Restore any idea or delete it immediately."
+            details="Compost is purged automatically on server startup and periodically while the server is running."
+            manualSection="compost"
+          />
+        </div>
         <p className="text-ink-400 text-sm mt-1">
           Deleted ideas stay recoverable for {retentionDays} days.
         </p>
