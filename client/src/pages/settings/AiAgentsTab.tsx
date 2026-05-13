@@ -58,7 +58,6 @@ import {
   linkAgent,
   testAiProvider,
   unlinkAgent,
-  getClaudeAccountStatus,
   startClaudeAccountLogin,
   completeClaudeAccountLogin,
   logoutClaudeAccount,
