@@ -268,7 +268,7 @@ class CodexAppServerSession extends EventEmitter {
         usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
         resolve: (result) => {
           clearTimeout(timeout);
-          resolve(result);
+          resolve({ ...result, resolvedModelId: resolvedModel });
         },
         reject: (err) => {
           clearTimeout(timeout);

@@ -33,7 +33,7 @@ import {
 } from './providers.js';
 import { AI_PROVIDER_DESCRIPTORS, openAICompatiblePreset } from './registry.js';
 import type { AiConfigPatch, AiProvider, AiProviderMessage, AiStoredConfig } from './types.js';
-import { AiStore } from './store.js';
+import { AiStore, type AiExecutionMetadata } from './store.js';
 
 const THINKING_PARTNER_PROMPT = [
   'You are a creative thinking partner.',
@@ -609,6 +609,41 @@ function providerIsLocal(config: AiStoredConfig): boolean {
   return false;
 }
 
+function metadataForConfig(config: AiStoredConfig, resolvedModelId = modelFor(config)): AiExecutionMetadata {
+  const descriptor = descriptorForConfig(config);
+  const requestedModel = modelFor(config);
+  const contentLeavesDevice = !providerIsLocal(config);
+  return {
+    providerFamily: descriptor?.family,
+    transport: descriptor?.transport,
+    requestedModel,
+    resolvedModelId,
+    contentLeavesDevice,
+  };
+}
+
+async function resolveExecutionModel(config: AiStoredConfig): Promise<string> {
+  const requested = modelFor(config);
+  if (config.provider === 'codex-account') {
+    try {
+      const { codexAccountSession } = await import('./codex-account/session.js');
+      return await codexAccountSession.resolveModel(requested);
+    } catch {
+      return requested;
+    }
+  }
+  if (config.provider === 'claude-account') {
+    try {
+      const { getCatalog } = await import('./claude-account/catalog.js');
+      const catalog = await getCatalog();
+      return catalog.models.find((model) => model.id === requested || model.friendlyAlias === requested)?.id ?? requested;
+    } catch {
+      return requested;
+    }
+  }
+  return requested;
+}
+
 function guardrailError(message: string, statusCode: number): Error {
   return Object.assign(new Error(message), { statusCode });
 }
@@ -747,7 +782,16 @@ export class AiService {
 
   async testProvider(input: AiConfigPatch = {}): Promise<AiProviderHealth> {
     const config = this.mergeConfig(input);
-    return this.provider(config).health(config);
+    const health = await this.provider(config).health(config);
+    const metadata = metadataForConfig(config, health.model ?? modelFor(config));
+    return {
+      ...health,
+      providerFamily: metadata.providerFamily,
+      transport: metadata.transport,
+      requestedModel: metadata.requestedModel,
+      resolvedModelId: metadata.resolvedModelId,
+      contentLeavesDevice: metadata.contentLeavesDevice,
+    };
   }
 
   async listModels(input: AiConfigPatch = {}): Promise<AiModelListResult> {
@@ -845,6 +889,7 @@ export class AiService {
     const config = resolveFeatureConfig(this.getConfig(), feature);
     const guardrails = sanitizeGuardrails(config.guardrails);
     const model = modelFor(config);
+    const metadata = metadataForConfig(config, model);
     const local = providerIsLocal(config);
     const providerLabel = providerLabelForConfig(config);
     const blockers: string[] = [];
@@ -868,7 +913,12 @@ export class AiService {
       feature,
       provider: config.provider,
       model,
+      providerFamily: metadata.providerFamily,
+      transport: metadata.transport,
+      requestedModel: metadata.requestedModel,
+      resolvedModelId: metadata.resolvedModelId,
       local,
+      contentLeavesDevice: metadata.contentLeavesDevice,
       contentLeavesMachine: !local,
       allowed: blockers.length === 0,
       requiresConfirmation: !local && guardrails.requireConfirmationForRemoteProvider,
@@ -884,9 +934,10 @@ export class AiService {
   private checkGuardrails(config: AiStoredConfig, feature: AiFeatureId, key: string, options: AiGuardrailCheckOptions = {}): void {
     const guardrails = sanitizeGuardrails(config.guardrails);
     const model = modelFor(config);
+    const metadata = metadataForConfig(config, model);
     const providerLabel = providerLabelForConfig(config);
     const deny = (message: string, statusCode: number) => {
-      this.store.recordAuditEvent('guardrail_denied', feature, config.provider, model, message);
+      this.store.recordAuditEvent('guardrail_denied', feature, config.provider, model, message, metadata);
       throw guardrailError(message, statusCode);
     };
     if (!options.skipRateLimit) {
@@ -915,7 +966,20 @@ export class AiService {
 
   private recordProviderFailure(feature: AiFeatureId, config: AiStoredConfig, error: unknown): void {
     const message = error instanceof Error ? error.message : String(error);
-    this.store.recordAuditEvent('provider_error', feature, config.provider, modelFor(config), message);
+    const model = modelFor(config);
+    this.store.recordAuditEvent('provider_error', feature, config.provider, model, message, metadataForConfig(config, model));
+  }
+
+  private async recordUsage(
+    config: AiStoredConfig,
+    route: string,
+    result: { usage: { inputTokens: number; outputTokens: number; totalTokens: number }; resolvedModelId?: string },
+  ): Promise<string> {
+    const requestedModel = modelFor(config);
+    const resolvedModelId = result.resolvedModelId ?? await resolveExecutionModel(config);
+    const metadata = metadataForConfig(config, resolvedModelId);
+    this.store.recordUsage(config.provider, requestedModel, route, result.usage, metadata);
+    return resolvedModelId;
   }
 
   assertFeatureAllowed(feature: AiFeatureId, key: string, confirmationToken?: string): void {
@@ -939,8 +1003,8 @@ export class AiService {
     this.store.addMessage(ideaId, 'user', userMessage);
     try {
       const result = await this.provider(config).stream(messagesForChat(idea, history, userMessage), config, onDelta);
-      const assistantMessage = this.store.addMessage(ideaId, 'assistant', result.text, config.provider, modelFor(config));
-      this.store.recordUsage(config.provider, modelFor(config), 'thinking-partner', result.usage);
+      const resolvedModelId = await this.recordUsage(config, 'thinking-partner', result);
+      const assistantMessage = this.store.addMessage(ideaId, 'assistant', result.text, config.provider, resolvedModelId);
       return assistantMessage;
     } catch (error) {
       this.recordProviderFailure('thinking-partner', config, error);
@@ -956,7 +1020,7 @@ export class AiService {
 
     try {
       const result = await this.provider(config).complete(promptForSuggestion(idea, field, currentValue), config);
-      this.store.recordUsage(config.provider, modelFor(config), 'field-suggestions', result.usage);
+      await this.recordUsage(config, 'field-suggestions', result);
       return parseSuggestion(field, result.text);
     } catch (error) {
       this.recordProviderFailure('field-suggestions', config, error);
@@ -983,7 +1047,7 @@ export class AiService {
         promptForFieldAssist(idea, field, currentValue, customPrompt, omitCurrentValue),
         config,
       );
-      this.store.recordUsage(config.provider, modelFor(config), 'field-suggestions', result.usage);
+      await this.recordUsage(config, 'field-suggestions', result);
       return parseSuggestion(field, result.text);
     } catch (error) {
       this.recordProviderFailure('field-suggestions', config, error);
@@ -1022,7 +1086,7 @@ export class AiService {
         config,
         onDelta,
       );
-      this.store.recordUsage(config.provider, modelFor(config), 'field-suggestions:conversation', result.usage);
+      const resolvedModelId = await this.recordUsage(config, 'field-suggestions:conversation', result);
       return {
         id: uuid(),
         ideaId: input.ideaId,
@@ -1030,7 +1094,7 @@ export class AiService {
         content: result.text,
         createdAt: new Date(),
         provider: config.provider,
-        model: modelFor(config),
+        model: resolvedModelId,
       };
     } catch (error) {
       this.recordProviderFailure('field-suggestions', config, error);
@@ -1051,7 +1115,7 @@ export class AiService {
 
     try {
       const result = await this.provider(config).complete(promptForMode(mode, context, prompt), config);
-      this.store.recordUsage(config.provider, modelFor(config), feature, result.usage);
+      await this.recordUsage(config, feature, result);
       return result.text;
     } catch (error) {
       this.recordProviderFailure(feature, config, error);
