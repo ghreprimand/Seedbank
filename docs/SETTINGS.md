@@ -186,7 +186,7 @@ Configure where Seedbank creates project folders when you graduate an idea. (Thi
 **Settings:**
 
 - **Local Project scaffold** — set the parent folder (project root) where Seedbank creates project directories. This works for any project type and does not require any external tool.
-- **Test connection** — checks that the saved path exists and is accessible. Seedbank will create the directory on first graduation if the parent folder exists; it does not probe write permissions at test time.
+- **Test connection** — checks that the saved path can be found or created later. Passes if the path already exists as a directory, or if its parent folder exists (the directory is created on first graduation). Does not probe write permissions.
 - **Custom adapters (Advanced, collapsed by default)** — optional adapters that integrate with a specific local workflow tool. Not required for standard project graduation. Expand the Advanced section to configure them if needed.
 
 A `configured` badge appears next to each adapter that has a valid project root. Unconfigured adapters show an amber notice inside the Graduation modal directing you here.
