@@ -82,6 +82,22 @@ test('markdown export preserves custom category ID (never writes undefined)', ()
   assert.equal(reimported.category, 'hardware-project');
 });
 
+test('repository getStats tracks custom category IDs for safe-delete guard', () => {
+  const { db, repository } = repositoryFixture();
+  try {
+    repository.createIdea({ id: 'idea-a', title: 'A', category: 'custom-lab', stage: 'seed' });
+    repository.createIdea({ id: 'idea-b', title: 'B', category: 'custom-lab', stage: 'seed' });
+    repository.createIdea({ id: 'idea-c', title: 'C', category: 'app', stage: 'seed' });
+
+    const stats = repository.getStats();
+    assert.equal(stats.byCategory['custom-lab'], 2, 'custom-lab count');
+    assert.equal(stats.byCategory['app'], 1, 'app count');
+    assert.ok(!('nonexistent' in stats.byCategory), 'absent category not present');
+  } finally {
+    db.close();
+  }
+});
+
 test('markdown imports preserve unknown category IDs while keeping built-in label compatibility', () => {
   const custom = parseMarkdownIdea([
     '# Custom category idea',

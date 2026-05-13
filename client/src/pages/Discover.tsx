@@ -126,6 +126,14 @@ function SectionHeader({
 
 export default function Discover() {
   const categorySettings = useCategoriesSettings();
+
+  // Resolve a category ID to its configured label, falling back to the static
+  // map and then the raw ID so custom categories appear readable in prose.
+  const categoryLabel = (id: string): string =>
+    categorySettings.items.find((c) => c.id === id)?.label ??
+    CATEGORY_LABELS[id as keyof typeof CATEGORY_LABELS] ??
+    id;
+
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -241,7 +249,7 @@ export default function Discover() {
       setPatternInsight(strongestTag
         ? `A repeated thread is "${strongestTag.tag}". Several ideas may benefit from shared primitives, templates, or a common starter project.`
         : strongestCategory
-          ? `Your archive leans toward ${strongestCategory.category}. Look for one reusable foundation that could support multiple ideas.`
+          ? `Your archive leans toward ${categoryLabel(strongestCategory.category)}. Look for one reusable foundation that could support multiple ideas.`
           : 'The archive is still sparse. Add more pitch, risk, and tech-stack notes to make patterns easier to spot.');
     } finally {
       setPatternLoading(false);
@@ -296,7 +304,7 @@ export default function Discover() {
         setPatternInsight(sortedTags[0]
           ? `A repeated thread is "${sortedTags[0].tag}". Several ideas may benefit from shared primitives, templates, or a common starter project.`
           : sortedCats[0]
-            ? `Your archive leans toward ${sortedCats[0].category}. Look for one reusable foundation that could support multiple ideas.`
+            ? `Your archive leans toward ${categoryLabel(sortedCats[0].category)}. Look for one reusable foundation that could support multiple ideas.`
             : 'The archive is still sparse. Add more pitch, risk, and tech-stack notes to make patterns easier to spot.');
 
         // Initial random selections (inlined so the effect has no

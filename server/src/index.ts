@@ -748,7 +748,11 @@ function normalizeCategoryDefinition(input: unknown, index: number): CategoryDef
 
   // For custom (non-built-in) IDs, normalize to lowercase-hyphen convention.
   // Built-in IDs are always stored as-is (they already conform).
-  const id = builtIn ? rawId : normalizeCategoryId(rawId) || rawId;
+  // Reject custom IDs that normalize to empty (e.g. emoji-only strings) rather
+  // than falling back to the raw non-conforming value.
+  const normalizedCustomId = builtIn ? rawId : normalizeCategoryId(rawId);
+  if (!builtIn && !normalizedCustomId) return null;
+  const id = normalizedCustomId;
 
   const label = typeof row.label === 'string' && row.label.trim()
     ? row.label.trim()
@@ -1299,6 +1303,40 @@ app.patch('/api/settings/:section', requireScope('write:ideas'), asyncRoute((req
   if (section === 'categories') {
     const body = req.body as { config?: Partial<CategorySettings>; items?: CategoryDefinition[] };
     const requested = body?.config ?? (Array.isArray(body?.items) ? { items: body.items } : {});
+
+    // Server-side safe-delete guard: reject removal of any custom category that
+    // is currently assigned to one or more ideas. The client enforces this from
+    // a cached stats snapshot; the server check closes the TOCTOU window where
+    // ideas could be created in another session between the client stats load
+    // and the PATCH request.
+    if (Array.isArray(requested.items)) {
+      const currentConfig = categoryConfig();
+      const requestedIds = new Set(
+        requested.items.map((item: unknown) => {
+          if (typeof item === 'object' && item !== null && 'id' in item) {
+            const id = (item as { id: unknown }).id;
+            return typeof id === 'string' ? id.trim() : '';
+          }
+          return '';
+        }).filter(Boolean)
+      );
+      // Find custom (non-built-in) IDs present in current config but absent from the request.
+      const removedCustomIds = currentConfig.items
+        .filter((cat) => !cat.builtIn && !requestedIds.has(cat.id))
+        .map((cat) => cat.id);
+      if (removedCustomIds.length > 0) {
+        const stats = repository.getStats();
+        const inUse = removedCustomIds.filter((id) => (stats.byCategory[id] ?? 0) > 0);
+        if (inUse.length > 0) {
+          res.status(409).json({
+            error: 'Cannot remove categories that are assigned to ideas',
+            inUse,
+          });
+          return;
+        }
+      }
+    }
+
     const next = categoryConfig(requested);
     repository.setSetting(SETTINGS_KEYS.categoryConfig, next);
     res.json(aggregateSettings());
