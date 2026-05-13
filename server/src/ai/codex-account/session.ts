@@ -117,7 +117,7 @@ export interface CodexAccountRuntimeAvailability {
   reason?: string;
 }
 
-function codexAccountEnabledByEnv(): boolean {
+export function codexAccountEnabledByEnv(): boolean {
   const raw = process.env.SEEDBANK_ENABLE_CODEX_ACCOUNT?.trim().toLowerCase();
   return raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on';
 }
