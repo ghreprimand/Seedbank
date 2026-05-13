@@ -382,11 +382,37 @@ export interface AiProviderHealth {
   status?: number;
   model?: string;
   normalizedBaseUrl?: string;
+  ollama?: AiOllamaDiagnostics;
+}
+
+export interface AiOllamaModelCapabilities {
+  tools: boolean;
+  vision: boolean;
+  thinking: boolean;
+  contextWindow?: number;
+}
+
+export type AiOllamaModelResidency = 'resident' | 'idle' | 'not-loaded';
+
+export interface AiOllamaLiveStatus {
+  up: boolean;
+  version?: string;
+  loadedModel?: string;
+  selectedModelResidency?: AiOllamaModelResidency;
+}
+
+export interface AiOllamaDiagnostics {
+  endpoint?: string;
+  responseDetail?: string;
+  capabilityWarning?: string;
+  modelCapabilities?: AiOllamaModelCapabilities;
+  live?: AiOllamaLiveStatus;
 }
 
 export interface AiModelInfo {
   id: string;
   name?: string;
+  capabilities?: AiOllamaModelCapabilities;
 }
 
 export interface AiModelListResult {
@@ -396,6 +422,7 @@ export interface AiModelListResult {
   code?: AiProviderErrorCode;
   message?: string;
   normalizedBaseUrl?: string;
+  ollama?: AiOllamaDiagnostics;
 }
 
 export type AiFeatureId =

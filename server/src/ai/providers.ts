@@ -1,9 +1,21 @@
-import { aiProviderLabel, type AiModelListResult, type AiProviderErrorCode, type AiProviderHealth, type AiProviderId } from '../../../shared/types.js';
+import {
+  aiProviderLabel,
+  type AiModelListResult,
+  type AiOllamaDiagnostics,
+  type AiOllamaLiveStatus,
+  type AiOllamaModelCapabilities,
+  type AiOllamaModelResidency,
+  type AiProviderErrorCode,
+  type AiProviderHealth,
+  type AiProviderId,
+} from '../../../shared/types.js';
 import { decryptSecret } from './crypto.js';
 import { openAICompatiblePreset } from './registry.js';
 import type { AiProvider, AiProviderMessage, AiProviderResult, AiStoredConfig, AiUsage } from './types.js';
 
 const REQUEST_TIMEOUT_MS = 8_000;
+const OLLAMA_KEEP_ALIVE = '5m';
+const OLLAMA_SMOKE_PROMPT = 'Reply with exactly: pong';
 
 export class AiProviderError extends Error {
   constructor(
@@ -105,6 +117,12 @@ async function parseErrorBody(response: Response): Promise<string> {
   return response.statusText || 'Provider request failed.';
 }
 
+function boundedDetail(value: unknown, max = 240): string {
+  if (value === null || value === undefined) return '';
+  const text = String(value).replace(/\s+/g, ' ').trim();
+  return text.length > max ? `${text.slice(0, max)}…` : text;
+}
+
 function providerFetchError(provider: AiProviderId, error: unknown): AiProviderError {
   if (error instanceof AiProviderError) return error;
   if (error instanceof TypeError || (error instanceof Error && error.name === 'AbortError')) {
@@ -184,20 +202,45 @@ async function parseSse(response: Response, onEvent: (event: string, data: strin
   }
 }
 
-async function parseJsonLines(response: Response, onLine: (data: Record<string, unknown>) => void): Promise<void> {
+async function parseJsonLines(
+  response: Response,
+  onLine: (data: Record<string, unknown>) => void,
+  options: { provider?: AiProviderId; context?: string } = {},
+): Promise<void> {
   if (!response.body) return;
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
+
+  const parseLine = (raw: string) => {
+    const line = raw.trim();
+    if (!line) return;
+    try {
+      onLine(JSON.parse(line) as Record<string, unknown>);
+    } catch (error) {
+      if (options.provider) {
+        throw new AiProviderError(
+          options.provider,
+          'parse_error',
+          `${options.context ?? 'Response stream'} contained invalid JSON: ${boundedDetail(line, 160)}`,
+        );
+      }
+      throw error;
+    }
+  };
+
   while (true) {
     const { value, done } = await reader.read();
-    if (done) break;
+    if (done) {
+      buffer += decoder.decode();
+      parseLine(buffer);
+      break;
+    }
     buffer += decoder.decode(value, { stream: true });
     const lines = buffer.split('\n');
     buffer = lines.pop() ?? '';
     for (const line of lines) {
-      if (!line.trim()) continue;
-      onLine(JSON.parse(line) as Record<string, unknown>);
+      parseLine(line);
     }
   }
 }
@@ -421,44 +464,206 @@ export class OllamaProvider implements AiProvider {
     return normalizeOllamaBaseUrl(config.ollamaBaseUrl);
   }
 
-  private chatUrl(config: AiStoredConfig): string {
-    return `${this.baseUrl(config)}/api/chat`;
+  private modelMatches(expected: string, candidate: string): boolean {
+    const left = expected.trim().toLowerCase();
+    const right = candidate.trim().toLowerCase();
+    if (!left || !right) return false;
+    if (left === right) return true;
+    const leftBase = left.split(':')[0];
+    const rightBase = right.split(':')[0];
+    return leftBase === rightBase;
+  }
+
+  private chatBody(messages: AiProviderMessage[], config: AiStoredConfig, stream: boolean): Record<string, unknown> {
+    return {
+      model: config.ollamaModel,
+      messages: messages.map((message) => ({ role: message.role, content: message.content })),
+      stream,
+      keep_alive: OLLAMA_KEEP_ALIVE,
+      options: {},
+      // `think` is intentionally omitted unless we add an explicit user setting.
+    };
+  }
+
+  private parseContextWindow(parameters: unknown): number | undefined {
+    if (typeof parameters !== 'string') return undefined;
+    const match = /^\s*num_ctx\s+(\d+)\s*$/m.exec(parameters);
+    if (!match) return undefined;
+    const parsed = Number.parseInt(match[1], 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+  }
+
+  private pickCapabilityWarning(capabilities: AiOllamaModelCapabilities): string | undefined {
+    if (typeof capabilities.contextWindow === 'number' && capabilities.contextWindow < 2048) {
+      return `Selected model context window (${capabilities.contextWindow}) is small and may truncate longer idea context.`;
+    }
+    if (!capabilities.thinking) {
+      return 'Selected model does not advertise thinking capability; Thinking Partner quality may vary for deep reasoning prompts.';
+    }
+    return undefined;
+  }
+
+  private selectedModelResidency(model: string, loaded: Array<{ name: string; expiresAt: string | null }>): AiOllamaModelResidency {
+    const hit = loaded.find((item) => this.modelMatches(model, item.name));
+    if (!hit) return 'not-loaded';
+    return hit.expiresAt ? 'idle' : 'resident';
+  }
+
+  private async readOllamaHttpError(
+    response: Response,
+    context: string,
+    model: string,
+    normalizedBaseUrl: string,
+    endpoint: string,
+  ): Promise<AiProviderError> {
+    const detail = boundedDetail(await parseErrorBody(response));
+    const code: AiProviderErrorCode = response.status === 404 ? 'model_missing' : 'http_error';
+    return new AiProviderError(
+      this.id,
+      code,
+      `${context} failed for model "${model}" at ${endpoint} (base: ${normalizedBaseUrl}, HTTP ${response.status}): ${detail || response.statusText}`,
+      response.status,
+    );
+  }
+
+  private wrapOllamaTransportError(
+    error: unknown,
+    context: string,
+    model: string,
+    normalizedBaseUrl: string,
+    endpoint: string,
+  ): AiProviderError {
+    if (error instanceof AiProviderError) return error;
+    if (error instanceof TypeError || (error instanceof Error && error.name === 'AbortError')) {
+      const detail = error instanceof Error ? boundedDetail(error.message) : '';
+      return new AiProviderError(
+        this.id,
+        'unreachable',
+        `${context} failed for model "${model}" at ${endpoint} (base: ${normalizedBaseUrl}): service unreachable${detail ? ` (${detail})` : ''}.`,
+      );
+    }
+    return new AiProviderError(
+      this.id,
+      'unknown',
+      `${context} failed for model "${model}" at ${endpoint} (base: ${normalizedBaseUrl}): ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+
+  private async requestChat(
+    messages: AiProviderMessage[],
+    config: AiStoredConfig,
+    stream: boolean,
+    context: string,
+  ): Promise<Response> {
+    const normalizedBaseUrl = this.baseUrl(config);
+    const endpoint = `${normalizedBaseUrl}/api/chat`;
+    try {
+      const response = await fetchWithTimeout(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(this.chatBody(messages, config, stream)),
+      });
+      if (!response.ok) {
+        throw await this.readOllamaHttpError(response, context, config.ollamaModel, normalizedBaseUrl, endpoint);
+      }
+      return response;
+    } catch (error) {
+      throw this.wrapOllamaTransportError(error, context, config.ollamaModel, normalizedBaseUrl, endpoint);
+    }
+  }
+
+  private async probeModelCapabilities(
+    normalizedBaseUrl: string,
+    model: string,
+  ): Promise<{ capabilities?: AiOllamaModelCapabilities; warning?: string; responseDetail?: string }> {
+    const endpoint = `${normalizedBaseUrl}/api/show`;
+    try {
+      const response = await fetchWithTimeout(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model, name: model }),
+      });
+      if (!response.ok) {
+        return {
+          warning: 'Could not inspect model capabilities from Ollama.',
+          responseDetail: boundedDetail(await parseErrorBody(response)),
+        };
+      }
+      const payload = await response.json() as { capabilities?: unknown; parameters?: unknown };
+      const capabilityList = Array.isArray(payload.capabilities)
+        ? payload.capabilities.filter((item): item is string => typeof item === 'string')
+        : [];
+      const capabilities: AiOllamaModelCapabilities = {
+        tools: capabilityList.includes('tools'),
+        vision: capabilityList.includes('vision'),
+        thinking: capabilityList.includes('thinking'),
+      };
+      const contextWindow = this.parseContextWindow(payload.parameters);
+      if (typeof contextWindow === 'number') capabilities.contextWindow = contextWindow;
+      return {
+        capabilities,
+        warning: this.pickCapabilityWarning(capabilities),
+      };
+    } catch (error) {
+      return {
+        warning: 'Could not inspect model capabilities from Ollama.',
+        responseDetail: boundedDetail(error instanceof Error ? error.message : String(error)),
+      };
+    }
+  }
+
+  private async probeDaemonLive(normalizedBaseUrl: string, model: string): Promise<AiOllamaLiveStatus> {
+    const psEndpoint = `${normalizedBaseUrl}/api/ps`;
+    const versionEndpoint = `${normalizedBaseUrl}/api/version`;
+    try {
+      const [psResponse, versionResponse] = await Promise.all([
+        fetchWithTimeout(psEndpoint),
+        fetchWithTimeout(versionEndpoint).catch(() => null),
+      ]);
+      if (!psResponse.ok) return { up: false };
+      const psPayload = await psResponse.json() as { models?: Array<{ name?: string; expires_at?: string }> };
+      const loaded = (psPayload.models ?? [])
+        .filter((item): item is { name: string; expires_at?: string } => typeof item?.name === 'string' && item.name.length > 0)
+        .map((item) => ({ name: item.name, expiresAt: typeof item.expires_at === 'string' ? item.expires_at : null }));
+      let version: string | undefined;
+      if (versionResponse && versionResponse.ok) {
+        try {
+          const versionPayload = await versionResponse.json() as { version?: unknown };
+          if (typeof versionPayload.version === 'string' && versionPayload.version.trim()) {
+            version = versionPayload.version.trim();
+          }
+        } catch {
+          // Ignore malformed version payloads and keep status best-effort.
+        }
+      }
+      return {
+        up: true,
+        ...(version ? { version } : {}),
+        ...(loaded[0] ? { loadedModel: loaded[0].name } : {}),
+        selectedModelResidency: this.selectedModelResidency(model, loaded),
+      };
+    } catch {
+      return { up: false };
+    }
   }
 
   async complete(messages: AiProviderMessage[], config: AiStoredConfig): Promise<AiProviderResult> {
     try {
-      const response = await fetchWithTimeout(this.chatUrl(config), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: config.ollamaModel,
-          messages,
-          stream: false,
-        }),
-      });
-      await assertOk(this.id, response, 'Ollama request');
+      const response = await this.requestChat(messages, config, false, 'Ollama request');
       const payload = await response.json() as { message?: { content?: string }; prompt_eval_count?: number; eval_count?: number };
       return {
         text: payload.message?.content ?? '',
         usage: usageFrom(payload),
       };
     } catch (error) {
+      if (error instanceof AiProviderError) throw error;
       throw providerFetchError(this.id, error);
     }
   }
 
   async stream(messages: AiProviderMessage[], config: AiStoredConfig, onDelta: (delta: string) => void): Promise<AiProviderResult> {
     try {
-      const response = await fetchWithTimeout(this.chatUrl(config), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: config.ollamaModel,
-          messages,
-          stream: true,
-        }),
-      });
-      await assertOk(this.id, response, 'Ollama stream');
+      const response = await this.requestChat(messages, config, true, 'Ollama stream');
       let text = '';
       let usage: AiUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
       await parseJsonLines(response, (payload) => {
@@ -468,49 +673,141 @@ export class OllamaProvider implements AiProvider {
           onDelta(message.content);
         }
         if (payload.done) usage = usageFrom(payload);
-      });
+      }, { provider: this.id, context: 'Ollama stream response' });
       return { text, usage };
     } catch (error) {
+      if (error instanceof AiProviderError) throw error;
       throw providerFetchError(this.id, error);
     }
   }
 
   async health(config: AiStoredConfig): Promise<AiProviderHealth> {
-    let normalizedBaseUrl: string | undefined;
+    let normalizedBaseUrl = '';
     try {
       normalizedBaseUrl = this.baseUrl(config);
       const models = await this.listModels(config);
       if (!models.ok) throw new AiProviderError(this.id, models.code ?? 'unknown', models.message ?? 'Ollama model discovery failed.');
-      if (models.models.length > 0 && !models.models.some((model) => model.id === config.ollamaModel)) {
+      if (models.models.length > 0 && !models.models.some((model) => this.modelMatches(model.id, config.ollamaModel))) {
         throw new AiProviderError(this.id, 'model_missing', `Ollama model "${config.ollamaModel}" is not installed. Pull it in Ollama or choose an installed model.`);
       }
-      return providerHealth(this.id, config.ollamaModel, undefined, normalizedBaseUrl);
+
+      // Smoke test: verify model can generate from /api/chat, not only list tags.
+      const smokeResponse = await this.requestChat(
+        [{ role: 'user', content: OLLAMA_SMOKE_PROMPT }],
+        config,
+        false,
+        'Ollama generation smoke test',
+      );
+      const smokePayload = await smokeResponse.json() as { message?: { content?: string } };
+      if (!smokePayload.message?.content?.trim()) {
+        throw new AiProviderError(
+          this.id,
+          'http_error',
+          `Ollama generation smoke test returned an empty response for model "${config.ollamaModel}" at ${normalizedBaseUrl}/api/chat.`,
+        );
+      }
+
+      const [modelMeta, live] = await Promise.all([
+        this.probeModelCapabilities(normalizedBaseUrl, config.ollamaModel),
+        this.probeDaemonLive(normalizedBaseUrl, config.ollamaModel),
+      ]);
+      const diagnostics: AiOllamaDiagnostics = {
+        endpoint: `${normalizedBaseUrl}/api/chat`,
+        ...(modelMeta.responseDetail ? { responseDetail: modelMeta.responseDetail } : {}),
+        ...(modelMeta.warning ? { capabilityWarning: modelMeta.warning } : {}),
+        ...(modelMeta.capabilities ? { modelCapabilities: modelMeta.capabilities } : {}),
+        live,
+      };
+      return {
+        provider: this.id,
+        ok: true,
+        code: 'ok',
+        message: 'Connection and generation smoke test succeeded.',
+        model: config.ollamaModel,
+        normalizedBaseUrl,
+        ollama: diagnostics,
+      };
     } catch (error) {
-      return providerHealth(this.id, config.ollamaModel, error, normalizedBaseUrl);
+      const normalized = providerFetchError(this.id, error);
+      return {
+        provider: this.id,
+        ok: false,
+        code: normalized.code,
+        message: normalized.message,
+        status: normalized.status,
+        model: config.ollamaModel,
+        normalizedBaseUrl: normalizedBaseUrl || undefined,
+        ollama: {
+          endpoint: normalizedBaseUrl ? `${normalizedBaseUrl}/api/chat` : undefined,
+        },
+      };
     }
   }
 
   async listModels(config: AiStoredConfig): Promise<AiModelListResult> {
-    let normalizedBaseUrl: string | undefined;
+    let normalizedBaseUrl = '';
     try {
       normalizedBaseUrl = this.baseUrl(config);
       const response = await fetchWithTimeout(`${normalizedBaseUrl}/api/tags`);
-      await assertOk(this.id, response, 'Ollama model discovery');
+      if (!response.ok) {
+        throw await this.readOllamaHttpError(
+          response,
+          'Ollama model discovery',
+          config.ollamaModel,
+          normalizedBaseUrl,
+          `${normalizedBaseUrl}/api/tags`,
+        );
+      }
       const payload = await response.json() as { models?: Array<{ name?: string; model?: string }> };
-      const models = (payload.models ?? [])
+      const modelIds = (payload.models ?? [])
         .map((model) => model.name ?? model.model ?? '')
-        .filter(Boolean)
-        .map((id) => ({ id }));
-      return { provider: this.id, ok: true, models, normalizedBaseUrl };
+        .filter(Boolean);
+      const capabilityEntries = await Promise.all(
+        modelIds.map(async (id) => ({
+          id,
+          meta: await this.probeModelCapabilities(normalizedBaseUrl, id),
+        })),
+      );
+      const models = capabilityEntries.map((entry) => ({
+        id: entry.id,
+        ...(entry.meta.capabilities ? { capabilities: entry.meta.capabilities } : {}),
+      }));
+      const selectedMeta = capabilityEntries.find((entry) => this.modelMatches(config.ollamaModel, entry.id))?.meta;
+      const live = await this.probeDaemonLive(normalizedBaseUrl, config.ollamaModel);
+      return {
+        provider: this.id,
+        ok: true,
+        models,
+        normalizedBaseUrl,
+        ollama: {
+          endpoint: `${normalizedBaseUrl}/api/tags`,
+          ...(selectedMeta?.responseDetail ? { responseDetail: selectedMeta.responseDetail } : {}),
+          ...(selectedMeta?.warning ? { capabilityWarning: selectedMeta.warning } : {}),
+          ...(selectedMeta?.capabilities ? { modelCapabilities: selectedMeta.capabilities } : {}),
+          live,
+        },
+      };
     } catch (error) {
-      const normalized = providerFetchError(this.id, error);
+      const normalized = error instanceof AiProviderError
+        ? error
+        : (normalizedBaseUrl
+          ? this.wrapOllamaTransportError(
+            error,
+            'Ollama model discovery',
+            config.ollamaModel,
+            normalizedBaseUrl,
+            `${normalizedBaseUrl}/api/tags`,
+          )
+          : providerFetchError(this.id, error));
+      const endpoint = normalizedBaseUrl ? `${normalizedBaseUrl}/api/tags` : undefined;
       return {
         provider: this.id,
         ok: false,
         models: [],
         code: normalized.code,
         message: normalized.message,
-        normalizedBaseUrl,
+        normalizedBaseUrl: normalizedBaseUrl || undefined,
+        ollama: endpoint ? { endpoint } : undefined,
       };
     }
   }
