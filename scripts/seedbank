@@ -282,8 +282,8 @@ start() {
 
   cd "$SEEDBANK_DIR"
   notify "Starting Seedbank" "$URL"
-  launch_process "$SERVER_PID_FILE" env PORT="$SERVER_PORT" npm run dev -w server
-  launch_process "$CLIENT_PID_FILE" env VITE_SEEDBANK_API_URL="http://localhost:${SERVER_PORT}" npm run dev -w client -- --host 127.0.0.1 --port "$CLIENT_PORT" --strictPort
+  launch_process "$SERVER_PID_FILE" env PORT="$SERVER_PORT" npm run start -w server
+  launch_process "$CLIENT_PID_FILE" env VITE_SEEDBANK_API_URL="http://localhost:${SERVER_PORT}" npm run preview -w client -- --host 127.0.0.1 --port "$CLIENT_PORT" --strictPort
   echo "$SERVER_PORT" > "$SERVER_PORT_FILE"
   echo "$CLIENT_PORT" > "$CLIENT_PORT_FILE"
 

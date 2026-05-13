@@ -1,0 +1,174 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Existing git tag to publish (for example v1.2.3)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag || github.ref_name }}
+
+jobs:
+  prepare:
+    name: Validate Release Inputs
+    runs-on: ubuntu-latest
+    outputs:
+      release_tag: ${{ steps.validate.outputs.release_tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate release tag
+        id: validate
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${RELEASE_TAG}"
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9]+)*$ ]]; then
+            echo "Release tag must be semver-like (vX.Y.Z...), got: $tag" >&2
+            exit 1
+          fi
+
+          git fetch --tags --force
+          if ! git rev-parse "$tag^{commit}" >/dev/null 2>&1; then
+            echo "Tag does not exist in repository: $tag" >&2
+            exit 1
+          fi
+
+          tag_sha="$(git rev-list -n1 "$tag")"
+          head_sha="$(git rev-parse HEAD)"
+          if [[ "$tag_sha" != "$head_sha" ]]; then
+            echo "Workflow ref ($head_sha) does not match tag $tag ($tag_sha)." >&2
+            echo "Run the workflow on the same commit as the release tag." >&2
+            exit 1
+          fi
+
+          echo "release_tag=$tag" >> "$GITHUB_OUTPUT"
+
+  package-linux-windows:
+    name: Package ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-x64
+            format: tar.gz
+          - os: windows-latest
+            target: windows-x64
+            format: zip
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build workspace
+        run: npm run build
+
+      - name: Create release artifact
+        run: node scripts/release/package-release.mjs --target ${{ matrix.target }} --format ${{ matrix.format }} --version-tag ${{ needs.prepare.outputs.release_tag }}
+
+      - name: Upload packaged artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.target }}
+          path: .release/artifacts/seedbank-${{ needs.prepare.outputs.release_tag }}-${{ matrix.target }}.*
+
+  package-macos:
+    name: Package macOS (self-hosted)
+    runs-on: [self-hosted, macOS]
+    needs: prepare
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build workspace
+        run: npm run build
+
+      - name: Create macOS release artifact
+        run: node scripts/release/package-release.mjs --target macos --format tar.gz --version-tag ${{ needs.prepare.outputs.release_tag }}
+
+      - name: Upload packaged artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-macos
+          path: .release/artifacts/seedbank-${{ needs.prepare.outputs.release_tag }}-macos.tar.gz
+
+  publish:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    needs: [prepare, package-linux-windows, package-macos]
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          merge-multiple: true
+          path: .release/publish
+
+      - name: Build aggregate manifest
+        run: |
+          node scripts/release/merge-manifests.mjs \
+            --artifacts-dir .release/publish \
+            --version-tag ${{ needs.prepare.outputs.release_tag }} \
+            --out .release/publish/manifest-${{ needs.prepare.outputs.release_tag }}.json
+
+      - name: Publish release files
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare.outputs.release_tag }}
+          name: Seedbank ${{ needs.prepare.outputs.release_tag }}
+          target_commitish: ${{ github.sha }}
+          body: |
+            Archive-based Seedbank release.
+
+            Download the archive for your platform:
+            - `seedbank-${{ needs.prepare.outputs.release_tag }}-linux-x64.tar.gz`
+            - `seedbank-${{ needs.prepare.outputs.release_tag }}-macos.tar.gz`
+            - `seedbank-${{ needs.prepare.outputs.release_tag }}-windows-x64.zip`
+
+            After extracting, open `INSTALL.md` in the archive and follow the quick-start steps.
+          files: |
+            .release/publish/seedbank-${{ needs.prepare.outputs.release_tag }}-linux-x64.tar.gz
+            .release/publish/seedbank-${{ needs.prepare.outputs.release_tag }}-macos.tar.gz
+            .release/publish/seedbank-${{ needs.prepare.outputs.release_tag }}-windows-x64.zip
+            .release/publish/manifest-${{ needs.prepare.outputs.release_tag }}.json
+
+  # Future phase: add a dedicated self-hosted macOS signing/notarization job, e.g.
+  # runs-on: [self-hosted, macOS, ARM64, seedbank-release]
+  # Keep Apple credentials limited to that signing runner only.

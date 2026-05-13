@@ -48,10 +48,10 @@ function Start-Seedbank {
   Ensure-Setup
   Add-Content -Path $LogFile -Value "`n=== $(Get-Date -Format o) - seedbank start client=$ClientPort server=$ServerPort ==="
 
-  $server = Start-Process -FilePath 'cmd.exe' -ArgumentList "/c cd /d `"$SeedbankDir`" && set PORT=$ServerPort&& npm run dev -w server >> `"$LogFile`" 2>&1" -WindowStyle Hidden -PassThru
+  $server = Start-Process -FilePath 'cmd.exe' -ArgumentList "/c cd /d `"$SeedbankDir`" && set PORT=$ServerPort&& npm run start -w server >> `"$LogFile`" 2>&1" -WindowStyle Hidden -PassThru
   Set-Content -Path $ServerPidFile -Value $server.Id
 
-  $client = Start-Process -FilePath 'cmd.exe' -ArgumentList "/c cd /d `"$SeedbankDir`" && set VITE_SEEDBANK_API_URL=http://localhost:$ServerPort&& npm run dev -w client -- --host 127.0.0.1 --port $ClientPort --strictPort >> `"$LogFile`" 2>&1" -WindowStyle Hidden -PassThru
+  $client = Start-Process -FilePath 'cmd.exe' -ArgumentList "/c cd /d `"$SeedbankDir`" && set VITE_SEEDBANK_API_URL=http://localhost:$ServerPort&& npm run preview -w client -- --host 127.0.0.1 --port $ClientPort --strictPort >> `"$LogFile`" 2>&1" -WindowStyle Hidden -PassThru
   Set-Content -Path $ClientPidFile -Value $client.Id
 
   Start-Sleep -Seconds 2

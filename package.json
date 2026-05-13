@@ -14,7 +14,12 @@
     "build": "npm run build -w client && npm run build -w server",
     "lint": "npm run lint -w client",
     "typecheck": "npm run typecheck -w client && npm run typecheck -w server",
-    "screenshots:readme": "node scripts/capture-readme-screenshots.mjs"
+    "screenshots:readme": "node scripts/capture-readme-screenshots.mjs",
+    "release:package": "node scripts/release/package-release.mjs",
+    "release:package:all": "node scripts/release/package-release.mjs --all",
+    "release:smoke": "bash scripts/release/smoke-release.sh",
+    "release:smoke:all": "bash scripts/release/smoke-release.sh",
+    "release:manifest": "node scripts/release/merge-manifests.mjs"
   },
   "workspaces": [
     "client",
