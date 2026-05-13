@@ -634,6 +634,36 @@ export async function logoutClaudeAccount(): Promise<{ ok: true }> {
   return request<{ ok: true }>('/api/ai/claude-account/logout', { method: 'POST' });
 }
 
+// ── Codex account auth ────────────────────────────────────────────────────────
+
+export interface CodexAccountStatus {
+  authenticated: boolean;
+  accountEmail?: string;
+  planType?: string;
+  requiresOpenaiAuth?: boolean;
+  userAgent?: string;
+}
+
+export interface CodexAccountLoginResult {
+  ok: boolean;
+  loginUrl?: string;
+  userCode?: string;
+  loginId?: string;
+  message: string;
+}
+
+export async function getCodexAccountStatus(): Promise<CodexAccountStatus> {
+  return request<CodexAccountStatus>('/api/ai/codex-account/status');
+}
+
+export async function startCodexAccountLogin(): Promise<CodexAccountLoginResult> {
+  return request<CodexAccountLoginResult>('/api/ai/codex-account/login', { method: 'POST' });
+}
+
+export async function logoutCodexAccount(): Promise<{ ok: true }> {
+  return request<{ ok: true }>('/api/ai/codex-account/logout', { method: 'POST' });
+}
+
 // ── AI conversations ──────────────────────────────────────────────────────────
 
 export async function getAiConversation(ideaId: string): Promise<AiChatMessage[]> {

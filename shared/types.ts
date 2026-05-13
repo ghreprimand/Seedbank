@@ -473,6 +473,15 @@ export interface AiClaudeAccountDiagnostics {
   catalogFresh: boolean;
 }
 
+export interface AiCodexAccountDiagnostics {
+  authenticated: boolean;
+  catalogFresh?: boolean;
+  accountEmail?: string;
+  planType?: string;
+  loginUrl?: string;
+  userCode?: string;
+}
+
 export interface AiModelListResult {
   provider: AiProviderId;
   ok: boolean;
@@ -482,6 +491,7 @@ export interface AiModelListResult {
   normalizedBaseUrl?: string;
   ollama?: AiOllamaDiagnostics;
   claudeAccount?: AiClaudeAccountDiagnostics;
+  codexAccount?: AiCodexAccountDiagnostics;
 }
 
 export type AiFeatureId =
@@ -596,6 +606,7 @@ export interface AiPublicConfig {
   hasAnthropicKey: boolean;
   hasOpenAICompatibleKey: boolean;
   claudeAccountAuthenticated: boolean;
+  codexAccountAuthenticated: boolean;
 }
 
 export type ThemeName =

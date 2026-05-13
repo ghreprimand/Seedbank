@@ -92,6 +92,7 @@ const DEFAULT_SETTINGS: AggregateSettings = {
     hasAnthropicKey: false,
     hasOpenAICompatibleKey: false,
     claudeAccountAuthenticated: false,
+    codexAccountAuthenticated: false,
   },
   api: {
     tokens: [],

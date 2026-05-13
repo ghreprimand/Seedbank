@@ -836,16 +836,6 @@ export class OllamaProvider implements AiProvider {
   }
 }
 
-class AccountProviderNotConfiguredError extends AiProviderError {
-  constructor(provider: AiProviderId, label: string) {
-    super(
-      provider,
-      'not_configured',
-      `${label} is not configured yet. Account login and runtime support will land in an upcoming update.`,
-    );
-  }
-}
-
 export class ClaudeAccountProvider implements AiProvider {
   readonly id = 'claude-account';
 
@@ -1032,31 +1022,100 @@ export class CodexAccountProvider implements AiProvider {
     return config.codexAccountModel?.trim() || 'codex-recommended';
   }
 
-  async complete(_messages: AiProviderMessage[], _config: AiStoredConfig): Promise<AiProviderResult> {
-    throw new AccountProviderNotConfiguredError(this.id, aiProviderLabel(this.id));
+  async complete(messages: AiProviderMessage[], config: AiStoredConfig): Promise<AiProviderResult> {
+    try {
+      const { codexAccountSession } = await import('./codex-account/session.js');
+      const status = await codexAccountSession.status();
+      if (!status.authenticated) {
+        throw new AiProviderError(
+          this.id,
+          'not_configured',
+          'Codex account is not logged in. Open Settings → AI & Agents and use the Codex account card to log in.',
+        );
+      }
+      return await codexAccountSession.complete(messages, this.configuredModel(config));
+    } catch (error) {
+      throw providerFetchError(this.id, error);
+    }
   }
 
   async stream(
-    _messages: AiProviderMessage[],
-    _config: AiStoredConfig,
-    _onDelta: (delta: string) => void,
+    messages: AiProviderMessage[],
+    config: AiStoredConfig,
+    onDelta: (delta: string) => void,
   ): Promise<AiProviderResult> {
-    throw new AccountProviderNotConfiguredError(this.id, aiProviderLabel(this.id));
+    try {
+      const { codexAccountSession } = await import('./codex-account/session.js');
+      const status = await codexAccountSession.status();
+      if (!status.authenticated) {
+        throw new AiProviderError(
+          this.id,
+          'not_configured',
+          'Codex account is not logged in. Open Settings → AI & Agents and use the Codex account card to log in.',
+        );
+      }
+      return await codexAccountSession.complete(messages, this.configuredModel(config), onDelta);
+    } catch (error) {
+      throw providerFetchError(this.id, error);
+    }
   }
 
   async health(config: AiStoredConfig): Promise<AiProviderHealth> {
-    return providerHealth(this.id, this.configuredModel(config), new AccountProviderNotConfiguredError(this.id, aiProviderLabel(this.id)));
+    const model = this.configuredModel(config);
+    try {
+      const { codexAccountSession } = await import('./codex-account/session.js');
+      const status = await codexAccountSession.status();
+      if (!status.authenticated) {
+        throw new AiProviderError(
+          this.id,
+          'not_configured',
+          'Codex account is not logged in. Log in with Codex before testing this provider.',
+        );
+      }
+      const resolvedModel = await codexAccountSession.resolveModel(model);
+      return providerHealth(this.id, resolvedModel);
+    } catch (error) {
+      return providerHealth(this.id, model, error);
+    }
   }
 
   async listModels(_config: AiStoredConfig): Promise<AiModelListResult> {
-    const err = new AccountProviderNotConfiguredError(this.id, aiProviderLabel(this.id));
-    return {
-      provider: this.id,
-      ok: false,
-      models: [],
-      code: err.code,
-      message: err.message,
-    };
+    try {
+      const { codexAccountSession } = await import('./codex-account/session.js');
+      const [status, catalog] = await Promise.all([
+        codexAccountSession.status().catch(() => ({ authenticated: false, accountEmail: undefined, planType: undefined })),
+        codexAccountSession.listModels(),
+      ]);
+      const visible = catalog.models.filter((model) => !model.hidden);
+      const defaultModel = visible.find((model) => model.isDefault) ?? visible[0];
+      const fastModel = visible.find((model) => /mini|fast/i.test(`${model.id} ${model.displayName}`));
+      const models = [
+        ...(defaultModel ? [{ id: 'codex-recommended', displayName: `Recommended (${defaultModel.displayName} · ${defaultModel.id})` }] : []),
+        ...(fastModel && fastModel.id !== defaultModel?.id ? [{ id: 'codex-fast', displayName: `Fast (${fastModel.displayName} · ${fastModel.id})` }] : []),
+        ...visible.map((model) => ({ id: model.id, displayName: model.displayName })),
+      ];
+      return {
+        provider: this.id,
+        ok: true,
+        models,
+        codexAccount: {
+          authenticated: status.authenticated,
+          catalogFresh: catalog.fresh,
+          ...(status.accountEmail ? { accountEmail: status.accountEmail } : {}),
+          ...(status.planType ? { planType: status.planType } : {}),
+        },
+      };
+    } catch (error) {
+      const normalized = providerFetchError(this.id, error);
+      return {
+        provider: this.id,
+        ok: false,
+        models: [],
+        code: normalized.code,
+        message: normalized.message,
+        codexAccount: { authenticated: false, catalogFresh: false },
+      };
+    }
   }
 }
 
