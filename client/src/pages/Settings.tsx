@@ -75,8 +75,8 @@ const TABS: TabDef[] = [
   },
   {
     id: 'integrations',
-    label: 'Integrations',
-    kicker: 'External projects, adapters, graduation paths',
+    label: 'Project Graduation',
+    kicker: 'Turn ideas into project folders',
     icon: Plug,
     component: IntegrationsTab,
   },

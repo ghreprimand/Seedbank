@@ -172,14 +172,24 @@ The header status pill continues to show last-backup time and links to this tab.
 
 ---
 
-## Integrations
+## Project Graduation
 
-Integration configuration that was previously inside the Graduation modal now lives here.
+Configure where Seedbank creates project folders when you graduate an idea. (This tab was previously labelled "Integrations".)
 
-- **Local Project adapter** — set an external project root; generic scaffolds are created here.
-- **Optional custom adapters** — if additional adapters are registered, configure their workspace and project roots here.
+**What graduation does:** when you graduate a seed, Seedbank creates a project directory inside the root you set here. The directory is named after the idea title. It always contains:
 
-A `configured` badge appears next to each integration that has a valid configuration. Unconfigured integrations show an amber notice inside the Graduation modal directing you here.
+- `README.md` — idea title, brief, and key context.
+- `CLAUDE.md` — AI context pre-filled for use with Claude Code, Codex, or another AI coding session.
+- `package.json` + starter file — for tool, app, and browser ideas.
+- `project.godot` stub — for game ideas.
+
+**Settings:**
+
+- **Local Project scaffold** — set the parent folder (project root) where Seedbank creates project directories. This works for any project type and does not require any external tool.
+- **Test connection** — verify Seedbank can write to the project root before graduating your first idea.
+- **Custom adapters (Advanced, collapsed by default)** — optional adapters that integrate with a specific local workflow tool. Not required for standard project graduation. Expand the Advanced section to configure them if needed.
+
+A `configured` badge appears next to each adapter that has a valid project root. Unconfigured adapters show an amber notice inside the Graduation modal directing you here.
 
 ---
 
