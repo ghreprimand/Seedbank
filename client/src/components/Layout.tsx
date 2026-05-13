@@ -1,7 +1,7 @@
 /** App shell — sticky header with search, nav, and CTA. Hosts modals and global keyboard shortcuts. */
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
-import { Search, Compass, Trash2, X, Settings, BookOpen } from 'lucide-react';
+import { Search, Compass, Trash2, X, Settings, BookOpen, HelpCircle } from 'lucide-react';
 import QuickCapture from './QuickCapture';
 import ConnectionStatus from './ConnectionStatus';
 import DataMigrationDialog from './DataMigrationDialog';
@@ -9,7 +9,49 @@ import BackupStatus from './BackupStatus';
 import ManualModal from '@/help/ManualModal';
 import { HelpProvider } from '@/help/HelpContext';
 import { HelpModeToggle } from '@/help/HelpPopover';
+import { useHelp } from '@/help/useHelp';
 import { useFilterStore } from '@/stores/filters';
+
+/** Persistent banner shown below the header when Help Mode is active. */
+function HelpModeBanner() {
+  const { helpMode, toggleHelpMode } = useHelp();
+  if (!helpMode) return null;
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="sticky top-14 z-20 flex items-center justify-between gap-3
+                 bg-sage-100 border-b border-sage-300 px-4 sm:px-6 py-2
+                 animate-slide-up"
+    >
+      <div className="flex items-center gap-2 min-w-0">
+        <HelpCircle className="w-4 h-4 text-sage-600 shrink-0" aria-hidden />
+        <p className="text-xs text-sage-800 font-medium leading-snug">
+          Help Mode is on.{' '}
+          <span className="font-normal">
+            Look for highlighted{' '}
+            <span className="inline-flex items-center gap-0.5 align-middle">
+              <HelpCircle className="w-3 h-3 text-sage-600" aria-hidden />
+            </span>{' '}
+            markers near settings and fields.
+          </span>
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={toggleHelpMode}
+        aria-label="Exit help mode"
+        className="shrink-0 flex items-center gap-1 px-2 py-1 rounded-pill text-xs
+                   font-medium text-sage-700 hover:bg-sage-200 border border-sage-300
+                   transition-colors focus-visible:outline-none focus-visible:ring-2
+                   focus-visible:ring-sage-400"
+      >
+        <X className="w-3 h-3" />
+        <span className="hidden sm:inline">Exit Help Mode</span>
+      </button>
+    </div>
+  );
+}
 
 export default function Layout() {
   const [isCaptureOpen, setIsCaptureOpen] = useState(false);
@@ -213,6 +255,9 @@ export default function Layout() {
           </button>
         </div>
       </header>
+
+      {/* ── Help Mode banner ─────────────────────────────── */}
+      <HelpModeBanner />
 
       {/* ── Mobile search bar ─────────────────────────────── */}
       {mobileSearchOpen && (
