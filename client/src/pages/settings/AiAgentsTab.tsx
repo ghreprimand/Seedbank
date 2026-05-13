@@ -840,13 +840,28 @@ const LOCAL_RESIDENCY_PRESETS = new Set(['lm-studio', 'vllm', 'llama-cpp', 'loca
 
 type DataResidency = 'local' | 'cloud' | 'mixed';
 
+function isLikelyLocalUrl(value: string | undefined): boolean {
+  if (!value?.trim()) return false;
+  try {
+    const hostname = new URL(value.trim()).hostname.toLowerCase();
+    return hostname === 'localhost'
+      || hostname === '127.0.0.1'
+      || hostname === '::1'
+      || hostname.endsWith('.local');
+  } catch {
+    return false;
+  }
+}
+
 function dataResidency(ai: AiPublicConfig): DataResidency {
   if (ai.provider === 'ollama') return 'local';
   if (ai.provider === 'openai-compatible') {
     const preset = ai.openaiCompatiblePreset as string;
-    if (LOCAL_RESIDENCY_PRESETS.has(preset)) return 'local';
+    if (preset === 'custom') return 'mixed';
+    if (isLikelyLocalUrl(ai.openaiCompatibleBaseUrl)) return 'local';
     if (CLOUD_COMPATIBLE_PRESETS.has(preset)) return 'cloud';
-    return 'mixed'; // custom or unknown endpoint — URL is user-configured
+    if (LOCAL_RESIDENCY_PRESETS.has(preset)) return 'cloud';
+    return 'mixed'; // unknown endpoint — URL is user-configured
   }
   return 'cloud';
 }
@@ -869,8 +884,13 @@ function PrivacyNotice({ ai, preflight }: { ai: AiPublicConfig; preflight?: AiPr
   // controls the URL and can point it at any remote host. Even if the current URL is localhost
   // the residency claim 'local' would be misleading, so we always show 'mixed' for custom preset.
   const isCustomPreset = ai.provider === 'openai-compatible' && ai.openaiCompatiblePreset === 'custom';
+  const isOpenAICompatibleRemote = ai.provider === 'openai-compatible'
+    && !isCustomPreset
+    && !isLikelyLocalUrl(ai.openaiCompatibleBaseUrl);
   const residency: DataResidency = isCustomPreset
     ? 'mixed'
+    : isOpenAICompatibleRemote
+      ? 'cloud'
     : preflight != null
       ? (preflight.local ? 'local' : preflight.contentLeavesMachine ? 'cloud' : 'mixed')
       : dataResidency(ai);
