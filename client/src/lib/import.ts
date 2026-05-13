@@ -10,7 +10,7 @@
 import { v4 as uuid } from 'uuid';
 import { db } from '@/db';
 import { createIdea, importArchive } from '@/api/client';
-import type { Idea, IdeaVersion, Category, IdeaLink } from '@/lib/types';
+import type { Idea, IdeaVersion, IdeaLink } from '@/lib/types';
 import { CATEGORIES, STAGES } from '@/lib/types';
 import type { SeedbankArchive } from '@/lib/export';
 
@@ -266,11 +266,12 @@ export function parseMarkdownIdea(markdown: string): Partial<Idea> {
           break;
         }
         case 'category': {
-          const catText = value.toLowerCase().replace(/\s+/g, '-');
+          const catText = value.trim();
+          const normalized = catText.toLowerCase().replace(/\s+/g, '-');
           const matched = CATEGORIES.find(
-            (c) => c === catText || CATEGORIES.includes(catText as Category)
+            (c) => c === normalized
           );
-          if (matched) idea.category = matched as Category;
+          idea.category = matched ?? catText;
           break;
         }
         case 'tags':

@@ -7,7 +7,7 @@ function formatDate(date: Date): string {
   return date.toISOString().split('T')[0] ?? date.toISOString();
 }
 
-function labelFor<T extends string>(labels: Record<T, string>, value: T): string {
+function labelFor(labels: Record<string, string>, value: string): string {
   return labels[value] ?? value;
 }
 
@@ -67,8 +67,10 @@ function parseStage(value: string): Stage | undefined {
 }
 
 function parseCategory(value: string): Category | undefined {
-  const normalized = value.toLowerCase().replace(/\s+/g, '-');
-  return CATEGORIES.find((category) => category === normalized || CATEGORY_LABELS[category].toLowerCase().replace(/\s+/g, '-') === normalized);
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  const normalized = trimmed.toLowerCase().replace(/\s+/g, '-');
+  return CATEGORIES.find((category) => category === normalized || CATEGORY_LABELS[category].toLowerCase().replace(/\s+/g, '-') === normalized) ?? trimmed;
 }
 
 function sectionName(line: string): string | undefined {
