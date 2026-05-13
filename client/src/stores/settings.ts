@@ -279,6 +279,9 @@ export const useAgentsSettings = () =>
 export const useBackupsSettings = () =>
   useSettingsStore((s) => s.data?.backups ?? DEFAULT_SETTINGS.backups);
 
+export const useCategoriesSettings = () =>
+  useSettingsStore((s) => s.data?.categories ?? DEFAULT_SETTINGS.categories);
+
 export const useIntegrationsSettings = () =>
   useSettingsStore((s) => s.data?.integrations ?? DEFAULT_SETTINGS.integrations);
 

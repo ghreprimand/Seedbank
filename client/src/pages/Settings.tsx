@@ -19,12 +19,14 @@ import {
   Archive,
   Plug,
   Info,
+  Tag,
 } from 'lucide-react';
 import GeneralTab from './settings/GeneralTab';
 import AiAgentsTab from './settings/AiAgentsTab';
 import ThemeTab from './settings/ThemeTab';
 import ApiServerTab from './settings/ApiServerTab';
 import BackupsTab from './settings/BackupsTab';
+import CategoriesTab from './settings/CategoriesTab';
 import IntegrationsTab from './settings/IntegrationsTab';
 import AboutTab from './settings/AboutTab';
 import OfflineBanner from './settings/OfflineBanner';
@@ -72,6 +74,13 @@ const TABS: TabDef[] = [
     kicker: 'Schedule, paths, manual backup',
     icon: Archive,
     component: BackupsTab,
+  },
+  {
+    id: 'categories',
+    label: 'Categories',
+    kicker: 'Add, rename, reorder, and archive categories',
+    icon: Tag,
+    component: CategoriesTab,
   },
   {
     id: 'integrations',

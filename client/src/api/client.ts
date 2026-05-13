@@ -36,6 +36,7 @@ export type ConnectionStatus = 'checking' | 'online' | 'offline';
 export interface ApiStats {
   totalIdeas: number;
   stageStats: Record<string, number>;
+  categoryStats: Record<string, number>;
 }
 
 export interface SeedbankArchive {
@@ -491,10 +492,11 @@ export async function searchIdeas(filters: IdeaFilters = {}): Promise<Idea[]> {
 
 export async function getStats(): Promise<ApiStats> {
   try {
-    const stats = await request<Partial<ApiStats> & { ideaCount?: number; total?: number; byStage?: Record<string, number> }>('/api/stats');
+    const stats = await request<Partial<ApiStats> & { ideaCount?: number; total?: number; byStage?: Record<string, number>; byCategory?: Record<string, number> }>('/api/stats');
     return {
       totalIdeas: stats.totalIdeas ?? stats.ideaCount ?? stats.total ?? 0,
       stageStats: stats.stageStats ?? stats.byStage ?? {},
+      categoryStats: stats.categoryStats ?? stats.byCategory ?? {},
     };
   } catch {
     const active = (await localIdeas.getAllIdeas()).filter((idea) => !idea.deletedAt);
@@ -502,9 +504,14 @@ export async function getStats(): Promise<ApiStats> {
       stats[idea.stage] = (stats[idea.stage] ?? 0) + 1;
       return stats;
     }, {});
+    const categoryStats = active.reduce<Record<string, number>>((stats, idea) => {
+      if (idea.category) stats[idea.category] = (stats[idea.category] ?? 0) + 1;
+      return stats;
+    }, {});
     return {
       totalIdeas: active.length,
       stageStats,
+      categoryStats,
     };
   }
 }

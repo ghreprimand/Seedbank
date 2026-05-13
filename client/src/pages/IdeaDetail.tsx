@@ -15,7 +15,6 @@ import {
 
 import type { Idea, Stage } from '@/lib/types';
 import {
-  CATEGORIES,
   CATEGORY_LABELS,
   STAGES,
   STAGE_LABELS,
@@ -42,7 +41,7 @@ import IdeaHealthCheck from '@/components/IdeaHealthCheck';
 import AiSuggestionButton from '@/components/AiSuggestionButton';
 import type { GraduationResponse } from '@/api/client';
 import { exportIdeaAsMarkdown, exportIdeaAsJSON } from '@/lib/export';
-import { useAgentsSettings } from '@/stores/settings';
+import { useAgentsSettings, useCategoriesSettings } from '@/stores/settings';
 import { HelpButton } from '@/help/HelpPopover';
 
 /** Auto-save debounce delay in ms */
@@ -67,6 +66,10 @@ export default function IdeaDetail() {
 
   const agents = useAgentsSettings();
   const anyAgentLinked = agents.claudeLinked || agents.codexLinked;
+  const categorySettings = useCategoriesSettings();
+  const activeCategories = categorySettings.items
+    .filter((c) => !c.archived)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
 
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -336,24 +339,28 @@ export default function IdeaDetail() {
                          text-ink-400 bg-paper-warm border border-ink-100 rounded-badge
                          hover:border-ink-200 transition-colors"
             >
-              {CATEGORY_LABELS[idea.category]}
+              {(() => {
+                const cat = categorySettings.items.find((c) => c.id === idea.category);
+                const label = cat?.label ?? CATEGORY_LABELS[idea.category] ?? idea.category;
+                return cat?.icon ? `${cat.icon} ${label}` : label;
+              })()}
               <ChevronDown className="w-3 h-3 text-ink-300" />
             </button>
             {categoryOpen && (
               <>
                 <div className="fixed inset-0 z-20" onClick={() => setCategoryOpen(false)} />
                 <div className="absolute left-0 top-full mt-1 z-30 bg-paper border border-ink-100 rounded-card shadow-modal p-1 min-w-[160px] animate-scale-in">
-                  {CATEGORIES.map((c) => (
+                  {activeCategories.map((c) => (
                     <button
-                      key={c}
-                      onClick={() => { saveNow({ category: c }); setCategoryOpen(false); }}
+                      key={c.id}
+                      onClick={() => { saveNow({ category: c.id }); setCategoryOpen(false); }}
                       className={`w-full text-left px-3 py-2 text-xs rounded-badge transition-colors ${
-                        idea.category === c
+                        idea.category === c.id
                           ? 'bg-sage-100 text-sage-800 font-semibold'
                           : 'text-ink-600 hover:bg-ink-50'
                       }`}
                     >
-                      {CATEGORY_LABELS[c]}
+                      {c.icon ? `${c.icon} ${c.label}` : c.label}
                     </button>
                   ))}
                 </div>
