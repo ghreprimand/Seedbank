@@ -869,12 +869,12 @@ export class ClaudeAccountProvider implements AiProvider {
     return providerHealth(this.id, this.configuredModel(config), new AccountProviderNotConfiguredError(this.id, aiProviderLabel(this.id)));
   }
 
-  async listModels(config: AiStoredConfig): Promise<AiModelListResult> {
+  async listModels(_config: AiStoredConfig): Promise<AiModelListResult> {
     const err = new AccountProviderNotConfiguredError(this.id, aiProviderLabel(this.id));
     return {
       provider: this.id,
       ok: false,
-      models: [{ id: this.configuredModel(config), name: 'Configured model (placeholder)' }],
+      models: [],
       code: err.code,
       message: err.message,
     };
@@ -904,12 +904,12 @@ export class CodexAccountProvider implements AiProvider {
     return providerHealth(this.id, this.configuredModel(config), new AccountProviderNotConfiguredError(this.id, aiProviderLabel(this.id)));
   }
 
-  async listModels(config: AiStoredConfig): Promise<AiModelListResult> {
+  async listModels(_config: AiStoredConfig): Promise<AiModelListResult> {
     const err = new AccountProviderNotConfiguredError(this.id, aiProviderLabel(this.id));
     return {
       provider: this.id,
       ok: false,
-      models: [{ id: this.configuredModel(config), name: 'Configured model (placeholder)' }],
+      models: [],
       code: err.code,
       message: err.message,
     };

@@ -1495,6 +1495,8 @@ const AI_PROVIDER_OPTIONS: Array<{ id: AiProviderId; label: string }> = [
   { id: 'openai-compatible', label: aiProviderLabel('openai-compatible') },
 ];
 
+const COMING_SOON_ACCOUNT_PROVIDERS = new Set<AiProviderId>(['claude-account', 'codex-account']);
+
 function providerModel(ai: AiPublicConfig, provider: AiProviderId): string {
   if (provider === 'openai') return ai.openaiModel;
   if (provider === 'anthropic') return ai.anthropicModel;
@@ -1528,7 +1530,16 @@ function FeatureRoutingSection({ ai, onSave }: FeatureRoutingSectionProps) {
     setSaved(false);
     setSaveError(null);
     try {
-      await onSave(routes);
+      const sanitized = Object.fromEntries(
+        Object.entries(routes).map(([feature, route]) => {
+          if (route.provider !== 'default' && COMING_SOON_ACCOUNT_PROVIDERS.has(route.provider)) {
+            return [feature, { provider: 'default' }];
+          }
+          return [feature, route];
+        }),
+      ) as AiPublicConfig['featureRoutes'];
+      await onSave(sanitized);
+      setRoutes(sanitized);
       setSaved(true);
       setTimeout(() => setSaved(false), 1500);
     } catch (err) {
@@ -1595,10 +1606,18 @@ function FeatureRoutingSection({ ai, onSave }: FeatureRoutingSectionProps) {
                   className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800"
                 >
                   <option value="default">Use global default</option>
-                  {AI_PROVIDER_OPTIONS.map((provider) => (
-                    <option key={provider.id} value={provider.id}>{provider.label}</option>
-                  ))}
+                  {AI_PROVIDER_OPTIONS.map((provider) => {
+                    const comingSoon = COMING_SOON_ACCOUNT_PROVIDERS.has(provider.id);
+                    return (
+                      <option key={provider.id} value={provider.id} disabled={comingSoon}>
+                        {comingSoon ? `${provider.label} (coming soon)` : provider.label}
+                      </option>
+                    );
+                  })}
                 </select>
+                <span className="mt-1 block text-[11px] text-ink-400">
+                  Claude account and Codex account routing will unlock after account login/runtime support lands.
+                </span>
               </label>
               <label className="block text-xs text-ink-500">
                 Model
