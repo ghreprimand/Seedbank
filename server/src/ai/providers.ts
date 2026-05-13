@@ -1022,8 +1022,21 @@ export class CodexAccountProvider implements AiProvider {
     return config.codexAccountModel?.trim() || 'codex-recommended';
   }
 
+  private async runtimeAvailability(): Promise<{ available: boolean; reason?: string }> {
+    const { codexAccountRuntimeAvailability } = await import('./codex-account/session.js');
+    return codexAccountRuntimeAvailability();
+  }
+
   async complete(messages: AiProviderMessage[], config: AiStoredConfig): Promise<AiProviderResult> {
     try {
+      const availability = await this.runtimeAvailability();
+      if (!availability.available) {
+        throw new AiProviderError(
+          this.id,
+          'not_configured',
+          availability.reason ?? 'Codex account is unavailable in this release candidate build.',
+        );
+      }
       const { codexAccountSession } = await import('./codex-account/session.js');
       const status = await codexAccountSession.status();
       if (!status.authenticated) {
@@ -1045,6 +1058,14 @@ export class CodexAccountProvider implements AiProvider {
     onDelta: (delta: string) => void,
   ): Promise<AiProviderResult> {
     try {
+      const availability = await this.runtimeAvailability();
+      if (!availability.available) {
+        throw new AiProviderError(
+          this.id,
+          'not_configured',
+          availability.reason ?? 'Codex account is unavailable in this release candidate build.',
+        );
+      }
       const { codexAccountSession } = await import('./codex-account/session.js');
       const status = await codexAccountSession.status();
       if (!status.authenticated) {
@@ -1063,6 +1084,14 @@ export class CodexAccountProvider implements AiProvider {
   async health(config: AiStoredConfig): Promise<AiProviderHealth> {
     const model = this.configuredModel(config);
     try {
+      const availability = await this.runtimeAvailability();
+      if (!availability.available) {
+        throw new AiProviderError(
+          this.id,
+          'not_configured',
+          availability.reason ?? 'Codex account is unavailable in this release candidate build.',
+        );
+      }
       const { codexAccountSession } = await import('./codex-account/session.js');
       const status = await codexAccountSession.status();
       if (!status.authenticated) {
@@ -1081,9 +1110,31 @@ export class CodexAccountProvider implements AiProvider {
 
   async listModels(_config: AiStoredConfig): Promise<AiModelListResult> {
     try {
+      const availability = await this.runtimeAvailability();
+      if (!availability.available) {
+        return {
+          provider: this.id,
+          ok: false,
+          models: [],
+          code: 'not_configured',
+          message: availability.reason ?? 'Codex account is unavailable in this release candidate build.',
+          codexAccount: {
+            authenticated: false,
+            catalogFresh: false,
+            available: false,
+            ...(availability.reason ? { unavailableReason: availability.reason } : {}),
+          },
+        };
+      }
       const { codexAccountSession } = await import('./codex-account/session.js');
       const [status, catalog] = await Promise.all([
-        codexAccountSession.status().catch(() => ({ authenticated: false, accountEmail: undefined, planType: undefined })),
+        codexAccountSession.status().catch(() => ({
+          authenticated: false,
+          available: true,
+          unavailableReason: undefined,
+          accountEmail: undefined,
+          planType: undefined,
+        })),
         codexAccountSession.listModels(),
       ]);
       const visible = catalog.models.filter((model) => !model.hidden);
@@ -1100,9 +1151,11 @@ export class CodexAccountProvider implements AiProvider {
         models,
         codexAccount: {
           authenticated: status.authenticated,
+          available: status.available,
           catalogFresh: catalog.fresh,
           ...(status.accountEmail ? { accountEmail: status.accountEmail } : {}),
           ...(status.planType ? { planType: status.planType } : {}),
+          ...(status.unavailableReason ? { unavailableReason: status.unavailableReason } : {}),
         },
       };
     } catch (error) {

@@ -11,6 +11,8 @@ const FALLBACK_CODEX_MODEL = 'gpt-5.3-codex';
 
 export interface CodexAccountStatus {
   authenticated: boolean;
+  available?: boolean;
+  unavailableReason?: string;
   accountEmail?: string;
   planType?: string;
   requiresOpenaiAuth?: boolean;
@@ -110,6 +112,26 @@ interface ActiveTurn {
   reject: (err: Error) => void;
 }
 
+export interface CodexAccountRuntimeAvailability {
+  available: boolean;
+  reason?: string;
+}
+
+function codexAccountEnabledByEnv(): boolean {
+  const raw = process.env.SEEDBANK_ENABLE_CODEX_ACCOUNT?.trim().toLowerCase();
+  return raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on';
+}
+
+export function codexAccountRuntimeAvailability(): CodexAccountRuntimeAvailability {
+  if (!codexAccountEnabledByEnv()) {
+    return {
+      available: false,
+      reason: 'Codex account is unavailable in this release candidate build. Set SEEDBANK_ENABLE_CODEX_ACCOUNT=1 to enable the experimental app-server path.',
+    };
+  }
+  return { available: true };
+}
+
 class CodexAppServerSession extends EventEmitter {
   private proc: ChildProcess | null = null;
   private rpc: JsonRpcClient | null = null;
@@ -120,11 +142,21 @@ class CodexAppServerSession extends EventEmitter {
   private starting: Promise<void> | null = null;
 
   async status(): Promise<CodexAccountStatus> {
+    const availability = codexAccountRuntimeAvailability();
+    if (!availability.available) {
+      return {
+        authenticated: false,
+        available: false,
+        ...(availability.reason ? { unavailableReason: availability.reason } : {}),
+        requiresOpenaiAuth: false,
+      };
+    }
     await this.ensureStarted();
     const response = await this.request<AccountResponse>('account/read', { refreshToken: true }, REQUEST_TIMEOUT_MS);
     const account = response.account;
     return {
       authenticated: Boolean(account),
+      available: true,
       ...(account?.email ? { accountEmail: account.email } : {}),
       ...(account?.planType ? { planType: account.planType } : {}),
       requiresOpenaiAuth: response.requiresOpenaiAuth,
@@ -133,6 +165,13 @@ class CodexAppServerSession extends EventEmitter {
   }
 
   async startLogin(): Promise<CodexAccountLoginResult> {
+    const availability = codexAccountRuntimeAvailability();
+    if (!availability.available) {
+      return {
+        ok: false,
+        message: availability.reason ?? 'Codex account is unavailable in this release candidate build.',
+      };
+    }
     await this.ensureStarted();
     const response = await this.request<LoginResponse>('account/login/start', { type: 'chatgpt', codexStreamlinedLogin: true }, REQUEST_TIMEOUT_MS);
     if (response.type === 'chatgpt') {
@@ -159,12 +198,16 @@ class CodexAppServerSession extends EventEmitter {
   }
 
   async logout(): Promise<void> {
+    const availability = codexAccountRuntimeAvailability();
+    if (!availability.available) return;
     await this.ensureStarted();
     await this.request('account/logout', undefined, REQUEST_TIMEOUT_MS);
     this.catalogCache = null;
   }
 
   async listModels(force = false): Promise<CodexCatalogSnapshot> {
+    const availability = codexAccountRuntimeAvailability();
+    if (!availability.available) throw new Error(availability.reason ?? 'Codex account is unavailable in this release candidate build.');
     if (!force && this.catalogCache && Date.now() - this.catalogCache.fetchedAt < 60 * 60 * 1000) {
       return this.catalogCache;
     }
@@ -193,6 +236,8 @@ class CodexAppServerSession extends EventEmitter {
   }
 
   async resolveModel(model: string): Promise<string> {
+    const availability = codexAccountRuntimeAvailability();
+    if (!availability.available) return model.trim() || 'codex-recommended';
     const requested = model.trim() || 'codex-recommended';
     const catalog = await this.listModels().catch(() => null);
     if (requested !== 'codex-recommended' && requested !== 'codex-fast') return requested;
@@ -209,6 +254,8 @@ class CodexAppServerSession extends EventEmitter {
   }
 
   async complete(messages: AiProviderMessage[], model: string, onDelta?: (delta: string) => void): Promise<AiProviderResult> {
+    const availability = codexAccountRuntimeAvailability();
+    if (!availability.available) throw new Error(availability.reason ?? 'Codex account is unavailable in this release candidate build.');
     await this.ensureStarted();
     if (this.activeTurn) throw new Error('Codex account app-server already has a request in flight.');
     const resolvedModel = await this.resolveModel(model);
