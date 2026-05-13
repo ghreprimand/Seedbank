@@ -826,6 +826,8 @@ function dataResidency(ai: AiPublicConfig): DataResidency {
 function cloudProviderLabel(ai: AiPublicConfig): string {
   if (ai.provider === 'openai') return aiProviderLabel('openai');
   if (ai.provider === 'anthropic') return aiProviderLabel('anthropic');
+  if (ai.provider === 'claude-account') return aiProviderLabel('claude-account');
+  if (ai.provider === 'codex-account') return aiProviderLabel('codex-account');
   if (ai.provider === 'openai-compatible') {
     const preset = presetFor(ai.openaiCompatiblePreset);
     return preset.label;
@@ -1039,11 +1041,26 @@ const PROVIDER_LABELS: Record<AiProviderId, string> = {
   anthropic: aiProviderLabel('anthropic'),
   ollama: aiProviderLabel('ollama'),
   'openai-compatible': aiProviderLabel('openai-compatible'),
+  'claude-account': aiProviderLabel('claude-account'),
+  'codex-account': aiProviderLabel('codex-account'),
 };
 
-const REMOTE_PROVIDERS: AiProviderId[] = ['openai', 'anthropic', 'openai-compatible'];
+const REMOTE_PROVIDERS: AiProviderId[] = [
+  'openai',
+  'anthropic',
+  'openai-compatible',
+  'claude-account',
+  'codex-account',
+];
 const FEATURE_IDS: AiFeatureId[] = ['thinking-partner', 'field-suggestions', 'health-check', 'discover-insights'];
-const PROVIDER_IDS: AiProviderId[] = ['openai', 'anthropic', 'ollama', 'openai-compatible'];
+const PROVIDER_IDS: AiProviderId[] = [
+  'openai',
+  'anthropic',
+  'claude-account',
+  'codex-account',
+  'ollama',
+  'openai-compatible',
+];
 
 interface AdvancedGuardrailsSectionProps {
   guardrails: AiGuardrailsConfig;
@@ -1472,6 +1489,8 @@ const AI_FEATURE_ROWS: Array<{ id: AiFeatureId; label: string; detail: string; s
 const AI_PROVIDER_OPTIONS: Array<{ id: AiProviderId; label: string }> = [
   { id: 'openai', label: aiProviderLabel('openai') },
   { id: 'anthropic', label: aiProviderLabel('anthropic') },
+  { id: 'claude-account', label: aiProviderLabel('claude-account') },
+  { id: 'codex-account', label: aiProviderLabel('codex-account') },
   { id: 'ollama', label: aiProviderLabel('ollama') },
   { id: 'openai-compatible', label: aiProviderLabel('openai-compatible') },
 ];
@@ -1479,6 +1498,8 @@ const AI_PROVIDER_OPTIONS: Array<{ id: AiProviderId; label: string }> = [
 function providerModel(ai: AiPublicConfig, provider: AiProviderId): string {
   if (provider === 'openai') return ai.openaiModel;
   if (provider === 'anthropic') return ai.anthropicModel;
+  if (provider === 'claude-account') return ai.claudeAccountModel;
+  if (provider === 'codex-account') return ai.codexAccountModel;
   if (provider === 'openai-compatible') return ai.openaiCompatibleModel;
   return ai.ollamaModel;
 }
