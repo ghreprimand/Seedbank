@@ -1,6 +1,6 @@
 # Settings
 
-Seedbank's Settings page lives at `/settings` and is the single place to configure providers, theming, tokens, backups, integrations, and more. Access it via the gear icon (⚙) in the top-right header, or navigate directly to any tab with a deep link.
+Seedbank's Settings page lives at `/settings` and is the single place to configure providers, theming, tokens, backups, project graduation, and more. Access it via the gear icon (⚙) in the top-right header, or navigate directly to any tab with a deep link.
 
 ## Navigation
 
@@ -13,7 +13,7 @@ Settings uses a tabbed shell. On desktop (`md+`) a left-rail sidebar lists every
 | Theme | `/settings/theme` | Color palette, system preference toggle |
 | API & Server | `/settings/api` | Server info, personal access tokens, webhooks, MCP |
 | Backups | `/settings/backups` | Schedule, retention, JSON export, destinations, manual run, restore validation |
-| Integrations | `/settings/integrations` | External project adapters and integration root configuration |
+| Project Graduation | `/settings/integrations` | Project folder creation — where to create project scaffolds when you graduate an idea |
 | About | `/settings/about` | Version, GitHub link, acknowledgements |
 
 The header API-status pill (top-right, next to the gear icon) is now a link that jumps to **API & Server** when clicked.
@@ -180,13 +180,13 @@ Configure where Seedbank creates project folders when you graduate an idea. (Thi
 
 - `README.md` — idea title, brief, and key context.
 - `CLAUDE.md` — AI context pre-filled for use with Claude Code, Codex, or another AI coding session.
-- `package.json` + starter file — for tool, app, and browser ideas.
+- `package.json` + starter file — for all ideas except games.
 - `project.godot` stub — for game ideas.
 
 **Settings:**
 
 - **Local Project scaffold** — set the parent folder (project root) where Seedbank creates project directories. This works for any project type and does not require any external tool.
-- **Test connection** — verify Seedbank can write to the project root before graduating your first idea.
+- **Test connection** — checks that the saved path exists and is accessible. Seedbank will create the directory on first graduation if the parent folder exists; it does not probe write permissions at test time.
 - **Custom adapters (Advanced, collapsed by default)** — optional adapters that integrate with a specific local workflow tool. Not required for standard project graduation. Expand the Advanced section to configure them if needed.
 
 A `configured` badge appears next to each adapter that has a valid project root. Unconfigured adapters show an amber notice inside the Graduation modal directing you here.

@@ -139,8 +139,8 @@ function ConfigField({
  */
 const ADAPTER_COPY: Record<string, { description: string; generatedFiles?: string }> = {
   'generic-project': {
-    description: 'Creates a project folder in the directory you choose. Always includes README.md with your idea brief and CLAUDE.md with AI context. May also add a starter package.json or project file based on the idea\'s category.',
-    generatedFiles: 'README.md · CLAUDE.md (always) · package.json + starter file (tool, app, browser ideas) · project.godot stub (game ideas)',
+    description: 'Creates a project folder in the directory you choose. Always includes README.md with your idea brief and CLAUDE.md with AI context. Also adds a package.json and starter file for most ideas; game ideas get a project.godot stub instead.',
+    generatedFiles: 'README.md · CLAUDE.md (always) · package.json + starter file (all non-game ideas) · project.godot stub (game ideas)',
   },
   'custom-local': {
     description: 'An optional adapter for integrating with a specific local workflow tool. Not required for standard project graduation — use Local Project scaffold for most cases.',
@@ -393,7 +393,7 @@ export default function IntegrationsTab() {
           helpId="integrations-tab"
           title="Project Graduation"
           summary="Graduating a seed creates a project folder with README.md and CLAUDE.md pre-filled with your idea's context. Set the project root to tell Seedbank where to create these folders."
-          details="Seedbank always creates README.md and CLAUDE.md. For tool, app, or browser ideas it may also add a package.json and starter file. For game ideas it may add a project.godot stub."
+          details="Seedbank always creates README.md and CLAUDE.md. For all ideas except games it also adds a package.json and starter file. For game ideas it adds a project.godot stub instead. Test connection checks that the path exists and is accessible — the directory is created on first graduation."
           manualSection="settings-integrations"
           alwaysShow
         />

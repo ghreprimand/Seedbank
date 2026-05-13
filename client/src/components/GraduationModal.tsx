@@ -175,7 +175,7 @@ export default function GraduationModal({ idea, onClose, onGraduated }: Graduati
                          underline underline-offset-2 hover:text-amber-900 transition-colors"
             >
               <Settings className="w-3.5 h-3.5" />
-              Configure in Settings → Integrations
+              Configure in Settings → Project Graduation
             </Link>
           </div>
         )}
