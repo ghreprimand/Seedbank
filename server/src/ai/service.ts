@@ -35,6 +35,7 @@ import {
 import { AI_PROVIDER_DESCRIPTORS, openAICompatiblePreset } from './registry.js';
 import type { AiConfigPatch, AiProvider, AiProviderMessage, AiStoredConfig } from './types.js';
 import { codexAccountEnabledByEnv } from './codex-account/session.js';
+import { claudeAccountEnabledByEnv, claudeAccountRuntimeAvailability } from './claude-account/auth.js';
 import { AiStore, type AiExecutionMetadata } from './store.js';
 
 const THINKING_PARTNER_PROMPT = [
@@ -363,6 +364,7 @@ function publicConfig(config: AiStoredConfig): AiPublicConfig {
     hasOpenAIKey: Boolean(config.openaiApiKeyEncrypted),
     hasAnthropicKey: Boolean(config.anthropicApiKeyEncrypted),
     hasOpenAICompatibleKey: Boolean(config.openaiCompatibleApiKeyEncrypted),
+    claudeAccountAvailable: claudeAccountEnabledByEnv(),
     claudeAccountAuthenticated: claudeAccountAuthenticatedCache,
     codexAccountAvailable: codexAccountEnabledByEnv(),
     codexAccountAuthenticated: codexAccountAuthenticatedCache,
@@ -810,9 +812,15 @@ export class AiService {
         featureRoutable: true,
         providerId: 'claude-account',
         beta: true,
-        ...(config.claudeAccountAuthenticated
-          ? { availability: 'available' as const }
-          : { availability: 'auth-required' as const, availabilityReason: 'Sign in with Claude account to enable this method.' }),
+        ...(() => {
+          const gate = claudeAccountRuntimeAvailability();
+          if (!gate.available) {
+            return { availability: 'unavailable' as const, availabilityReason: gate.reason };
+          }
+          return config.claudeAccountAuthenticated
+            ? { availability: 'available' as const }
+            : { availability: 'auth-required' as const, availabilityReason: 'Sign in with Claude account to enable this method.' };
+        })(),
       },
       {
         id: 'openai-api-key',
