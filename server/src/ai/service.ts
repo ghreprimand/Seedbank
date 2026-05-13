@@ -100,6 +100,7 @@ const DEFAULT_CONFIG: AiStoredConfig = {
     requireConfirmationForRemoteProvider: false,
   },
   claudeAccountAuthenticated: false,
+  codexAccountAuthenticated: false,
 };
 
 const AI_CONFIG_KEY = 'ai.config';
@@ -146,6 +147,7 @@ const FEATURE_ROUTABLE_PROVIDERS: ReadonlySet<AiProviderId> = new Set([
   'openai',
   'anthropic',
   'claude-account',
+  'codex-account',
   'ollama',
   'openai-compatible',
 ]);
@@ -329,9 +331,14 @@ function migrateKnownStaleModelDefaults(config: AiStoredConfig): AiStoredConfig 
 // Cached Claude account auth status — refreshed by async calls.
 // Defaults to false; updated when config is loaded or auth endpoints run.
 let claudeAccountAuthenticatedCache = false;
+let codexAccountAuthenticatedCache = false;
 
 export function setCachedClaudeAccountAuth(authenticated: boolean): void {
   claudeAccountAuthenticatedCache = authenticated;
+}
+
+export function setCachedCodexAccountAuth(authenticated: boolean): void {
+  codexAccountAuthenticatedCache = authenticated;
 }
 
 function publicConfig(config: AiStoredConfig): AiPublicConfig {
@@ -355,6 +362,7 @@ function publicConfig(config: AiStoredConfig): AiPublicConfig {
     hasAnthropicKey: Boolean(config.anthropicApiKeyEncrypted),
     hasOpenAICompatibleKey: Boolean(config.openaiCompatibleApiKeyEncrypted),
     claudeAccountAuthenticated: claudeAccountAuthenticatedCache,
+    codexAccountAuthenticated: codexAccountAuthenticatedCache,
   };
 }
 

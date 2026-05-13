@@ -1765,6 +1765,29 @@ app.post('/api/ai/claude-account/logout', requireScope('write:ideas'), asyncRout
   res.json({ ok: true });
 }));
 
+// ── Codex account app-server endpoints ───────────────────────────────────────
+
+app.get('/api/ai/codex-account/status', requireScope('read:ideas'), asyncRoute(async (_req, res) => {
+  const { codexAccountSession } = await import('./ai/codex-account/session.js');
+  const { setCachedCodexAccountAuth } = await import('./ai/service.js');
+  const status = await codexAccountSession.status();
+  setCachedCodexAccountAuth(status.authenticated);
+  res.json(status);
+}));
+
+app.post('/api/ai/codex-account/login', requireScope('write:ideas'), asyncRoute(async (_req, res) => {
+  const { codexAccountSession } = await import('./ai/codex-account/session.js');
+  res.json(await codexAccountSession.startLogin());
+}));
+
+app.post('/api/ai/codex-account/logout', requireScope('write:ideas'), asyncRoute(async (_req, res) => {
+  const { codexAccountSession } = await import('./ai/codex-account/session.js');
+  const { setCachedCodexAccountAuth } = await import('./ai/service.js');
+  await codexAccountSession.logout();
+  setCachedCodexAccountAuth(false);
+  res.json({ ok: true });
+}));
+
 app.get('/api/ai/conversations/:ideaId', requireScope('read:ideas'), asyncRoute((req, res) => {
   res.json({ messages: aiService.getConversation(routeParam(req, 'ideaId')) });
 }));
@@ -2168,5 +2191,11 @@ app.listen(PORT, () => {
     const { setCachedClaudeAccountAuth } = await import('./ai/service.js');
     setCachedClaudeAccountAuth(tokens !== null && tokens.expiresAt > Date.now());
   }).catch(() => { /* auth file missing or unreadable — stays false */ });
+  // Warm the Codex account auth cache without requiring Codex to be installed.
+  void import('./ai/codex-account/session.js').then(async ({ codexAccountSession }) => {
+    const status = await codexAccountSession.status();
+    const { setCachedCodexAccountAuth } = await import('./ai/service.js');
+    setCachedCodexAccountAuth(status.authenticated);
+  }).catch(() => { /* Codex unavailable or not logged in — stays false */ });
   console.log(`Seedbank server listening on http://localhost:${PORT}`);
 });

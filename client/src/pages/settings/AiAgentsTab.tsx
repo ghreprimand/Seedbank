@@ -62,9 +62,13 @@ import {
   startClaudeAccountLogin,
   completeClaudeAccountLogin,
   logoutClaudeAccount,
+  getCodexAccountStatus,
+  startCodexAccountLogin,
+  logoutCodexAccount,
   type AiUsageDetail,
   type AiUsageSummary,
   type ClaudeAccountLoginResult,
+  type CodexAccountLoginResult,
 } from '@/api/client';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -1504,7 +1508,7 @@ const AI_PROVIDER_OPTIONS: Array<{ id: AiProviderId; label: string }> = [
   { id: 'openai-compatible', label: aiProviderLabel('openai-compatible') },
 ];
 
-const COMING_SOON_ACCOUNT_PROVIDERS = new Set<AiProviderId>(['codex-account']);
+const COMING_SOON_ACCOUNT_PROVIDERS = new Set<AiProviderId>();
 
 function providerModel(ai: AiPublicConfig, provider: AiProviderId): string {
   if (provider === 'openai') return ai.openaiModel;
@@ -1625,7 +1629,7 @@ function FeatureRoutingSection({ ai, onSave }: FeatureRoutingSectionProps) {
                   })}
                 </select>
                 <span className="mt-1 block text-[11px] text-ink-400">
-                  Codex account routing will unlock after account login/runtime support lands.
+                  Account providers use your subscription login, not API-key billing.
                 </span>
               </label>
               <label className="block text-xs text-ink-500">
@@ -1845,6 +1849,175 @@ function ClaudeAccountDetail({
   );
 }
 
+// ── Codex Account Detail ──────────────────────────────────────────────────────
+
+function CodexAccountDetail({
+  model,
+  onSave,
+  authenticated,
+  onStatusChange,
+}: {
+  model: string;
+  onSave: (model: string) => Promise<void>;
+  authenticated: boolean;
+  onStatusChange?: (status: ProviderCardProps['status']) => void;
+}) {
+  const [localModel, setLocalModel] = useState(model);
+  const [saving, setSaving] = useState(false);
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [loginResult, setLoginResult] = useState<CodexAccountLoginResult | null>(null);
+  const [logoutLoading, setLogoutLoading] = useState(false);
+  const [account, setAccount] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  const refreshSettings = useSettingsStore((s) => s.refresh);
+
+  const refreshStatus = async () => {
+    setError('');
+    try {
+      const status = await getCodexAccountStatus();
+      setAccount(status.accountEmail ?? status.planType ?? null);
+      onStatusChange?.(status.authenticated ? 'connected' : 'key-needed');
+      await refreshSettings();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      onStatusChange?.('unreachable');
+    }
+  };
+
+  const handleLogin = async () => {
+    setLoginLoading(true);
+    setError('');
+    try {
+      const result = await startCodexAccountLogin();
+      setLoginResult(result);
+      if (result.loginUrl) window.open(result.loginUrl, '_blank', 'noopener');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      onStatusChange?.('unreachable');
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    setLogoutLoading(true);
+    setError('');
+    try {
+      await logoutCodexAccount();
+      setLoginResult(null);
+      setAccount(null);
+      onStatusChange?.('key-needed');
+      await refreshSettings();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLogoutLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await onSave(localModel);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
+        <span className="font-semibold">Beta</span>
+        <span>— Codex account uses the local Codex app-server and your ChatGPT/Codex login. This is separate from OpenAI API billing.</span>
+      </div>
+
+      {!authenticated ? (
+        <div className="space-y-2">
+          <p className="text-[12px] text-neutral-600">
+            Log in with Codex to use your ChatGPT/Codex account for Seedbank AI features.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={handleLogin}
+              disabled={loginLoading}
+              className="px-3 py-1.5 text-[12px] font-medium bg-neutral-800 text-white rounded hover:bg-neutral-900 disabled:opacity-50"
+            >
+              {loginLoading ? 'Starting...' : 'Log in with Codex'}
+            </button>
+            <button
+              onClick={() => void refreshStatus()}
+              className="px-3 py-1.5 text-[12px] font-medium border border-neutral-300 rounded hover:bg-neutral-50"
+            >
+              Refresh status
+            </button>
+          </div>
+          {loginResult && (
+            <div className="space-y-1.5 p-2 bg-neutral-50 border border-neutral-200 rounded text-[11px]">
+              <p>{loginResult.message}</p>
+              {loginResult.userCode && (
+                <p className="font-mono text-neutral-700">Code: {loginResult.userCode}</p>
+              )}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-green-700 font-medium">
+              ✓ Logged in{account ? ` · ${account}` : ''}
+            </span>
+            <button
+              onClick={handleLogout}
+              disabled={logoutLoading}
+              className="px-2 py-1 text-[11px] text-neutral-500 hover:text-red-600 underline"
+            >
+              {logoutLoading ? 'Logging out...' : 'Log out'}
+            </button>
+          </div>
+          <label className="block text-[11px] font-medium text-neutral-700">
+            Model
+            <input
+              type="text"
+              value={localModel}
+              onChange={(e) => setLocalModel(e.target.value)}
+              placeholder="codex-recommended"
+              className="mt-0.5 block w-full rounded border border-neutral-300 px-2 py-1 text-[12px] font-mono"
+            />
+          </label>
+          <p className="text-[10px] text-neutral-500">
+            Use <code>codex-recommended</code> or choose a resolved model from the app-server catalog.
+          </p>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="px-3 py-1 text-[11px] font-medium bg-neutral-800 text-white rounded hover:bg-neutral-900 disabled:opacity-50"
+          >
+            {saving ? 'Saving...' : 'Save'}
+          </button>
+          <ProviderProbe
+            buildConfig={() => ({ provider: 'codex-account', codexAccountModel: localModel })}
+            onPickModel={setLocalModel}
+            onStatusChange={onStatusChange}
+            testLabel="Test connection"
+            listLabel="List models"
+          />
+        </div>
+      )}
+
+      {!authenticated && (
+        <ProviderProbe
+          buildConfig={() => ({ provider: 'codex-account', codexAccountModel: localModel })}
+          onPickModel={setLocalModel}
+          onStatusChange={onStatusChange}
+          listLabel="List known models"
+        />
+      )}
+
+      {error && <p className="text-[11px] text-red-600">{error}</p>}
+    </div>
+  );
+}
+
 // ── Main tab ──────────────────────────────────────────────────────────────────
 
 export default function AiAgentsTab() {
@@ -1862,6 +2035,7 @@ export default function AiAgentsTab() {
   const openaiStatus: ProviderCardProps['status'] = probeStatuses.openai ?? (ai.hasOpenAIKey ? 'connected' : 'key-needed');
   const anthropicStatus: ProviderCardProps['status'] = probeStatuses.anthropic ?? (ai.hasAnthropicKey ? 'connected' : 'key-needed');
   const claudeAccountStatus: ProviderCardProps['status'] = probeStatuses['claude-account'] ?? (ai.claudeAccountAuthenticated ? 'connected' : 'key-needed');
+  const codexAccountStatus: ProviderCardProps['status'] = probeStatuses['codex-account'] ?? (ai.codexAccountAuthenticated ? 'connected' : 'key-needed');
   const ollamaStatus: ProviderCardProps['status'] = probeStatuses.ollama ?? 'not-tested';
   const compatiblePreset = presetFor(ai.openaiCompatiblePreset);
   const compatibleStatus: ProviderCardProps['status'] = probeStatuses['openai-compatible']
@@ -1881,6 +2055,10 @@ export default function AiAgentsTab() {
 
   const saveClaudeAccount = async (model: string) => {
     await patch('ai', { claudeAccountModel: model });
+  };
+
+  const saveCodexAccount = async (model: string) => {
+    await patch('ai', { codexAccountModel: model });
   };
 
   const saveOllama = async (model: string, baseUrl: string) => {
@@ -2026,6 +2204,23 @@ export default function AiAgentsTab() {
               onSave={saveClaudeAccount}
               authenticated={ai.claudeAccountAuthenticated}
               onStatusChange={(status) => setProbeStatus('claude-account', status)}
+            />
+          </ProviderCard>
+
+          {/* Codex Account (subscription) */}
+          <ProviderCard
+            label={aiProviderLabel('codex-account')}
+            icon="⌁"
+            isDefault={ai.provider === 'codex-account'}
+            status={codexAccountStatus}
+            modelLabel={ai.codexAccountModel || 'codex-recommended'}
+            onSetDefault={() => void setDefaultProvider('codex-account')}
+          >
+            <CodexAccountDetail
+              model={ai.codexAccountModel || 'codex-recommended'}
+              onSave={saveCodexAccount}
+              authenticated={ai.codexAccountAuthenticated}
+              onStatusChange={(status) => setProbeStatus('codex-account', status)}
             />
           </ProviderCard>
 
