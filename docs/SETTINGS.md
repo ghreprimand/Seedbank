@@ -165,6 +165,10 @@ All backup settings live here. Backups are written to `<seedbank-data-dir>/backu
 - **Test destination** — run a connectivity/writeability check before relying on a destination.
 - **Manual backup** — runs a backup immediately.
 - **Test restore (safe validation)** — reads and validates the latest local backup files without replacing live data. Validates what Seedbank has stored locally; rclone remote destinations are delivery targets and are not directly validated by this tool.
+  - Remote restore-check recipe:
+    1. Download the backup files from the remote destination (database backup and/or JSON export).
+    2. Place those files into the local backup/export location on the Seedbank machine.
+    3. Run **Test restore** so Seedbank validates the local copy before any real recovery action.
 
 The rclone status indicator in the backup summary shows whether rclone is installed and how many remotes are configured on this machine.
 
