@@ -1508,8 +1508,6 @@ const AI_PROVIDER_OPTIONS: Array<{ id: AiProviderId; label: string }> = [
   { id: 'openai-compatible', label: aiProviderLabel('openai-compatible') },
 ];
 
-const COMING_SOON_ACCOUNT_PROVIDERS = new Set<AiProviderId>();
-
 function providerModel(ai: AiPublicConfig, provider: AiProviderId): string {
   if (provider === 'openai') return ai.openaiModel;
   if (provider === 'anthropic') return ai.anthropicModel;
@@ -1525,14 +1523,17 @@ function providerLabel(provider: AiProviderId): string {
 
 interface FeatureRoutingSectionProps {
   ai: AiPublicConfig;
+  providerStatuses: Partial<Record<AiProviderId, ProviderCardStatus>>;
+  accountSetupIssues: Partial<Record<'claude-account' | 'codex-account', string>>;
   onSave: (routes: AiPublicConfig['featureRoutes']) => Promise<void>;
 }
 
-function FeatureRoutingSection({ ai, onSave }: FeatureRoutingSectionProps) {
+function FeatureRoutingSection({ ai, providerStatuses, accountSetupIssues, onSave }: FeatureRoutingSectionProps) {
   const [routes, setRoutes] = useState(ai.featureRoutes);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const openAICompatiblePreset = presetFor(ai.openaiCompatiblePreset);
 
   const updateRoute = (feature: AiFeatureId, route: AiFeatureRoute) => {
     setRoutes((current) => ({ ...current, [feature]: route }));
@@ -1543,16 +1544,8 @@ function FeatureRoutingSection({ ai, onSave }: FeatureRoutingSectionProps) {
     setSaved(false);
     setSaveError(null);
     try {
-      const sanitized = Object.fromEntries(
-        Object.entries(routes).map(([feature, route]) => {
-          if (route.provider !== 'default' && COMING_SOON_ACCOUNT_PROVIDERS.has(route.provider)) {
-            return [feature, { provider: 'default' }];
-          }
-          return [feature, route];
-        }),
-      ) as AiPublicConfig['featureRoutes'];
-      await onSave(sanitized);
-      setRoutes(sanitized);
+      await onSave(routes);
+      setRoutes(routes);
       setSaved(true);
       setTimeout(() => setSaved(false), 1500);
     } catch (err) {
@@ -1595,6 +1588,46 @@ function FeatureRoutingSection({ ai, onSave }: FeatureRoutingSectionProps) {
           const route = routes[feature.id] ?? { provider: 'default' as const };
           const effective = ai.effectiveFeatureRoutes[feature.id];
           const selectedProvider = route.provider === 'default' ? 'default' : route.provider;
+          const selectedUnavailableReason =
+            selectedProvider === 'default'
+              ? null
+              : selectedProvider === 'openai' && !ai.hasOpenAIKey
+                ? 'OpenAI API key missing in the OpenAI API card.'
+                : selectedProvider === 'anthropic' && !ai.hasAnthropicKey
+                  ? 'Anthropic API key missing in the Anthropic API card.'
+                  : selectedProvider === 'openai-compatible'
+                    && openAICompatiblePreset.requiresKey
+                    && !ai.hasOpenAICompatibleKey
+                    ? 'This OpenRouter/custom preset needs an API key in its provider card.'
+                    : selectedProvider === 'claude-account' && !ai.claudeAccountAuthenticated
+                      ? (accountSetupIssues['claude-account'] ?? 'Claude account is not signed in.')
+                      : selectedProvider === 'codex-account' && !ai.codexAccountAuthenticated
+                        ? (accountSetupIssues['codex-account'] ?? 'Codex account is not signed in.')
+                        : selectedProvider === 'ollama' && providerStatuses.ollama === 'unreachable'
+                          ? 'Ollama host is unreachable. Check the Ollama base URL and daemon.'
+                          : null;
+          const providerHint =
+            selectedProvider === 'default'
+              ? 'Uses whichever provider is set as global default above.'
+              : selectedUnavailableReason
+                ? `Unavailable right now: ${selectedUnavailableReason}`
+                : selectedProvider === 'claude-account'
+                  ? 'Subscription login path (not API-key billing).'
+                  : selectedProvider === 'codex-account'
+                    ? 'Codex app-server login path (not OpenAI API-key billing).'
+                    : selectedProvider === 'openai-compatible'
+                      ? 'Custom/OpenRouter endpoint path; model field accepts manual IDs.'
+                      : 'Provider is ready for this feature route.';
+          const modelHint =
+            selectedProvider === 'default'
+              ? `Effective: ${providerLabel(effective.provider)} · ${effective.model || 'choose a model'}`
+              : selectedProvider === 'claude-account'
+                ? 'Try aliases like claude-sonnet-latest. List models shows alias + resolved ID.'
+                : selectedProvider === 'codex-account'
+                  ? 'Use codex-recommended/codex-fast or a resolved catalog ID from List models.'
+                  : selectedProvider === 'openai-compatible'
+                    ? 'Manual model IDs are expected here (for OpenRouter or custom endpoint catalogs).'
+                    : `Effective: ${providerLabel(effective.provider)} · ${effective.model || 'choose a model'}`;
           return (
             <div
               key={feature.id}
@@ -1619,17 +1652,18 @@ function FeatureRoutingSection({ ai, onSave }: FeatureRoutingSectionProps) {
                   className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800"
                 >
                   <option value="default">Use global default</option>
-                  {AI_PROVIDER_OPTIONS.map((provider) => {
-                    const comingSoon = COMING_SOON_ACCOUNT_PROVIDERS.has(provider.id);
-                    return (
-                      <option key={provider.id} value={provider.id} disabled={comingSoon}>
-                        {comingSoon ? `${provider.label} (coming soon)` : provider.label}
-                      </option>
-                    );
-                  })}
+                  {AI_PROVIDER_OPTIONS.map((provider) => (
+                    <option key={provider.id} value={provider.id}>
+                      {provider.label}
+                      {provider.id === 'openai' && !ai.hasOpenAIKey ? ' — setup required' : ''}
+                      {provider.id === 'anthropic' && !ai.hasAnthropicKey ? ' — setup required' : ''}
+                      {provider.id === 'claude-account' && !ai.claudeAccountAuthenticated ? ' — sign in required' : ''}
+                      {provider.id === 'codex-account' && !ai.codexAccountAuthenticated ? ' — sign in required' : ''}
+                    </option>
+                  ))}
                 </select>
                 <span className="mt-1 block text-[11px] text-ink-400">
-                  Account providers use your subscription login, not API-key billing.
+                  {providerHint}
                 </span>
               </label>
               <label className="block text-xs text-ink-500">
@@ -1642,7 +1676,7 @@ function FeatureRoutingSection({ ai, onSave }: FeatureRoutingSectionProps) {
                   className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800 disabled:bg-ink-50 disabled:text-ink-400"
                 />
                 <span className="mt-1 block text-[11px] text-ink-400">
-                  Effective: {providerLabel(effective.provider)} · {effective.model || 'choose a model'}
+                  {modelHint}
                 </span>
               </label>
             </div>
@@ -2026,6 +2060,7 @@ export default function AiAgentsTab() {
   const offline = useSettingsOffline();
   const patch = useSettingsStore((s) => s.patch);
   const [probeStatuses, setProbeStatuses] = useState<Partial<Record<AiProviderId, ProviderCardStatus>>>({});
+  const [accountSetupIssues, setAccountSetupIssues] = useState<Partial<Record<'claude-account' | 'codex-account', string>>>({});
 
   const setProbeStatus = (provider: AiProviderId, status: ProviderCardStatus) => {
     setProbeStatuses((current) => ({ ...current, [provider]: status }));
@@ -2040,6 +2075,45 @@ export default function AiAgentsTab() {
   const compatiblePreset = presetFor(ai.openaiCompatiblePreset);
   const compatibleStatus: ProviderCardProps['status'] = probeStatuses['openai-compatible']
     ?? (compatiblePreset.requiresKey && !ai.hasOpenAICompatibleKey ? 'key-needed' : 'not-tested');
+
+  useEffect(() => {
+    if (offline) return;
+    let cancelled = false;
+    void (async () => {
+      const next: Partial<Record<'claude-account' | 'codex-account', string>> = {};
+      try {
+        const status = await getClaudeAccountStatus();
+        if (!cancelled && !status.authenticated) {
+          next['claude-account'] = 'Sign in from the Claude account card before routing features here.';
+        }
+      } catch (err) {
+        if (!cancelled) {
+          next['claude-account'] = err instanceof Error ? err.message : 'Claude account status is unavailable.';
+        }
+      }
+
+      try {
+        const status = await getCodexAccountStatus();
+        if (!cancelled && !status.authenticated) {
+          next['codex-account'] = status.requiresOpenaiAuth
+            ? 'Sign in from the Codex account card before routing features here.'
+            : 'Codex account is not ready yet. Use the Codex card to log in or refresh status.';
+        }
+      } catch (err) {
+        if (!cancelled) {
+          const message = err instanceof Error ? err.message : String(err);
+          next['codex-account'] = /(enoent|not found|app-server|codex)/i.test(message)
+            ? 'Codex CLI/app-server is unavailable. Install or relaunch Codex, then refresh the Codex card status.'
+            : message;
+        }
+      }
+
+      if (!cancelled) setAccountSetupIssues(next);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [offline]);
 
   const setDefaultProvider = async (provider: AiProviderId) => {
     await patch('ai', { provider });
@@ -2127,8 +2201,8 @@ export default function AiAgentsTab() {
             <HelpButton
               helpId="ai-providers"
               title="Choosing an AI Provider"
-              summary="Not sure which to pick? Use the Thinking Partner with any provider — OpenAI and Anthropic use API keys, Ollama runs locally, OpenRouter works with many services."
-              details="I have a Claude subscription → Anthropic API (claude.ai subscriptions and API keys are separate). I run Ollama → Ollama provider, no key needed. I use OpenRouter/Groq/LM Studio → OpenRouter / custom endpoint."
+              summary="Pick by billing and runtime: OpenAI/Anthropic API keys, Claude/Codex account login, Ollama local models, or OpenRouter/custom endpoint."
+              details="Claude account and Codex account use subscription/app-server login (beta). OpenAI API and Anthropic API use direct API-key billing. OpenRouter/custom endpoint supports manual model IDs. Project Graduation is separate and only controls file scaffolding."
               manualSection="provider-chooser"
               alwaysShow
             />
@@ -2284,7 +2358,19 @@ export default function AiAgentsTab() {
       {/* key is intentionally absent — key-based remount caused unsaved route
           drafts to be discarded whenever any other AI setting was saved. */}
       <section className="p-4 bg-paper-warm border border-ink-100 rounded-card">
-        <FeatureRoutingSection ai={ai} onSave={saveFeatureRoutes} />
+        <FeatureRoutingSection
+          ai={ai}
+          providerStatuses={{
+            openai: openaiStatus,
+            anthropic: anthropicStatus,
+            'claude-account': claudeAccountStatus,
+            'codex-account': codexAccountStatus,
+            ollama: ollamaStatus,
+            'openai-compatible': compatibleStatus,
+          }}
+          accountSetupIssues={accountSetupIssues}
+          onSave={saveFeatureRoutes}
+        />
       </section>
 
       {/* ── A3: Guardrails (privacy + budget + usage + advanced controls) ─── */}
