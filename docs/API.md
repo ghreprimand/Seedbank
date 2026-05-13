@@ -447,7 +447,7 @@ Scope expectations (bearer mode):
 - `POST /api/ai/field-chat` (`ai:suggest`, SSE) - modal-local field assistance using the `field-suggestions` route; accepts `aiConfirmationToken`
 - `POST /api/ai/chat` (`ai:suggest`, SSE) - Thinking Partner chat; accepts `aiConfirmationToken`
 
-## Backups, Integrations, Import/Export
+## Backups, Project Graduation, Import/Export
 
 ### Backups
 - `GET /api/backups` (`read:ideas`)
@@ -456,7 +456,7 @@ Scope expectations (bearer mode):
 - `POST /api/backups/destinations/test` (`write:ideas`)
 - `POST /api/backups/test-restore` (`write:ideas`)
 
-### Integrations
+### Project Graduation
 - `GET /api/integrations` (`read:ideas`)
 - `POST /api/integrations/:id/configure` (`write:ideas`)
 - `POST /api/integrations/:id/graduate/:ideaId` (`write:ideas`)

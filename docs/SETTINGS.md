@@ -78,7 +78,7 @@ See [`docs/THEMING.md`](./THEMING.md) for the full theme model and custom-theme 
 
 ---
 
-## API & Server
+## API & Server (API & Automation)
 
 ### Server info card
 
@@ -116,7 +116,7 @@ Unauthenticated requests from `localhost` continue to work for normal in-app use
 
 > Token creation is restricted to local browser sessions (the server checks that the request originates from `127.0.0.1` / `::1`). Token creation from a remote host — even a valid bearer token — is not permitted.
 
-### Webhooks
+### Webhooks (Automation triggers)
 
 Configure an outbound webhook URL that receives a `POST` request on idea lifecycle events. The payload is the full idea record.
 
@@ -189,6 +189,8 @@ Configure where Seedbank creates project folders when you graduate an idea. (Thi
 - **Test connection** — checks that the saved path can be found or created later. Passes if the path already exists as a directory, or if its parent folder exists (the directory is created on first graduation). Does not probe write permissions.
 - **Custom adapters (Advanced, collapsed by default)** — optional adapters that integrate with a specific local workflow tool. Not required for standard project graduation. Expand the Advanced section to configure them if needed.
 
+See [`docs/INTEGRATIONS.md`](./INTEGRATIONS.md) for adapter internals and custom adapter implementation.
+
 A `configured` badge appears next to each adapter that has a valid project root. Unconfigured adapters show an amber notice inside the Graduation modal directing you here.
 
 ---
@@ -211,7 +213,7 @@ A `configured` badge appears next to each adapter that has a valid project root.
 | Agents config (linked, CLI paths) | Server `settings` table (`agents.config`) | Shown from cache; linking requires server |
 | Token budget | Server `settings` table (`ai.config`) | Shown from cache; changes require server |
 | Backups config | Server `settings` table (`backups.config`) | Shown from cache; changes require server |
-| Integrations config | Server `settings` table (`integration:<adapter-id>`; for example `integration:generic-project`) | Shown from cache; changes require server |
+| Project Graduation config | Server `settings` table (`integration:<adapter-id>`; for example `integration:generic-project`) | Shown from cache; changes require server |
 | Personal access tokens | Server `api_tokens` table, hashed | Not visible offline |
 | Webhook URL + events | Server `settings` table (`api.webhooks`) | Not visible offline |
 
