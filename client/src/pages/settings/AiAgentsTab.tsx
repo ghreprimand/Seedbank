@@ -865,9 +865,15 @@ function cloudProviderLabel(ai: AiPublicConfig): string {
 
 function PrivacyNotice({ ai, preflight }: { ai: AiPublicConfig; preflight?: AiPreflightResult | null }) {
   // If preflight is available, trust its authoritative `contentLeavesMachine` field.
-  const residency: DataResidency = preflight != null
-    ? (preflight.local ? 'local' : preflight.contentLeavesMachine ? 'cloud' : 'mixed')
-    : dataResidency(ai);
+  // Exception: when the provider is openai-compatible with the 'custom' preset, the user
+  // controls the URL and can point it at any remote host. Even if the current URL is localhost
+  // the residency claim 'local' would be misleading, so we always show 'mixed' for custom preset.
+  const isCustomPreset = ai.provider === 'openai-compatible' && ai.openaiCompatiblePreset === 'custom';
+  const residency: DataResidency = isCustomPreset
+    ? 'mixed'
+    : preflight != null
+      ? (preflight.local ? 'local' : preflight.contentLeavesMachine ? 'cloud' : 'mixed')
+      : dataResidency(ai);
 
   if (residency === 'local') {
     return (
