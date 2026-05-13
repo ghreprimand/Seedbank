@@ -14,6 +14,7 @@ import { openAICompatiblePreset } from './registry.js';
 import type { AiProvider, AiProviderMessage, AiProviderResult, AiStoredConfig, AiUsage } from './types.js';
 
 const REQUEST_TIMEOUT_MS = 8_000;
+const OLLAMA_REQUEST_TIMEOUT_MS = 120_000;
 const OLLAMA_KEEP_ALIVE = '5m';
 const OLLAMA_SMOKE_PROMPT = 'Reply with exactly: pong';
 
@@ -87,9 +88,9 @@ function extractModelIds(payload: unknown): string[] {
     .filter(Boolean);
 }
 
-async function fetchWithTimeout(url: string, init?: RequestInit): Promise<Response> {
+async function fetchWithTimeout(url: string, init?: RequestInit, timeoutMs = REQUEST_TIMEOUT_MS): Promise<Response> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     return await fetch(url, { ...init, signal: controller.signal });
   } finally {
@@ -529,9 +530,17 @@ export class OllamaProvider implements AiProvider {
     model: string,
     normalizedBaseUrl: string,
     endpoint: string,
+    timeoutMs: number,
   ): AiProviderError {
     if (error instanceof AiProviderError) return error;
-    if (error instanceof TypeError || (error instanceof Error && error.name === 'AbortError')) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      return new AiProviderError(
+        this.id,
+        'unreachable',
+        `${context} timed out for model "${model}" at ${endpoint} (base: ${normalizedBaseUrl}) after ${Math.floor(timeoutMs / 1000)}s. Try a smaller/faster model or retry.`,
+      );
+    }
+    if (error instanceof TypeError) {
       const detail = error instanceof Error ? boundedDetail(error.message) : '';
       return new AiProviderError(
         this.id,
@@ -551,6 +560,7 @@ export class OllamaProvider implements AiProvider {
     config: AiStoredConfig,
     stream: boolean,
     context: string,
+    timeoutMs = OLLAMA_REQUEST_TIMEOUT_MS,
   ): Promise<Response> {
     const normalizedBaseUrl = this.baseUrl(config);
     const endpoint = `${normalizedBaseUrl}/api/chat`;
@@ -559,13 +569,13 @@ export class OllamaProvider implements AiProvider {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(this.chatBody(messages, config, stream)),
-      });
+      }, timeoutMs);
       if (!response.ok) {
         throw await this.readOllamaHttpError(response, context, config.ollamaModel, normalizedBaseUrl, endpoint);
       }
       return response;
     } catch (error) {
-      throw this.wrapOllamaTransportError(error, context, config.ollamaModel, normalizedBaseUrl, endpoint);
+      throw this.wrapOllamaTransportError(error, context, config.ollamaModel, normalizedBaseUrl, endpoint, timeoutMs);
     }
   }
 
@@ -654,12 +664,17 @@ export class OllamaProvider implements AiProvider {
 
   async complete(messages: AiProviderMessage[], config: AiStoredConfig): Promise<AiProviderResult> {
     try {
-      const response = await this.requestChat(messages, config, false, 'Ollama request');
-      const payload = await response.json() as { message?: { content?: string }; prompt_eval_count?: number; eval_count?: number };
-      return {
-        text: payload.message?.content ?? '',
-        usage: usageFrom(payload),
-      };
+      // Use streamed /api/chat even for non-streaming callers so long local
+      // generations don't hit the short "full body" HTTP timeout.
+      const response = await this.requestChat(messages, config, true, 'Ollama request');
+      let text = '';
+      let usage: AiUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+      await parseJsonLines(response, (payload) => {
+        const message = payload.message as { content?: string } | undefined;
+        if (message?.content) text += message.content;
+        if (payload.done) usage = usageFrom(payload);
+      }, { provider: this.id, context: 'Ollama request response' });
+      return { text, usage };
     } catch (error) {
       if (error instanceof AiProviderError) throw error;
       throw providerFetchError(this.id, error);
@@ -804,6 +819,7 @@ export class OllamaProvider implements AiProvider {
             config.ollamaModel,
             normalizedBaseUrl,
             `${normalizedBaseUrl}/api/tags`,
+            REQUEST_TIMEOUT_MS,
           )
           : providerFetchError(this.id, error));
       const endpoint = normalizedBaseUrl ? `${normalizedBaseUrl}/api/tags` : undefined;
