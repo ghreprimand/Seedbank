@@ -961,6 +961,16 @@ export class ClaudeAccountProvider implements AiProvider {
   async health(config: AiStoredConfig): Promise<AiProviderHealth> {
     const model = this.configuredModel(config);
     try {
+      // Health requires live auth — unauthenticated is not_configured, not healthy
+      const { ensureLiveTokens } = await import('./claude-account/oauth.js');
+      const tokens = await ensureLiveTokens();
+      if (!tokens) {
+        throw new AiProviderError(
+          this.id,
+          'not_configured',
+          'Claude account is not logged in. Open Settings → AI & Agents and click "Log in with Claude" to authenticate.',
+        );
+      }
       const models = await this.listModels(config);
       if (!models.ok) {
         throw new AiProviderError(this.id, models.code ?? 'unknown', models.message ?? 'Claude account model discovery failed.');

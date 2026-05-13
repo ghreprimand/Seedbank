@@ -151,6 +151,11 @@ export async function startBootstrap(): Promise<BootstrapResult> {
     try {
       const tokens = await exchangeCode(code, codeVerifier);
       await saveTokens(tokens);
+      // Update the auth cache so publicConfig reflects the login immediately
+      try {
+        const { setCachedClaudeAccountAuth } = await import('../service.js');
+        setCachedClaudeAccountAuth(true);
+      } catch { /* service module not available during tests */ }
     } catch (err) {
       console.error('[claude-account] OAuth code exchange failed:', err);
     } finally {
