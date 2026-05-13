@@ -1656,10 +1656,12 @@ function ClaudeAccountDetail({
   model,
   onSave,
   authenticated,
+  onStatusChange,
 }: {
   model: string;
   onSave: (model: string) => Promise<void>;
   authenticated: boolean;
+  onStatusChange?: (status: ProviderCardProps['status']) => void;
 }) {
   const [localModel, setLocalModel] = useState(model);
   const [saving, setSaving] = useState(false);
@@ -1819,7 +1821,23 @@ function ClaudeAccountDetail({
           >
             {saving ? 'Saving…' : 'Save'}
           </button>
+          <ProviderProbe
+            buildConfig={() => ({ provider: 'claude-account', claudeAccountModel: localModel })}
+            onPickModel={setLocalModel}
+            onStatusChange={onStatusChange}
+            testLabel="Test connection"
+            listLabel="List models"
+          />
         </div>
+      )}
+
+      {!authenticated && (
+        <ProviderProbe
+          buildConfig={() => ({ provider: 'claude-account', claudeAccountModel: localModel })}
+          onPickModel={setLocalModel}
+          onStatusChange={onStatusChange}
+          listLabel="List known models"
+        />
       )}
 
       {error && <p className="text-[11px] text-red-600">{error}</p>}
@@ -2002,17 +2020,12 @@ export default function AiAgentsTab() {
             status={claudeAccountStatus}
             modelLabel={ai.claudeAccountModel || 'claude-sonnet-latest'}
             onSetDefault={() => void setDefaultProvider('claude-account')}
-            actions={(
-              <ProviderProbe
-                buildConfig={() => ({ provider: 'claude-account', claudeAccountModel: ai.claudeAccountModel })}
-                onStatusChange={(status) => setProbeStatus('claude-account', status)}
-              />
-            )}
           >
             <ClaudeAccountDetail
               model={ai.claudeAccountModel || 'claude-sonnet-latest'}
               onSave={saveClaudeAccount}
               authenticated={ai.claudeAccountAuthenticated}
+              onStatusChange={(status) => setProbeStatus('claude-account', status)}
             />
           </ProviderCard>
 
