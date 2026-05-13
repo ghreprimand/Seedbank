@@ -58,8 +58,13 @@ import {
   linkAgent,
   testAiProvider,
   unlinkAgent,
+  getClaudeAccountStatus,
+  startClaudeAccountLogin,
+  completeClaudeAccountLogin,
+  logoutClaudeAccount,
   type AiUsageDetail,
   type AiUsageSummary,
+  type ClaudeAccountLoginResult,
 } from '@/api/client';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -1495,7 +1500,7 @@ const AI_PROVIDER_OPTIONS: Array<{ id: AiProviderId; label: string }> = [
   { id: 'openai-compatible', label: aiProviderLabel('openai-compatible') },
 ];
 
-const COMING_SOON_ACCOUNT_PROVIDERS = new Set<AiProviderId>(['claude-account', 'codex-account']);
+const COMING_SOON_ACCOUNT_PROVIDERS = new Set<AiProviderId>(['codex-account']);
 
 function providerModel(ai: AiPublicConfig, provider: AiProviderId): string {
   if (provider === 'openai') return ai.openaiModel;
@@ -1641,6 +1646,167 @@ function FeatureRoutingSection({ ai, onSave }: FeatureRoutingSectionProps) {
   );
 }
 
+// ── Claude Account Detail ─────────────────────────────────────────────────────
+
+function ClaudeAccountDetail({
+  model,
+  onSave,
+  authenticated,
+}: {
+  model: string;
+  onSave: (model: string) => Promise<void>;
+  authenticated: boolean;
+}) {
+  const [localModel, setLocalModel] = useState(model);
+  const [saving, setSaving] = useState(false);
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [loginResult, setLoginResult] = useState<ClaudeAccountLoginResult | null>(null);
+  const [manualUrl, setManualUrl] = useState('');
+  const [logoutLoading, setLogoutLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleLogin = async () => {
+    setLoginLoading(true);
+    setError('');
+    try {
+      const result = await startClaudeAccountLogin();
+      setLoginResult(result);
+      // Open the authorization URL in a new tab
+      window.open(result.authorizationUrl, '_blank', 'noopener');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const handleManualComplete = async () => {
+    if (!manualUrl.trim()) return;
+    setError('');
+    try {
+      await completeClaudeAccountLogin(manualUrl.trim());
+      setLoginResult(null);
+      setManualUrl('');
+      // Trigger a config refresh by re-saving model
+      await onSave(localModel);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const handleLogout = async () => {
+    setLogoutLoading(true);
+    setError('');
+    try {
+      await logoutClaudeAccount();
+      setLoginResult(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLogoutLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await onSave(localModel);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
+        <span className="font-semibold">Beta</span>
+        <span>— Claude account login uses your Anthropic subscription. This transport may change as Anthropic evolves their auth.</span>
+      </div>
+
+      {!authenticated ? (
+        <div className="space-y-2">
+          <p className="text-[12px] text-neutral-600">
+            Log in with your Claude account to use your Anthropic subscription for AI features.
+          </p>
+          <button
+            onClick={handleLogin}
+            disabled={loginLoading}
+            className="px-3 py-1.5 text-[12px] font-medium bg-violet-600 text-white rounded hover:bg-violet-700 disabled:opacity-50"
+          >
+            {loginLoading ? 'Starting…' : 'Log in with Claude'}
+          </button>
+
+          {loginResult && (
+            <div className="space-y-2 p-2 bg-neutral-50 border border-neutral-200 rounded text-[11px]">
+              <p>
+                A browser tab opened for Claude login.{' '}
+                {loginResult.manualFallback
+                  ? 'After granting access, copy the redirect URL and paste it below.'
+                  : 'After granting access, Seedbank will detect the callback automatically.'}
+              </p>
+              {loginResult.manualFallback && loginResult.manualReason && (
+                <p className="text-amber-700">{loginResult.manualReason}</p>
+              )}
+              <div className="flex gap-1.5">
+                <input
+                  type="text"
+                  placeholder="Paste callback URL here…"
+                  value={manualUrl}
+                  onChange={(e) => setManualUrl(e.target.value)}
+                  className="flex-1 rounded border border-neutral-300 px-2 py-1 text-[11px] font-mono"
+                />
+                <button
+                  onClick={handleManualComplete}
+                  disabled={!manualUrl.trim()}
+                  className="px-2 py-1 text-[11px] font-medium bg-neutral-700 text-white rounded hover:bg-neutral-800 disabled:opacity-50"
+                >
+                  Complete
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-green-700 font-medium">✓ Logged in</span>
+            <button
+              onClick={handleLogout}
+              disabled={logoutLoading}
+              className="px-2 py-1 text-[11px] text-neutral-500 hover:text-red-600 underline"
+            >
+              {logoutLoading ? 'Logging out…' : 'Log out'}
+            </button>
+          </div>
+
+          <label className="block text-[11px] font-medium text-neutral-700">
+            Model
+            <input
+              type="text"
+              value={localModel}
+              onChange={(e) => setLocalModel(e.target.value)}
+              placeholder="claude-sonnet-latest"
+              className="mt-0.5 block w-full rounded border border-neutral-300 px-2 py-1 text-[12px] font-mono"
+            />
+          </label>
+          <p className="text-[10px] text-neutral-500">
+            Use an alias like <code>claude-sonnet-latest</code> or a specific version like <code>claude-sonnet-4-20250514</code>.
+          </p>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="px-3 py-1 text-[11px] font-medium bg-neutral-800 text-white rounded hover:bg-neutral-900 disabled:opacity-50"
+          >
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+      )}
+
+      {error && <p className="text-[11px] text-red-600">{error}</p>}
+    </div>
+  );
+}
+
 // ── Main tab ──────────────────────────────────────────────────────────────────
 
 export default function AiAgentsTab() {
@@ -1657,6 +1823,7 @@ export default function AiAgentsTab() {
   // Determine provider connection status
   const openaiStatus: ProviderCardProps['status'] = probeStatuses.openai ?? (ai.hasOpenAIKey ? 'connected' : 'key-needed');
   const anthropicStatus: ProviderCardProps['status'] = probeStatuses.anthropic ?? (ai.hasAnthropicKey ? 'connected' : 'key-needed');
+  const claudeAccountStatus: ProviderCardProps['status'] = probeStatuses['claude-account'] ?? (ai.claudeAccountAuthenticated ? 'connected' : 'key-needed');
   const ollamaStatus: ProviderCardProps['status'] = probeStatuses.ollama ?? 'not-tested';
   const compatiblePreset = presetFor(ai.openaiCompatiblePreset);
   const compatibleStatus: ProviderCardProps['status'] = probeStatuses['openai-compatible']
@@ -1672,6 +1839,10 @@ export default function AiAgentsTab() {
 
   const saveAnthropic = async (model: string, key?: string) => {
     await patch('ai', { anthropicModel: model, ...(key ? { anthropicApiKey: key } : {}) });
+  };
+
+  const saveClaudeAccount = async (model: string) => {
+    await patch('ai', { claudeAccountModel: model });
   };
 
   const saveOllama = async (model: string, baseUrl: string) => {
@@ -1800,6 +1971,28 @@ export default function AiAgentsTab() {
               model={ai.anthropicModel}
               hasKey={ai.hasAnthropicKey}
               onSave={saveAnthropic}
+            />
+          </ProviderCard>
+
+          {/* Claude Account (subscription) */}
+          <ProviderCard
+            label={aiProviderLabel('claude-account')}
+            icon="🟣"
+            isDefault={ai.provider === 'claude-account'}
+            status={claudeAccountStatus}
+            modelLabel={ai.claudeAccountModel || 'claude-sonnet-latest'}
+            onSetDefault={() => void setDefaultProvider('claude-account')}
+            actions={(
+              <ProviderProbe
+                buildConfig={() => ({ provider: 'claude-account', claudeAccountModel: ai.claudeAccountModel })}
+                onStatusChange={(status) => setProbeStatus('claude-account', status)}
+              />
+            )}
+          >
+            <ClaudeAccountDetail
+              model={ai.claudeAccountModel || 'claude-sonnet-latest'}
+              onSave={saveClaudeAccount}
+              authenticated={ai.claudeAccountAuthenticated}
             />
           </ProviderCard>
 

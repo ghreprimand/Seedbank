@@ -145,6 +145,7 @@ const AI_FEATURE_IDS: AiFeatureId[] = [
 const FEATURE_ROUTABLE_PROVIDERS: ReadonlySet<AiProviderId> = new Set([
   'openai',
   'anthropic',
+  'claude-account',
   'ollama',
   'openai-compatible',
 ]);
