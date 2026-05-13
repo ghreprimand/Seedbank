@@ -647,6 +647,8 @@ export interface AiPublicConfig {
   hasOpenAIKey: boolean;
   hasAnthropicKey: boolean;
   hasOpenAICompatibleKey: boolean;
+  /** true only when SEEDBANK_ENABLE_CLAUDE_ACCOUNT opt-in is set server-side */
+  claudeAccountAvailable: boolean;
   claudeAccountAuthenticated: boolean;
   /** true only when SEEDBANK_ENABLE_CODEX_ACCOUNT opt-in is set server-side */
   codexAccountAvailable: boolean;

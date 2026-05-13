@@ -1758,12 +1758,18 @@ app.post('/api/ai/models', requireScope('write:ideas'), asyncRoute(async (req, r
 // ── Claude account auth endpoints ─────────────────────────────────────────────
 
 app.get('/api/ai/claude-account/status', requireScope('read:ideas'), asyncRoute(async (_req, res) => {
-  const { loadTokens } = await import('./ai/claude-account/auth.js');
+  const { loadTokens, claudeAccountRuntimeAvailability } = await import('./ai/claude-account/auth.js');
+  const gate = claudeAccountRuntimeAvailability();
+  if (!gate.available) {
+    res.json({ available: false, unavailableReason: gate.reason, authenticated: false });
+    return;
+  }
   const { setCachedClaudeAccountAuth } = await import('./ai/service.js');
   const tokens = await loadTokens();
   const authenticated = tokens !== null && tokens.expiresAt > Date.now();
   setCachedClaudeAccountAuth(authenticated);
   res.json({
+    available: true,
     authenticated,
     expiresAt: tokens?.expiresAt ?? null,
     obtainedAt: tokens?.obtainedAt ?? null,
@@ -1771,12 +1777,24 @@ app.get('/api/ai/claude-account/status', requireScope('read:ideas'), asyncRoute(
 }));
 
 app.post('/api/ai/claude-account/login', requireScope('write:ideas'), asyncRoute(async (_req, res) => {
+  const { claudeAccountRuntimeAvailability } = await import('./ai/claude-account/auth.js');
+  const gate = claudeAccountRuntimeAvailability();
+  if (!gate.available) {
+    res.status(503).json({ error: gate.reason });
+    return;
+  }
   const { startBootstrap } = await import('./ai/claude-account/oauth.js');
   const result = await startBootstrap();
   res.json(result);
 }));
 
 app.post('/api/ai/claude-account/login/complete', requireScope('write:ideas'), asyncRoute(async (req, res) => {
+  const { claudeAccountRuntimeAvailability } = await import('./ai/claude-account/auth.js');
+  const gate = claudeAccountRuntimeAvailability();
+  if (!gate.available) {
+    res.status(503).json({ error: gate.reason });
+    return;
+  }
   const body = req.body as { url?: string };
   if (!body.url || typeof body.url !== 'string') {
     res.status(400).json({ error: 'url is required (paste the callback redirect URL).' });
@@ -1790,7 +1808,12 @@ app.post('/api/ai/claude-account/login/complete', requireScope('write:ideas'), a
 }));
 
 app.post('/api/ai/claude-account/logout', requireScope('write:ideas'), asyncRoute(async (_req, res) => {
-  const { clearTokens } = await import('./ai/claude-account/auth.js');
+  const { clearTokens, claudeAccountRuntimeAvailability } = await import('./ai/claude-account/auth.js');
+  const gate = claudeAccountRuntimeAvailability();
+  if (!gate.available) {
+    res.status(503).json({ error: gate.reason });
+    return;
+  }
   const { setCachedClaudeAccountAuth } = await import('./ai/service.js');
   await clearTokens();
   setCachedClaudeAccountAuth(false);
@@ -2217,8 +2240,9 @@ fs.mkdirSync(path.join(dataDir, 'agent-runs'), { recursive: true });
 app.listen(PORT, () => {
   runScheduledBackupIfDue();
   setInterval(runScheduledBackupIfDue, 5 * 60 * 1000).unref();
-  // Warm the Claude account auth cache at startup (non-blocking).
-  void import('./ai/claude-account/auth.js').then(async ({ loadTokens }) => {
+  // Warm the Claude account auth cache at startup (non-blocking; skipped when gate is off).
+  void import('./ai/claude-account/auth.js').then(async ({ loadTokens, claudeAccountEnabledByEnv }) => {
+    if (!claudeAccountEnabledByEnv()) return;
     const tokens = await loadTokens();
     const { setCachedClaudeAccountAuth } = await import('./ai/service.js');
     setCachedClaudeAccountAuth(tokens !== null && tokens.expiresAt > Date.now());
