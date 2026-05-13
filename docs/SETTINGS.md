@@ -33,26 +33,53 @@ Replaces the settings popover that used to live inside the inline AI chat panel.
 
 ### Provider cards
 
-Four provider cards appear in a column: **OpenAI API**, **Anthropic API**, **Ollama / local models**, and **OpenRouter / custom endpoint**. Each shows:
+Six provider cards appear in four labeled groups:
 
-- A status pill: `connected` (key stored), `key needed`, `unreachable`, or `local`.
+- **Direct API providers** — **OpenAI API**, **Anthropic API**
+- **Local inference** — **Ollama**
+- **External & custom endpoints** — **Custom / OpenAI-compatible endpoint**
+- **Account & subscription transports** — **Claude account**, **Codex account**
+
+Each provider card shows:
+
+- A status pill: `connected`, `key needed`, `unreachable`, `local`, `not tested`, or `upcoming`.
 - The configured model name.
 - A **Set default** button (radio-like) to choose which provider the Thinking Partner uses.
 - An expandable details row for model, API key where needed, and the base URL for local/custom endpoints.
 
-The default provider is stored server-side and read by the Thinking Partner panel on every idea detail page. You no longer configure the provider from within the chat panel itself.
+The default provider is stored server-side and read by Thinking Partner and other AI surfaces. You no longer configure providers from within the chat panel itself.
 
 **Provider API keys vs. Seedbank tokens.** Provider API keys (OpenAI API, Anthropic API, OpenRouter, Groq, Mistral, Together, Fireworks, or another custom endpoint) are credentials for external AI services — stored server-side, encrypted at rest, never exposed to the browser. `hasOpenAIKey`, `hasAnthropicKey`, and `hasOpenAICompatibleKey` booleans in the public config indicate whether a key is stored. These are entirely separate from **Seedbank personal access tokens** (Settings → API & Server), which are bearer tokens for the Seedbank REST API itself.
 
-> **Data flow:** Ollama and local custom endpoint calls stay on the configured host. OpenAI API, Anthropic API, OpenRouter, and cloud custom endpoint calls send idea content to those providers' servers. All calls are proxied server-side; the browser communicates only with the local Seedbank server.
+> **Data flow:** Ollama and local endpoints send content only to the configured local host. Cloud providers (OpenAI API, Anthropic API, and remote OpenAI-compatible endpoints) send content to external servers. All AI calls are proxied server-side; the browser communicates only with the local Seedbank server.
 
-### OpenRouter / custom endpoint
+### Custom / OpenAI-compatible endpoint
 
-Use the **OpenRouter / custom endpoint** card for OpenRouter, Groq, Mistral, Together, Fireworks, LM Studio, vLLM, llama.cpp, LocalAI, or another service that accepts OpenAI Chat Completions requests. Configure the preset, base URL, API key when required, and model name. For advanced routing, fallback, or multi-model strategies, use a gateway like OpenRouter or LiteLLM as the base URL — Seedbank delegates those concerns rather than implementing native routing.
+Use the **Custom / OpenAI-compatible endpoint** card for OpenRouter, Groq, Mistral, Together, Fireworks, LM Studio, vLLM, llama.cpp, LocalAI, or another service that accepts OpenAI Chat Completions requests. Configure the preset, base URL, API key when required, and model name. For advanced routing, fallback, or multi-model strategies, use a gateway like OpenRouter or LiteLLM as the base URL.
+
+### Account providers
+
+- **Claude account** appears as **coming soon** (`upcoming`) in this RC and is not available as a normal connected provider path yet.
+- **Codex account** is experimental and runtime-gated behind `SEEDBANK_ENABLE_CODEX_ACCOUNT`. It is an opt-in account transport, not OpenAI API key billing, and not the same feature as linked Codex CLI agent launching.
+
+### Feature Defaults
+
+**Feature Defaults** let you route individual features (Thinking Partner, field suggestions, health checks, Discover insights) to a specific provider/model instead of the global default.
+
+- Routes can inherit the global default or pin a provider/model.
+- Unavailable account routes are intentionally visible for roadmap clarity, but save is blocked when a route targets unavailable account transports.
 
 ### Token budget & usage
 
-A daily token limit input controls how many tokens Seedbank's AI features can consume in a 24-hour window. The limit is enforced server-side — requests that exceed the budget return an error. Setting `0` disables enforcement. The mono-styled readout below shows tokens used in the last 24 hours and last 7 days, drawn from the `ai_usage` table.
+The **Usage & Guardrails** section includes a daily token limit plus advanced safety controls.
+
+- **Daily token budget** caps total AI token use over 24 hours (`0` disables enforcement).
+- **Cloud alerts** warn when selected routes send content to remote providers.
+- **Local-only mode** blocks remote-provider execution.
+- **Per-feature, per-provider, and per-model caps** enforce tighter budget limits.
+- **Model allowlist** restricts requests to approved model IDs only.
+
+Usage readouts show tokens consumed in the last 24 hours and last 7 days (from `ai_usage`).
 
 ### Agents
 

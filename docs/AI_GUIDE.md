@@ -10,15 +10,24 @@ Provider configuration lives in **Settings → AI & Agents**. Navigate there via
 
 ### Built-in providers
 
-Four provider cards are available today:
+Settings now shows six provider cards arranged in four groups:
+
+- **Direct API providers**: OpenAI API, Anthropic API
+- **Local inference**: Ollama
+- **External & custom endpoints**: Custom / OpenAI-compatible endpoint
+- **Account & subscription transports**: Claude account, Codex account
 
 **OpenAI API** — enter your API key and model name (e.g. `gpt-4.1-mini`). Calls are made server-side to `api.openai.com`. Idea content is sent to OpenAI's servers.
 
 **Anthropic API** — enter your API key and model name (e.g. `claude-sonnet-4-20250514`). Calls are made server-side to `api.anthropic.com`. Works well for reflective critique and longer contextual responses. Idea content is sent to Anthropic's servers.
 
-**Ollama / local models** — configure the base URL (usually `http://localhost:11434`) and model name (e.g. `llama3.2`). No API key required. Calls stay on the configured Ollama host. Useful for local-only experimentation or privacy-sensitive archives.
+**Ollama** — configure the base URL (usually `http://localhost:11434`) and model name (e.g. `llama3.2`). No API key required. Calls stay on the configured Ollama host. Useful for local-only experimentation or privacy-sensitive archives.
 
-**OpenRouter / custom endpoint** — choose a preset or enter a compatible endpoint URL, API key when required, and model name. Use this for OpenRouter, Groq, Mistral, Together, Fireworks, LM Studio, vLLM, llama.cpp, LocalAI, or another service that accepts OpenAI Chat Completions requests.
+**Custom / OpenAI-compatible endpoint** — choose a preset or enter a compatible endpoint URL, API key when required, and model name. Use this for OpenRouter, Groq, Mistral, Together, Fireworks, LM Studio, vLLM, llama.cpp, LocalAI, or another service that accepts OpenAI Chat Completions requests.
+
+**Claude account** — shown as coming soon/unavailable in this RC.
+
+**Codex account** — experimental account transport, available only with explicit server opt-in (`SEEDBANK_ENABLE_CODEX_ACCOUNT`). This is not OpenAI API billing and not the same as linked Codex CLI agent launching.
 
 ### Choosing a default provider
 
@@ -30,9 +39,9 @@ A **Set default** radio button on each provider card determines which provider t
 
 **Seedbank personal access tokens** are a separate concept. They are bearer tokens you generate in **Settings → API & Server** to call the Seedbank REST API from scripts, external tools, or remote hosts. They do not interact with provider API keys.
 
-### OpenRouter / custom endpoint
+### Custom / OpenAI-compatible endpoint
 
-The **OpenRouter / custom endpoint** card accepts any endpoint that uses OpenAI Chat Completions requests. Configure:
+The **Custom / OpenAI-compatible endpoint** card accepts any endpoint that uses OpenAI Chat Completions requests. Configure:
 
 | Field | Description |
 |---|---|
@@ -41,6 +50,15 @@ The **OpenRouter / custom endpoint** card accepts any endpoint that uses OpenAI 
 | Model | Model identifier string as accepted by the endpoint |
 
 This lets you use providers such as OpenRouter, LM Studio, vLLM, LiteLLM gateways, Groq, Mistral, and locally-hosted inference servers that expose a `/v1/chat/completions` endpoint.
+
+### Feature Defaults
+
+Feature Defaults let you route each AI feature independently (Thinking Partner, field suggestions, health checks, Discover insights):
+
+- Inherit the global default provider/model, or
+- Pin a specific provider/model per feature.
+
+Unavailable account transports can appear as options for visibility, but save is blocked when a route targets unavailable account providers.
 
 ### Advanced routing and fallback
 
@@ -62,6 +80,15 @@ A **daily token limit** input in Settings → AI & Agents controls how many toke
 - Tokens used in the last 7 days.
 
 Drawn from the `ai_usage` tracking table. The limit is enforced server-side — requests that would exceed the budget return an error. Setting the limit to `0` disables enforcement.
+
+### Usage & Guardrails advanced controls
+
+Advanced controls support stricter policy and spend constraints:
+
+- **Local-only mode** to block remote-provider execution.
+- **Cloud alerts** when selected routes send content off-machine.
+- **Per-feature caps** and additional provider/model caps.
+- **Model allowlist** to permit only approved model IDs.
 
 ---
 
