@@ -8,6 +8,9 @@ const CLIENT_VERSION = '1.0.0';
 const REQUEST_TIMEOUT_MS = 20_000;
 const TURN_TIMEOUT_MS = 120_000;
 const FALLBACK_CODEX_MODEL = 'gpt-5.3-codex';
+const START_FAILURE_THRESHOLD = 3;
+const START_BACKOFF_BASE_MS = 5_000;
+const START_BACKOFF_MAX_MS = 60_000;
 
 export interface CodexAccountStatus {
   authenticated: boolean;
@@ -156,6 +159,9 @@ class CodexAppServerSession extends EventEmitter {
   private catalogCache: CodexCatalogSnapshot | null = null;
   private activeTurn: ActiveTurn | null = null;
   private starting: Promise<void> | null = null;
+  private startFailureCount = 0;
+  private circuitOpenUntil = 0;
+  private lastStartFailure = '';
 
   async status(): Promise<CodexAccountStatus> {
     const availability = codexAccountRuntimeAvailability();
@@ -167,7 +173,16 @@ class CodexAppServerSession extends EventEmitter {
         requiresOpenaiAuth: false,
       };
     }
-    await this.ensureStarted();
+    try {
+      await this.ensureStarted();
+    } catch (error) {
+      return {
+        authenticated: false,
+        available: false,
+        unavailableReason: error instanceof Error ? error.message : String(error),
+        requiresOpenaiAuth: false,
+      };
+    }
     const response = await this.request<AccountResponse>('account/read', { refreshToken: true }, REQUEST_TIMEOUT_MS);
     const account = response.account;
     return {
@@ -381,13 +396,42 @@ class CodexAppServerSession extends EventEmitter {
 
   private async ensureStarted(): Promise<void> {
     if (this.rpc && this.proc && !this.proc.killed) return;
+    if (this.circuitOpenUntil > Date.now()) {
+      throw new Error(this.circuitOpenMessage());
+    }
     if (this.starting) return this.starting;
-    this.starting = this.start();
+    this.starting = this.start().catch((error) => {
+      this.recordStartFailure(error);
+      throw error;
+    });
     try {
       await this.starting;
+      this.clearStartFailures();
     } finally {
       this.starting = null;
     }
+  }
+
+  private clearStartFailures(): void {
+    this.startFailureCount = 0;
+    this.circuitOpenUntil = 0;
+    this.lastStartFailure = '';
+  }
+
+  private recordStartFailure(error: unknown): void {
+    this.startFailureCount += 1;
+    this.lastStartFailure = compactDetail(error instanceof Error ? error.message : String(error), 220);
+    if (this.startFailureCount < START_FAILURE_THRESHOLD) return;
+    const exponent = this.startFailureCount - START_FAILURE_THRESHOLD;
+    const delay = Math.min(START_BACKOFF_MAX_MS, START_BACKOFF_BASE_MS * (2 ** exponent));
+    this.circuitOpenUntil = Date.now() + delay;
+  }
+
+  private circuitOpenMessage(): string {
+    const remainingMs = boundedMs(this.circuitOpenUntil - Date.now());
+    const seconds = Math.max(1, Math.ceil(remainingMs / 1000));
+    const base = `Codex app-server startup is temporarily paused after repeated failures. Retry in ${seconds}s.`;
+    return this.lastStartFailure ? `${base} Last error: ${this.lastStartFailure}` : base;
   }
 
   private async start(): Promise<void> {
@@ -623,6 +667,11 @@ function compactDetail(value: string, max = 180): string {
   const text = value.replace(/\s+/g, ' ').trim();
   if (!text) return '';
   return text.length > max ? `${text.slice(0, max)}…` : text;
+}
+
+function boundedMs(ms: number): number {
+  if (!Number.isFinite(ms) || ms <= 0) return 0;
+  return Math.max(0, Math.floor(ms));
 }
 
 function killCodexProcess(proc: ChildProcess | null): void {

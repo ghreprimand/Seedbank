@@ -422,6 +422,46 @@ test('Codex JSON-RPC context-window errors map to actionable message', async () 
   }
 });
 
+test('Codex status applies startup circuit-breaker after repeated app-server failures', async () => {
+  const prev = process.env.SEEDBANK_ENABLE_CODEX_ACCOUNT;
+  process.env.SEEDBANK_ENABLE_CODEX_ACCOUNT = '1';
+
+  const session = codexAccountSession as unknown as Record<string, unknown>;
+  const originalStart = session.start as () => Promise<void>;
+  const originalProc = session.proc;
+  const originalRpc = session.rpc;
+  const originalStarting = session.starting;
+  const originalFailureCount = session.startFailureCount;
+  const originalCircuitUntil = session.circuitOpenUntil;
+  const originalLastFailure = session.lastStartFailure;
+
+  let startCalls = 0;
+  session.start = async () => {
+    startCalls += 1;
+    throw new Error('spawn boom');
+  };
+
+  try {
+    await codexAccountSession.status();
+    await codexAccountSession.status();
+    await codexAccountSession.status();
+    const blocked = await codexAccountSession.status();
+    assert.equal(blocked.available, false);
+    assert.match(blocked.unavailableReason ?? '', /temporarily paused|retry in/i);
+    assert.equal(startCalls, 3);
+  } finally {
+    session.start = originalStart;
+    session.proc = originalProc;
+    session.rpc = originalRpc;
+    session.starting = originalStarting;
+    session.startFailureCount = originalFailureCount;
+    session.circuitOpenUntil = originalCircuitUntil;
+    session.lastStartFailure = originalLastFailure;
+    if (prev === undefined) delete process.env.SEEDBANK_ENABLE_CODEX_ACCOUNT;
+    else process.env.SEEDBANK_ENABLE_CODEX_ACCOUNT = prev;
+  }
+});
+
 test('ensureLiveTokens refreshes expired Claude token with single-flight lock', async () => {
   await withAuthSnapshot(async () => {
     await saveTokens({
