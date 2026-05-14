@@ -251,6 +251,61 @@ async function parseJsonLines(
 export class OpenAIProvider implements AiProvider {
   readonly id = 'openai';
 
+  private supportsReasoningEffort(model: string): boolean {
+    const normalized = model.trim().toLowerCase();
+    return normalized.startsWith('gpt-5')
+      || /^o[1-9](?:[-_.]|$)/.test(normalized);
+  }
+
+  private supportsTextVerbosity(model: string): boolean {
+    const normalized = model.trim().toLowerCase();
+    return normalized.startsWith('gpt-5');
+  }
+
+  private selectedEffort(config: AiStoredConfig): 'minimal' | 'low' | 'medium' | 'high' | undefined {
+    const candidate = (config as AiStoredConfig & {
+      openaiReasoningEffort?: unknown;
+      reasoningEffort?: unknown;
+      effort?: unknown;
+    }).openaiReasoningEffort
+      ?? (config as AiStoredConfig & { reasoningEffort?: unknown }).reasoningEffort
+      ?? (config as AiStoredConfig & { effort?: unknown }).effort;
+    if (typeof candidate !== 'string') return undefined;
+    const normalized = candidate.trim().toLowerCase();
+    if (normalized === 'minimal' || normalized === 'low' || normalized === 'medium' || normalized === 'high') {
+      return normalized;
+    }
+    return undefined;
+  }
+
+  private selectedVerbosity(config: AiStoredConfig): 'low' | 'medium' | 'high' | undefined {
+    const candidate = (config as AiStoredConfig & {
+      openaiTextVerbosity?: unknown;
+      textVerbosity?: unknown;
+      verbosity?: unknown;
+    }).openaiTextVerbosity
+      ?? (config as AiStoredConfig & { textVerbosity?: unknown }).textVerbosity
+      ?? (config as AiStoredConfig & { verbosity?: unknown }).verbosity;
+    if (typeof candidate !== 'string') return undefined;
+    const normalized = candidate.trim().toLowerCase();
+    if (normalized === 'low' || normalized === 'medium' || normalized === 'high') return normalized;
+    return undefined;
+  }
+
+  private responsesBody(messages: AiProviderMessage[], config: AiStoredConfig, stream = false): Record<string, unknown> {
+    const model = config.openaiModel;
+    const effort = this.supportsReasoningEffort(model) ? this.selectedEffort(config) : undefined;
+    const verbosity = this.supportsTextVerbosity(model) ? this.selectedVerbosity(config) : undefined;
+    return {
+      model,
+      instructions: systemPrompt(messages),
+      input: transcript(messages),
+      ...(effort ? { reasoning: { effort } } : {}),
+      ...(verbosity ? { text: { verbosity } } : {}),
+      ...(stream ? { stream: true } : {}),
+    };
+  }
+
   private apiKey(config: AiStoredConfig): string {
     const apiKey = decryptSecret(config.openaiApiKeyEncrypted);
     if (!apiKey) throw new AiProviderError(this.id, 'not_configured', 'OpenAI API key is not configured.');
@@ -265,12 +320,7 @@ export class OpenAIProvider implements AiProvider {
           Authorization: `Bearer ${this.apiKey(config)}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          model: config.openaiModel,
-          instructions: systemPrompt(messages),
-          input: transcript(messages),
-          text: { verbosity: 'low' },
-        }),
+        body: JSON.stringify(this.responsesBody(messages, config)),
       });
       await assertOk(this.id, response, 'OpenAI request');
       const payload = await response.json() as { usage?: unknown };
@@ -288,13 +338,7 @@ export class OpenAIProvider implements AiProvider {
           Authorization: `Bearer ${this.apiKey(config)}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          model: config.openaiModel,
-          instructions: systemPrompt(messages),
-          input: transcript(messages),
-          text: { verbosity: 'low' },
-          stream: true,
-        }),
+        body: JSON.stringify(this.responsesBody(messages, config, true)),
       });
       await assertOk(this.id, response, 'OpenAI stream');
       let text = '';
