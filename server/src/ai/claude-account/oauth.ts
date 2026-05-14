@@ -37,11 +37,15 @@ const CALLBACK_HOST = '127.0.0.1';
 const CALLBACK_PORT = 53693; // Seedbank uses 53693 to avoid colliding with Archon's 53692
 const CALLBACK_PATH = '/callback';
 const REDIRECT_URI = `http://localhost:${CALLBACK_PORT}${CALLBACK_PATH}`;
-const SCOPES = [
+
+// Match Archon's Claude Native account-login scope set so model catalog,
+// profile/auth state, and account-token inference all share one consent grant.
+export const CLAUDE_ACCOUNT_OAUTH_SCOPES = [
   'org:create_api_key',
   'user:profile',
   'user:inference',
-].join(' ');
+] as const;
+const SCOPES = CLAUDE_ACCOUNT_OAUTH_SCOPES.join(' ');
 
 const REFRESH_LEAD_MS = 30_000;
 const CLAUDE_ACCOUNT_BETA_HEADER = 'claude-code-20250219,oauth-2025-04-20';
