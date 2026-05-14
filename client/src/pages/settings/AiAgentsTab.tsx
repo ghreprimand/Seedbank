@@ -44,7 +44,6 @@ import type {
 } from '@/lib/types';
 import {
   useAiSettings,
-  useAgentsSettings,
   useSettingsStore,
   useSettingsOffline,
 } from '@/stores/settings';
@@ -54,9 +53,7 @@ import {
   preflightAiRequest,
   getAiMethodCapabilities,
   listAiModels,
-  linkAgent,
   testAiProvider,
-  unlinkAgent,
   getClaudeAccountStatus,
   startClaudeAccountLogin,
   completeClaudeAccountLogin,
@@ -107,6 +104,25 @@ type OpenAICompatibleMode = 'local' | 'cloud';
 const LOCAL_COMPATIBLE_DEFAULT_PRESET: AiOpenAICompatiblePresetId = 'lm-studio';
 const CLOUD_COMPATIBLE_DEFAULT_PRESET: AiOpenAICompatiblePresetId = 'openrouter';
 const CLOUD_CUSTOM_BASE_URL = 'https://api.example.com/v1';
+
+// ── Local Models unified dropdown ─────────────────────────────────────────────
+
+/** Maps the Local Models server-type dropdown to an Ollama or OpenAI-compatible preset. */
+type LocalServerType = 'ollama' | 'lm-studio' | 'vllm' | 'llama-cpp' | 'localai' | 'custom-local';
+
+const LOCAL_SERVER_OPTIONS: Array<{
+  id: LocalServerType;
+  label: string;
+  presetId?: AiOpenAICompatiblePresetId;
+  defaultUrl: string;
+}> = [
+  { id: 'ollama',        label: 'Ollama',        defaultUrl: 'http://localhost:11434' },
+  { id: 'lm-studio',    label: 'LM Studio',     presetId: 'lm-studio',  defaultUrl: 'http://localhost:1234/v1' },
+  { id: 'vllm',         label: 'vLLM',          presetId: 'vllm',       defaultUrl: 'http://localhost:8000/v1' },
+  { id: 'llama-cpp',    label: 'llama.cpp',     presetId: 'llama-cpp',  defaultUrl: 'http://localhost:8080/v1' },
+  { id: 'localai',      label: 'LocalAI',       presetId: 'localai',    defaultUrl: 'http://localhost:8080/v1' },
+  { id: 'custom-local', label: 'Custom local',  presetId: 'custom',     defaultUrl: 'http://localhost:1234/v1' },
+];
 
 function describeOllamaResidency(residency: AiOllamaModelResidency | undefined): string {
   if (!residency) return 'unknown';
@@ -1032,6 +1048,21 @@ function isLikelyLocalUrl(value: string | undefined): boolean {
   }
 }
 
+/**
+ * Infers which local server type was last configured so the dropdown
+ * initialises to a sensible value on first render.
+ */
+function initialLocalServerType(ai: AiPublicConfig): LocalServerType {
+  const preset = ai.openaiCompatiblePreset;
+  const url    = ai.openaiCompatibleBaseUrl;
+  if (preset === 'lm-studio'  && isLikelyLocalUrl(url)) return 'lm-studio';
+  if (preset === 'vllm'       && isLikelyLocalUrl(url)) return 'vllm';
+  if (preset === 'llama-cpp'  && isLikelyLocalUrl(url)) return 'llama-cpp';
+  if (preset === 'localai'    && isLikelyLocalUrl(url)) return 'localai';
+  if (preset === 'custom'     && isLikelyLocalUrl(url)) return 'custom-local';
+  return 'ollama';
+}
+
 function dataResidency(ai: AiPublicConfig): DataResidency {
   if (ai.provider === 'ollama') return 'local';
   if (ai.provider === 'openai-compatible') {
@@ -1809,6 +1840,17 @@ function providerModel(ai: AiPublicConfig, provider: AiProviderId): string {
   return ai.ollamaModel;
 }
 
+/**
+ * True when the selected provider exposes effort/verbosity controls.
+ * Stub — returns true only for providers whose backend effort params are
+ * known (OpenAI Responses API reasoning.effort, Codex app-server turn effort).
+ * TODO(Phase 7): replace with a capability-map lookup from the model catalog.
+ */
+function providerSupportsEffort(provider: AiProviderId | 'default'): boolean {
+  if (provider === 'default') return false;
+  return provider === 'openai' || provider === 'codex-account';
+}
+
 function providerLabel(provider: AiProviderId): string {
   return aiProviderLabel(provider);
 }
@@ -1826,6 +1868,9 @@ function FeatureRoutingSection({ ai, providerStatuses, providerAvailability, onS
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const openAICompatiblePreset = presetFor(ai.openaiCompatiblePreset);
+  // Effort is local state only — not yet persisted. The backend contract for
+  // per-feature effort in featureRoutes is pending (Phase 7). Wire here when ready.
+  const [featureEfforts, setFeatureEfforts] = useState<Partial<Record<AiFeatureId, string>>>({});
 
   const updateRoute = (feature: AiFeatureId, route: AiFeatureRoute) => {
     setRoutes((current) => ({ ...current, [feature]: route }));
@@ -1882,7 +1927,7 @@ function FeatureRoutingSection({ ai, providerStatuses, providerAvailability, onS
             />
           </div>
           <p className="text-xs text-ink-400 mt-1">
-            Route each AI feature to the global provider or a specific chat/model-capable provider. CLI file agents are intentionally excluded.
+            Route each AI feature to the global provider or a specific chat/model-capable provider. Account login and API key methods are both eligible; file-producing agent methods are excluded from chat routing.
           </p>
         </div>
         <button
@@ -1946,7 +1991,7 @@ function FeatureRoutingSection({ ai, providerStatuses, providerAvailability, onS
           return (
             <div
               key={feature.id}
-              className={`grid gap-3 p-3 md:grid-cols-[1.2fr_1fr_1fr] md:items-center ${
+              className={`grid gap-3 p-3 md:grid-cols-[1.2fr_1fr_1fr_auto] md:items-start ${
                 feature.secondary ? 'opacity-60' : ''
               }`}
             >
@@ -1998,6 +2043,29 @@ function FeatureRoutingSection({ ai, providerStatuses, providerAvailability, onS
                   {modelHint}
                 </span>
               </label>
+              {/* Effort column: visible only when the selected provider supports reasoning effort.
+                  Local state only — not yet persisted (Phase 7 backend contract pending). */}
+              {providerSupportsEffort(route.provider) ? (
+                <label className="block text-xs text-ink-500 min-w-[100px]">
+                  Effort
+                  <select
+                    value={featureEfforts[feature.id] ?? ''}
+                    onChange={(e) => setFeatureEfforts((prev) => ({ ...prev, [feature.id]: e.target.value }))}
+                    className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800"
+                  >
+                    <option value="">Default</option>
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="max">Max</option>
+                  </select>
+                  <span className="mt-1 block text-[11px] text-ink-400">
+                    Reasoning effort — not yet persisted
+                  </span>
+                </label>
+              ) : (
+                <div /> /* keeps the 4-col grid balanced */
+              )}
             </div>
           );
         })}
@@ -2467,7 +2535,6 @@ function CodexAccountDetail({
 
 export default function AiAgentsTab() {
   const ai = useAiSettings();
-  const agents = useAgentsSettings();
   const offline = useSettingsOffline();
   const patch = useSettingsStore((s) => s.patch);
   const [probeStatuses, setProbeStatuses] = useState<Partial<Record<AiProviderId, ProviderCardStatus>>>({});
@@ -2619,25 +2686,10 @@ export default function AiAgentsTab() {
     await patch('ai', { featureRoutes });
   };
 
-  // ── Agent link/unlink ────────────────────────────────────────────────────────
-  const refresh = useSettingsStore((s) => s.refresh);
-
-  const handleLink = async (provider: AgentProvider, cliPath: string) => {
-    const result = await linkAgent({ provider, cliPath });
-    if (!result.linked) throw new Error(`Could not validate ${provider} CLI at that path.`);
-    await refresh();
-  };
-
-  const handleDetect = async (provider: AgentProvider) => {
-    const result = await linkAgent({ provider, detect: true });
-    if (!result.linked) throw new Error(`${provider} CLI not found on PATH.`);
-    await refresh();
-  };
-
-  const handleUnlink = async (provider: AgentProvider) => {
-    await unlinkAgent(provider);
-    await refresh();
-  };
+  // ── Local Models section ─────────────────────────────────────────────────────
+  const [localServerType, setLocalServerType] = useState<LocalServerType>(() => initialLocalServerType(ai));
+  const localServerOpt = LOCAL_SERVER_OPTIONS.find((o) => o.id === localServerType)!;
+  const localServerPresetId: AiOpenAICompatiblePresetId = localServerOpt.presetId ?? 'custom';
 
   return (
     <div className="space-y-8">
@@ -2657,16 +2709,17 @@ export default function AiAgentsTab() {
             <HelpButton
               helpId="ai-providers"
               title="Choosing an AI Provider"
-              summary="Settings are grouped by service family first (Claude, Codex/OpenAI, Local inference, Cloud routers), then by connection method (API key, account transport, or CLI agent)."
-              details="Feature Defaults routes only chat/model-capable methods. CLI methods launch review-first file work and are intentionally separate from chat routing."
+              summary="Settings are grouped by service family (Claude, Codex/OpenAI, Local Models, External/Cloud). Choose API key for direct provider access or Account login to use your subscription."
+              details="Feature Defaults routes only chat/model-capable methods. Connection type — API key or Account login — is set per service family in the cards above."
               manualSection="provider-chooser"
               alwaysShow
             />
           </div>
         </div>
         <p className="text-xs text-ink-400">
-          Configure each service area by method. Global default + Feature Defaults apply to chat/model-capable
-          methods only. CLI methods (Claude Code and Codex CLI) are file-producing agent tools, not chat routes.
+          Configure each service family. Choose <strong>API key</strong> for direct provider access or{' '}
+          <strong>Account login</strong> to use your subscription. Global default and Feature Defaults apply to
+          chat/model-capable methods only.
         </p>
 
         <div className="space-y-4">
@@ -2677,12 +2730,11 @@ export default function AiAgentsTab() {
               value={claudeMethod}
               onChange={(next) => setClaudeMethod(next)}
               options={(claudeMethodOptions.length > 0
-                ? claudeMethodOptions
+                ? claudeMethodOptions.filter((m) => m.channel !== 'file-agent')
                 : [
-                    { id: 'anthropic-api-key', label: 'Anthropic API key', channel: 'chat-model', availability: 'available' as const },
+                    { id: 'anthropic-api-key', label: 'API key', channel: 'chat-model', availability: 'available' as const },
                     // Fallback before capabilities load: mirror the gate state so the pill is correct.
-                    { id: 'claude-account-native', label: 'Claude account', channel: 'chat-model', availability: (ai.claudeAccountAvailable ? 'auth-required' : 'unavailable') as AiMethodCapability['availability'] },
-                    { id: 'claude-code-cli-agent', label: 'Claude Code CLI', channel: 'file-agent', availability: 'unavailable' as const },
+                    { id: 'claude-account-native', label: 'Account login', channel: 'chat-model', availability: (ai.claudeAccountAvailable ? 'auth-required' : 'unavailable') as AiMethodCapability['availability'] },
                   ] as AiMethodCapability[]
               ).map(optionFromMethodCapability)}
             />
@@ -2729,24 +2781,7 @@ export default function AiAgentsTab() {
                 />
               </ProviderCard>
             )}
-            {claudeMethod === 'claude-code-cli-agent' && (
-              <div className="space-y-2">
-                <AgentCard
-                  provider="claude"
-                  label="Claude Code"
-                  description="File-producing agent method. Not used for Feature Defaults chat routing."
-                  docsUrl="https://docs.anthropic.com/en/docs/claude-code"
-                  isLinked={agents.claudeLinked}
-                  version={agents.claudeVersion}
-                  onLink={(path) => handleLink('claude', path)}
-                  onDetect={() => handleDetect('claude')}
-                  onUnlink={() => handleUnlink('claude')}
-                />
-                <p className="text-[11px] text-ink-400">
-                  This method launches review-first file work from idea pages. It does not route Thinking Partner/chat traffic.
-                </p>
-              </div>
-            )}
+
           </div>
 
           <div className="rounded-card border border-ink-100 bg-paper p-3 space-y-3">
@@ -2756,11 +2791,10 @@ export default function AiAgentsTab() {
               value={openaiMethod}
               onChange={(next) => setOpenaiMethod(next)}
               options={(openaiMethodOptions.length > 0
-                ? openaiMethodOptions
+                ? openaiMethodOptions.filter((m) => m.channel !== 'file-agent')
                 : [
-                    { id: 'openai-api-key', label: 'OpenAI API key', channel: 'chat-model', availability: 'available' as const },
-                    { id: 'codex-account-app-server', label: 'Codex account', channel: 'chat-model', availability: 'auth-required' as const },
-                    { id: 'codex-cli-agent', label: 'Codex CLI', channel: 'file-agent', availability: 'unavailable' as const },
+                    { id: 'openai-api-key', label: 'API key', channel: 'chat-model', availability: 'available' as const },
+                    { id: 'codex-account-app-server', label: 'Account login', channel: 'chat-model', availability: (ai.codexAccountAvailable ? (ai.codexAccountAuthenticated ? 'available' : 'auth-required') : 'unavailable') as AiMethodCapability['availability'] },
                   ] as AiMethodCapability[]
               ).map(optionFromMethodCapability)}
             />
@@ -2807,95 +2841,109 @@ export default function AiAgentsTab() {
                 />
               </ProviderCard>
             )}
-            {openaiMethod === 'codex-cli-agent' && (
-              <div className="space-y-2">
-                <AgentCard
-                  provider="codex"
-                  label="Codex CLI"
-                  description="File-producing agent method. Not used for Feature Defaults chat routing."
-                  docsUrl="https://github.com/openai/codex"
-                  isLinked={agents.codexLinked}
-                  version={agents.codexVersion}
-                  onLink={(path) => handleLink('codex', path)}
-                  onDetect={() => handleDetect('codex')}
-                  onUnlink={() => handleUnlink('codex')}
+
+          </div>
+
+          {/* ── Local Models ─────────────────────────────────────────────────── */}
+          <div className="rounded-card border border-ink-100 bg-paper p-3 space-y-3">
+            <p className="text-[10px] font-mono uppercase tracking-wider text-ink-400">Local Models</p>
+
+            {/* Server-type dropdown — single selector for all local servers */}
+            <label className="block text-xs text-ink-500">
+              Server type
+              <select
+                value={localServerType}
+                onChange={(e) => setLocalServerType(e.target.value as LocalServerType)}
+                className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800"
+              >
+                {LOCAL_SERVER_OPTIONS.map((opt) => (
+                  <option key={opt.id} value={opt.id}>{opt.label}</option>
+                ))}
+              </select>
+            </label>
+
+            {localServerType === 'ollama' && (
+              <ProviderCard
+                label="Ollama"
+                icon="🦙"
+                isDefault={ai.provider === 'ollama'}
+                status={ollamaStatus}
+                modelLabel={`${ai.ollamaModel} · ${ai.ollamaBaseUrl}`}
+                onSetDefault={() => void setDefaultProvider('ollama')}
+                actions={(
+                  <ProviderProbe
+                    buildConfig={() => ({ provider: 'ollama', ollamaModel: ai.ollamaModel, ollamaBaseUrl: ai.ollamaBaseUrl })}
+                    onStatusChange={(status) => setProbeStatus('ollama', status)}
+                    testLabel="Run saved smoke test"
+                    listLabel="List saved models"
+                  />
+                )}
+              >
+                <OllamaDetail
+                  model={ai.ollamaModel}
+                  baseUrl={ai.ollamaBaseUrl}
+                  onSave={saveOllama}
                 />
-                <p className="text-[11px] text-ink-400">
-                  This method launches review-first file work from idea pages. It does not route Thinking Partner/chat traffic.
-                </p>
-              </div>
+              </ProviderCard>
+            )}
+
+            {localServerType !== 'ollama' && (
+              <ProviderCard
+                label={localServerOpt.label}
+                icon="🧩"
+                isDefault={
+                  ai.provider === 'openai-compatible'
+                  && ai.openaiCompatiblePreset === localServerPresetId
+                  && isLikelyLocalUrl(ai.openaiCompatibleBaseUrl)
+                }
+                status={localCompatibleStatus}
+                modelLabel={
+                  ai.openaiCompatiblePreset === localServerPresetId && isLikelyLocalUrl(ai.openaiCompatibleBaseUrl)
+                    ? `${localServerOpt.label} · ${ai.openaiCompatibleModel || 'choose a model'}`
+                    : `${localServerOpt.label} · not configured`
+                }
+                onSetDefault={() => void setDefaultProvider('openai-compatible')}
+                actions={(
+                  <ProviderProbe
+                    buildConfig={() => ({
+                      provider: 'openai-compatible',
+                      openaiCompatiblePreset: ai.openaiCompatiblePreset,
+                      openaiCompatibleModel: ai.openaiCompatibleModel,
+                      openaiCompatibleBaseUrl: ai.openaiCompatibleBaseUrl,
+                    })}
+                    onStatusChange={(status) => setProbeStatus('openai-compatible', status)}
+                    testLabel="Test saved"
+                    listLabel="List saved models"
+                  />
+                )}
+              >
+                <OpenAICompatibleDetail
+                  preset={ai.openaiCompatiblePreset}
+                  model={ai.openaiCompatibleModel}
+                  baseUrl={ai.openaiCompatibleBaseUrl}
+                  hasKey={ai.hasOpenAICompatibleKey}
+                  mode="local"
+                  allowedPresets={[localServerPresetId]}
+                  guidance={
+                    localServerType === 'custom-local'
+                      ? 'Custom local endpoints should use a localhost, 127.0.0.1, or .local URL.'
+                      : `${localServerOpt.label} runs a local OpenAI-compatible server. Ensure it is running before testing.`
+                  }
+                  sharedConfigNotice="Seedbank currently stores one OpenAI-compatible profile. Saving this local server replaces any existing endpoint in that shared slot."
+                  onSave={saveOpenAICompatible}
+                />
+              </ProviderCard>
             )}
           </div>
 
-          <div className="rounded-card border border-ink-100 bg-paper p-3 space-y-2">
-            <p className="text-[10px] font-mono uppercase tracking-wider text-ink-400">Local Inference</p>
+          {/* ── External / Cloud ─────────────────────────────────────────────── */}
+          <div className="rounded-card border border-ink-100 bg-paper p-3 space-y-3">
+            <p className="text-[10px] font-mono uppercase tracking-wider text-ink-400">External / Cloud</p>
             <p className="text-[11px] text-ink-400">
-              Configure local model servers (Ollama, LM Studio, vLLM, llama.cpp, LocalAI, or a custom localhost endpoint).
+              Connect to hosted services: OpenRouter, Groq, Mistral, Together, Fireworks, or a custom cloud endpoint.
             </p>
             <ProviderCard
-              label={aiProviderLabel('ollama')}
-              icon="🦙"
-              isDefault={ai.provider === 'ollama'}
-              status={ollamaStatus}
-              modelLabel={`${ai.ollamaModel} · ${ai.ollamaBaseUrl}`}
-              onSetDefault={() => void setDefaultProvider('ollama')}
-              actions={(
-                <ProviderProbe
-                  buildConfig={() => ({ provider: 'ollama', ollamaModel: ai.ollamaModel, ollamaBaseUrl: ai.ollamaBaseUrl })}
-                  onStatusChange={(status) => setProbeStatus('ollama', status)}
-                  testLabel="Run saved smoke test"
-                  listLabel="List saved models"
-                />
-              )}
-            >
-              <OllamaDetail
-                model={ai.ollamaModel}
-                baseUrl={ai.ollamaBaseUrl}
-                onSave={saveOllama}
-              />
-            </ProviderCard>
-            <ProviderCard
-              label="Local OpenAI-compatible servers"
-              icon="🧩"
-              isDefault={ai.provider === 'openai-compatible' && localCompatibleActive}
-              status={localCompatibleStatus}
-              modelLabel={localCompatibleLabel}
-              onSetDefault={() => void setDefaultProvider('openai-compatible')}
-              actions={(
-                <ProviderProbe
-                  buildConfig={() => ({
-                    provider: 'openai-compatible',
-                    openaiCompatiblePreset: ai.openaiCompatiblePreset,
-                    openaiCompatibleModel: ai.openaiCompatibleModel,
-                    openaiCompatibleBaseUrl: ai.openaiCompatibleBaseUrl,
-                  })}
-                  onStatusChange={(status) => setProbeStatus('openai-compatible', status)}
-                  testLabel="Test saved"
-                  listLabel="List saved models"
-                />
-              )}
-            >
-              <OpenAICompatibleDetail
-                preset={ai.openaiCompatiblePreset}
-                model={ai.openaiCompatibleModel}
-                baseUrl={ai.openaiCompatibleBaseUrl}
-                hasKey={ai.hasOpenAICompatibleKey}
-                mode="local"
-                allowedPresets={localPresetMethodIds}
-                guidance="Custom local endpoints should use a localhost, 127.0.0.1, or .local URL."
-                sharedConfigNotice="Seedbank currently stores one OpenAI-compatible profile. Saving this local server replaces the active OpenAI-compatible endpoint used by the cloud card."
-                onSave={saveOpenAICompatible}
-              />
-            </ProviderCard>
-          </div>
-
-          <div className="rounded-card border border-ink-100 bg-paper p-3 space-y-2">
-            <p className="text-[10px] font-mono uppercase tracking-wider text-ink-400">External / Cloud Routers</p>
-            <p className="text-[11px] text-ink-400">
-              Configure hosted OpenAI-compatible services (OpenRouter, Groq, Mistral, Together, Fireworks, or a custom cloud endpoint).
-            </p>
-            <ProviderCard
-              label="Cloud OpenAI-compatible endpoints"
+              label={cloudCompatibleActive ? `${compatiblePreset.label}` : 'Cloud provider'}
               icon="☁️"
               isDefault={ai.provider === 'openai-compatible' && cloudCompatibleActive}
               status={cloudCompatibleStatus}
@@ -2923,7 +2971,7 @@ export default function AiAgentsTab() {
                 mode="cloud"
                 allowedPresets={cloudPresetMethodIds}
                 guidance="Custom cloud endpoints should use a remote HTTPS URL from the hosted service."
-                sharedConfigNotice="Seedbank currently stores one OpenAI-compatible profile. Saving this cloud endpoint replaces the active OpenAI-compatible endpoint used by the local card."
+                sharedConfigNotice="Seedbank currently stores one OpenAI-compatible profile. Saving this cloud endpoint replaces any existing endpoint in that shared slot."
                 onSave={saveOpenAICompatible}
               />
             </ProviderCard>
