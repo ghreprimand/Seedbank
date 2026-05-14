@@ -26,6 +26,8 @@ import type {
   AiSuggestionField,
   AiUsageDetail,
   AiBudgetState,
+  AiReasoningEffort,
+  AiTextVerbosity,
   Idea,
 } from '../../../shared/types.js';
 import { v4 as uuid } from 'uuid';
@@ -327,6 +329,31 @@ function isFeatureRoutableProvider(provider: AiProviderId): boolean {
   return FEATURE_ROUTABLE_PROVIDERS.has(provider);
 }
 
+function sanitizeReasoningEffort(value: unknown): AiReasoningEffort | undefined {
+  if (typeof value !== 'string') return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'minimal' || normalized === 'low' || normalized === 'medium' || normalized === 'high') {
+    return normalized;
+  }
+  return undefined;
+}
+
+function sanitizeTextVerbosity(value: unknown): AiTextVerbosity | undefined {
+  if (typeof value !== 'string') return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'low' || normalized === 'medium' || normalized === 'high') return normalized;
+  return undefined;
+}
+
+function openAIModelSupportsReasoningEffort(model: string): boolean {
+  const normalized = model.trim().toLowerCase();
+  return normalized.startsWith('gpt-5') || /^o[1-9](?:[-_.]|$)/.test(normalized);
+}
+
+function openAIModelSupportsTextVerbosity(model: string): boolean {
+  return model.trim().toLowerCase().startsWith('gpt-5');
+}
+
 function defaultFeatureRoutes(): Record<AiFeatureId, AiFeatureRoute> {
   return {
     'thinking-partner': { provider: 'default' },
@@ -338,8 +365,10 @@ function defaultFeatureRoutes(): Record<AiFeatureId, AiFeatureRoute> {
 }
 
 function sanitizeFeatureRoute(value: unknown): AiFeatureRoute | undefined {
-  const route = value as { provider?: unknown; providerInstanceId?: unknown; model?: unknown } | undefined;
+  const route = value as { provider?: unknown; providerInstanceId?: unknown; model?: unknown; effort?: unknown; verbosity?: unknown } | undefined;
   if (!route) return undefined;
+  const effort = sanitizeReasoningEffort(route.effort);
+  const verbosity = sanitizeTextVerbosity(route.verbosity);
   if (route.provider === 'default') {
     return { provider: 'default' };
   }
@@ -349,6 +378,8 @@ function sanitizeFeatureRoute(value: unknown): AiFeatureRoute | undefined {
       provider,
       providerInstanceId: route.providerInstanceId,
       ...(typeof route.model === 'string' && route.model.trim() ? { model: route.model.trim() } : {}),
+      ...(effort ? { effort } : {}),
+      ...(verbosity ? { verbosity } : {}),
     };
   }
   if (!isProvider(route.provider)) return undefined;
@@ -368,6 +399,8 @@ function sanitizeFeatureRoute(value: unknown): AiFeatureRoute | undefined {
     provider: route.provider,
     providerInstanceId,
     ...(typeof route.model === 'string' && route.model.trim() ? { model: route.model.trim() } : {}),
+    ...(effort ? { effort } : {}),
+    ...(verbosity ? { verbosity } : {}),
   };
 }
 
@@ -517,6 +550,24 @@ function applyModelOverride(config: AiStoredConfig, provider: AiProviderId, mode
   return { ...config, ollamaModel: model.trim() };
 }
 
+function applyRouteControls(config: AiStoredConfig, route: AiFeatureRoute): AiStoredConfig {
+  if (config.provider === 'openai') {
+    const model = modelFor(config);
+    return {
+      ...config,
+      openaiReasoningEffort: route.effort && openAIModelSupportsReasoningEffort(model) ? route.effort : undefined,
+      openaiTextVerbosity: route.verbosity && openAIModelSupportsTextVerbosity(model) ? route.verbosity : undefined,
+    };
+  }
+  if (config.provider === 'codex-account') {
+    return {
+      ...config,
+      codexReasoningEffort: route.effort,
+    };
+  }
+  return config;
+}
+
 function normalizeDefaultProviderInstance(value: unknown): AiProviderInstanceId {
   return isProviderInstanceId(value) ? value : DEFAULT_CONFIG.defaultProviderInstanceId;
 }
@@ -568,9 +619,12 @@ function resolveFeatureConfig(config: AiStoredConfig, feature: AiFeatureId): AiS
     return applyProviderInstance(config, defaultInstanceId);
   }
   if (route.providerInstanceId) {
-    return applyModelOverride(applyProviderInstance(config, route.providerInstanceId), providerInstanceToProvider(route.providerInstanceId), route.model ?? '');
+    return applyRouteControls(
+      applyModelOverride(applyProviderInstance(config, route.providerInstanceId), providerInstanceToProvider(route.providerInstanceId), route.model ?? ''),
+      route,
+    );
   }
-  return applyModelOverride({ ...config, provider: route.provider }, route.provider, route.model ?? '');
+  return applyRouteControls(applyModelOverride({ ...config, provider: route.provider }, route.provider, route.model ?? ''), route);
 }
 
 interface FeatureRouteValidationIssue {
@@ -688,6 +742,8 @@ function effectiveFeatureRoutes(config: AiStoredConfig): Record<AiFeatureId, AiE
       provider: resolved.provider,
       providerInstanceId,
       model: modelFor(resolved),
+      ...(resolved.openaiReasoningEffort ?? resolved.codexReasoningEffort ? { effort: resolved.openaiReasoningEffort ?? resolved.codexReasoningEffort } : {}),
+      ...(resolved.openaiTextVerbosity ? { verbosity: resolved.openaiTextVerbosity } : {}),
       inherited: route?.provider === 'default',
     };
     return acc;

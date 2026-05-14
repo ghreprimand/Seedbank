@@ -136,3 +136,46 @@ test('Cloud OpenAI-compatible key is cleared when base URL identity changes', ()
     db.close();
   }
 });
+
+test('Feature route effort and verbosity persist and resolve only for supported OpenAI models', () => {
+  const { db, service } = aiFixture();
+  try {
+    const supported = service.configure({
+      openaiApiKey: 'sk-test',
+      openaiModel: 'gpt-5.2',
+      featureRoutes: {
+        'thinking-partner': {
+          provider: 'openai',
+          providerInstanceId: 'openai-api',
+          model: 'gpt-5.2',
+          effort: 'high',
+          verbosity: 'low',
+        },
+      },
+    });
+
+    assert.equal(supported.featureRoutes['thinking-partner']?.effort, 'high');
+    assert.equal(supported.featureRoutes['thinking-partner']?.verbosity, 'low');
+    assert.equal(supported.effectiveFeatureRoutes['thinking-partner']?.effort, 'high');
+    assert.equal(supported.effectiveFeatureRoutes['thinking-partner']?.verbosity, 'low');
+
+    const unsupported = service.configure({
+      featureRoutes: {
+        'thinking-partner': {
+          provider: 'openai',
+          providerInstanceId: 'openai-api',
+          model: 'gpt-4.1-mini',
+          effort: 'high',
+          verbosity: 'low',
+        },
+      },
+    });
+
+    assert.equal(unsupported.featureRoutes['thinking-partner']?.effort, 'high');
+    assert.equal(unsupported.featureRoutes['thinking-partner']?.verbosity, 'low');
+    assert.equal(unsupported.effectiveFeatureRoutes['thinking-partner']?.effort, undefined);
+    assert.equal(unsupported.effectiveFeatureRoutes['thinking-partner']?.verbosity, undefined);
+  } finally {
+    db.close();
+  }
+});

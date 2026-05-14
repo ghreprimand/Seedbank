@@ -639,14 +639,21 @@ export interface AiFeatureRoute {
   provider: AiProviderId | 'default';
   providerInstanceId?: AiProviderInstanceId;
   model?: string;
+  effort?: AiReasoningEffort;
+  verbosity?: AiTextVerbosity;
 }
 
 export interface AiEffectiveFeatureRoute {
   provider: AiProviderId;
   providerInstanceId: AiProviderInstanceId;
   model: string;
+  effort?: AiReasoningEffort;
+  verbosity?: AiTextVerbosity;
   inherited: boolean;
 }
+
+export type AiReasoningEffort = 'minimal' | 'low' | 'medium' | 'high';
+export type AiTextVerbosity = 'low' | 'medium' | 'high';
 
 export type AiBudgetScope = 'global' | 'feature' | 'provider' | 'model';
 

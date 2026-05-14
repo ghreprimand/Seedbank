@@ -305,17 +305,19 @@ class CodexAppServerSession extends EventEmitter {
       ?? FALLBACK_CODEX_MODEL;
   }
 
-  private async resolveEffort(modelId: string): Promise<CodexReasoningEffort> {
+  private async resolveEffort(modelId: string, requestedEffort?: CodexReasoningEffort): Promise<CodexReasoningEffort> {
     const normalizedModel = modelId.trim().toLowerCase();
     if (/\bmini\b|\bfast\b/.test(normalizedModel)) return 'low';
     const catalog = await this.listModels().catch(() => null);
     const modelMeta = catalog?.models.find((model) => model.id === modelId);
     if (modelMeta?.supportedReasoningEfforts?.length) {
+      if (requestedEffort && modelMeta.supportedReasoningEfforts.includes(requestedEffort)) return requestedEffort;
       if (modelMeta.supportedReasoningEfforts.includes('medium')) return 'medium';
       if (modelMeta.supportedReasoningEfforts.includes('high')) return 'high';
       if (modelMeta.supportedReasoningEfforts.includes('low')) return 'low';
       return modelMeta.supportedReasoningEfforts[0];
     }
+    if (requestedEffort) return requestedEffort;
     const rawEffort = modelMeta?.defaultReasoningEffort ?? '';
     const normalizedEffort = rawEffort.trim().toLowerCase();
     if (normalizedEffort === 'minimal' || normalizedEffort === 'low' || normalizedEffort === 'medium' || normalizedEffort === 'high') {
@@ -324,13 +326,18 @@ class CodexAppServerSession extends EventEmitter {
     return 'medium';
   }
 
-  async complete(messages: AiProviderMessage[], model: string, onDelta?: (delta: string) => void): Promise<AiProviderResult> {
+  async complete(
+    messages: AiProviderMessage[],
+    model: string,
+    onDelta?: (delta: string) => void,
+    requestedEffort?: CodexReasoningEffort,
+  ): Promise<AiProviderResult> {
     const availability = codexAccountRuntimeAvailability();
     if (!availability.available) throw new Error(availability.reason ?? 'Codex account is unavailable in this release candidate build.');
     await this.ensureStarted();
     if (this.activeTurn) throw new Error('Codex account app-server already has a request in flight.');
     const resolvedModel = await this.resolveModel(model);
-    const effort = await this.resolveEffort(resolvedModel);
+    const effort = await this.resolveEffort(resolvedModel, requestedEffort);
     const thread = await this.request<ThreadStartResponse>('thread/start', {
       model: resolvedModel,
       modelProvider: null,
