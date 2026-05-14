@@ -230,13 +230,15 @@ The first time the backend is available, the client can migrate existing browser
 
 ### AI Setup
 
-Built-in providers: **OpenAI API**, **Anthropic API**, **Ollama / local models**, and **OpenRouter / custom endpoint**. OpenRouter, Groq, Mistral, Together, Fireworks, LM Studio, vLLM, llama.cpp, LocalAI, and custom gateways can be configured in Settings → AI & Agents.
+Built-in provider methods include **OpenAI API**, **Anthropic API**, **Claude account**, **Codex account**, **Ollama / local models**, and OpenAI-compatible local/cloud endpoints. OpenRouter, Groq, Mistral, Together, Fireworks, LM Studio, vLLM, llama.cpp, LocalAI, and custom gateways can be configured in Settings → AI & Agents.
 
-Provider settings are configured in **Settings → AI & Agents**. Provider API keys (OpenAI, Anthropic) are stored server-side, encrypted at rest; public config responses only expose whether a key exists. These are separate from **Seedbank personal access tokens** (Settings → API & Server), which are bearer tokens for the Seedbank REST API itself.
+Provider settings are configured in **Settings → AI & Agents**. Local and external OpenAI-compatible services can be saved as separate provider instances, each with its own label, URL, model catalog, enabled-model subset, and health/probe status. When a provider connects, Seedbank discovers available models and stores them server-side for Feature Defaults and Ask AI routing.
+
+Provider API keys (OpenAI, Anthropic, OpenRouter, Groq, Mistral, Together, Fireworks, or another compatible endpoint) are stored server-side, encrypted at rest; public config responses only expose whether a key exists. These are separate from **Seedbank personal access tokens** (Settings → API & Server), which are bearer tokens for the Seedbank REST API itself.
 
 To link a local CLI agent (Claude Code or Codex CLI), point Seedbank at the binary path in Settings → AI & Agents. Agents authenticate via their own CLI credentials (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `claude auth login`) — Seedbank stores only the binary path and a linked flag.
 
-AI features include the Thinking Partner chat, contextual field suggestions, What If, Devil's Advocate, Scope Down, User Story, Idea Health Check, Smart Cross-Pollinate, and Pattern Insights. All AI features are opt-in. See [docs/AI_GUIDE.md](docs/AI_GUIDE.md).
+AI features include the Thinking Partner chat, contextual field suggestions, What If, Devil's Advocate, Scope Down, User Story, Idea Health Check, Smart Cross-Pollinate, and Pattern Insights. All AI features are opt-in. Feature Defaults choose the provider/model/effort for each feature, and the Ask AI modal lets you temporarily switch to another configured provider/model for a single run. See [docs/AI_GUIDE.md](docs/AI_GUIDE.md).
 
 ### Project Graduation
 

@@ -423,7 +423,11 @@ export default function IdeaDetail() {
           />
         </Section>
 
-        <Section label="Full Notes" hint="Detailed description, raw thoughts, anything goes">
+        <Section
+          label="Full Notes"
+          hint="Detailed description, raw thoughts, anything goes"
+          action={<AiSuggestionButton idea={idea} field="fullNotes" currentValue={idea.fullNotes} onApply={(value) => saveNow({ fullNotes: value })} />}
+        >
           <AutoGrowTextarea
             value={idea.fullNotes}
             onChange={(v) => update('fullNotes', v)}
@@ -645,14 +649,18 @@ function Section({
 }) {
   return (
     <div>
-      <div className="flex items-center justify-between gap-3 mb-0.5">
+      <div className="mb-0.5">
         <label className="block text-[11px] font-medium text-ink-400 uppercase tracking-wider font-mono">
           {label}
         </label>
-        {action}
       </div>
       {hint && <p className="text-[11px] text-ink-300 mb-2">{hint}</p>}
       {children}
+      {action && (
+        <div className="mt-2 flex justify-end">
+          {action}
+        </div>
+      )}
     </div>
   );
 }

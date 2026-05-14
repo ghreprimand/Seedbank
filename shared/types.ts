@@ -315,14 +315,7 @@ export const AI_PROVIDER_IDS: readonly AiProviderId[] = [
   'codex-account',
 ] as const;
 
-export type AiProviderInstanceId =
-  | 'claude-api'
-  | 'claude-account'
-  | 'openai-api'
-  | 'codex-account'
-  | 'ollama'
-  | 'local-openai-compatible'
-  | 'cloud-openai-compatible';
+export type AiProviderInstanceId = string;
 
 export const AI_PROVIDER_INSTANCE_IDS: readonly AiProviderInstanceId[] = [
   'claude-api',
@@ -472,6 +465,13 @@ export interface AiProviderInstanceConfig {
   modelDiscovery: boolean;
   configuredModel: string;
   discoveredModels: AiModelInfo[];
+  /**
+   * Optional per-instance model allowlist for broad catalog providers such as OpenRouter.
+   * Empty/undefined means every discovered model is available for routing.
+   */
+  enabledModelIds?: string[];
+  lastProbeStatus?: 'connected' | 'key-needed' | 'unreachable' | 'not-tested';
+  lastProbedAt?: string;
   available: AiProviderInstanceAvailability;
   availabilityReason?: string;
   authenticated?: boolean;
@@ -481,6 +481,16 @@ export interface AiProviderInstanceConfig {
   baseUrl?: string;
   presetId?: AiOpenAICompatiblePresetId;
 }
+
+export type AiClaudeServiceMethod = 'anthropic-api-key' | 'claude-account-native';
+export type AiCodexOpenAIServiceMethod = 'openai-api-key' | 'codex-account-app-server';
+export type AiLocalModelServiceMethod =
+  | 'ollama'
+  | 'lm-studio'
+  | 'vllm'
+  | 'llama-cpp'
+  | 'localai'
+  | 'custom-local';
 
 export interface AiMethodCapability {
   id: string;
@@ -686,6 +696,10 @@ export interface AiGuardrailsConfig {
 
 export interface AiPreflightRequest {
   feature: AiFeatureId;
+  providerInstanceId?: AiProviderInstanceId;
+  model?: string;
+  effort?: AiReasoningEffort;
+  verbosity?: AiTextVerbosity;
 }
 
 export interface AiPreflightResult {
@@ -757,11 +771,17 @@ export interface AiPublicConfig {
   defaultProviderInstanceId: AiProviderInstanceId;
   providerInstances: Record<AiProviderInstanceId, AiProviderInstanceConfig>;
   provider: AiProviderId;
+  claudeServiceMethod: AiClaudeServiceMethod;
+  codexOpenAIServiceMethod: AiCodexOpenAIServiceMethod;
+  localModelServiceMethod: AiLocalModelServiceMethod;
   openaiModel: string;
   anthropicModel: string;
   claudeAccountModel: string;
   claudeAccountCompact: boolean;
   codexAccountModel: string;
+  openaiReasoningEffort?: AiReasoningEffort;
+  openaiTextVerbosity?: AiTextVerbosity;
+  codexReasoningEffort?: AiReasoningEffort;
   ollamaModel: string;
   ollamaBaseUrl: string;
   localOpenaiCompatiblePreset: AiOpenAICompatiblePresetId;
@@ -973,12 +993,20 @@ export interface AiConfigInput {
   providerInstanceId?: AiProviderInstanceId;
   defaultProviderInstanceId?: AiProviderInstanceId;
   providerInstances?: Partial<Record<AiProviderInstanceId, Partial<AiProviderInstanceConfig>>>;
+  providerInstanceApiKeys?: Partial<Record<AiProviderInstanceId, string>>;
+  removedProviderInstanceIds?: AiProviderInstanceId[];
   provider?: AiProviderId;
+  claudeServiceMethod?: AiClaudeServiceMethod;
+  codexOpenAIServiceMethod?: AiCodexOpenAIServiceMethod;
+  localModelServiceMethod?: AiLocalModelServiceMethod;
   openaiModel?: string;
   anthropicModel?: string;
   claudeAccountModel?: string;
   claudeAccountCompact?: boolean;
   codexAccountModel?: string;
+  openaiReasoningEffort?: AiReasoningEffort | null;
+  openaiTextVerbosity?: AiTextVerbosity | null;
+  codexReasoningEffort?: AiReasoningEffort | null;
   ollamaModel?: string;
   ollamaBaseUrl?: string;
   localOpenaiCompatiblePreset?: AiOpenAICompatiblePresetId;
@@ -1010,7 +1038,13 @@ export interface AiChatMessage {
   model?: string;
 }
 
-export type AiSuggestionField = 'pitch' | 'risks' | 'techStack' | 'hook' | 'whyItMightWork';
+export type AiSuggestionField =
+  | 'pitch'
+  | 'fullNotes'
+  | 'risks'
+  | 'techStack'
+  | 'hook'
+  | 'whyItMightWork';
 
 export interface AiSuggestion {
   field: AiSuggestionField;
@@ -1025,6 +1059,10 @@ export interface AiFieldSuggestionRequest {
   prompt?: string;
   omitCurrentValue?: boolean;
   aiConfirmationToken?: string;
+  providerInstanceId?: AiProviderInstanceId;
+  model?: string;
+  effort?: AiReasoningEffort;
+  verbosity?: AiTextVerbosity;
 }
 
 export interface AiFieldAssistMessage {
@@ -1039,4 +1077,8 @@ export interface AiFieldAssistChatRequest {
   message: string;
   history?: AiFieldAssistMessage[];
   aiConfirmationToken?: string;
+  providerInstanceId?: AiProviderInstanceId;
+  model?: string;
+  effort?: AiReasoningEffort;
+  verbosity?: AiTextVerbosity;
 }

@@ -16,6 +16,7 @@ import type { Idea } from '@/lib/types';
 
 export const FIELD_LABELS: Record<string, string> = {
   pitch: 'Pitch',
+  fullNotes: 'Full Notes',
   hook: 'Hook / 30-second demo',
   whyItMightWork: 'Why It Might Work',
   risks: 'Risks & Blockers',

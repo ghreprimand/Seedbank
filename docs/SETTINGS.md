@@ -51,9 +51,9 @@ AI & Agents is now organized by **service family first**, then **connection meth
 
 Chat/model-capable method cards show status (`connected`, `key needed`, `unreachable`, `local`, `not tested`), model/base URL state, and setup/test/list actions.
 
-Global default routing remains provider-based and stored server-side.
+Global default routing is provider-instance based and stored server-side. A provider instance is a concrete configured method such as "Claude account", "Ollama", "LM Studio laptop", or "OpenRouter personal".
 
-**Provider API keys vs. Seedbank tokens.** Provider API keys (OpenAI API, Anthropic API, OpenRouter, Groq, Mistral, Together, Fireworks, or another custom endpoint) are credentials for external AI services — stored server-side, encrypted at rest, never exposed to the browser. `hasOpenAIKey`, `hasAnthropicKey`, and `hasOpenAICompatibleKey` booleans in the public config indicate whether a key is stored. These are entirely separate from **Seedbank personal access tokens** (Settings → API & Server), which are bearer tokens for the Seedbank REST API itself.
+**Provider API keys vs. Seedbank tokens.** Provider API keys (OpenAI API, Anthropic API, OpenRouter, Groq, Mistral, Together, Fireworks, or another custom endpoint) are credentials for external AI services — stored server-side, encrypted at rest, never exposed to the browser. Public config responses expose only key-presence booleans such as `hasOpenAIKey`, `hasAnthropicKey`, `hasLocalOpenAICompatibleKey`, and `hasCloudOpenAICompatibleKey`. These are entirely separate from **Seedbank personal access tokens** (Settings → API & Server), which are bearer tokens for the Seedbank REST API itself.
 
 > **Data flow:** Ollama and local endpoints send content only to the configured local host. Cloud providers (OpenAI API, Anthropic API, and remote OpenAI-compatible endpoints) send content to external servers. All AI calls are proxied server-side; the browser communicates only with the local Seedbank server.
 
@@ -64,12 +64,16 @@ OpenAI-compatible configuration appears in two method areas:
 - **Local inference method card** (LM Studio, vLLM, llama.cpp, LocalAI, or custom localhost URL)
 - **External/cloud router method card** (OpenRouter, Groq, Mistral, Together, Fireworks, or custom cloud URL)
 
-Both cards configure the same OpenAI-compatible provider settings (preset, base URL, optional key, model), but are separated in the UI to avoid mixing local and cloud usage patterns.
+Local and cloud OpenAI-compatible instances are stored separately so a local endpoint does not overwrite an external router. You can add multiple saved local instances and multiple saved external/cloud instances. Each saved instance keeps its own label, base URL, preset, configured model, API-key presence, probe status, and discovered model list.
+
+For large cloud catalogs such as OpenRouter, the expanded instance card includes an **Enabled models in Seedbank** checklist. Enabled models are the subset that appear in Feature Defaults and the Ask AI provider/model picker.
 
 ### Account providers
 
 - **Claude account** is an account-login transport for Claude.ai subscriptions. Login and logout from the Claude account card; token refresh is automatic.
 - **Codex account** is an account-login transport through the local Codex app-server. If Codex is missing or cannot start, the card reports that runtime failure directly.
+
+When Claude account, Codex account, API-key providers, local servers, or OpenAI-compatible endpoints become usable, Seedbank discovers available models and persists them to the provider instance. Discovery runs after successful auth/key saves, account status checks, manual list-model actions, server startup, and a background refresh cycle. Provider cards show the model count and retain the last probe status after navigating away.
 
 ### Feature Defaults
 
@@ -78,6 +82,10 @@ Both cards configure the same OpenAI-compatible provider settings (preset, base 
 - Routes can inherit the global default or pin a provider/model.
 - Only **chat/model-capable methods** are routable. CLI file agents are intentionally excluded.
 - Unavailable account routes may appear for visibility, but save is blocked when a route targets unavailable account transports.
+- Provider/model controls use discovered model dropdowns when available, while still accepting free-text model IDs for custom endpoints.
+- The global default row sets the default provider instance, model, and reasoning effort where the selected provider/model supports effort.
+
+The **Ask AI** modal on idea fields uses the effective `field-suggestions` route by default. Its provider/model pill is clickable and lets you choose another configured provider/model for that one run. The selected route is used for preflight warnings, one-shot suggestions, and field-assist chat; it does not change permanent Settings.
 
 ### Token budget & usage
 
@@ -86,7 +94,8 @@ The **Usage & Guardrails** section includes a daily token limit plus advanced sa
 - **Daily token budget** caps total AI token use over 24 hours (`0` disables enforcement).
 - **Cloud alerts** warn when selected routes send content to remote providers.
 - **Local-only mode** blocks remote-provider execution.
-- **Per-feature, per-provider, and per-model caps** enforce tighter budget limits.
+- **Provider methods** enable or disable concrete configured instances. Disabled methods are hidden from setup and Feature Defaults and blocked server-side.
+- **Per-feature, per-provider-family, per-provider-instance, and per-model caps** enforce tighter budget limits.
 - **Model allowlist** restricts requests to approved model IDs only.
 
 Usage readouts show tokens consumed in the last 24 hours and last 7 days (from `ai_usage`).

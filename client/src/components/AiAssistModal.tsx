@@ -25,6 +25,7 @@ import {
   AlertTriangle,
   Bot,
   Check,
+  ChevronDown,
   ChevronRight,
   ExternalLink,
   Loader2,
@@ -34,7 +35,16 @@ import {
   Sparkles,
   X,
 } from 'lucide-react';
-import { aiProviderLabel, type AiChatMessage, type AiFeatureId, type AiPreflightResult, type AiSuggestionField } from '@/lib/types';
+import {
+  aiProviderLabel,
+  type AiChatMessage,
+  type AiFeatureId,
+  type AiPreflightResult,
+  type AiProviderInstanceId,
+  type AiPublicConfig,
+  type AiReasoningEffort,
+  type AiSuggestionField,
+} from '@/lib/types';
 import { preflightAiRequest, suggestIdeaField, streamFieldAssistChat } from '@/api/client';
 import { useAiSettings } from '@/stores/settings';
 import {
@@ -109,6 +119,12 @@ type ModalView =
 
 // ── Provider badge ────────────────────────────────────────────────────────────
 
+interface AiAssistRouteSelection {
+  providerInstanceId: AiProviderInstanceId;
+  model: string;
+  effort?: AiReasoningEffort;
+}
+
 function providerName(provider: string): string {
   const names: Record<string, string> = {
     openai: aiProviderLabel('openai', 'short'),
@@ -119,37 +135,150 @@ function providerName(provider: string): string {
   return names[provider] ?? provider;
 }
 
-function ProviderBadge({ featureKey }: { featureKey?: string }) {
-  const ai = useAiSettings();
+function featureRoute(ai: AiPublicConfig, featureKey?: string) {
   const featureId = (featureKey ?? 'field-suggestions') as keyof typeof ai.effectiveFeatureRoutes;
-  const effective =
+  return (
     ai.effectiveFeatureRoutes[featureId] ??
     ai.effectiveFeatureRoutes['field-suggestions'] ??
-    ai.effectiveFeatureRoutes.default;
+    ai.effectiveFeatureRoutes.default
+  );
+}
 
-  if (!effective) return null;
-  const instance = ai.providerInstances[effective.providerInstanceId];
+function defaultRouteSelection(ai: AiPublicConfig, featureKey?: string): AiAssistRouteSelection {
+  const effective = featureRoute(ai, featureKey);
+  return {
+    providerInstanceId: effective?.providerInstanceId ?? ai.defaultProviderInstanceId,
+    model: effective?.model ?? ai.providerInstances[ai.defaultProviderInstanceId]?.configuredModel ?? '',
+    ...(effective?.effort ? { effort: effective.effort } : {}),
+  };
+}
+
+function instanceModelIds(instance: AiPublicConfig['providerInstances'][string]): string[] {
+  const discovered = instance.enabledModelIds?.length
+    ? instance.discoveredModels.filter((model) => instance.enabledModelIds?.includes(model.id))
+    : instance.discoveredModels;
+  const ids = discovered.map((model) => model.id);
+  const configured = instance.configuredModel?.trim();
+  if (configured && !ids.includes(configured)) ids.unshift(configured);
+  return ids;
+}
+
+function configuredRouteOptions(ai: AiPublicConfig): AiAssistRouteSelection[] {
+  return Object.values(ai.providerInstances)
+    .filter((instance) =>
+      instance.featureRoutable &&
+      instance.available === 'available' &&
+      ai.guardrails.providerEnabled[instance.provider] !== false &&
+      ai.guardrails.providerInstanceEnabled[instance.id] !== false)
+    .flatMap((instance) => {
+      const models = instanceModelIds(instance);
+      const effort = instance.id === 'codex-account'
+        ? ai.codexReasoningEffort
+        : instance.id === 'openai-api'
+          ? ai.openaiReasoningEffort
+          : undefined;
+      return models.map((model) => ({
+        providerInstanceId: instance.id,
+        model,
+        ...(effort ? { effort } : {}),
+      }));
+    });
+}
+
+function sameRouteSelection(a: AiAssistRouteSelection, b: AiAssistRouteSelection) {
+  return a.providerInstanceId === b.providerInstanceId &&
+    a.model === b.model &&
+    a.effort === b.effort;
+}
+
+function ProviderRoutePicker({
+  featureKey,
+  selection,
+  onChange,
+}: {
+  featureKey?: string;
+  selection: AiAssistRouteSelection;
+  onChange: (selection: AiAssistRouteSelection) => void;
+}) {
+  const ai = useAiSettings();
+  const [open, setOpen] = useState(false);
+  const effective = featureRoute(ai, featureKey);
+  const options = configuredRouteOptions(ai);
+  const instance = ai.providerInstances[selection.providerInstanceId];
 
   const parts = [
-    instance?.label ?? providerName(effective.provider),
-    effective.model || undefined,
-    effective.effort ? `effort:${effective.effort}` : undefined,
+    instance?.label ?? (effective ? providerName(effective.provider) : selection.providerInstanceId),
+    selection.model || undefined,
+    selection.effort ? `effort:${selection.effort}` : undefined,
   ].filter(Boolean);
   const display = parts.join(' · ');
+  const currentValue = `${selection.providerInstanceId}\n${selection.model}\n${selection.effort ?? ''}`;
 
   return (
-    <span
-      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-badge text-[10px]
-                 font-mono text-ink-400 bg-paper-warm border border-ink-100 shrink-0"
-      title={
-        effective.inherited
-          ? `Global default: ${instance?.label ?? providerName(effective.provider)}`
-          : `Feature override: ${instance?.label ?? providerName(effective.provider)}`
-      }
-    >
-      <Bot className="w-2.5 h-2.5" />
-      {display}
-    </span>
+    <div className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="inline-flex max-w-[22rem] items-center gap-1 px-1.5 py-0.5 rounded-badge text-[10px]
+                   font-mono text-ink-500 bg-paper-warm border border-ink-100 hover:border-sage-300
+                   hover:text-sage-700 transition-colors"
+        title={
+          effective?.inherited
+            ? 'Using the global default. Click to choose a configured provider/model for this request.'
+            : 'Using the configured feature route. Click to choose another configured provider/model for this request.'
+        }
+      >
+        <Bot className="w-2.5 h-2.5 shrink-0" />
+        <span className="truncate">{display}</span>
+        <ChevronDown className="w-2.5 h-2.5 shrink-0" />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full z-50 mt-1 w-80 rounded-card border border-ink-100 bg-paper p-2 shadow-modal">
+            <label className="block text-[10px] font-mono uppercase tracking-wider text-ink-400">
+              Provider / model for this run
+              <select
+                value={currentValue}
+                onChange={(event) => {
+                  const next = options.find((option) =>
+                    `${option.providerInstanceId}\n${option.model}\n${option.effort ?? ''}` === event.target.value,
+                  );
+                  if (next) {
+                    onChange(next);
+                    setOpen(false);
+                  }
+                }}
+                className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-xs text-ink-800"
+              >
+                {!options.some((option) => sameRouteSelection(option, selection)) && (
+                  <option value={currentValue}>{display}</option>
+                )}
+                {options.map((option) => {
+                  const optionInstance = ai.providerInstances[option.providerInstanceId];
+                  const optionLabel = [
+                    optionInstance?.label ?? option.providerInstanceId,
+                    option.model,
+                    option.effort ? `effort:${option.effort}` : undefined,
+                  ].filter(Boolean).join(' · ');
+                  return (
+                    <option
+                      key={`${option.providerInstanceId}:${option.model}:${option.effort ?? ''}`}
+                      value={`${option.providerInstanceId}\n${option.model}\n${option.effort ?? ''}`}
+                    >
+                      {optionLabel}
+                    </option>
+                  );
+                })}
+              </select>
+            </label>
+            <p className="mt-1.5 text-[10px] leading-relaxed text-ink-400">
+              This only changes the current Ask AI run. Permanent defaults live in Settings.
+            </p>
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -159,10 +288,12 @@ interface ModalHeaderProps {
   title: string;
   subtitle?: string;
   featureKey?: string;
+  routeSelection: AiAssistRouteSelection;
+  onRouteChange: (selection: AiAssistRouteSelection) => void;
   onClose: () => void;
 }
 
-function ModalHeader({ title, subtitle, featureKey, onClose }: ModalHeaderProps) {
+function ModalHeader({ title, subtitle, featureKey, routeSelection, onRouteChange, onClose }: ModalHeaderProps) {
   return (
     <div className="flex items-start justify-between gap-3 mb-4">
       <div className="flex-1 min-w-0">
@@ -172,7 +303,13 @@ function ModalHeader({ title, subtitle, featureKey, onClose }: ModalHeaderProps)
         )}
       </div>
       <div className="flex items-center gap-2 shrink-0">
-        {featureKey !== undefined && <ProviderBadge featureKey={featureKey} />}
+        {featureKey !== undefined && (
+          <ProviderRoutePicker
+            featureKey={featureKey}
+            selection={routeSelection}
+            onChange={onRouteChange}
+          />
+        )}
         <button
           type="button"
           onClick={onClose}
@@ -192,11 +329,13 @@ function ModalHeader({ title, subtitle, featureKey, onClose }: ModalHeaderProps)
 interface IntentSelectorProps {
   context: AiAssistContext;
   featureKey?: string;
+  routeSelection: AiAssistRouteSelection;
+  onRouteChange: (selection: AiAssistRouteSelection) => void;
   onSelect: (intent: AiAssistIntent, playbookId?: string) => void;
   onClose: () => void;
 }
 
-function IntentSelector({ context, featureKey, onSelect, onClose }: IntentSelectorProps) {
+function IntentSelector({ context, featureKey, routeSelection, onRouteChange, onSelect, onClose }: IntentSelectorProps) {
   const availablePlaybooks = playbooksForField(context.field);
   const [showPlaybooks, setShowPlaybooks] = useState(false);
 
@@ -210,6 +349,8 @@ function IntentSelector({ context, featureKey, onSelect, onClose }: IntentSelect
         title={`AI Assistance · ${context.fieldLabel}`}
         subtitle="What would you like help with?"
         featureKey={featureKey}
+        routeSelection={routeSelection}
+        onRouteChange={onRouteChange}
         onClose={onClose}
       />
 
@@ -296,6 +437,8 @@ interface ReviewViewProps {
   suggestion: string;
   rationale: string;
   featureKey?: string;
+  routeSelection: AiAssistRouteSelection;
+  onRouteChange: (selection: AiAssistRouteSelection) => void;
   onApply: () => void;
   onReject: () => void;
   onRefine: () => void;
@@ -307,6 +450,8 @@ function ReviewView({
   suggestion,
   rationale,
   featureKey,
+  routeSelection,
+  onRouteChange,
   onApply,
   onReject,
   onRefine,
@@ -318,6 +463,8 @@ function ReviewView({
         title={`Review suggestion · ${context.fieldLabel}`}
         subtitle="Review before applying."
         featureKey={featureKey}
+        routeSelection={routeSelection}
+        onRouteChange={onRouteChange}
         onClose={onClose}
       />
 
@@ -389,12 +536,14 @@ function ReviewView({
 interface RefineViewProps {
   context: AiAssistContext;
   featureKey?: string;
+  routeSelection: AiAssistRouteSelection;
+  onRouteChange: (selection: AiAssistRouteSelection) => void;
   onSubmit: (instruction: string) => void;
   onBack: () => void;
   onClose: () => void;
 }
 
-function RefineView({ context, featureKey, onSubmit, onBack, onClose }: RefineViewProps) {
+function RefineView({ context, featureKey, routeSelection, onRouteChange, onSubmit, onBack, onClose }: RefineViewProps) {
   const [instruction, setInstruction] = useState('');
 
   return (
@@ -403,6 +552,8 @@ function RefineView({ context, featureKey, onSubmit, onBack, onClose }: RefineVi
         title={`Refine · ${context.fieldLabel}`}
         subtitle="Add an instruction to guide the next attempt."
         featureKey={featureKey}
+        routeSelection={routeSelection}
+        onRouteChange={onRouteChange}
         onClose={onClose}
       />
 
@@ -445,6 +596,9 @@ function RefineView({ context, featureKey, onSubmit, onBack, onClose }: RefineVi
 
 interface ConversationViewProps {
   context: AiAssistContext;
+  featureKey?: string;
+  routeSelection: AiAssistRouteSelection;
+  onRouteChange: (selection: AiAssistRouteSelection) => void;
   initialPrompt?: string;
   /** Token from preflight — passed to streamFieldAssistChat to satisfy server confirmation check. */
   confirmationToken?: string;
@@ -466,7 +620,17 @@ interface ConversationViewProps {
  * S-1 fix: auto-send in useEffect.
  * S-3 fix: "Apply to field" only on the latest assistant message.
  */
-function ConversationView({ context, initialPrompt, confirmationToken, onConfirmationExpired, onApplyToField, onClose }: ConversationViewProps) {
+function ConversationView({
+  context,
+  featureKey,
+  routeSelection,
+  onRouteChange,
+  initialPrompt,
+  confirmationToken,
+  onConfirmationExpired,
+  onApplyToField,
+  onClose,
+}: ConversationViewProps) {
   const [localMessages, setLocalMessages] = useState<AiChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [streamingText, setStreamingText] = useState('');
@@ -506,6 +670,9 @@ function ConversationView({ context, initialPrompt, confirmationToken, onConfirm
           history,
           message: content,
           aiConfirmationToken: confirmationToken,
+          providerInstanceId: routeSelection.providerInstanceId,
+          model: routeSelection.model,
+          effort: routeSelection.effort,
         },
         (delta) => setStreamingText((prev) => prev + delta),
       );
@@ -555,6 +722,9 @@ function ConversationView({ context, initialPrompt, confirmationToken, onConfirm
       <ModalHeader
         title={`Ask AI · ${context.fieldLabel}`}
         subtitle="Chatting in context of this idea. Not saved to Thinking Partner."
+        featureKey={featureKey}
+        routeSelection={routeSelection}
+        onRouteChange={onRouteChange}
         onClose={onClose}
       />
 
@@ -641,6 +811,9 @@ export default function AiAssistModal({
   featureKey,
 }: AiAssistModalProps) {
   const ai = useAiSettings();
+  const [routeSelection, setRouteSelection] = useState<AiAssistRouteSelection>(() =>
+    defaultRouteSelection(ai, featureKey),
+  );
   const [view, setView] = useState<ModalView>('intent-select');
   const [selectedIntent, setSelectedIntent] = useState<AiAssistIntent | null>(null);
   const [selectedPlaybookId, setSelectedPlaybookId] = useState<string | undefined>();
@@ -669,6 +842,20 @@ export default function AiAssistModal({
    * requests without needing an AbortController (suggestions are fast).
    */
   const requestGenRef = useRef(0);
+
+  useEffect(() => {
+    const options = configuredRouteOptions(ai);
+    setRouteSelection((current) => {
+      if (options.some((option) => sameRouteSelection(option, current))) return current;
+      return defaultRouteSelection(ai, featureKey);
+    });
+  }, [ai, featureKey]);
+
+  const routeRequest = {
+    providerInstanceId: routeSelection.providerInstanceId,
+    model: routeSelection.model,
+    effort: routeSelection.effort,
+  };
 
   /**
    * Execute the actual one-shot AI call (called after preflight is satisfied).
@@ -701,6 +888,7 @@ export default function AiAssistModal({
           prompt: customPrompt,
           omitCurrentValue: intent === 'fresh',
           aiConfirmationToken: confirmationToken,
+          ...routeRequest,
         },
       );
       if (requestGenRef.current !== gen) return;
@@ -734,6 +922,7 @@ export default function AiAssistModal({
     try {
       pf = await preflightAiRequest({
         feature: (featureKey ?? 'field-suggestions') as AiFeatureId,
+        ...routeRequest,
       });
     } catch {
       // preflight unavailable — proceed directly
@@ -780,6 +969,7 @@ export default function AiAssistModal({
         try {
           pf = await preflightAiRequest({
             feature: (featureKey ?? 'field-suggestions') as AiFeatureId,
+            ...routeRequest,
           });
         } catch { /* proceed without gating */ }
 
@@ -816,6 +1006,7 @@ export default function AiAssistModal({
       try {
         pf = await preflightAiRequest({
           feature: (featureKey ?? 'field-suggestions') as AiFeatureId,
+          ...routeRequest,
         });
       } catch { /* proceed without gating — shouldn't happen since server just issued a 403 */ }
       if (pf) {
@@ -843,6 +1034,8 @@ export default function AiAssistModal({
           <IntentSelector
             context={context}
             featureKey={featureKey}
+            routeSelection={routeSelection}
+            onRouteChange={setRouteSelection}
             onSelect={handleIntentSelect}
             onClose={onClose}
           />
@@ -856,6 +1049,8 @@ export default function AiAssistModal({
                 ? 'Confirmation required before sending idea content to a cloud provider.'
                 : 'Review before proceeding.'}
               featureKey={featureKey}
+              routeSelection={routeSelection}
+              onRouteChange={setRouteSelection}
               onClose={onClose}
             />
 
@@ -879,9 +1074,11 @@ export default function AiAssistModal({
               // custom-cloud providers have richer labels there.
               const featureId = (featureKey ?? 'field-suggestions') as keyof typeof ai.effectiveFeatureRoutes;
               const effective = ai.effectiveFeatureRoutes[featureId] ?? ai.effectiveFeatureRoutes['field-suggestions'] ?? ai.effectiveFeatureRoutes.default;
-              const instanceLabel = effective
-                ? (ai.providerInstances[effective.providerInstanceId]?.label ?? providerName(pendingPreflight.provider))
-                : providerName(pendingPreflight.provider);
+              const selectedInstance = ai.providerInstances[routeSelection.providerInstanceId];
+              const instanceLabel = selectedInstance?.label
+                ?? (effective
+                  ? (ai.providerInstances[effective.providerInstanceId]?.label ?? providerName(pendingPreflight.provider))
+                  : providerName(pendingPreflight.provider));
               const leavesDevice = pendingPreflight.contentLeavesDevice ?? pendingPreflight.contentLeavesMachine;
               const modelLabel = pendingPreflight.resolvedModelId ?? pendingPreflight.model;
               return (
@@ -960,6 +1157,8 @@ export default function AiAssistModal({
             <ModalHeader
               title={`Generating · ${context.fieldLabel}`}
               featureKey={featureKey}
+              routeSelection={routeSelection}
+              onRouteChange={setRouteSelection}
               onClose={onClose}
             />
             <div className="flex flex-col items-center justify-center py-12 gap-3">
@@ -983,6 +1182,8 @@ export default function AiAssistModal({
             suggestion={suggestion}
             rationale={rationale}
             featureKey={featureKey}
+            routeSelection={routeSelection}
+            onRouteChange={setRouteSelection}
             onApply={() => { onApply(suggestion); onClose(); }}
             onReject={() => setView('intent-select')}
             onRefine={() => setView('refine')}
@@ -994,6 +1195,8 @@ export default function AiAssistModal({
           <RefineView
             context={context}
             featureKey={featureKey}
+            routeSelection={routeSelection}
+            onRouteChange={setRouteSelection}
             onSubmit={handleRefineSubmit}
             onBack={() => setView('review')}
             onClose={onClose}
@@ -1003,6 +1206,9 @@ export default function AiAssistModal({
         {view === 'conversation' && (
           <ConversationView
             context={context}
+            featureKey={featureKey}
+            routeSelection={routeSelection}
+            onRouteChange={setRouteSelection}
             initialPrompt={conversationPrompt}
             confirmationToken={conversationToken}
             onConfirmationExpired={handleConversationConfirmationExpired}
@@ -1015,6 +1221,9 @@ export default function AiAssistModal({
           <div className="space-y-4">
             <ModalHeader
               title="Something went wrong"
+              featureKey={featureKey}
+              routeSelection={routeSelection}
+              onRouteChange={setRouteSelection}
               onClose={onClose}
             />
             <div className="px-3 py-2.5 bg-red-50 border border-red-100 rounded-card text-xs

@@ -43,7 +43,10 @@ import type {
   AiFeatureId,
   AiMethodCapability,
   AiPreflightRequest,
+  AiProviderInstanceId,
+  AiReasoningEffort,
   AiSuggestionField,
+  AiTextVerbosity,
   Category,
   PublicToken,
   ServerInfo,
@@ -1086,8 +1089,11 @@ function clientKey(req: Request): string {
   return req.ip || req.socket.remoteAddress || 'local';
 }
 
-const AI_SUGGESTION_FIELDS: readonly AiSuggestionField[] = ['pitch', 'risks', 'techStack', 'hook', 'whyItMightWork'];
+const AI_SUGGESTION_FIELDS: readonly AiSuggestionField[] = ['pitch', 'fullNotes', 'risks', 'techStack', 'hook', 'whyItMightWork'];
+const AI_SUGGESTION_FIELD_ERROR = 'field must be one of pitch, fullNotes, risks, techStack, hook, or whyItMightWork.';
 const AI_FEATURE_IDS: readonly AiFeatureId[] = ['thinking-partner', 'field-suggestions', 'health-check', 'discover-insights', 'default'];
+const AI_REASONING_EFFORTS: readonly AiReasoningEffort[] = ['minimal', 'low', 'medium', 'high'];
+const AI_TEXT_VERBOSITIES: readonly AiTextVerbosity[] = ['low', 'medium', 'high'];
 
 function parseAiSuggestionField(value: unknown): AiSuggestionField | undefined {
   return typeof value === 'string' && AI_SUGGESTION_FIELDS.includes(value as AiSuggestionField)
@@ -1098,6 +1104,24 @@ function parseAiSuggestionField(value: unknown): AiSuggestionField | undefined {
 function parseAiFeatureId(value: unknown): AiFeatureId | undefined {
   return typeof value === 'string' && AI_FEATURE_IDS.includes(value as AiFeatureId)
     ? value as AiFeatureId
+    : undefined;
+}
+
+function parseAiReasoningEffort(value: unknown): AiReasoningEffort | undefined {
+  return typeof value === 'string' && AI_REASONING_EFFORTS.includes(value as AiReasoningEffort)
+    ? value as AiReasoningEffort
+    : undefined;
+}
+
+function parseAiTextVerbosity(value: unknown): AiTextVerbosity | undefined {
+  return typeof value === 'string' && AI_TEXT_VERBOSITIES.includes(value as AiTextVerbosity)
+    ? value as AiTextVerbosity
+    : undefined;
+}
+
+function parseProviderInstanceId(value: unknown): AiProviderInstanceId | undefined {
+  return typeof value === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,95}$/.test(value)
+    ? value as AiProviderInstanceId
     : undefined;
 }
 
@@ -1252,7 +1276,13 @@ app.get('/api/health', (_req, res) => {
 });
 
 app.get('/api/openapi.json', (_req, res) => {
-  res.json(openApiSpec);
+  res.json({
+    ...openApiSpec,
+    info: {
+      ...(openApiSpec.info && typeof openApiSpec.info === 'object' ? openApiSpec.info : {}),
+      version: SERVER_VERSION,
+    },
+  });
 });
 
 app.get('/api/server/info', requireScope('read:ideas'), asyncRoute((_req, res) => {
@@ -1750,7 +1780,17 @@ app.post('/api/ai/preflight', requireScope('read:ideas'), asyncRoute((req, res) 
     res.status(400).json({ error: 'feature must be a known AI feature id.' });
     return;
   }
-  res.json(aiService.preflight(feature));
+  const model = optionalString(body.model, 'model');
+  if (!model.ok) {
+    res.status(400).json({ error: model.error });
+    return;
+  }
+  res.json(aiService.preflight(feature, {
+    providerInstanceId: parseProviderInstanceId(body.providerInstanceId),
+    ...(model.value?.trim() ? { model: model.value.trim() } : {}),
+    effort: parseAiReasoningEffort(body.effort),
+    verbosity: parseAiTextVerbosity(body.verbosity),
+  }));
 }));
 
 app.post('/api/ai/test', requireScope('write:ideas'), asyncRoute(async (req, res) => {
@@ -1786,6 +1826,8 @@ app.get('/api/ai/claude-account/status', requireScope('read:ideas'), asyncRoute(
   const tokens = await loadTokens();
   const authenticated = tokens !== null && tokens.expiresAt > Date.now();
   setCachedClaudeAccountAuth(authenticated);
+  // Auto-discover models for existing sessions before the client refreshes settings.
+  if (authenticated) await aiService.refreshDiscoveredModels('claude-account');
   res.json({
     available: true,
     authenticated,
@@ -1822,6 +1864,8 @@ app.post('/api/ai/claude-account/login/complete', requireScope('write:ideas'), a
   const { setCachedClaudeAccountAuth } = await import('./ai/service.js');
   await completeBootstrap(body.url);
   setCachedClaudeAccountAuth(true);
+  // Auto-discover models before responding so the next settings refresh can see them.
+  await aiService.refreshDiscoveredModels('claude-account');
   res.json({ ok: true });
 }));
 
@@ -1845,6 +1889,8 @@ app.get('/api/ai/codex-account/status', requireScope('read:ideas'), asyncRoute(a
   const { setCachedCodexAccountAuth } = await import('./ai/service.js');
   const status = await codexAccountSession.status();
   setCachedCodexAccountAuth(status.authenticated);
+  // Auto-discover models before responding so the next settings refresh can see them.
+  if (status.authenticated) await aiService.refreshDiscoveredModels('codex-account');
   res.json(status);
 }));
 
@@ -1873,6 +1919,10 @@ app.post('/api/ai/suggest', requireScope('ai:suggest'), asyncRoute(async (req, r
     prompt?: unknown;
     omitCurrentValue?: unknown;
     aiConfirmationToken?: unknown;
+    providerInstanceId?: unknown;
+    model?: unknown;
+    effort?: unknown;
+    verbosity?: unknown;
     mode?: unknown;
     context?: unknown;
   };
@@ -1895,7 +1945,7 @@ app.post('/api/ai/suggest', requireScope('ai:suggest'), asyncRoute(async (req, r
     }
     const field = parseAiSuggestionField(body.field);
     if (!field) {
-      res.status(400).json({ error: 'field must be one of pitch, risks, techStack, hook, or whyItMightWork.' });
+      res.status(400).json({ error: AI_SUGGESTION_FIELD_ERROR });
       return;
     }
     const currentValue = optionalString(body.currentValue, 'currentValue');
@@ -1907,12 +1957,21 @@ app.post('/api/ai/suggest', requireScope('ai:suggest'), asyncRoute(async (req, r
       res.status(400).json({ error: 'omitCurrentValue must be a boolean.' });
       return;
     }
+    const model = optionalString(body.model, 'model');
+    if (!model.ok) {
+      res.status(400).json({ error: model.error });
+      return;
+    }
     const suggestionRequest: AiFieldSuggestionRequest = {
       ideaId: ideaId.value,
       field,
       currentValue: currentValue.value ?? '',
       ...(prompt.value?.trim() ? { prompt: prompt.value.trim() } : {}),
       ...(body.omitCurrentValue === true ? { omitCurrentValue: true } : {}),
+      providerInstanceId: parseProviderInstanceId(body.providerInstanceId),
+      ...(model.value?.trim() ? { model: model.value.trim() } : {}),
+      effort: parseAiReasoningEffort(body.effort),
+      verbosity: parseAiTextVerbosity(body.verbosity),
     };
     const suggestion = await aiService.suggestField(
       suggestionRequest.ideaId,
@@ -1922,6 +1981,12 @@ app.post('/api/ai/suggest', requireScope('ai:suggest'), asyncRoute(async (req, r
       suggestionRequest.prompt,
       suggestionRequest.omitCurrentValue,
       aiConfirmationToken.value,
+      {
+        providerInstanceId: suggestionRequest.providerInstanceId,
+        model: suggestionRequest.model,
+        effort: suggestionRequest.effort,
+        verbosity: suggestionRequest.verbosity,
+      },
     );
     res.json(suggestion);
     return;
@@ -1949,13 +2014,14 @@ app.post('/api/ai/field-chat', requireScope('ai:suggest'), async (req, res) => {
   const userMessage = requiredString(body.message, 'message');
   const currentValue = optionalString(body.currentValue, 'currentValue');
   const aiConfirmationToken = optionalString((body as { aiConfirmationToken?: unknown }).aiConfirmationToken, 'aiConfirmationToken');
+  const model = optionalString(body.model, 'model');
   const history = parseFieldAssistHistory(body.history);
   if (!ideaId.ok) {
     res.status(400).json({ error: ideaId.error });
     return;
   }
   if (!field) {
-    res.status(400).json({ error: 'field must be one of pitch, risks, techStack, hook, or whyItMightWork.' });
+    res.status(400).json({ error: AI_SUGGESTION_FIELD_ERROR });
     return;
   }
   if (!userMessage.ok) {
@@ -1970,13 +2036,22 @@ app.post('/api/ai/field-chat', requireScope('ai:suggest'), async (req, res) => {
     res.status(400).json({ error: aiConfirmationToken.error });
     return;
   }
+  if (!model.ok) {
+    res.status(400).json({ error: model.error });
+    return;
+  }
   if (!history.ok) {
     res.status(400).json({ error: history.error });
     return;
   }
 
   try {
-    aiService.assertFeatureAllowed('field-suggestions', clientKey(req), aiConfirmationToken.value);
+    aiService.assertFeatureAllowed('field-suggestions', clientKey(req), aiConfirmationToken.value, {
+      providerInstanceId: parseProviderInstanceId(body.providerInstanceId),
+      ...(model.value?.trim() ? { model: model.value.trim() } : {}),
+      effort: parseAiReasoningEffort(body.effort),
+      verbosity: parseAiTextVerbosity(body.verbosity),
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'AI field assistance blocked.';
     const statusCode = typeof (err as { statusCode?: unknown })?.statusCode === 'number'
@@ -2000,6 +2075,10 @@ app.post('/api/ai/field-chat', requireScope('ai:suggest'), async (req, res) => {
         currentValue: currentValue.value,
         message: userMessage.value,
         history: history.value,
+        providerInstanceId: parseProviderInstanceId(body.providerInstanceId),
+        ...(model.value?.trim() ? { model: model.value.trim() } : {}),
+        effort: parseAiReasoningEffort(body.effort),
+        verbosity: parseAiTextVerbosity(body.verbosity),
       },
       clientKey(req),
       (delta) => {
@@ -2270,5 +2349,12 @@ app.listen(PORT, () => {
     const { setCachedCodexAccountAuth } = await import('./ai/service.js');
     setCachedCodexAccountAuth(status.authenticated);
   }).catch(() => { /* Codex unavailable or not logged in — stays false */ });
+  // Auto-discover models for connected providers — delayed so auth caches warm first.
+  const MODEL_REFRESH_DELAY_MS = 10_000;
+  const MODEL_REFRESH_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+  setTimeout(() => {
+    void aiService.refreshAllDiscoveredModels();
+    setInterval(() => void aiService.refreshAllDiscoveredModels(), MODEL_REFRESH_INTERVAL_MS).unref();
+  }, MODEL_REFRESH_DELAY_MS);
   console.log(`Seedbank server listening on http://localhost:${PORT}`);
 });

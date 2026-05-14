@@ -25,6 +25,7 @@ export interface AiStoredConfig extends Omit<
   anthropicApiKeyEncrypted?: string;
   localOpenaiCompatibleApiKeyEncrypted?: string;
   cloudOpenaiCompatibleApiKeyEncrypted?: string;
+  providerInstanceApiKeyEncrypted?: Record<string, string>;
   openaiReasoningEffort?: 'minimal' | 'low' | 'medium' | 'high';
   openaiTextVerbosity?: 'low' | 'medium' | 'high';
   codexReasoningEffort?: 'minimal' | 'low' | 'medium' | 'high';
