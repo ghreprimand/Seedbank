@@ -9,9 +9,25 @@ import type {
   Idea,
 } from '../../../shared/types.js';
 
-export interface AiStoredConfig extends Omit<AiPublicConfig, 'hasOpenAIKey' | 'hasAnthropicKey' | 'hasOpenAICompatibleKey' | 'effectiveFeatureRoutes' | 'claudeAccountAvailable' | 'codexAccountAvailable'> {
+export interface AiStoredConfig extends Omit<
+  AiPublicConfig,
+  | 'hasOpenAIKey'
+  | 'hasAnthropicKey'
+  | 'hasLocalOpenAICompatibleKey'
+  | 'hasCloudOpenAICompatibleKey'
+  | 'hasOpenAICompatibleKey'
+  | 'effectiveFeatureRoutes'
+  | 'claudeAccountAvailable'
+  | 'codexAccountAvailable'
+> {
   openaiApiKeyEncrypted?: string;
   anthropicApiKeyEncrypted?: string;
+  localOpenaiCompatibleApiKeyEncrypted?: string;
+  cloudOpenaiCompatibleApiKeyEncrypted?: string;
+  /**
+   * Legacy shared key for pre-instance openai-compatible configuration.
+   * Maintained for migration/backward compatibility.
+   */
   openaiCompatibleApiKeyEncrypted?: string;
 }
 
