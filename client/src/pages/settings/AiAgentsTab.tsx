@@ -274,6 +274,8 @@ interface ProviderCardProps {
   canSetDefault?: boolean;
   actions?: React.ReactNode;
   children?: React.ReactNode; // expandable detail row
+  /** Expand detail section on first render. Use when the primary action lives in children and the user needs it immediately (e.g. account not signed in). */
+  defaultExpanded?: boolean;
 }
 
 type ProviderCardStatus = 'connected' | 'key-needed' | 'unreachable' | 'local' | 'not-tested';
@@ -295,9 +297,9 @@ function StatusPill({ status }: { status: ProviderCardProps['status'] }) {
 }
 
 function ProviderCard({
-  label, icon, isDefault, status, modelLabel, onSetDefault, canSetDefault = true, actions, children,
+  label, icon, isDefault, status, modelLabel, onSetDefault, canSetDefault = true, actions, children, defaultExpanded = false,
 }: ProviderCardProps) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(defaultExpanded);
 
   return (
     <div className={`rounded-card border transition-colors ${isDefault ? 'border-sage-300 bg-paper' : 'border-ink-100 bg-paper'}`}>
@@ -2999,6 +3001,7 @@ export default function AiAgentsTab() {
                 modelLabel={ai.claudeAccountModel || 'claude-sonnet-latest'}
                 onSetDefault={() => void setDefaultProvider('claude-account')}
                 canSetDefault={claudeAccountStatus === 'connected'}
+                defaultExpanded={!ai.claudeAccountAuthenticated}
               >
                 <ClaudeAccountDetail
                   model={ai.claudeAccountModel || 'claude-sonnet-latest'}
@@ -3060,6 +3063,7 @@ export default function AiAgentsTab() {
                 modelLabel={ai.codexAccountModel || 'codex-recommended'}
                 onSetDefault={() => void setDefaultProvider('codex-account')}
                 canSetDefault={ai.codexAccountAvailable === true && ai.codexAccountAuthenticated === true && codexAccountStatus === 'connected'}
+                defaultExpanded={!ai.codexAccountAuthenticated}
               >
                 <CodexAccountDetail
                   model={ai.codexAccountModel || 'codex-recommended'}
