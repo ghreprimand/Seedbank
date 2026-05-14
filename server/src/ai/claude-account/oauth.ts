@@ -17,7 +17,14 @@
 
 import { createServer, type Server } from 'node:http';
 import { randomBytes, createHash } from 'node:crypto';
-import { loadTokens, saveTokens, type ClaudeAccountTokens } from './auth.js';
+import {
+  loadTokens,
+  saveTokens,
+  withAuthLock,
+  readTokensUnlocked,
+  writeTokensUnlocked,
+  type ClaudeAccountTokens,
+} from './auth.js';
 
 // Public PKCE client_id (base64-encoded for minor scrape protection;
 // this is NOT a secret).
@@ -37,6 +44,29 @@ const SCOPES = [
 ].join(' ');
 
 const REFRESH_LEAD_MS = 30_000;
+const CLAUDE_ACCOUNT_BETA_HEADER = 'claude-code-20250219,oauth-2025-04-20';
+const CLAUDE_ACCOUNT_USER_AGENT = 'claude-cli/2.1.75';
+
+export class ClaudeAccountNoAuthError extends Error {
+  constructor(message = 'Claude account is not authenticated.') {
+    super(message);
+    this.name = 'ClaudeAccountNoAuthError';
+  }
+}
+
+export class ClaudeAccountRefreshError extends Error {
+  constructor(
+    message: string,
+    readonly status?: number,
+    options?: { cause?: unknown },
+  ) {
+    super(message);
+    this.name = 'ClaudeAccountRefreshError';
+    if (options?.cause !== undefined) {
+      (this as Error & { cause?: unknown }).cause = options.cause;
+    }
+  }
+}
 
 interface PendingFlow {
   state: string;
@@ -213,7 +243,13 @@ function cancelPendingFlow(): void {
 async function exchangeCode(code: string, codeVerifier: string): Promise<ClaudeAccountTokens> {
   const res = await fetch(TOKEN_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      'anthropic-beta': CLAUDE_ACCOUNT_BETA_HEADER,
+      'user-agent': CLAUDE_ACCOUNT_USER_AGENT,
+      'x-app': 'cli',
+    },
     body: JSON.stringify({
       grant_type: 'authorization_code',
       client_id: CLIENT_ID,
@@ -248,54 +284,74 @@ async function exchangeCode(code: string, codeVerifier: string): Promise<ClaudeA
 /**
  * Refresh tokens ahead of expiry.
  */
-export async function refreshTokens(current: ClaudeAccountTokens): Promise<ClaudeAccountTokens> {
-  const res = await fetch(TOKEN_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({
-      grant_type: 'refresh_token',
-      client_id: CLIENT_ID,
-      refresh_token: current.refreshToken,
-    }),
+export async function refreshTokens(): Promise<ClaudeAccountTokens> {
+  return await withAuthLock(async () => {
+    const latest = await readTokensUnlocked();
+    if (!latest) {
+      throw new ClaudeAccountNoAuthError();
+    }
+    if (latest.expiresAt > Date.now() + REFRESH_LEAD_MS) {
+      return latest;
+    }
+
+    let res: Response;
+    try {
+      res = await fetch(TOKEN_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'anthropic-beta': CLAUDE_ACCOUNT_BETA_HEADER,
+          'user-agent': CLAUDE_ACCOUNT_USER_AGENT,
+          'x-app': 'cli',
+        },
+        body: JSON.stringify({
+          grant_type: 'refresh_token',
+          client_id: CLIENT_ID,
+          refresh_token: latest.refreshToken,
+        }),
+      });
+    } catch (error) {
+      throw new ClaudeAccountRefreshError('Claude account token refresh failed due to a network error.', undefined, { cause: error });
+    }
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '');
+      throw new ClaudeAccountRefreshError(
+        `Claude account token refresh failed (${res.status}): ${txt.slice(0, 200)}`,
+        res.status,
+      );
+    }
+    const data = await res.json() as {
+      access_token: string;
+      refresh_token?: string;
+      expires_in: number;
+      token_type?: string;
+      scope?: string;
+    };
+    const now = Date.now();
+    const next: ClaudeAccountTokens = {
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token ?? latest.refreshToken,
+      expiresAt: now + (data.expires_in * 1000),
+      tokenType: data.token_type ?? latest.tokenType,
+      scope: data.scope ?? latest.scope,
+      obtainedAt: now,
+    };
+    await writeTokensUnlocked(next);
+    return next;
   });
-  if (!res.ok) {
-    const txt = await res.text().catch(() => '');
-    throw new Error(`Token refresh failed (${res.status}): ${txt.slice(0, 200)}`);
-  }
-  const data = await res.json() as {
-    access_token: string;
-    refresh_token?: string;
-    expires_in: number;
-    token_type?: string;
-    scope?: string;
-  };
-  const now = Date.now();
-  const next: ClaudeAccountTokens = {
-    accessToken: data.access_token,
-    refreshToken: data.refresh_token ?? current.refreshToken,
-    expiresAt: now + (data.expires_in * 1000),
-    tokenType: data.token_type ?? current.tokenType,
-    scope: data.scope ?? current.scope,
-    obtainedAt: now,
-  };
-  await saveTokens(next);
-  return next;
 }
 
 /**
  * Load tokens, refresh if near expiry, return live set.
- * Returns null if not authenticated.
+ * Throws ClaudeAccountNoAuthError when not authenticated.
+ * Throws ClaudeAccountRefreshError when refresh fails.
  */
-export async function ensureLiveTokens(): Promise<ClaudeAccountTokens | null> {
+export async function ensureLiveTokens(): Promise<ClaudeAccountTokens> {
   const tokens = await loadTokens();
-  if (!tokens) return null;
+  if (!tokens) throw new ClaudeAccountNoAuthError();
   if (tokens.expiresAt > Date.now() + REFRESH_LEAD_MS) return tokens;
-  try {
-    return await refreshTokens(tokens);
-  } catch {
-    // Refresh failed — return null so callers treat as unauthenticated
-    return null;
-  }
+  return await refreshTokens();
 }
 
 export function isBootstrapPending(): boolean {

@@ -29,6 +29,7 @@ interface AuthFileShape {
 }
 
 const AUTH_PATH = join(dataDir, 'claude-auth.json');
+let authLock: Promise<void> = Promise.resolve();
 
 async function readRaw(): Promise<AuthFileShape> {
   try {
@@ -50,27 +51,59 @@ async function writeRaw(data: AuthFileShape): Promise<void> {
   try { await fs.chmod(AUTH_PATH, 0o600); } catch { /* best-effort */ }
 }
 
+export async function withAuthLock<T>(fn: () => Promise<T>): Promise<T> {
+  const previous = authLock;
+  let release!: () => void;
+  authLock = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await previous;
+  try {
+    return await fn();
+  } finally {
+    release();
+  }
+}
+
 export async function loadTokens(): Promise<ClaudeAccountTokens | null> {
   const data = await readRaw();
   return data.claude?.account ?? null;
 }
 
 export async function saveTokens(next: ClaudeAccountTokens): Promise<void> {
+  await withAuthLock(async () => {
+    const data = await readRaw();
+    const merged: AuthFileShape = {
+      ...data,
+      claude: { ...(data.claude ?? {}), account: next },
+    };
+    await writeRaw(merged);
+  });
+}
+
+export async function clearTokens(): Promise<void> {
+  await withAuthLock(async () => {
+    const data = await readRaw();
+    if (data.claude?.account) {
+      delete data.claude.account;
+      if (Object.keys(data.claude).length === 0) delete data.claude;
+    }
+    await writeRaw(data);
+  });
+}
+
+export async function readTokensUnlocked(): Promise<ClaudeAccountTokens | null> {
+  const data = await readRaw();
+  return data.claude?.account ?? null;
+}
+
+export async function writeTokensUnlocked(next: ClaudeAccountTokens): Promise<void> {
   const data = await readRaw();
   const merged: AuthFileShape = {
     ...data,
     claude: { ...(data.claude ?? {}), account: next },
   };
   await writeRaw(merged);
-}
-
-export async function clearTokens(): Promise<void> {
-  const data = await readRaw();
-  if (data.claude?.account) {
-    delete data.claude.account;
-    if (Object.keys(data.claude).length === 0) delete data.claude;
-  }
-  await writeRaw(data);
 }
 
 // ── Runtime availability gate ─────────────────────────────────────────────────

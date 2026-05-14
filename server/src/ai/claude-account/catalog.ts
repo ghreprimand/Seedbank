@@ -6,10 +6,12 @@
  * known models when offline or unauthenticated.
  */
 
-import { ensureLiveTokens } from './oauth.js';
+import { ClaudeAccountNoAuthError, ensureLiveTokens } from './oauth.js';
 
 const REFRESH_INTERVAL_MS = 60 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 15_000;
+const CLAUDE_ACCOUNT_BETA_HEADER = 'claude-code-20250219,oauth-2025-04-20';
+const CLAUDE_ACCOUNT_USER_AGENT = 'claude-cli/2.1.75';
 
 export interface ClaudeCatalogModel {
   id: string;
@@ -67,8 +69,11 @@ export async function getCatalog(force = false): Promise<ClaudeCatalogSnapshot> 
     if (cache) {
       return { ...cache, fresh: false };
     }
-    // No cache, no auth — return bundled fallback clearly labeled
-    return { fetchedAt: now, models: BUNDLED_MODELS, fresh: false };
+    if (err instanceof ClaudeAccountNoAuthError) {
+      // No cache + not authenticated: return bundled fallback.
+      return { fetchedAt: now, models: BUNDLED_MODELS, fresh: false };
+    }
+    throw err;
   }
 }
 
@@ -81,7 +86,6 @@ export function getBundledModels(): ClaudeCatalogModel[] {
 
 async function fetchCatalog(): Promise<ClaudeCatalogSnapshot> {
   const tokens = await ensureLiveTokens();
-  if (!tokens) throw new Error('Not authenticated');
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -92,6 +96,9 @@ async function fetchCatalog(): Promise<ClaudeCatalogSnapshot> {
         Accept: 'application/json',
         Authorization: `Bearer ${tokens.accessToken}`,
         'anthropic-version': '2023-06-01',
+        'anthropic-beta': CLAUDE_ACCOUNT_BETA_HEADER,
+        'user-agent': CLAUDE_ACCOUNT_USER_AGENT,
+        'x-app': 'cli',
       },
       signal: controller.signal,
     });
