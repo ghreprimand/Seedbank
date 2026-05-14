@@ -1,7 +1,7 @@
 /**
  * ProviderCard and StatusPill components for the AI & Agents settings page.
  */
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ChevronDown, Radio } from 'lucide-react';
 import type { AiModelInfo } from '@/lib/types';
 import type { ProviderCardStatus } from './types';
@@ -73,13 +73,15 @@ export function ProviderCard({
   helpManualSection,
 }: ProviderCardProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
+  const [lastDefaultExpanded, setLastDefaultExpanded] = useState(defaultExpanded);
 
   // Auto-expand when defaultExpanded transitions to true after mount
   // (e.g. session expiry while page is open — surfaces the login action).
   // Does NOT force-collapse on login so the user stays in context.
-  useEffect(() => {
+  if (defaultExpanded !== lastDefaultExpanded) {
+    setLastDefaultExpanded(defaultExpanded);
     if (defaultExpanded) setExpanded(true);
-  }, [defaultExpanded]);
+  }
 
   return (
     <div

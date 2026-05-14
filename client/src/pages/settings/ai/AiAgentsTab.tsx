@@ -68,30 +68,16 @@ export default function AiAgentsTab() {
 
   // ── Method capabilities ────────────────────────────────────────────────────
   const [methodCapabilities, setMethodCapabilities] = useState<AiMethodCapability[]>([]);
-  const [claudeMethod, setClaudeMethod] = useState<string>(
-    ai.claudeServiceMethod,
-  );
-  const [openaiMethod, setOpenaiMethod] = useState<string>(
-    ai.codexOpenAIServiceMethod,
-  );
-
-  useEffect(() => {
-    setClaudeMethod(ai.claudeServiceMethod);
-  }, [ai.claudeServiceMethod]);
-
-  useEffect(() => {
-    setOpenaiMethod(ai.codexOpenAIServiceMethod);
-  }, [ai.codexOpenAIServiceMethod]);
+  const claudeMethod = ai.claudeServiceMethod;
+  const openaiMethod = ai.codexOpenAIServiceMethod;
 
   const saveClaudeMethod = (method: string) => {
     if (method !== 'anthropic-api-key' && method !== 'claude-account-native') return;
-    setClaudeMethod(method);
     void patch('ai', { claudeServiceMethod: method });
   };
 
   const saveOpenaiMethod = (method: string) => {
     if (method !== 'openai-api-key' && method !== 'codex-account-app-server') return;
-    setOpenaiMethod(method);
     void patch('ai', { codexOpenAIServiceMethod: method });
   };
 
@@ -299,18 +285,7 @@ export default function AiAgentsTab() {
   );
 
   // ── Local Models section ───────────────────────────────────────────────────
-  const [localServerType, setLocalServerType] = useState<LocalServerType>(
-    () => ai.localModelServiceMethod ?? initialLocalServerType(ai),
-  );
-  useEffect(() => {
-    setLocalServerType(ai.localModelServiceMethod ?? initialLocalServerType(ai));
-  }, [
-    ai.localModelServiceMethod,
-    ai.localOpenaiCompatiblePreset,
-    ai.localOpenaiCompatibleBaseUrl,
-    ai.openaiCompatiblePreset,
-    ai.openaiCompatibleBaseUrl,
-  ]);
+  const localServerType = ai.localModelServiceMethod ?? initialLocalServerType(ai);
   const localServerOpt = LOCAL_SERVER_OPTIONS.find((o) => o.id === localServerType)!;
   const localServerPresetId: AiOpenAICompatiblePresetId = localServerOpt.presetId ?? 'custom';
   const [newLocalType, setNewLocalType] = useState<LocalServerType>('lm-studio');
@@ -323,7 +298,6 @@ export default function AiAgentsTab() {
   const [newCloudModel, setNewCloudModel] = useState('openai/gpt-4o-mini');
   const [newCloudKey, setNewCloudKey] = useState('');
   const saveLocalServerType = (next: LocalServerType) => {
-    setLocalServerType(next);
     const option = LOCAL_SERVER_OPTIONS.find((o) => o.id === next);
     const patchBody: Partial<AiPublicConfig> = { localModelServiceMethod: next };
     if (option?.presetId) {

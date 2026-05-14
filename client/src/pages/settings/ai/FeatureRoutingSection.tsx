@@ -1,7 +1,7 @@
 /**
  * FeatureRoutingSection — per-feature AI provider/model routing table.
  */
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Check, Loader2 } from 'lucide-react';
 import type {
   AiFeatureId,
@@ -47,43 +47,54 @@ export function FeatureRoutingSection({
   onSave,
   onSaveDefault,
 }: FeatureRoutingSectionProps) {
+  const defaultEffortForInstance = (instanceId: AiProviderInstanceId): AiReasoningEffort | '' =>
+    instanceId === 'codex-account'
+      ? ai.codexReasoningEffort ?? ''
+      : instanceId === 'openai-api'
+        ? ai.openaiReasoningEffort ?? ''
+        : '';
+
   const [routes, setRoutes] = useState(ai.featureRoutes);
+  const [lastFeatureRoutes, setLastFeatureRoutes] = useState(ai.featureRoutes);
   const [defaultInstanceId, setDefaultInstanceId] = useState(ai.defaultProviderInstanceId);
+  const [lastDefaultDraft, setLastDefaultDraft] = useState(() => ({
+    instanceId: ai.defaultProviderInstanceId,
+    providerInstances: ai.providerInstances,
+    codexReasoningEffort: ai.codexReasoningEffort,
+    openaiReasoningEffort: ai.openaiReasoningEffort,
+  }));
   const [defaultModel, setDefaultModel] = useState(
     ai.providerInstances[ai.defaultProviderInstanceId]?.configuredModel ?? '',
   );
   const [defaultEffort, setDefaultEffort] = useState<AiReasoningEffort | ''>(
-    ai.defaultProviderInstanceId === 'codex-account'
-      ? ai.codexReasoningEffort ?? ''
-      : ai.defaultProviderInstanceId === 'openai-api'
-        ? ai.openaiReasoningEffort ?? ''
-        : '',
+    defaultEffortForInstance(ai.defaultProviderInstanceId),
   );
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  useEffect(() => {
+  if (ai.featureRoutes !== lastFeatureRoutes) {
+    setLastFeatureRoutes(ai.featureRoutes);
     setRoutes(ai.featureRoutes);
-  }, [ai.featureRoutes]);
+  }
 
-  useEffect(() => {
+  if (
+    ai.defaultProviderInstanceId !== lastDefaultDraft.instanceId ||
+    ai.providerInstances !== lastDefaultDraft.providerInstances ||
+    ai.codexReasoningEffort !== lastDefaultDraft.codexReasoningEffort ||
+    ai.openaiReasoningEffort !== lastDefaultDraft.openaiReasoningEffort
+  ) {
     const instance = ai.providerInstances[ai.defaultProviderInstanceId];
+    setLastDefaultDraft({
+      instanceId: ai.defaultProviderInstanceId,
+      providerInstances: ai.providerInstances,
+      codexReasoningEffort: ai.codexReasoningEffort,
+      openaiReasoningEffort: ai.openaiReasoningEffort,
+    });
     setDefaultInstanceId(ai.defaultProviderInstanceId);
     setDefaultModel(instance?.configuredModel ?? '');
-    setDefaultEffort(
-      ai.defaultProviderInstanceId === 'codex-account'
-        ? ai.codexReasoningEffort ?? ''
-        : ai.defaultProviderInstanceId === 'openai-api'
-          ? ai.openaiReasoningEffort ?? ''
-          : '',
-    );
-  }, [
-    ai.defaultProviderInstanceId,
-    ai.providerInstances,
-    ai.codexReasoningEffort,
-    ai.openaiReasoningEffort,
-  ]);
+    setDefaultEffort(defaultEffortForInstance(ai.defaultProviderInstanceId));
+  }
 
   const isLocalInstance = ai.defaultProviderInstanceId === 'local-openai-compatible';
   const openAICompatiblePreset = presetFor(

@@ -843,18 +843,15 @@ export default function AiAssistModal({
    */
   const requestGenRef = useRef(0);
 
-  useEffect(() => {
-    const options = configuredRouteOptions(ai);
-    setRouteSelection((current) => {
-      if (options.some((option) => sameRouteSelection(option, current))) return current;
-      return defaultRouteSelection(ai, featureKey);
-    });
-  }, [ai, featureKey]);
+  const routeOptions = configuredRouteOptions(ai);
+  const activeRouteSelection = routeOptions.some((option) => sameRouteSelection(option, routeSelection))
+    ? routeSelection
+    : defaultRouteSelection(ai, featureKey);
 
   const routeRequest = {
-    providerInstanceId: routeSelection.providerInstanceId,
-    model: routeSelection.model,
-    effort: routeSelection.effort,
+    providerInstanceId: activeRouteSelection.providerInstanceId,
+    model: activeRouteSelection.model,
+    effort: activeRouteSelection.effort,
   };
 
   /**
@@ -1034,7 +1031,7 @@ export default function AiAssistModal({
           <IntentSelector
             context={context}
             featureKey={featureKey}
-            routeSelection={routeSelection}
+            routeSelection={activeRouteSelection}
             onRouteChange={setRouteSelection}
             onSelect={handleIntentSelect}
             onClose={onClose}
@@ -1049,7 +1046,7 @@ export default function AiAssistModal({
                 ? 'Confirmation required before sending idea content to a cloud provider.'
                 : 'Review before proceeding.'}
               featureKey={featureKey}
-              routeSelection={routeSelection}
+              routeSelection={activeRouteSelection}
               onRouteChange={setRouteSelection}
               onClose={onClose}
             />
@@ -1074,7 +1071,7 @@ export default function AiAssistModal({
               // custom-cloud providers have richer labels there.
               const featureId = (featureKey ?? 'field-suggestions') as keyof typeof ai.effectiveFeatureRoutes;
               const effective = ai.effectiveFeatureRoutes[featureId] ?? ai.effectiveFeatureRoutes['field-suggestions'] ?? ai.effectiveFeatureRoutes.default;
-              const selectedInstance = ai.providerInstances[routeSelection.providerInstanceId];
+              const selectedInstance = ai.providerInstances[activeRouteSelection.providerInstanceId];
               const instanceLabel = selectedInstance?.label
                 ?? (effective
                   ? (ai.providerInstances[effective.providerInstanceId]?.label ?? providerName(pendingPreflight.provider))
@@ -1157,7 +1154,7 @@ export default function AiAssistModal({
             <ModalHeader
               title={`Generating · ${context.fieldLabel}`}
               featureKey={featureKey}
-              routeSelection={routeSelection}
+              routeSelection={activeRouteSelection}
               onRouteChange={setRouteSelection}
               onClose={onClose}
             />
@@ -1182,7 +1179,7 @@ export default function AiAssistModal({
             suggestion={suggestion}
             rationale={rationale}
             featureKey={featureKey}
-            routeSelection={routeSelection}
+            routeSelection={activeRouteSelection}
             onRouteChange={setRouteSelection}
             onApply={() => { onApply(suggestion); onClose(); }}
             onReject={() => setView('intent-select')}
@@ -1195,7 +1192,7 @@ export default function AiAssistModal({
           <RefineView
             context={context}
             featureKey={featureKey}
-            routeSelection={routeSelection}
+            routeSelection={activeRouteSelection}
             onRouteChange={setRouteSelection}
             onSubmit={handleRefineSubmit}
             onBack={() => setView('review')}
@@ -1207,7 +1204,7 @@ export default function AiAssistModal({
           <ConversationView
             context={context}
             featureKey={featureKey}
-            routeSelection={routeSelection}
+            routeSelection={activeRouteSelection}
             onRouteChange={setRouteSelection}
             initialPrompt={conversationPrompt}
             confirmationToken={conversationToken}
@@ -1222,7 +1219,7 @@ export default function AiAssistModal({
             <ModalHeader
               title="Something went wrong"
               featureKey={featureKey}
-              routeSelection={routeSelection}
+              routeSelection={activeRouteSelection}
               onRouteChange={setRouteSelection}
               onClose={onClose}
             />

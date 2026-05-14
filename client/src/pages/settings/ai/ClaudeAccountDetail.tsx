@@ -37,6 +37,7 @@ export function ClaudeAccountDetail({
 }: ClaudeAccountDetailProps) {
   const [localModel, setLocalModel] = useState(model);
   const [compact, setCompact] = useState(compactEnabled);
+  const [lastCompactEnabled, setLastCompactEnabled] = useState(compactEnabled);
   const [listedModels, setListedModels] = useState<AiModelInfo[]>([]);
   const [loginLoading, setLoginLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -55,9 +56,10 @@ export function ClaudeAccountDetail({
     }
   };
 
-  useEffect(() => {
+  if (compactEnabled !== lastCompactEnabled) {
+    setLastCompactEnabled(compactEnabled);
     setCompact(compactEnabled);
-  }, [compactEnabled]);
+  }
 
   const refreshStatus = async () => {
     if (!available) {
