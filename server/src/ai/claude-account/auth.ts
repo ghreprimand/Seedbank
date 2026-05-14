@@ -107,34 +107,13 @@ export async function writeTokensUnlocked(next: ClaudeAccountTokens): Promise<vo
   await writeRaw(merged);
 }
 
-// ── Runtime availability gate ─────────────────────────────────────────────────
+// ── Runtime availability ──────────────────────────────────────────────────────
 
 export interface ClaudeAccountRuntimeAvailability {
   available: boolean;
   reason?: string;
 }
 
-/**
- * Returns true when the operator has explicitly opted in via
- * `SEEDBANK_ENABLE_CLAUDE_ACCOUNT=1` (or `true`/`yes`/`on`).
- *
- * Claude account native OAuth is experimental in the current RC build.
- * The gate prevents the capability from appearing as a routeable choice
- * for average users who have not opted in.
- */
-export function claudeAccountEnabledByEnv(): boolean {
-  const raw = process.env.SEEDBANK_ENABLE_CLAUDE_ACCOUNT?.trim().toLowerCase();
-  return raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on';
-}
-
 export function claudeAccountRuntimeAvailability(): ClaudeAccountRuntimeAvailability {
-  if (!claudeAccountEnabledByEnv()) {
-    return {
-      available: false,
-      reason:
-        'Claude account native OAuth is unavailable in this release candidate build. ' +
-        'Set SEEDBANK_ENABLE_CLAUDE_ACCOUNT=1 to opt in to the experimental OAuth path.',
-    };
-  }
   return { available: true };
 }

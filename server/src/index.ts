@@ -2258,9 +2258,8 @@ fs.mkdirSync(path.join(dataDir, 'agent-runs'), { recursive: true });
 app.listen(PORT, () => {
   runScheduledBackupIfDue();
   setInterval(runScheduledBackupIfDue, 5 * 60 * 1000).unref();
-  // Warm the Claude account auth cache at startup (non-blocking; skipped when gate is off).
-  void import('./ai/claude-account/auth.js').then(async ({ loadTokens, claudeAccountEnabledByEnv }) => {
-    if (!claudeAccountEnabledByEnv()) return;
+  // Warm the Claude account auth cache at startup without blocking account login.
+  void import('./ai/claude-account/auth.js').then(async ({ loadTokens }) => {
     const tokens = await loadTokens();
     const { setCachedClaudeAccountAuth } = await import('./ai/service.js');
     setCachedClaudeAccountAuth(tokens !== null && tokens.expiresAt > Date.now());

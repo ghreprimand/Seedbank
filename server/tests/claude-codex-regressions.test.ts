@@ -283,9 +283,6 @@ test('Claude account listModels surfaces refresh failures instead of false logou
 });
 
 test('Codex turn/start request includes non-null effort mapping', async () => {
-  const prev = process.env.SEEDBANK_ENABLE_CODEX_ACCOUNT;
-  process.env.SEEDBANK_ENABLE_CODEX_ACCOUNT = '1';
-
   const session = codexAccountSession as unknown as Record<string, unknown>;
   const originalEnsureStarted = session.ensureStarted as () => Promise<void>;
   const originalResolveModel = session.resolveModel as (model: string) => Promise<string>;
@@ -314,8 +311,6 @@ test('Codex turn/start request includes non-null effort mapping', async () => {
     session.resolveModel = originalResolveModel;
     session.request = originalRequest;
     session.activeTurn = null;
-    if (prev === undefined) delete process.env.SEEDBANK_ENABLE_CODEX_ACCOUNT;
-    else process.env.SEEDBANK_ENABLE_CODEX_ACCOUNT = prev;
   }
 
   assert.ok(turnStartParams, 'turn/start should be called');
@@ -323,9 +318,6 @@ test('Codex turn/start request includes non-null effort mapping', async () => {
 });
 
 test('Codex timeout triggers turn/interrupt before rejecting', async () => {
-  const prev = process.env.SEEDBANK_ENABLE_CODEX_ACCOUNT;
-  process.env.SEEDBANK_ENABLE_CODEX_ACCOUNT = '1';
-
   const session = codexAccountSession as unknown as Record<string, unknown>;
   const originalEnsureStarted = session.ensureStarted as () => Promise<void>;
   const originalResolveModel = session.resolveModel as (model: string) => Promise<string>;
@@ -367,17 +359,12 @@ test('Codex timeout triggers turn/interrupt before rejecting', async () => {
     session.resolveModel = originalResolveModel;
     session.request = originalRequest;
     session.activeTurn = null;
-    if (prev === undefined) delete process.env.SEEDBANK_ENABLE_CODEX_ACCOUNT;
-    else process.env.SEEDBANK_ENABLE_CODEX_ACCOUNT = prev;
   }
 
   assert.equal(interruptCalled, true);
 });
 
 test('Codex reasoning notifications stream labeled text before assistant delta', async () => {
-  const prev = process.env.SEEDBANK_ENABLE_CODEX_ACCOUNT;
-  process.env.SEEDBANK_ENABLE_CODEX_ACCOUNT = '1';
-
   const session = codexAccountSession as unknown as Record<string, unknown>;
   const originalEnsureStarted = session.ensureStarted as () => Promise<void>;
   const originalResolveModel = session.resolveModel as (model: string) => Promise<string>;
@@ -423,15 +410,10 @@ test('Codex reasoning notifications stream labeled text before assistant delta',
     session.resolveModel = originalResolveModel;
     session.request = originalRequest;
     session.activeTurn = null;
-    if (prev === undefined) delete process.env.SEEDBANK_ENABLE_CODEX_ACCOUNT;
-    else process.env.SEEDBANK_ENABLE_CODEX_ACCOUNT = prev;
   }
 });
 
 test('Codex failed-turn unauthorized error surfaces actionable login message', async () => {
-  const prev = process.env.SEEDBANK_ENABLE_CODEX_ACCOUNT;
-  process.env.SEEDBANK_ENABLE_CODEX_ACCOUNT = '1';
-
   const session = codexAccountSession as unknown as Record<string, unknown>;
   const originalEnsureStarted = session.ensureStarted as () => Promise<void>;
   const originalResolveModel = session.resolveModel as (model: string) => Promise<string>;
@@ -472,8 +454,6 @@ test('Codex failed-turn unauthorized error surfaces actionable login message', a
     session.resolveModel = originalResolveModel;
     session.request = originalRequest;
     session.activeTurn = null;
-    if (prev === undefined) delete process.env.SEEDBANK_ENABLE_CODEX_ACCOUNT;
-    else process.env.SEEDBANK_ENABLE_CODEX_ACCOUNT = prev;
   }
 });
 
@@ -505,9 +485,6 @@ test('Codex JSON-RPC context-window errors map to actionable message', async () 
 });
 
 test('Codex status applies startup circuit-breaker after repeated app-server failures', async () => {
-  const prev = process.env.SEEDBANK_ENABLE_CODEX_ACCOUNT;
-  process.env.SEEDBANK_ENABLE_CODEX_ACCOUNT = '1';
-
   const session = codexAccountSession as unknown as Record<string, unknown>;
   const originalStart = session.start as () => Promise<void>;
   const originalProc = session.proc;
@@ -539,8 +516,6 @@ test('Codex status applies startup circuit-breaker after repeated app-server fai
     session.startFailureCount = originalFailureCount;
     session.circuitOpenUntil = originalCircuitUntil;
     session.lastStartFailure = originalLastFailure;
-    if (prev === undefined) delete process.env.SEEDBANK_ENABLE_CODEX_ACCOUNT;
-    else process.env.SEEDBANK_ENABLE_CODEX_ACCOUNT = prev;
   }
 });
 

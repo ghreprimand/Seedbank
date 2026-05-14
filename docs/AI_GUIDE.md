@@ -27,9 +27,9 @@ The local and cloud OpenAI-compatible cards are two views of one shared OpenAI-c
 
 **Custom / OpenAI-compatible endpoint** — choose a preset or enter a compatible endpoint URL, API key when required, and model name. Use this for OpenRouter, Groq, Mistral, Together, Fireworks, LM Studio, vLLM, llama.cpp, LocalAI, or another service that accepts OpenAI Chat Completions requests.
 
-**Claude account** — account-auth method with login/status controls shown in the Claude service area. RC posture is still coming-soon/unavailable for normal production routing.
+**Claude account** — account-auth method with login/status controls shown in the Claude service area. Use this to route AI chat through a Claude.ai subscription with OAuth tokens rather than an Anthropic API key.
 
-**Codex account** — experimental account-auth method, available only with explicit server opt-in (`SEEDBANK_ENABLE_CODEX_ACCOUNT`). This is not OpenAI API billing and not the same as linked Codex CLI agent launching.
+**Codex account** — account-auth method that talks to the local Codex app-server over JSON-RPC. This requires a compatible Codex runtime installed locally. It is not OpenAI API billing and not the same as linked Codex CLI agent launching.
 
 **Claude Code CLI / Codex CLI** — file-producing agent methods inside their respective service areas. These are review-first development tools, not Feature Defaults chat providers.
 

@@ -43,25 +43,16 @@ test('provider instance registry exposes required-field contracts', () => {
   }
 });
 
-test('provider instance diagnostics include missing-key and runtime-unavailable states', () => {
-  const prevCodex = process.env.SEEDBANK_ENABLE_CODEX_ACCOUNT;
-  const prevClaude = process.env.SEEDBANK_ENABLE_CLAUDE_ACCOUNT;
-  delete process.env.SEEDBANK_ENABLE_CODEX_ACCOUNT;
-  delete process.env.SEEDBANK_ENABLE_CLAUDE_ACCOUNT;
-
+test('provider instance diagnostics include missing-key and account-auth states', () => {
   const { db, service } = aiFixture();
   try {
     const diagnostics = service.getProviderInstanceDiagnostics();
     assert.ok(diagnostics.some((diag) => diag.instanceId === 'openai-api' && diag.code === 'missing_key'));
     assert.ok(diagnostics.some((diag) => diag.instanceId === 'cloud-openai-compatible' && diag.code === 'missing_key'));
-    assert.ok(diagnostics.some((diag) => diag.instanceId === 'claude-account' && diag.code === 'runtime_unavailable'));
-    assert.ok(diagnostics.some((diag) => diag.instanceId === 'codex-account' && diag.code === 'runtime_unavailable'));
+    assert.ok(diagnostics.some((diag) => diag.instanceId === 'claude-account' && diag.code === 'auth_required'));
+    assert.ok(diagnostics.some((diag) => diag.instanceId === 'codex-account' && diag.code === 'auth_required'));
   } finally {
     db.close();
-    if (prevCodex === undefined) delete process.env.SEEDBANK_ENABLE_CODEX_ACCOUNT;
-    else process.env.SEEDBANK_ENABLE_CODEX_ACCOUNT = prevCodex;
-    if (prevClaude === undefined) delete process.env.SEEDBANK_ENABLE_CLAUDE_ACCOUNT;
-    else process.env.SEEDBANK_ENABLE_CLAUDE_ACCOUNT = prevClaude;
   }
 });
 
