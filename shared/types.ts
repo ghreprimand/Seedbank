@@ -786,10 +786,10 @@ export interface AiPublicConfig {
   hasCloudOpenAICompatibleKey: boolean;
   /** Legacy aggregate flag for compatibility during UI transition. */
   hasOpenAICompatibleKey: boolean;
-  /** true only when SEEDBANK_ENABLE_CLAUDE_ACCOUNT opt-in is set server-side */
+  /** true when Claude account login can be started from this server session. */
   claudeAccountAvailable: boolean;
   claudeAccountAuthenticated: boolean;
-  /** true only when SEEDBANK_ENABLE_CODEX_ACCOUNT opt-in is set server-side */
+  /** true when Codex account login is exposed; app-server status reports runtime failures separately. */
   codexAccountAvailable: boolean;
   codexAccountAuthenticated: boolean;
 }

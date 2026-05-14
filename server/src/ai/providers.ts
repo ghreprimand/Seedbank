@@ -1216,7 +1216,7 @@ export class CodexAccountProvider implements AiProvider {
         throw new AiProviderError(
           this.id,
           'not_configured',
-          availability.reason ?? 'Codex account is unavailable in this release candidate build.',
+          availability.reason ?? 'Codex account app-server is unavailable.',
         );
       }
       const { codexAccountSession } = await import('./codex-account/session.js');
@@ -1245,7 +1245,7 @@ export class CodexAccountProvider implements AiProvider {
         throw new AiProviderError(
           this.id,
           'not_configured',
-          availability.reason ?? 'Codex account is unavailable in this release candidate build.',
+          availability.reason ?? 'Codex account app-server is unavailable.',
         );
       }
       const { codexAccountSession } = await import('./codex-account/session.js');
@@ -1271,7 +1271,7 @@ export class CodexAccountProvider implements AiProvider {
         throw new AiProviderError(
           this.id,
           'not_configured',
-          availability.reason ?? 'Codex account is unavailable in this release candidate build.',
+          availability.reason ?? 'Codex account app-server is unavailable.',
         );
       }
       const { codexAccountSession } = await import('./codex-account/session.js');
@@ -1299,7 +1299,7 @@ export class CodexAccountProvider implements AiProvider {
           ok: false,
           models: [],
           code: 'not_configured',
-          message: availability.reason ?? 'Codex account is unavailable in this release candidate build.',
+          message: availability.reason ?? 'Codex account app-server is unavailable.',
           codexAccount: {
             authenticated: false,
             catalogFresh: false,

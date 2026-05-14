@@ -154,18 +154,7 @@ export interface CodexAccountRuntimeAvailability {
   reason?: string;
 }
 
-export function codexAccountEnabledByEnv(): boolean {
-  const raw = process.env.SEEDBANK_ENABLE_CODEX_ACCOUNT?.trim().toLowerCase();
-  return raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on';
-}
-
 export function codexAccountRuntimeAvailability(): CodexAccountRuntimeAvailability {
-  if (!codexAccountEnabledByEnv()) {
-    return {
-      available: false,
-      reason: 'Codex account is unavailable in this release candidate build. Set SEEDBANK_ENABLE_CODEX_ACCOUNT=1 to enable the experimental app-server path.',
-    };
-  }
   return { available: true };
 }
 
@@ -218,7 +207,7 @@ class CodexAppServerSession extends EventEmitter {
     if (!availability.available) {
       return {
         ok: false,
-        message: availability.reason ?? 'Codex account is unavailable in this release candidate build.',
+        message: availability.reason ?? 'Codex account app-server is unavailable.',
       };
     }
     await this.ensureStarted();
@@ -256,7 +245,7 @@ class CodexAppServerSession extends EventEmitter {
 
   async listModels(force = false): Promise<CodexCatalogSnapshot> {
     const availability = codexAccountRuntimeAvailability();
-    if (!availability.available) throw new Error(availability.reason ?? 'Codex account is unavailable in this release candidate build.');
+    if (!availability.available) throw new Error(availability.reason ?? 'Codex account app-server is unavailable.');
     if (!force && this.catalogCache && Date.now() - this.catalogCache.fetchedAt < 60 * 60 * 1000) {
       return this.catalogCache;
     }
@@ -333,7 +322,7 @@ class CodexAppServerSession extends EventEmitter {
     requestedEffort?: CodexReasoningEffort,
   ): Promise<AiProviderResult> {
     const availability = codexAccountRuntimeAvailability();
-    if (!availability.available) throw new Error(availability.reason ?? 'Codex account is unavailable in this release candidate build.');
+    if (!availability.available) throw new Error(availability.reason ?? 'Codex account app-server is unavailable.');
     await this.ensureStarted();
     if (this.activeTurn) throw new Error('Codex account app-server already has a request in flight.');
     const resolvedModel = await this.resolveModel(model);

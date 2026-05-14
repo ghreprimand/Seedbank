@@ -53,8 +53,8 @@ import {
   providerInstanceDescriptor,
 } from './registry.js';
 import type { AiConfigPatch, AiProvider, AiProviderMessage, AiProviderResult, AiStoredConfig } from './types.js';
-import { codexAccountEnabledByEnv } from './codex-account/session.js';
-import { claudeAccountEnabledByEnv, claudeAccountRuntimeAvailability } from './claude-account/auth.js';
+import { codexAccountRuntimeAvailability } from './codex-account/session.js';
+import { claudeAccountRuntimeAvailability } from './claude-account/auth.js';
 import { AiStore, type AiExecutionMetadata } from './store.js';
 
 const THINKING_PARTNER_PROMPT = [
@@ -826,7 +826,7 @@ function isLocalOpenAICompatibleConfig(preset: AiOpenAICompatiblePresetId, baseU
 
 function materializeProviderInstances(config: AiStoredConfig): Record<AiProviderInstanceId, AiProviderInstanceConfig> {
   const claudeGate = claudeAccountRuntimeAvailability();
-  const codexGate = codexAccountEnabledByEnv();
+  const codexGate = codexAccountRuntimeAvailability();
   const cloudKeyPresent = Boolean(config.cloudOpenaiCompatibleApiKeyEncrypted ?? config.openaiCompatibleApiKeyEncrypted);
   const localKeyPresent = Boolean(config.localOpenaiCompatibleApiKeyEncrypted);
 
@@ -847,7 +847,14 @@ function materializeProviderInstances(config: AiStoredConfig): Record<AiProvider
       ...current['claude-account'],
       ...AI_PROVIDER_INSTANCE_DESCRIPTORS['claude-account'],
       configuredModel: config.claudeAccountModel,
-      ...toAvailability(claudeGate.available, claudeGate.reason),
+      ...(
+        claudeGate.available
+          ? {
+              available: claudeAccountAuthenticatedCache ? 'available' as const : 'auth-required' as const,
+              availabilityReason: claudeAccountAuthenticatedCache ? undefined : 'Sign in with Claude account to enable this method.',
+            }
+          : toAvailability(false, claudeGate.reason)
+      ),
       authenticated: claudeAccountAuthenticatedCache,
       requiresApiKey: false,
       hasApiKey: false,
@@ -867,7 +874,14 @@ function materializeProviderInstances(config: AiStoredConfig): Record<AiProvider
       ...current['codex-account'],
       ...AI_PROVIDER_INSTANCE_DESCRIPTORS['codex-account'],
       configuredModel: config.codexAccountModel,
-      ...toAvailability(codexGate, codexGate ? undefined : 'Codex account app-server is disabled in this build. Set SEEDBANK_ENABLE_CODEX_ACCOUNT=1 to opt in.'),
+      ...(
+        codexGate.available
+          ? {
+              available: codexAccountAuthenticatedCache ? 'available' as const : 'auth-required' as const,
+              availabilityReason: codexAccountAuthenticatedCache ? undefined : 'Sign in with Codex account to enable this method.',
+            }
+          : toAvailability(false, codexGate.reason)
+      ),
       authenticated: codexAccountAuthenticatedCache,
       requiresApiKey: false,
       hasApiKey: false,
@@ -1068,9 +1082,9 @@ function publicConfig(config: AiStoredConfig): AiPublicConfig {
     hasLocalOpenAICompatibleKey,
     hasCloudOpenAICompatibleKey,
     hasOpenAICompatibleKey: hasLocalOpenAICompatibleKey || hasCloudOpenAICompatibleKey,
-    claudeAccountAvailable: claudeAccountEnabledByEnv(),
+    claudeAccountAvailable: claudeAccountRuntimeAvailability().available,
     claudeAccountAuthenticated: claudeAccountAuthenticatedCache,
-    codexAccountAvailable: codexAccountEnabledByEnv(),
+    codexAccountAvailable: codexAccountRuntimeAvailability().available,
     codexAccountAuthenticated: codexAccountAuthenticatedCache,
   };
 }
@@ -1531,14 +1545,9 @@ export class AiService {
       } satisfies AiMethodCapability;
     });
 
-    const codexAvailability = !config.codexAccountAvailable
-      ? {
-          availability: 'auth-required' as const,
-          availabilityReason: 'Codex account login requires SEEDBANK_ENABLE_CODEX_ACCOUNT=1 on the server. Enable it, then sign in.',
-        }
-      : config.codexAccountAuthenticated
-        ? { availability: 'available' as const }
-        : { availability: 'auth-required' as const, availabilityReason: 'Sign in with Codex account to enable this method.' };
+    const codexAvailability = config.codexAccountAuthenticated
+      ? { availability: 'available' as const }
+      : { availability: 'auth-required' as const, availabilityReason: 'Sign in with Codex account to enable this method.' };
 
     return [
       {
@@ -1560,15 +1569,9 @@ export class AiService {
         featureRoutable: true,
         providerId: 'claude-account',
         beta: true,
-        ...(() => {
-          const gate = claudeAccountRuntimeAvailability();
-          if (!gate.available) {
-            return { availability: 'auth-required' as const, availabilityReason: gate.reason };
-          }
-          return config.claudeAccountAuthenticated
-            ? { availability: 'available' as const }
-            : { availability: 'auth-required' as const, availabilityReason: 'Sign in with Claude account to enable this method.' };
-        })(),
+        ...(config.claudeAccountAuthenticated
+          ? { availability: 'available' as const }
+          : { availability: 'auth-required' as const, availabilityReason: 'Sign in with Claude account to enable this method.' }),
       },
       {
         id: 'openai-api-key',
