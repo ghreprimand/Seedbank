@@ -5,11 +5,13 @@ import type {
   AiChatMessage,
   AiProviderDescriptor,
   AiProviderFamily,
+  AiProviderInstanceId,
   AiUsageBucket,
 } from '../../../shared/types.js';
 import type { AiUsage } from './types.js';
 
 export interface AiExecutionMetadata {
+  providerInstanceId?: AiProviderInstanceId;
   providerFamily?: AiProviderFamily;
   transport?: AiProviderDescriptor['transport'];
   requestedModel?: string;
@@ -38,6 +40,7 @@ interface UsageRow {
   key: string;
   feature?: string;
   provider?: string;
+  provider_instance_id?: AiProviderInstanceId | null;
   model?: string;
   provider_family?: AiProviderFamily;
   transport?: AiProviderDescriptor['transport'];
@@ -126,14 +129,15 @@ export class AiStore {
   recordUsage(provider: string, model: string, route: string, usage: AiUsage, metadata: AiExecutionMetadata = {}): void {
     this.db.prepare(`
       INSERT INTO ai_usage (
-        id, provider, model, route, input_tokens, output_tokens, total_tokens,
+        id, provider, provider_instance_id, model, route, input_tokens, output_tokens, total_tokens,
         provider_family, transport, requested_model, resolved_model_id, content_leaves_device,
         created_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       uuid(),
       provider,
+      metadata.providerInstanceId ?? null,
       model,
       route,
       usage.inputTokens,
@@ -150,13 +154,17 @@ export class AiStore {
 
   tokensSince(
     sinceIso: string,
-    filters: { provider?: string; model?: string; routePrefix?: string } = {},
+    filters: { provider?: string; providerInstanceId?: string; model?: string; routePrefix?: string } = {},
   ): number {
     const clauses = ['created_at >= ?'];
     const params: unknown[] = [sinceIso];
     if (filters.provider) {
       clauses.push('provider = ?');
       params.push(filters.provider);
+    }
+    if (filters.providerInstanceId) {
+      clauses.push('provider_instance_id = ?');
+      params.push(filters.providerInstanceId);
     }
     if (filters.model) {
       clauses.push('model = ?');
@@ -186,6 +194,7 @@ export class AiStore {
       SELECT
         ${expression} AS key,
         CASE WHEN COUNT(provider_family) = COUNT(*) AND COUNT(DISTINCT provider_family) = 1 THEN MIN(provider_family) ELSE NULL END AS provider_family,
+        CASE WHEN COUNT(provider_instance_id) = COUNT(*) AND COUNT(DISTINCT provider_instance_id) = 1 THEN MIN(provider_instance_id) ELSE NULL END AS provider_instance_id,
         CASE WHEN COUNT(transport) = COUNT(*) AND COUNT(DISTINCT transport) = 1 THEN MIN(transport) ELSE NULL END AS transport,
         CASE WHEN COUNT(requested_model) = COUNT(*) AND COUNT(DISTINCT requested_model) = 1 THEN MIN(requested_model) ELSE NULL END AS requested_model,
         CASE WHEN COUNT(resolved_model_id) = COUNT(*) AND COUNT(DISTINCT resolved_model_id) = 1 THEN MIN(resolved_model_id) ELSE NULL END AS resolved_model_id,
@@ -206,6 +215,7 @@ export class AiStore {
       ...(groupBy === 'provider' ? { provider: row.key } : {}),
       ...(groupBy === 'model' ? { model: row.key } : {}),
       ...(row.provider_family ? { providerFamily: row.provider_family } : {}),
+      ...(row.provider_instance_id ? { providerInstanceId: row.provider_instance_id } : {}),
       ...(row.transport ? { transport: row.transport } : {}),
       ...(row.requested_model ? { requestedModel: row.requested_model } : {}),
       ...(row.resolved_model_id ? { resolvedModelId: row.resolved_model_id } : {}),
@@ -226,6 +236,7 @@ export class AiStore {
         route AS key,
         CASE WHEN instr(route, ':') > 0 THEN substr(route, 1, instr(route, ':') - 1) ELSE route END AS feature,
         provider,
+        provider_instance_id,
         model,
         CASE WHEN COUNT(provider_family) = COUNT(*) AND COUNT(DISTINCT provider_family) = 1 THEN MIN(provider_family) ELSE NULL END AS provider_family,
         CASE WHEN COUNT(transport) = COUNT(*) AND COUNT(DISTINCT transport) = 1 THEN MIN(transport) ELSE NULL END AS transport,
@@ -246,6 +257,7 @@ export class AiStore {
       key: row.key,
       feature: row.feature,
       provider: row.provider,
+      ...(row.provider_instance_id ? { providerInstanceId: row.provider_instance_id } : {}),
       model: row.model,
       ...(row.provider_family ? { providerFamily: row.provider_family } : {}),
       ...(row.transport ? { transport: row.transport } : {}),
@@ -326,6 +338,7 @@ function parseMetadata(value: string | undefined): AiExecutionMetadata {
     const parsed = JSON.parse(value) as AiExecutionMetadata;
     return {
       ...(typeof parsed.providerFamily === 'string' ? { providerFamily: parsed.providerFamily } : {}),
+      ...(typeof parsed.providerInstanceId === 'string' ? { providerInstanceId: parsed.providerInstanceId as AiProviderInstanceId } : {}),
       ...(typeof parsed.transport === 'string' ? { transport: parsed.transport } : {}),
       ...(typeof parsed.requestedModel === 'string' ? { requestedModel: parsed.requestedModel } : {}),
       ...(typeof parsed.resolvedModelId === 'string' ? { resolvedModelId: parsed.resolvedModelId } : {}),

@@ -658,7 +658,7 @@ export interface AiEffectiveFeatureRoute {
 export type AiReasoningEffort = 'minimal' | 'low' | 'medium' | 'high';
 export type AiTextVerbosity = 'low' | 'medium' | 'high';
 
-export type AiBudgetScope = 'global' | 'feature' | 'provider' | 'model';
+export type AiBudgetScope = 'global' | 'feature' | 'provider' | 'provider-instance' | 'model';
 
 export interface AiBudgetState {
   scope: AiBudgetScope;
@@ -673,9 +673,11 @@ export interface AiBudgetState {
 export interface AiGuardrailsConfig {
   featureEnabled: Partial<Record<AiFeatureId, boolean>>;
   providerEnabled: Partial<Record<AiProviderId, boolean>>;
+  providerInstanceEnabled: Partial<Record<AiProviderInstanceId, boolean>>;
   allowedModels: string[];
   featureDailyTokenBudgets: Partial<Record<AiFeatureId, number>>;
   providerDailyTokenBudgets: Partial<Record<AiProviderId, number>>;
+  providerInstanceDailyTokenBudgets: Partial<Record<AiProviderInstanceId, number>>;
   modelDailyTokenBudgets: Record<string, number>;
   warnOnRemoteProvider: boolean;
   requireConfirmationForRemoteProvider: boolean;
@@ -708,6 +710,7 @@ export interface AiUsageBucket {
   key: string;
   feature?: string;
   provider?: string;
+  providerInstanceId?: AiProviderInstanceId;
   model?: string;
   providerFamily?: AiProviderFamily;
   transport?: AiProviderDescriptor['transport'];
@@ -726,6 +729,7 @@ export interface AiAuditEvent {
   type: 'guardrail_denied' | 'provider_error';
   feature: string;
   provider: string;
+  providerInstanceId?: AiProviderInstanceId;
   model: string;
   providerFamily?: AiProviderFamily;
   transport?: AiProviderDescriptor['transport'];

@@ -14,6 +14,7 @@ function aiServiceFixture(): { db: Database.Database; service: AiService } {
     '002_ai_assistance.sql',
     '005_ai_guardrail_audit.sql',
     '006_ai_execution_metadata.sql',
+    '007_ai_provider_instance_usage.sql',
   ]) {
     db.exec(fs.readFileSync(path.resolve('migrations', migration), 'utf8'));
   }
