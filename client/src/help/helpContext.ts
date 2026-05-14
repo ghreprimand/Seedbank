@@ -9,11 +9,11 @@ export interface HelpContextValue {
 
   collapsed: boolean;
   setCollapsed: (next: boolean) => void;
-  toggleCollapsed: () => void;
 
   activeHelp: ActiveHelpState | null;
   closeActiveHelp: () => void;
   openHelpAtRect: (id: string, entry: HelpEntry, anchorRect: DOMRect) => void;
+  inspectPoint: (x: number, y: number) => void;
 
   openManual: (sectionId?: string) => void;
 }
@@ -26,11 +26,11 @@ export const HelpContext = createContext<HelpContextValue>({
 
   collapsed: false,
   setCollapsed: () => {},
-  toggleCollapsed: () => {},
 
   activeHelp: null,
   closeActiveHelp: () => {},
   openHelpAtRect: () => {},
+  inspectPoint: () => {},
 
   openManual: () => {},
 });
