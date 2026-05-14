@@ -276,7 +276,7 @@ interface ProviderCardProps {
   children?: React.ReactNode; // expandable detail row
 }
 
-type ProviderCardStatus = 'connected' | 'key-needed' | 'unreachable' | 'local' | 'not-tested' | 'upcoming';
+type ProviderCardStatus = 'connected' | 'key-needed' | 'unreachable' | 'local' | 'not-tested';
 
 function StatusPill({ status }: { status: ProviderCardProps['status'] }) {
   const cfg: Record<ProviderCardProps['status'], { label: string; classes: string }> = {
@@ -285,7 +285,6 @@ function StatusPill({ status }: { status: ProviderCardProps['status'] }) {
     unreachable: { label: 'unreachable', classes: 'bg-red-50 text-red-600 border-red-200' },
     local:       { label: 'local',       classes: 'bg-sage-50 text-sage-700 border-sage-200' },
     'not-tested': { label: 'not tested', classes: 'bg-ink-50 text-ink-500 border-ink-200' },
-    upcoming:     { label: 'coming soon', classes: 'bg-violet-50 text-violet-600 border-violet-200' },
   };
   const { label, classes } = cfg[status];
   return (
@@ -2087,7 +2086,7 @@ function FeatureRoutingSection({ ai, providerStatuses, providerAvailability, onS
                     ? (ai.claudeAccountAuthenticated
                       ? 'Subscription login path (not API-key billing).'
                       : 'Claude account requires sign-in before routing features here.')
-                    : 'Claude account login is not available in the current server configuration. Use the Anthropic API provider for Claude models.')
+                    : 'Claude account login runtime is unavailable. Refresh status or use the Anthropic API provider for Claude models.')
                   : selectedProvider === 'codex-account'
                     ? 'Codex account subscription transport — separate from OpenAI API billing. See the Codex account card for setup.'
                     : selectedProvider === 'openai-compatible'
@@ -2257,7 +2256,7 @@ function ClaudeAccountDetail({
   const refreshStatus = async () => {
     if (!available) {
       setExpiresAt(null);
-      onStatusChange?.('upcoming');
+      onStatusChange?.('unreachable');
       return;
     }
     setRefreshing(true);
@@ -2265,8 +2264,7 @@ function ClaudeAccountDetail({
     try {
       const status = await getClaudeAccountStatus();
       setExpiresAt(status.expiresAt ?? null);
-      // 'key-needed' = gate on but user hasn't signed in; 'upcoming' = gate off.
-      onStatusChange?.(status.authenticated ? 'connected' : (available ? 'key-needed' : 'upcoming'));
+      onStatusChange?.(status.authenticated ? 'connected' : 'key-needed');
       await refreshSettings();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -2357,12 +2355,12 @@ function ClaudeAccountDetail({
     <div className="space-y-3">
       {!available ? (
         <div className="space-y-2">
-          <div className="flex items-center gap-2 text-[11px] text-violet-700 bg-violet-50 border border-violet-200 rounded px-2 py-1.5">
-            <span className="font-semibold">Unavailable</span>
-            <span>— Claude account login is disabled by server configuration.</span>
+          <div className="flex items-center gap-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
+            <span className="font-semibold">Runtime unavailable</span>
+            <span>— Claude account login is not reachable. Refresh status or restart the server.</span>
           </div>
           <p className="text-[11px] text-ink-500 leading-relaxed">
-            To use Claude models now, use the <span className="font-semibold text-ink-700">Anthropic API</span> method with an API key from{' '}
+            Use the <span className="font-semibold text-ink-700">Anthropic API</span> method with an API key from{' '}
             <a
               href="https://console.anthropic.com"
               target="_blank"
@@ -2559,7 +2557,12 @@ function CodexAccountDetail({
     try {
       const status = await getCodexAccountStatus();
       setAccount(status.accountEmail ?? status.planType ?? null);
-      onStatusChange?.(status.authenticated ? 'connected' : 'key-needed');
+      if (status.available === false) {
+        setError(status.unavailableReason ?? 'Codex app-server is unavailable. Install or update the Codex runtime, then refresh status.');
+        onStatusChange?.('unreachable');
+      } else {
+        onStatusChange?.(status.authenticated ? 'connected' : 'key-needed');
+      }
       await refreshSettings();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -2616,7 +2619,7 @@ function CodexAccountDetail({
 
       {!available && (
         <div className="text-[11px] text-ink-600 bg-ink-50 border border-ink-200 rounded px-2 py-1.5">
-          Runtime unavailable: enable <code className="font-mono">SEEDBANK_ENABLE_CODEX_ACCOUNT</code> on the server to expose this method.
+          Runtime unavailable: install or update the Codex runtime, then refresh status.
         </div>
       )}
 
@@ -2729,17 +2732,14 @@ export default function AiAgentsTab() {
   // Determine provider connection status
   const openaiStatus: ProviderCardProps['status'] = probeStatuses.openai ?? (ai.hasOpenAIKey ? 'connected' : 'key-needed');
   const anthropicStatus: ProviderCardProps['status'] = probeStatuses.anthropic ?? (ai.hasAnthropicKey ? 'connected' : 'key-needed');
-  // 'key-needed' when gate is on but user hasn't signed in; 'upcoming' only when gate is off.
   const claudeAccountStatus: ProviderCardProps['status'] = probeStatuses['claude-account']
     ?? (ai.claudeAccountAuthenticated
       ? 'connected'
-      : (ai.claudeAccountAvailable ? 'key-needed' : 'upcoming'));
-  // When the Codex opt-in env var is not set, treat as 'upcoming' (not 'key-needed') so the
-  // status pill accurately reflects unavailability rather than implying a key entry is needed.
+      : (ai.claudeAccountAvailable ? 'key-needed' : 'unreachable'));
   const codexAccountStatus: ProviderCardProps['status'] = probeStatuses['codex-account']
     ?? (ai.codexAccountAvailable
       ? (ai.codexAccountAuthenticated ? 'connected' : 'key-needed')
-      : 'upcoming');
+      : 'unreachable');
   const ollamaStatus: ProviderCardProps['status'] = probeStatuses.ollama ?? 'not-tested';
   // ── Local OpenAI-compatible derived state (uses split localOpenaiCompatible* fields) ──
   const localCompatiblePreset = presetFor(ai.localOpenaiCompatiblePreset ?? ai.openaiCompatiblePreset);
@@ -2809,10 +2809,10 @@ export default function AiAgentsTab() {
         : 'unavailable',
       reason: ai.claudeAccountAvailable
         ? (ai.claudeAccountAuthenticated ? undefined : 'Sign in with Claude account to enable this method.')
-        : 'Claude account login is disabled by server configuration. Use the Anthropic API method, or set SEEDBANK_ENABLE_CLAUDE_ACCOUNT=1 to enable account login.',
+        : 'Claude account login is not available from this server session. Use the Anthropic API method if needed.',
       featureRoutable: true,
     }),
-    'codex-account': capabilityState('codex-account-app-server', { availability: ai.codexAccountAvailable ? (ai.codexAccountAuthenticated ? 'available' : 'auth-required') : 'unavailable', reason: ai.codexAccountAvailable ? 'Sign in with Codex account to enable this method.' : 'Codex account method is disabled by server configuration.', featureRoutable: true }),
+    'codex-account': capabilityState('codex-account-app-server', { availability: ai.codexAccountAvailable ? (ai.codexAccountAuthenticated ? 'available' : 'auth-required') : 'unavailable', reason: ai.codexAccountAvailable ? 'Sign in with Codex account to enable this method.' : 'Codex account app-server is unavailable. Install or update the Codex runtime, then refresh status.', featureRoutable: true }),
     ollama: capabilityState('ollama-local', { availability: 'available', featureRoutable: true }),
     'openai-compatible': capabilityState(
       `openai-compatible:${ai.defaultProviderInstanceId === 'local-openai-compatible' ? (ai.localOpenaiCompatiblePreset ?? ai.openaiCompatiblePreset) : (ai.cloudOpenaiCompatiblePreset ?? ai.openaiCompatiblePreset)}`,
