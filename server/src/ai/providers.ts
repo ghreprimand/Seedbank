@@ -1095,6 +1095,13 @@ export class CodexAccountProvider implements AiProvider {
     return config.codexAccountModel?.trim() || 'codex-recommended';
   }
 
+  private configuredEffort(config: AiStoredConfig): 'minimal' | 'low' | 'medium' | 'high' | undefined {
+    const effort = config.codexReasoningEffort;
+    return effort === 'minimal' || effort === 'low' || effort === 'medium' || effort === 'high'
+      ? effort
+      : undefined;
+  }
+
   private async runtimeAvailability(): Promise<{ available: boolean; reason?: string }> {
     const { codexAccountRuntimeAvailability } = await import('./codex-account/session.js');
     return codexAccountRuntimeAvailability();
@@ -1119,7 +1126,7 @@ export class CodexAccountProvider implements AiProvider {
           'Codex account is not logged in. Open Settings → AI & Agents and use the Codex account card to log in.',
         );
       }
-      return await codexAccountSession.complete(messages, this.configuredModel(config));
+      return await codexAccountSession.complete(messages, this.configuredModel(config), undefined, this.configuredEffort(config));
     } catch (error) {
       throw providerFetchError(this.id, error);
     }
@@ -1148,7 +1155,7 @@ export class CodexAccountProvider implements AiProvider {
           'Codex account is not logged in. Open Settings → AI & Agents and use the Codex account card to log in.',
         );
       }
-      return await codexAccountSession.complete(messages, this.configuredModel(config), onDelta);
+      return await codexAccountSession.complete(messages, this.configuredModel(config), onDelta, this.configuredEffort(config));
     } catch (error) {
       throw providerFetchError(this.id, error);
     }

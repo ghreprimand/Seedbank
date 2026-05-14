@@ -36,6 +36,8 @@ import type {
   AiProviderHealth,
   AiProviderInstanceId,
   AiPublicConfig,
+  AiReasoningEffort,
+  AiTextVerbosity,
   AiUsageBucket,
 } from '@/lib/types';
 import {
@@ -1788,16 +1790,43 @@ function providerModel(ai: AiPublicConfig, provider: AiProviderId): string {
   return ai.ollamaModel;
 }
 
-/**
- * True when the selected provider exposes effort/verbosity controls.
- * Stub — returns true only for providers whose backend effort params are
- * known (OpenAI Responses API reasoning.effort, Codex app-server turn effort).
- * TODO(Phase 7): replace with a capability-map lookup from the model catalog.
- */
-function providerSupportsEffort(provider: AiProviderId | 'default', providerInstanceId?: AiProviderInstanceId): boolean {
+function openAIModelSupportsReasoningEffort(model: string): boolean {
+  const normalized = model.trim().toLowerCase();
+  return normalized.startsWith('gpt-5') || /^o[1-9](?:[-_.]|$)/.test(normalized);
+}
+
+function openAIModelSupportsTextVerbosity(model: string): boolean {
+  return model.trim().toLowerCase().startsWith('gpt-5');
+}
+
+function routeModel(route: AiFeatureRoute, selectedInstance: AiPublicConfig['providerInstances'][AiProviderInstanceId] | null): string {
+  return route.model?.trim() || selectedInstance?.configuredModel || '';
+}
+
+function providerSupportsEffort(provider: AiProviderId | 'default', providerInstanceId: AiProviderInstanceId | null, model: string): boolean {
   if (provider === 'default') return false;
-  if (providerInstanceId === 'openai-api') return true;
-  return provider === 'codex-account';
+  if (providerInstanceId === 'openai-api') return openAIModelSupportsReasoningEffort(model);
+  return providerInstanceId === 'codex-account';
+}
+
+function providerSupportsVerbosity(providerInstanceId: AiProviderInstanceId | null, model: string): boolean {
+  return providerInstanceId === 'openai-api' && openAIModelSupportsTextVerbosity(model);
+}
+
+function updateRouteControl<K extends 'effort' | 'verbosity'>(
+  route: AiFeatureRoute,
+  key: K,
+  value: string,
+): AiFeatureRoute {
+  const next = { ...route } as AiFeatureRoute;
+  if (key === 'effort') {
+    if (value === 'minimal' || value === 'low' || value === 'medium' || value === 'high') next.effort = value as AiReasoningEffort;
+    else delete next.effort;
+  } else {
+    if (value === 'low' || value === 'medium' || value === 'high') next.verbosity = value as AiTextVerbosity;
+    else delete next.verbosity;
+  }
+  return next;
 }
 
 function providerLabel(provider: AiProviderId): string {
@@ -1829,9 +1858,6 @@ function FeatureRoutingSection({ ai, providerStatuses, providerAvailability, onS
     isLocalInstance ? (ai.localOpenaiCompatiblePreset ?? ai.openaiCompatiblePreset)
                     : (ai.cloudOpenaiCompatiblePreset ?? ai.openaiCompatiblePreset),
   );
-  // Effort is local state only — not yet persisted. The backend contract for
-  // per-feature effort in featureRoutes is pending (Phase 7). Wire here when ready.
-  const [featureEfforts, setFeatureEfforts] = useState<Partial<Record<AiFeatureId, string>>>({});
   const instanceRoutingOptions = Object.values(ai.providerInstances).filter((instance) => instance.featureRoutable);
   const firstInstanceForProvider = (provider: AiProviderId): AiProviderInstanceId | null => (
     instanceRoutingOptions.find((instance) => instance.provider === provider)?.id ?? null
@@ -1996,6 +2022,8 @@ function FeatureRoutingSection({ ai, providerStatuses, providerAvailability, onS
                       provider: instance.provider,
                       providerInstanceId: instance.id,
                       model: route.model,
+                      effort: route.effort,
+                      verbosity: route.verbosity,
                     });
                   }}
                   className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800"
@@ -2028,29 +2056,47 @@ function FeatureRoutingSection({ ai, providerStatuses, providerAvailability, onS
                   {modelHint}
                 </span>
               </label>
-              {/* Effort column: visible only when the selected provider supports reasoning effort.
-                  Local state only — not yet persisted (Phase 7 backend contract pending). */}
-              {providerSupportsEffort(route.provider, route.provider === 'default' ? undefined : selectedInstanceId ?? undefined) ? (
-                <label className="block text-xs text-ink-500 min-w-[100px]">
-                  Effort
-                  <select
-                    value={featureEfforts[feature.id] ?? ''}
-                    onChange={(e) => setFeatureEfforts((prev) => ({ ...prev, [feature.id]: e.target.value }))}
-                    className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800"
-                  >
-                    <option value="">Default</option>
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                    <option value="max">Max</option>
-                  </select>
-                  <span className="mt-1 block text-[11px] text-ink-400">
-                    Reasoning effort — not yet persisted
-                  </span>
-                </label>
-              ) : (
-                <div /> /* keeps the 4-col grid balanced */
-              )}
+              {(() => {
+                const model = routeModel(route, selectedInstance);
+                const supportsEffort = providerSupportsEffort(route.provider, selectedInstanceId, model);
+                const supportsVerbosity = providerSupportsVerbosity(selectedInstanceId, model);
+                if (!supportsEffort && !supportsVerbosity) return <div />;
+                return (
+                  <div className="space-y-2 min-w-[110px]">
+                    {supportsEffort && (
+                      <label className="block text-xs text-ink-500">
+                        Effort
+                        <select
+                          value={route.effort ?? ''}
+                          onChange={(event) => updateRoute(feature.id, updateRouteControl(route, 'effort', event.target.value))}
+                          className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800"
+                        >
+                          <option value="">Default</option>
+                          <option value="minimal">Minimal</option>
+                          <option value="low">Low</option>
+                          <option value="medium">Medium</option>
+                          <option value="high">High</option>
+                        </select>
+                      </label>
+                    )}
+                    {supportsVerbosity && (
+                      <label className="block text-xs text-ink-500">
+                        Verbosity
+                        <select
+                          value={route.verbosity ?? ''}
+                          onChange={(event) => updateRoute(feature.id, updateRouteControl(route, 'verbosity', event.target.value))}
+                          className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800"
+                        >
+                          <option value="">Default</option>
+                          <option value="low">Low</option>
+                          <option value="medium">Medium</option>
+                          <option value="high">High</option>
+                        </select>
+                      </label>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           );
         })}

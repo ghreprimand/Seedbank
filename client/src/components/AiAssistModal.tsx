@@ -129,13 +129,11 @@ function ProviderBadge({ featureKey }: { featureKey?: string }) {
 
   if (!effective) return null;
   const instance = ai.providerInstances[effective.providerInstanceId];
-  const route = ai.featureRoutes[featureId as keyof typeof ai.featureRoutes] ?? ai.featureRoutes.default;
-  const routeEffort = (route as { effort?: string } | undefined)?.effort;
 
   const parts = [
     instance?.label ?? providerName(effective.provider),
     effective.model || undefined,
-    routeEffort ? `effort:${routeEffort}` : undefined,
+    effective.effort ? `effort:${effective.effort}` : undefined,
   ].filter(Boolean);
   const display = parts.join(' · ');
 

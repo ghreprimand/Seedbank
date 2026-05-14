@@ -24,6 +24,9 @@ export interface AiStoredConfig extends Omit<
   anthropicApiKeyEncrypted?: string;
   localOpenaiCompatibleApiKeyEncrypted?: string;
   cloudOpenaiCompatibleApiKeyEncrypted?: string;
+  openaiReasoningEffort?: 'minimal' | 'low' | 'medium' | 'high';
+  openaiTextVerbosity?: 'low' | 'medium' | 'high';
+  codexReasoningEffort?: 'minimal' | 'low' | 'medium' | 'high';
   /**
    * Legacy shared key for pre-instance openai-compatible configuration.
    * Maintained for migration/backward compatibility.

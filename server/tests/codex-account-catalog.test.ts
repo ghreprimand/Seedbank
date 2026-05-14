@@ -96,10 +96,10 @@ test('Codex complete uses catalog-supported reasoning effort when provided', { c
 
     try {
       await assert.rejects(
-        () => codexAccountSession.complete([{ role: 'user', content: 'hello' }], 'gpt-5.2-codex'),
+        () => codexAccountSession.complete([{ role: 'user', content: 'hello' }], 'gpt-5.2-codex', undefined, 'high'),
         /stop-after-turn-start/,
       );
-      assert.equal(effortFromTurnStart, 'medium');
+      assert.equal(effortFromTurnStart, 'high');
     } finally {
       session.ensureStarted = originalEnsureStarted;
       session.request = originalRequest;
