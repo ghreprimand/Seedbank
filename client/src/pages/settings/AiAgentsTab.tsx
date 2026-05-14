@@ -1852,12 +1852,14 @@ function FeatureRoutingSection({ ai, providerStatuses, providerAvailability, onS
           const providerHint =
             selectedProvider === 'default'
               ? 'Uses whichever provider is set as global default above.'
-              : selectedUnavailableReason
+                : selectedUnavailableReason
                 ? `Unavailable right now: ${selectedUnavailableReason}`
                 : selectedProvider === 'claude-account'
-                  ? (ai.claudeAccountAuthenticated
-                    ? 'Subscription login path (not API-key billing).'
-                    : 'Claude account login is not yet available. Use the Anthropic API provider for Claude models.')
+                  ? (ai.claudeAccountAvailable
+                    ? (ai.claudeAccountAuthenticated
+                      ? 'Subscription login path (not API-key billing).'
+                      : 'Claude account requires sign-in before routing features here.')
+                    : 'Claude account OAuth is disabled in this RC build. Use the Anthropic API provider for Claude models.')
                   : selectedProvider === 'codex-account'
                     ? 'Codex account subscription transport — separate from OpenAI API billing. See the Codex account card for setup.'
                     : selectedProvider === 'openai-compatible'
@@ -2450,7 +2452,15 @@ export default function AiAgentsTab() {
   const providerAvailability: Partial<Record<AiProviderId, { availability: AiMethodCapability['availability']; reason?: string; featureRoutable: boolean }>> = {
     openai: capabilityState('openai-api-key', { availability: ai.hasOpenAIKey ? 'available' : 'auth-required', reason: ai.hasOpenAIKey ? undefined : 'OpenAI API key is not configured.', featureRoutable: true }),
     anthropic: capabilityState('anthropic-api-key', { availability: ai.hasAnthropicKey ? 'available' : 'auth-required', reason: ai.hasAnthropicKey ? undefined : 'Anthropic API key is not configured.', featureRoutable: true }),
-    'claude-account': capabilityState('claude-account-native', { availability: ai.claudeAccountAuthenticated ? 'available' : 'auth-required', reason: ai.claudeAccountAuthenticated ? undefined : 'Sign in with Claude account to enable this method.', featureRoutable: true }),
+    'claude-account': capabilityState('claude-account-native', {
+      availability: ai.claudeAccountAvailable
+        ? (ai.claudeAccountAuthenticated ? 'available' : 'auth-required')
+        : 'unavailable',
+      reason: ai.claudeAccountAvailable
+        ? (ai.claudeAccountAuthenticated ? undefined : 'Sign in with Claude account to enable this method.')
+        : 'Claude account OAuth is disabled in this release-candidate build. Use the Anthropic API method, or set SEEDBANK_ENABLE_CLAUDE_ACCOUNT=1 to opt in.',
+      featureRoutable: true,
+    }),
     'codex-account': capabilityState('codex-account-app-server', { availability: ai.codexAccountAvailable ? (ai.codexAccountAuthenticated ? 'available' : 'auth-required') : 'unavailable', reason: ai.codexAccountAvailable ? 'Sign in with Codex account to enable this method.' : 'Codex account method is disabled by server configuration.', featureRoutable: true }),
     ollama: capabilityState('ollama-local', { availability: 'available', featureRoutable: true }),
     'openai-compatible': capabilityState(`openai-compatible:${ai.openaiCompatiblePreset}`, { availability: 'available', featureRoutable: true }),
