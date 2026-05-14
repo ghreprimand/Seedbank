@@ -118,6 +118,7 @@ Messages are streamed from `POST /api/ai/chat` and persisted per idea.
 ## Contextual Field Suggestions
 
 Field-level AI prompts use `POST /api/ai/suggest`. Each suggestion is shown as a draft — you choose whether to apply it.
+Applied suggestions are stored as plain field text. Seedbank preserves line breaks in the field editor, but does not render markdown inside editable idea fields.
 
 Supported fields:
 

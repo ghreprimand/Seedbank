@@ -8,6 +8,10 @@ export interface ParsedSuggestion {
   rationale: string;
 }
 
+function normalizeFieldText(value: string): string {
+  return value.replace(/\r\n?/g, '\n');
+}
+
 export function extractSuggestion(text: string): ParsedSuggestion {
   const trimmed = text.trim();
   if (!trimmed) {
@@ -33,8 +37,8 @@ export function extractSuggestion(text: string): ParsedSuggestion {
 
         if (s !== undefined || r !== undefined) {
           return {
-            suggestion: s ?? '',
-            rationale: r ?? '',
+            suggestion: normalizeFieldText(s ?? ''),
+            rationale: normalizeFieldText(r ?? ''),
           };
         }
       }
@@ -48,7 +52,7 @@ export function extractSuggestion(text: string): ParsedSuggestion {
   // but we should strip fences if they were present.
   const cleanText = fenceMatch ? fenceMatch[1] : trimmed;
   return {
-    suggestion: cleanText,
+    suggestion: normalizeFieldText(cleanText),
     rationale: '',
   };
 }

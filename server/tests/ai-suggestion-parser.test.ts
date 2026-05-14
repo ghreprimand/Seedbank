@@ -59,3 +59,8 @@ test('extractSuggestion handles the screenshot bug style payload', () => {
   const input = 'Sure, here is the suggestion:\n\n```json\n{\n  "suggestion": "A refined pitch",\n  "rationale": "It targets the core value proposition more effectively."\n}\n```';
   assert.deepEqual(extractSuggestion(input), { suggestion: 'A refined pitch', rationale: 'It targets the core value proposition more effectively.' });
 });
+
+test('extractSuggestion normalizes Windows line endings while preserving line breaks', () => {
+  const input = '{"suggestion":"First line\\r\\nSecond line","rationale":"Reason\\r\\nDetail"}';
+  assert.deepEqual(extractSuggestion(input), { suggestion: 'First line\nSecond line', rationale: 'Reason\nDetail' });
+});
