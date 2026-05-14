@@ -391,8 +391,8 @@ export interface AiProviderDescriptor {
 }
 
 export type AiMethodServiceFamily = 'claude' | 'codex-openai' | 'local-inference' | 'external-router';
-export type AiMethodConnection = 'api-key' | 'account' | 'local-server' | 'openai-compatible' | 'cli-agent';
-export type AiMethodChannel = 'chat-model' | 'file-agent';
+export type AiMethodConnection = 'api-key' | 'account' | 'local-server' | 'openai-compatible';
+export type AiMethodChannel = 'chat-model';
 export type AiMethodAvailability = 'available' | 'auth-required' | 'unavailable';
 export type AiProviderInstanceAvailability = 'available' | 'auth-required' | 'unavailable';
 
@@ -646,6 +646,7 @@ export type AiFeatureId =
   | 'field-suggestions'
   | 'health-check'
   | 'discover-insights'
+  | 'project-drafting'
   | 'default';
 
 export interface AiFeatureRoute {
@@ -719,6 +720,40 @@ export interface AiPreflightResult {
   blockers: string[];
   budgets: AiBudgetState[];
   confirmationToken?: string;
+}
+
+export interface AiProjectDraftFile {
+  path: string;
+  content: string;
+  description?: string;
+}
+
+export interface AiProjectDraftRequest {
+  ideaId: string;
+  prompt?: string;
+  aiConfirmationToken?: string;
+  providerInstanceId?: AiProviderInstanceId;
+  model?: string;
+  effort?: AiReasoningEffort;
+  verbosity?: AiTextVerbosity;
+}
+
+export interface AiProjectDraftResult {
+  summary: string;
+  files: AiProjectDraftFile[];
+  provider: AiProviderId;
+  providerInstanceId: AiProviderInstanceId;
+  model: string;
+}
+
+export interface AiProjectDraftApplyRequest {
+  ideaId: string;
+  files: AiProjectDraftFile[];
+}
+
+export interface AiProjectDraftApplyResult {
+  targetPath: string;
+  filesWritten: string[];
 }
 
 export interface AiUsageBucket {
@@ -844,48 +879,6 @@ export interface ShortcutConfig {
   openManual?: ShortcutBinding;       // default: { key: '?' }
 }
 
-export type AgentProvider = 'claude' | 'codex';
-
-export interface AgentsPublicConfig {
-  claudeLinked: boolean;
-  codexLinked: boolean;
-  claudeVersion?: string;
-  codexVersion?: string;
-}
-
-export interface AgentLinkResult {
-  provider: AgentProvider;
-  linked: boolean;
-  version?: string;
-  cliPath?: string;
-}
-
-/** Client-side run status (maps from server's AgentRunState). */
-export type AgentRunStatus = 'pending' | 'running' | 'stopped' | 'done' | 'error';
-
-/** Server AgentRunState values as returned by the API. */
-export type AgentRunState = 'running' | 'completed' | 'failed' | 'stopped';
-
-/**
- * Minimal client representation of a run after startAgentRun / getAgentRun.
- * proposedFiles: relative paths inside the scratch workspace.
- */
-export interface AgentRun {
-  id: string;
-  status: AgentRunStatus;
-  proposedFiles: string[];
-}
-
-/**
- * SSE stream event — mirrors server's AgentRunStreamEvent shape exactly.
- * Use the `type` discriminant to handle each case.
- */
-export type AgentRunEvent =
-  | { type: 'state'; runId: string; state: AgentRunState; timestamp: string }
-  | { type: 'delta'; runId: string; delta: string; timestamp: string }
-  | { type: 'done';  runId: string; state: AgentRunState; timestamp: string }
-  | { type: 'error'; runId: string; error: string;  timestamp: string };
-
 export interface WebhooksConfig {
   url: string | null;
   events: string[];
@@ -1004,7 +997,6 @@ export interface AggregateSettings {
     tokens: PublicToken[];
     webhooks: WebhooksConfig;
   };
-  agents: AgentsPublicConfig;
   backups: BackupStatus;
   integrations: IntegrationSummary[];
   server: ServerInfo;

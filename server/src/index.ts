@@ -7,7 +7,6 @@ import { registerAiRoutes } from './ai/routes.js';
 import { AiStore } from './ai/store.js';
 import {
   dbPath,
-  dataDir,
   openDatabase,
 } from './db.js';
 import { BackupService } from './backups/service.js';
@@ -19,11 +18,11 @@ import { openApiSpec } from './openapi.js';
 import { SeedbankRepository, type ImportArchive, type ListIdeasOptions } from './repository.js';
 import { ApiTokenStore, TOKEN_SCOPES, type TokenScope } from './tokens.js';
 import { WebhookEmitter, normalizeWebhookUrl, toWebhookEventList } from './webhooks.js';
-import { AgentService } from './agents/service.js';
 import type { AiConfigPatch } from './ai/types.js';
 import type {
-  AgentsPublicConfig,
   AggregateSettings,
+  AiProjectDraftApplyRequest,
+  AiProjectDraftFile,
   BackupConfig,
   CategoryDefinition,
   CategorySettings,
@@ -46,18 +45,6 @@ const repository = new SeedbankRepository(database);
 const integrations = new IntegrationRegistry(repository);
 const aiService = new AiService(repository, new AiStore(database));
 const tokenStore = new ApiTokenStore(database);
-const agentService = new AgentService(repository, () => integrations.configuredRoots());
-
-interface AgentStoredConfig {
-  claudeLinked: boolean;
-  codexLinked: boolean;
-  claudeCliPath?: string;
-  codexCliPath?: string;
-  claudeVersion?: string;
-  codexVersion?: string;
-  runtimeCapMinutes?: number;
-  dailyRunBudget?: number;
-}
 
 const SETTINGS_KEYS = {
   uiTheme: 'ui.theme',
@@ -66,7 +53,6 @@ const SETTINGS_KEYS = {
   aiConfigLegacy: 'ai:config',
   backupConfig: 'backup.config',
   apiWebhooks: 'api.webhooks',
-  agentsConfig: 'agents.config',
   categoryConfig: 'categories.config',
 } as const;
 
@@ -106,11 +92,6 @@ function migrateServerThemeName(name: string | undefined): ThemeName {
     ? (name as ThemeName)
     : 'paper';
 }
-
-const DEFAULT_AGENTS_CONFIG: AgentStoredConfig = {
-  claudeLinked: false,
-  codexLinked: false,
-};
 
 const DEFAULT_CATEGORY_CONFIG: CategorySettings = {
   schemaVersion: 1,
@@ -220,26 +201,6 @@ function publicTokens(): PublicToken[] {
   return tokenStore.list();
 }
 
-function agentsStoredConfig(): AgentStoredConfig {
-  const stored = repository.getSetting<Partial<AgentStoredConfig>>(SETTINGS_KEYS.agentsConfig) ?? {};
-  return {
-    ...DEFAULT_AGENTS_CONFIG,
-    ...stored,
-    claudeLinked: Boolean(stored.claudeLinked ?? stored.claudeCliPath),
-    codexLinked: Boolean(stored.codexLinked ?? stored.codexCliPath),
-  };
-}
-
-function agentsPublicConfig(): AgentsPublicConfig {
-  const stored = agentsStoredConfig();
-  return {
-    claudeLinked: Boolean(stored.claudeLinked),
-    codexLinked: Boolean(stored.codexLinked),
-    ...(stored.claudeVersion ? { claudeVersion: stored.claudeVersion } : {}),
-    ...(stored.codexVersion ? { codexVersion: stored.codexVersion } : {}),
-  };
-}
-
 /** Normalise a raw category ID to a URL/file-safe lowercase hyphen slug. */
 function normalizeCategoryId(raw: string): string {
   return raw
@@ -330,7 +291,6 @@ function aggregateSettings(): AggregateSettings {
       tokens: publicTokens(),
       webhooks: webhooksConfig(),
     },
-    agents: agentsPublicConfig(),
     backups: backupService.status({ includeSensitiveDestinationPaths: true }),
     integrations: integrations.list(),
     server: serverInfo(),
@@ -408,6 +368,37 @@ function boolParam(value: unknown): boolean {
 function routeParam(req: Request, name: string): string {
   const value = req.params[name];
   return Array.isArray(value) ? value[0] ?? '' : value;
+}
+
+function safeDraftRelativePath(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const raw = value.trim().replace(/\\/g, '/');
+  if (!raw || raw.startsWith('/') || raw.startsWith('~') || raw.includes('\0')) return undefined;
+  const parts = raw.split('/').filter(Boolean);
+  if (parts.some((part) => part === '.' || part === '..' || part.startsWith('.'))) return undefined;
+  return parts.join('/');
+}
+
+function isInsidePath(childPath: string, parentPath: string): boolean {
+  const relative = path.relative(path.resolve(parentPath), path.resolve(childPath));
+  return relative === '' || (!!relative && !relative.startsWith('..') && !path.isAbsolute(relative));
+}
+
+function parseProjectDraftApplyFiles(value: unknown): AiProjectDraftFile[] | null {
+  if (!Array.isArray(value)) return null;
+  const files: AiProjectDraftFile[] = [];
+  for (const item of value.slice(0, 8)) {
+    if (!item || typeof item !== 'object') return null;
+    const file = item as { path?: unknown; content?: unknown; description?: unknown };
+    const safePath = safeDraftRelativePath(file.path);
+    if (!safePath || typeof file.content !== 'string' || !file.content.trim()) return null;
+    files.push({
+      path: safePath,
+      content: file.content.slice(0, 80000),
+      ...(typeof file.description === 'string' ? { description: file.description.slice(0, 500) } : {}),
+    });
+  }
+  return files.length > 0 ? files : null;
 }
 
 function listOptionsFromQuery(query: Request['query']): ListIdeasOptions {
@@ -497,83 +488,6 @@ app.post('/api/tokens', requireScope('write:ideas'), requireImplicitLocal, async
     ...created.record,
     token: created.token,
   });
-}));
-
-app.post('/api/agents/link', requireScope('agents:run'), asyncRoute((req, res) => {
-  const body = req.body as { provider?: string; cliPath?: string };
-  if (!body.provider) {
-    res.status(400).json({ error: 'provider is required.' });
-    return;
-  }
-  res.json(agentService.link(body.provider, body.cliPath));
-}));
-
-app.delete('/api/agents/link/:provider', requireScope('agents:run'), asyncRoute((req, res) => {
-  res.json(agentService.unlink(routeParam(req, 'provider')));
-}));
-
-app.post('/api/agents/runs', requireScope('agents:run'), asyncRoute((req, res) => {
-  const body = req.body as { ideaId?: string; projectPath?: string; provider?: string; prompt?: string };
-  if (!body.provider || !body.prompt) {
-    res.status(400).json({ error: 'provider and prompt are required.' });
-    return;
-  }
-
-  const created = agentService.startRun({
-    ideaId: body.ideaId,
-    projectPath: body.projectPath,
-    provider: body.provider as 'claude' | 'codex',
-    prompt: body.prompt,
-  });
-  res.status(202).json(created);
-}));
-
-app.get('/api/agents/runs/:id', requireScope('agents:run'), asyncRoute((req, res) => {
-  res.json(agentService.getRun(routeParam(req, 'id')));
-}));
-
-app.get('/api/agents/runs/:id/stream', requireScope('agents:run'), asyncRoute((req, res) => {
-  const runId = routeParam(req, 'id');
-  const current = agentService.getRun(runId);
-
-  res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache, no-transform',
-    Connection: 'keep-alive',
-  });
-
-  res.write(`event: state\ndata: ${JSON.stringify({ type: 'state', runId, state: current.state, timestamp: new Date().toISOString() })}\n\n`);
-  if (current.transcript) {
-    res.write(`event: delta\ndata: ${JSON.stringify({ type: 'delta', runId, delta: current.transcript, timestamp: new Date().toISOString() })}\n\n`);
-  }
-  if (current.state !== 'running') {
-    res.write(`event: done\ndata: ${JSON.stringify({ type: 'done', runId, state: current.state, timestamp: new Date().toISOString() })}\n\n`);
-    res.end();
-    return;
-  }
-
-  const unsubscribe = agentService.subscribe(runId, (event) => {
-    res.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
-    if (event.type === 'done') {
-      unsubscribe();
-      res.end();
-    }
-  });
-
-  req.on('close', () => {
-    unsubscribe();
-  });
-}));
-
-app.post('/api/agents/runs/:id/stop', requireScope('agents:run'), asyncRoute((req, res) => {
-  agentService.stopRun(routeParam(req, 'id'));
-  res.status(202).json({ ok: true });
-}));
-
-app.post('/api/agents/runs/:id/apply', requireScope('agents:run'), asyncRoute((req, res) => {
-  const body = req.body as { paths?: string[] };
-  const result = agentService.applyRunPaths(routeParam(req, 'id'), { paths: body.paths ?? [] });
-  res.json(result);
 }));
 
 app.delete('/api/tokens/:id', requireScope('write:ideas'), asyncRoute((req, res) => {
@@ -677,39 +591,6 @@ app.patch('/api/settings/:section', requireScope('write:ideas'), asyncRoute((req
       };
       repository.setSetting(SETTINGS_KEYS.apiWebhooks, next);
     }
-    res.json(aggregateSettings());
-    return;
-  }
-
-  if (section === 'agents') {
-    const body = req.body as {
-      claudeCliPath?: unknown;
-      codexCliPath?: unknown;
-      runtimeCapMinutes?: unknown;
-      dailyRunBudget?: unknown;
-    };
-    const current = agentsStoredConfig();
-    const claudeCliPath = typeof body.claudeCliPath === 'string' && body.claudeCliPath.trim()
-      ? body.claudeCliPath.trim()
-      : undefined;
-    const codexCliPath = typeof body.codexCliPath === 'string' && body.codexCliPath.trim()
-      ? body.codexCliPath.trim()
-      : undefined;
-
-    const next: AgentStoredConfig = {
-      ...current,
-      claudeCliPath: body.claudeCliPath === undefined ? current.claudeCliPath : claudeCliPath,
-      codexCliPath: body.codexCliPath === undefined ? current.codexCliPath : codexCliPath,
-      runtimeCapMinutes: typeof body.runtimeCapMinutes === 'number'
-        ? Math.min(30, Math.max(1, Math.floor(body.runtimeCapMinutes)))
-        : current.runtimeCapMinutes,
-      dailyRunBudget: typeof body.dailyRunBudget === 'number'
-        ? Math.max(1, Math.floor(body.dailyRunBudget))
-        : current.dailyRunBudget,
-    };
-    next.claudeLinked = body.claudeCliPath === undefined ? current.claudeLinked : Boolean(next.claudeCliPath);
-    next.codexLinked = body.codexCliPath === undefined ? current.codexLinked : Boolean(next.codexCliPath);
-    repository.setSetting(SETTINGS_KEYS.agentsConfig, next);
     res.json(aggregateSettings());
     return;
   }
@@ -953,11 +834,61 @@ app.post('/api/ideas/:id/versions/restore/:versionId', requireScope('write:ideas
   res.json(idea);
 }));
 
+app.post('/api/ai/project-draft/apply', requireScope('ai:suggest'), asyncRoute((req, res) => {
+  const body = (req.body ?? {}) as Partial<AiProjectDraftApplyRequest>;
+  const ideaId = typeof body.ideaId === 'string' ? body.ideaId.trim() : '';
+  if (!ideaId) {
+    res.status(400).json({ error: 'ideaId is required.' });
+    return;
+  }
+  const idea = repository.getIdea(ideaId);
+  if (!idea) {
+    res.status(404).json({ error: 'Idea not found.' });
+    return;
+  }
+  if (!idea.graduatedTo) {
+    res.status(400).json({ error: 'This idea has not been graduated to a project path.' });
+    return;
+  }
+  const targetRoot = path.resolve(idea.graduatedTo);
+  const allowedRoots = integrations.configuredRoots().map((root) => path.resolve(root));
+  if (!allowedRoots.some((root) => isInsidePath(targetRoot, root))) {
+    res.status(403).json({ error: 'Graduated project path is outside configured project roots.' });
+    return;
+  }
+  const files = parseProjectDraftApplyFiles(body.files);
+  if (!files) {
+    res.status(400).json({ error: 'files must be a non-empty array of safe relative text files.' });
+    return;
+  }
+
+  const written: string[] = [];
+  for (const file of files) {
+    const destination = path.resolve(targetRoot, file.path);
+    if (!isInsidePath(destination, targetRoot)) {
+      res.status(400).json({ error: `Unsafe draft file path: ${file.path}` });
+      return;
+    }
+    if (fs.existsSync(destination)) {
+      res.status(409).json({ error: `File already exists: ${file.path}` });
+      return;
+    }
+  }
+  for (const file of files) {
+    const destination = path.resolve(targetRoot, file.path);
+    fs.mkdirSync(path.dirname(destination), { recursive: true });
+    fs.writeFileSync(destination, file.content, { encoding: 'utf8', flag: 'wx' });
+    written.push(file.path);
+  }
+
+  res.json({ targetPath: targetRoot, filesWritten: written });
+}));
+
 app.get('/api/stats', requireScope('read:ideas'), asyncRoute((_req, res) => {
   res.json(repository.getStats());
 }));
 
-registerAiRoutes(app, aiService, agentsPublicConfig);
+registerAiRoutes(app, aiService);
 registerBackupRoutes(app, backupService);
 
 app.get('/api/integrations', requireScope('read:ideas'), asyncRoute((req, res) => {
@@ -1046,8 +977,6 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 migrateLegacySettings();
-fs.mkdirSync(path.join(dataDir, 'scratch'), { recursive: true });
-fs.mkdirSync(path.join(dataDir, 'agent-runs'), { recursive: true });
 
 app.listen(PORT, () => {
   backupService.runScheduledIfDue();

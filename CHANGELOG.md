@@ -6,7 +6,7 @@
 
 - Added a persistent Claude/Codex account reauth notice that appears only after this browser has previously seen a successful account auth and current status later requires sign-in again.
 - The notice links directly to Settings → AI & Agents (`/settings/ai-agents`) and includes a refresh action; intentional logout clears the browser-side reminder.
-- Updated README, repo docs, in-app manual, and contextual help to distinguish Claude native OAuth / Codex app-server account auth from the optional file-producing CLI agent runner.
+- Removed the old CLI runner documentation and added Project drafting docs that describe provider-routed file drafts through normal AI configuration.
 - Refreshed backup documentation to mention both startup safety snapshots and scheduled backup checks.
 
 ### Manual readability, linking, and privacy-copy accuracy
@@ -59,17 +59,17 @@ Seedbank v2.2.0 completes the theme catalog, adds a comprehensive searchable in-
 - **Help/Manual trigger** — BookOpen icon in the app header; `?` global keyboard shortcut.
 - **Manual modal** — grouped index (left rail on desktop, optgroup selector on mobile), section anchors, scroll-to-section navigation, field-note aesthetic.
 - **Local search** — all-words matching across title/body/keywords; matching words highlighted in result titles (`bg-sage-100 text-sage-700`); empty state with guidance.
-- **28 sections across 8 groups:** Getting Started, Garden, Idea Editor, Health & AI, Settings, Integrations, API & Automation, Troubleshooting. Covers every major feature including: stage/category badges, score pickers, health check, Thinking Partner, prompt modes, agent runs, theme match system, token budgets, API tokens (all four scopes including `mcp:read`), webhooks, MCP, backups, import/export, version history, compost, and integrations.
+- **28 sections across 8 groups:** Getting Started, Garden, Idea Editor, Health & AI, Settings, Integrations, API & Automation, Troubleshooting. Covers every major feature including: stage/category badges, score pickers, health check, Thinking Partner, prompt modes, Project drafting, theme match system, token budgets, API tokens, webhooks, MCP, backups, import/export, version history, compost, and integrations.
 - **Deep-link support** — contextual help popovers can open the manual to a specific section without breaking the current route.
 - **Accessibility** — focus trap, Escape close, labelled `role="dialog"`, keyboard-navigable index/search/results.
-- **Platform-neutral language** — integration sections explain generic adapters, external project roots, REST/OpenAPI, webhooks, MCP, and CLI agents without referencing private tools.
+- **Platform-neutral language** — integration sections explain generic adapters, external project roots, REST/OpenAPI, webhooks, MCP, and AI-assisted workflows without referencing private tools.
 
 ### Contextual help system
 
 - **`HelpProvider` / `useHelp()` hook** — fast-refresh-safe context split across `helpContext.ts`, `HelpContext.tsx`, `useHelp.ts`.
 - **`HelpModeToggle`** — always-visible button in the manual modal header to enable/disable help mode. When enabled, `HelpButton` markers appear near documented UI elements.
 - **`HelpButton` + `HelpPopover`** — each popover carries a summary, optional details, and an "Open manual section" deep-link. Touch and keyboard activation work; hover-only dead ends avoided.
-- **Coverage:** stage picker, category badges, health check, agent run controls, score pickers, token budget, linked agents, API token scopes, webhooks, backup schedule.
+- **Coverage:** stage picker, category badges, health check, Project drafting, score pickers, token budget, API token scopes, webhooks, backup schedule.
 - **Non-intrusive by default** — help triggers do not block primary actions or resize controls; `HelpButton` is only rendered when help mode is on.
 
 ### Full ApiServerTab implementation
@@ -106,9 +106,9 @@ Seedbank v2.2.0 completes the theme catalog, adds a comprehensive searchable in-
 
 ---
 
-## 2.1.0 — Settings, API, Theming & Agents
+## 2.1.0 — Settings, API, Theming & AI Features
 
-Seedbank v2.1.0 ships four closely-related feature groups that turn scattered configuration popovers into a permanent Settings page, give the local API a real security surface, make the UI themeable at runtime, and link local AI CLI agents for sandboxed "develop with agent" runs.
+Seedbank v2.1.0 ships closely-related feature groups that turn scattered configuration popovers into a permanent Settings page, give the local API a real security surface, make the UI themeable at runtime, and expand AI-assisted workflows.
 
 ### Settings foundation
 
@@ -134,9 +134,7 @@ Seedbank v2.1.0 ships four closely-related feature groups that turn scattered co
 - Provider cards for OpenAI, Anthropic, and Ollama — status pill, inline test-connection, expandable key/model/URL fields. Replaces the dense grid in the AI panel popover.
 - Default-provider radio — single source of truth; the Thinking Partner panel reads this setting.
 - Token budget slider with last-24 h / last-7 d usage readout (from `ai_usage` table).
-- **Claude Code / Codex CLI linking** — enter the binary path; Seedbank validates with `--version` server-side and stores `agentLinked: true`. No raw credentials enter the browser.
-- **"Develop with agent"** button on idea detail — opens a panel that streams the agent's run against a scratch workspace seeded with the idea's markdown context. Proposed files appear in a checklist; accepted files are saved as attachments.
-- **"Continue with agent"** button on graduated ideas — hands the idea + scaffolded project directory to the agent for follow-on work.
+- **Project drafting route** — configure provider/model/effort through Feature Defaults and generate reviewable starter files from an idea.
 
 ### Theming system
 
@@ -151,10 +149,8 @@ Seedbank v2.1.0 ships four closely-related feature groups that turn scattered co
 - API tokens hashed at rest (SHA-256 via `server/src/ai/crypto.ts` pattern); only the hash is stored.
 - Token creation endpoint enforces `requireImplicitLocal` — only requests from `127.0.0.1` / `::1` / `localhost` can mint new tokens.
 - Bearer-token middleware is additive: cookie-less local requests continue to work without a token.
-- MCP endpoints are read-only and token-gated; they return idea records and search results as context for external agent sessions.
-- CLI agent credentials stay in the OS / CLI tool's own keyring; Seedbank stores only the binary path and `agentLinked: true`.
-- Agent runs are sandboxed to a per-idea scratch workspace (no access to arbitrary filesystem paths). Runtime capped at 5 min per run (30 min absolute); kill switch always visible in the UI.
-- No agent output auto-writes to canonical idea fields — every proposed change flows through an explicit accept/reject step.
+- MCP endpoints are read-only and token-gated; they return idea records and search results as context for external AI sessions.
+- Project drafting returns reviewable files and does not auto-write canonical idea fields.
 
 ### Documentation
 

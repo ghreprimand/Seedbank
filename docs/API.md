@@ -32,7 +32,6 @@ Supported scopes:
 - `write:ideas`
 - `ai:suggest`
 - `mcp:read`
-- `agents:run`
 
 Loopback implicit-local requests bypass scope checks. Bearer requests are deny-by-default if required scope is missing.
 
@@ -90,10 +89,6 @@ High-level shape:
     "tokens": [],
     "webhooks": { "url": null, "events": [] }
   },
-  "agents": {
-    "claudeLinked": false,
-    "codexLinked": false
-  },
   "backups": { "config": { "frequency": "daily", "exportJson": true } },
   "integrations": [],
   "server": {
@@ -113,7 +108,6 @@ Supported sections:
 - `ui`
 - `ai`
 - `api`
-- `agents`
 - `backups`
 - `categories`
 
@@ -151,14 +145,6 @@ Rules:
 - URL must be `http://` or `https://`.
 - `events` must be a subset of supported webhook events.
 - `tokens` cannot be patched here (`400`); use `/api/tokens` endpoints.
-
-#### `agents`
-
-Body supports:
-- `claudeCliPath`
-- `codexCliPath`
-- `runtimeCapMinutes` (clamped `1..30`)
-- `dailyRunBudget` (minimum `1`)
 
 #### `backups`
 
@@ -300,119 +286,6 @@ Query:
 
 Returns compact summary matches.
 
-## Agent Runner Endpoints
-
-All routes below require `agents:run` for bearer-authenticated requests.
-
-### `POST /api/agents/link`
-
-Body:
-
-```json
-{ "provider": "claude", "cliPath": "/usr/local/bin/claude" }
-```
-
-- Validates by invoking `<cli> --version` server-side.
-- Stores link details in `agents.config`.
-- Browser never receives raw credentials.
-
-Response:
-
-```json
-{
-  "claudeLinked": true,
-  "codexLinked": false,
-  "claudeVersion": "...",
-  "codexVersion": null
-}
-```
-
-### `DELETE /api/agents/link/:provider`
-
-Unlinks one provider (`claude` or `codex`). Returns same public link shape.
-
-### `POST /api/agents/runs`
-
-Body:
-
-```json
-{
-  "provider": "codex",
-  "prompt": "Build the first scaffold",
-  "ideaId": "uuid"
-}
-```
-
-Modes:
-- Scratch mode: provide `ideaId`, omit `projectPath`.
-- Continue mode: provide `projectPath` (must be inside configured integration roots), optional `ideaId`.
-
-Response (`202`):
-
-```json
-{ "runId": "uuid", "state": "running" }
-```
-
-### `GET /api/agents/runs/:id`
-
-Returns run metadata and transcript:
-
-```json
-{
-  "id": "uuid",
-  "ideaId": "uuid",
-  "projectPath": null,
-  "provider": "claude",
-  "state": "completed",
-  "startedAt": "...",
-  "endedAt": "...",
-  "exitCode": 0,
-  "proposedFiles": ["SPEC.md"],
-  "transcript": "...",
-  "truncated": false
-}
-```
-
-`transcriptPath` is intentionally not exposed in the public API.
-
-### `GET /api/agents/runs/:id/stream` (SSE)
-
-Events:
-- `state`
-- `delta`
-- `error`
-- `done`
-
-Behavior:
-- sends current state immediately
-- replays existing transcript for late subscribers
-- streams live deltas while running
-
-### `POST /api/agents/runs/:id/stop`
-
-Requests termination (`202`). Runtime behavior:
-- sends `SIGTERM`
-- escalates to `SIGKILL` after 5s if still running
-
-### `POST /api/agents/runs/:id/apply`
-
-Body:
-
-```json
-{ "paths": ["SPEC.md", "prototype/notes.md"] }
-```
-
-Rules:
-- only allowed for scratch runs (`ideaId` set, `projectPath` null)
-- run must not be `running`
-- each path must resolve inside scratch workspace
-- symlinks and symlink traversal are blocked
-
-Effect:
-- copies selected files into `<seedbank-data-dir>/attachments/<ideaId>/<runId>/...`
-- appends copied paths to `idea.images`
-- does not auto-write canonical idea fields (`pitch`, `hook`, etc.)
-
 ## Core Idea Endpoints
 
 Scope expectations (bearer mode):
@@ -463,9 +336,11 @@ Scope expectations (bearer mode):
 - `GET /api/ai/conversations/:ideaId` (`read:ideas`)
 - `POST /api/ai/suggest` (`ai:suggest`) - field suggestions accept optional `prompt`, `omitCurrentValue`, `aiConfirmationToken`, `providerInstanceId`, `model`, `effort`, and `verbosity`
 - `POST /api/ai/field-chat` (`ai:suggest`, SSE) - modal-local field assistance using the `field-suggestions` route; accepts `aiConfirmationToken` plus the same optional provider/model override fields as `POST /api/ai/suggest`
+- `POST /api/ai/project-draft` (`ai:suggest`) - generates reviewable project files using the `project-drafting` Feature Defaults route; accepts `ideaId`, optional `prompt`, `aiConfirmationToken`, `providerInstanceId`, `model`, `effort`, and `verbosity`
+- `POST /api/ai/project-draft/apply` (`ai:suggest`) - writes selected reviewed draft files into the idea's graduated project path when it is inside a configured project root; rejects unsafe paths and existing files
 - `POST /api/ai/chat` (`ai:suggest`, SSE) - Thinking Partner chat; accepts `aiConfirmationToken`
 
-The provider/model override fields are request-scoped. They let the Ask AI modal run one suggestion or field-assist chat against another configured provider instance without changing Settings → AI & Agents → Feature Defaults.
+The provider/model override fields are request-scoped. They let a single AI request run against another configured provider instance without changing Settings → AI & Agents → Feature Defaults.
 
 ## Backups, Project Graduation, Import/Export
 

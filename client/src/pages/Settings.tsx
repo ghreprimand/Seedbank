@@ -50,7 +50,7 @@ const TABS: TabDef[] = [
   {
     id: 'ai-agents',
     label: 'AI & Agents',
-    kicker: 'Provider connections, agent linking, token budget',
+    kicker: 'Provider connections, feature routing, token budget',
     icon: Bot,
     component: AiAgentsTab,
   },

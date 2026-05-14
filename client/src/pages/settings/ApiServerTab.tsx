@@ -62,7 +62,6 @@ const SCOPES = [
   { value: 'write:ideas', label: 'Write ideas', desc: 'Create and update ideas' },
   { value: 'ai:suggest',  label: 'AI suggest', desc: 'Call AI suggestion endpoints' },
   { value: 'mcp:read',    label: 'MCP read',   desc: 'Read-only MCP context endpoints' },
-  { value: 'agents:run',  label: 'Agents run', desc: 'Start, stop, and apply agent runs' },
 ] as const;
 
 const WEBHOOK_EVENTS = ['idea.created', 'idea.graduated', 'idea.shipped'] as const;

@@ -199,6 +199,7 @@ const DEFAULT_SETTINGS: AggregateSettings = {
       'field-suggestions': { provider: 'default' },
       'health-check': { provider: 'default' },
       'discover-insights': { provider: 'default' },
+      'project-drafting': { provider: 'default' },
       default: { provider: 'default' },
     },
     effectiveFeatureRoutes: {
@@ -206,6 +207,7 @@ const DEFAULT_SETTINGS: AggregateSettings = {
       'field-suggestions': { provider: 'openai', providerInstanceId: 'openai-api', model: 'gpt-4.1-mini', inherited: true },
       'health-check': { provider: 'openai', providerInstanceId: 'openai-api', model: 'gpt-4.1-mini', inherited: true },
       'discover-insights': { provider: 'openai', providerInstanceId: 'openai-api', model: 'gpt-4.1-mini', inherited: true },
+      'project-drafting': { provider: 'openai', providerInstanceId: 'openai-api', model: 'gpt-4.1-mini', inherited: true },
       default: { provider: 'openai', providerInstanceId: 'openai-api', model: 'gpt-4.1-mini', inherited: true },
     },
     guardrails: {
@@ -214,6 +216,7 @@ const DEFAULT_SETTINGS: AggregateSettings = {
         'field-suggestions': true,
         'health-check': true,
         'discover-insights': true,
+        'project-drafting': true,
         default: true,
       },
       providerEnabled: {
@@ -256,7 +259,6 @@ const DEFAULT_SETTINGS: AggregateSettings = {
     tokens: [],
     webhooks: { url: null, events: [] },
   },
-  agents: { claudeLinked: false, codexLinked: false },
   backups: {
     config: { frequency: 'daily', exportJson: true, retentionCount: 10, destinations: [] },
     lastRun: null,
@@ -432,9 +434,6 @@ export const useAiSettings = () =>
 
 export const useApiSettings = () =>
   useSettingsStore((s) => s.data?.api ?? DEFAULT_SETTINGS.api);
-
-export const useAgentsSettings = () =>
-  useSettingsStore((s) => s.data?.agents ?? DEFAULT_SETTINGS.agents);
 
 export const useBackupsSettings = () =>
   useSettingsStore((s) => s.data?.backups ?? DEFAULT_SETTINGS.backups);

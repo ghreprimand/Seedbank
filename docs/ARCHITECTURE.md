@@ -26,7 +26,7 @@ Browser <-> Dexie / IndexedDB cache
 ## Monorepo Packages
 
 - `client/` — SPA UI, settings store, API client, offline fallback cache
-- `server/` — Express routes, auth, SQLite repository, AI, integrations, agent runner
+- `server/` — Express routes, auth, SQLite repository, AI, integrations, backups
 - `shared/` — shared TypeScript domain types
 
 Top-level scripts:
@@ -46,13 +46,11 @@ Primary DB tables:
 - `settings`
 - `ai_*` usage/conversation tables
 - `api_tokens` (`server/migrations/003_api_tokens.sql`)
-- `agent_runs` (`server/migrations/004_agent_runs.sql`)
 
 `settings` is namespaced and now includes keys such as:
 - `ui.theme`
 - `ai.config` (legacy `ai:config` migrated on startup)
 - `api.webhooks`
-- `agents.config`
 - `integration:<adapter-id>` (one namespaced key per registered adapter; for example `integration:generic-project`)
 - backup keys (`backup.config`, `backup.lastRun`)
 
@@ -68,7 +66,6 @@ The server composes a single aggregate payload containing:
 - UI theme
 - AI public config
 - API webhooks and token metadata
-- linked-agent public status
 - backup status
 - integration summaries
 - server info
@@ -131,44 +128,21 @@ Read-only MCP-style endpoints:
 - `GET /api/mcp/ideas/:id`
 - `GET /api/mcp/search`
 
-These routes require `mcp:read` for bearer auth and are designed for external agent/tool context pulls, not mutation.
+These routes require `mcp:read` for bearer auth and are designed for external AI/tool context pulls, not mutation.
 
-## Optional CLI Agent Runner Architecture
+## Project Drafting Architecture
 
-Core modules:
-- `server/src/agents/link.ts` — CLI binary resolution and `--version` validation for `claude`/`codex`
-- `server/src/agents/service.ts` — run lifecycle, process control, transcript streaming, safety rails
-- `server/src/agents/store.ts` — `agent_runs` persistence
+Project drafting is implemented as a normal AI feature route:
 
-Execution model:
-- Seedbank spawns local CLI processes (`spawn`) in either:
-  - scratch workspace for idea development mode
-  - graduated project path for continue mode
-- environment is intentionally inherited because linked CLI tools run as child processes of the Seedbank server. This is separate from Claude account native OAuth and Codex account app-server auth used for chat/model routing.
+- shared feature id: `project-drafting`
+- API route: `POST /api/ai/project-draft`
+- service method: `AiService.draftProject`
+- prompt/parser helpers: `server/src/ai/prompts.ts`
+- client panel: `client/src/components/ProjectDraftPanel.tsx`
 
-Transcript model:
-- transcript written to disk under `<seedbank-data-dir>/agent-runs/<runId>.log`
-- capped at 256 KB with truncation marker
-- run API exposes transcript content, not internal transcript file paths
+The route resolves Feature Defaults in the same way as Thinking Partner, field suggestions, health check, and Discover insights. Guardrails, remote-provider confirmation, disabled providers, model allowlists, rate limits, and token budgets are enforced before the request reaches the provider.
 
-Persistence model (`agent_runs`):
-- run metadata and state
-- transcript path (internal)
-- proposed files JSON
-- startup normalization marks orphaned `running` rows as `failed`
-
-## Agent Safety Rails
-
-Implemented safety controls include:
-- per-run runtime cap (`runtimeCapMinutes`, max 30)
-- daily run budget (`dailyRunBudget`)
-- explicit stop endpoint with SIGTERM then SIGKILL escalation
-- workspace root allowlist for continue mode (configured integration roots)
-- scratch apply-only behavior for attachment copy flow
-- no direct auto-write to canonical idea fields
-- symlink traversal protections during proposed-file collection and apply
-
-This keeps the agent role as a constrained assistant that proposes changes and requires explicit user acceptance.
+The provider returns strict JSON containing a summary and proposed files. The server accepts only safe relative paths, rejects traversal/hidden paths, caps the number and size of files, and returns the result for user review. A separate apply endpoint can write the reviewed selection into the idea's graduated project path when that path is inside a configured project root; existing files are not overwritten. The feature does not write canonical idea fields.
 
 ## Integration Architecture
 
@@ -187,8 +161,6 @@ Data directory:
 ├── seedbank.db
 ├── backups/
 ├── exports/
-├── scratch/
-├── agent-runs/
 └── attachments/
 ```
 
