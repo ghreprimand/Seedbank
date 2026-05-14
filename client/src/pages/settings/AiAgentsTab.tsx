@@ -1053,8 +1053,9 @@ function isLikelyLocalUrl(value: string | undefined): boolean {
  * initialises to a sensible value on first render.
  */
 function initialLocalServerType(ai: AiPublicConfig): LocalServerType {
-  const preset = ai.openaiCompatiblePreset;
-  const url    = ai.openaiCompatibleBaseUrl;
+  // Use the split local field; fall back to the legacy combined field for older configs.
+  const preset = ai.localOpenaiCompatiblePreset ?? ai.openaiCompatiblePreset;
+  const url    = ai.localOpenaiCompatibleBaseUrl ?? ai.openaiCompatibleBaseUrl;
   if (preset === 'lm-studio'  && isLikelyLocalUrl(url)) return 'lm-studio';
   if (preset === 'vllm'       && isLikelyLocalUrl(url)) return 'vllm';
   if (preset === 'llama-cpp'  && isLikelyLocalUrl(url)) return 'llama-cpp';
@@ -1066,9 +1067,12 @@ function initialLocalServerType(ai: AiPublicConfig): LocalServerType {
 function dataResidency(ai: AiPublicConfig): DataResidency {
   if (ai.provider === 'ollama') return 'local';
   if (ai.provider === 'openai-compatible') {
-    const preset = ai.openaiCompatiblePreset as string;
+    // For residency, check the default provider instance to pick the right split config.
+    const isLocalInstance = ai.defaultProviderInstanceId === 'local-openai-compatible';
+    const preset = (isLocalInstance ? ai.localOpenaiCompatiblePreset : ai.cloudOpenaiCompatiblePreset) as string;
+    const url    = isLocalInstance ? ai.localOpenaiCompatibleBaseUrl : ai.cloudOpenaiCompatibleBaseUrl;
     if (preset === 'custom') return 'mixed';
-    if (isLikelyLocalUrl(ai.openaiCompatibleBaseUrl)) return 'local';
+    if (isLikelyLocalUrl(url)) return 'local';
     if (CLOUD_COMPATIBLE_PRESETS.has(preset)) return 'cloud';
     if (LOCAL_RESIDENCY_PRESETS.has(preset)) return 'cloud';
     return 'mixed'; // unknown endpoint — URL is user-configured
@@ -1082,7 +1086,8 @@ function cloudProviderLabel(ai: AiPublicConfig): string {
   if (ai.provider === 'claude-account') return aiProviderLabel('claude-account');
   if (ai.provider === 'codex-account') return aiProviderLabel('codex-account');
   if (ai.provider === 'openai-compatible') {
-    const preset = presetFor(ai.openaiCompatiblePreset);
+    const isLocal = ai.defaultProviderInstanceId === 'local-openai-compatible';
+    const preset = presetFor(isLocal ? ai.localOpenaiCompatiblePreset : ai.cloudOpenaiCompatiblePreset);
     return preset.label;
   }
   return 'the AI provider';
@@ -1093,10 +1098,18 @@ function PrivacyNotice({ ai, preflight }: { ai: AiPublicConfig; preflight?: AiPr
   // Exception: when the provider is openai-compatible with the 'custom' preset, the user
   // controls the URL and can point it at any remote host. Even if the current URL is localhost
   // the residency claim 'local' would be misleading, so we always show 'mixed' for custom preset.
-  const isCustomPreset = ai.provider === 'openai-compatible' && ai.openaiCompatiblePreset === 'custom';
+  // Determine which split slot is active for the default provider instance.
+  const isLocalInstance = ai.defaultProviderInstanceId === 'local-openai-compatible';
+  const activePreset = ai.provider === 'openai-compatible'
+    ? (isLocalInstance ? ai.localOpenaiCompatiblePreset : ai.cloudOpenaiCompatiblePreset)
+    : ai.openaiCompatiblePreset;
+  const activeBaseUrl = ai.provider === 'openai-compatible'
+    ? (isLocalInstance ? ai.localOpenaiCompatibleBaseUrl : ai.cloudOpenaiCompatibleBaseUrl)
+    : ai.openaiCompatibleBaseUrl;
+  const isCustomPreset = ai.provider === 'openai-compatible' && activePreset === 'custom';
   const isOpenAICompatibleRemote = ai.provider === 'openai-compatible'
     && !isCustomPreset
-    && !isLikelyLocalUrl(ai.openaiCompatibleBaseUrl);
+    && !isLikelyLocalUrl(activeBaseUrl);
   const residency: DataResidency = isCustomPreset
     ? 'mixed'
     : isOpenAICompatibleRemote
@@ -1113,7 +1126,7 @@ function PrivacyNotice({ ai, preflight }: { ai: AiPublicConfig; preflight?: AiPr
           <p className="text-sm font-medium text-sage-800">Current default provider runs locally</p>
           <p className="text-xs text-sage-700 mt-0.5 leading-relaxed">
             The global default ({' '}
-            <span className="font-semibold">{ai.provider === 'ollama' ? 'Ollama' : presetFor(ai.openaiCompatiblePreset).label}</span>
+            <span className="font-semibold">{ai.provider === 'ollama' ? 'Ollama' : presetFor(activePreset).label}</span>
             ) sends idea content only to the configured local host. Individual Feature Defaults may route to different providers.
             To keep every AI feature local, set local providers for each Feature Default or enable{' '}
             <span className="font-medium">Local-only mode</span> in Advanced guardrails.
@@ -1674,7 +1687,16 @@ function GuardrailsSection({ ai, onSaveBudget, onSaveGuardrails }: GuardrailsSec
     void preflightAiRequest({ feature: 'default' })
       .then(setPreflight)
       .catch(() => {});
-  }, [ai.provider, ai.openaiCompatibleBaseUrl, ai.openaiCompatiblePreset]);
+  }, [
+    ai.provider,
+    ai.defaultProviderInstanceId,
+    ai.openaiCompatibleBaseUrl,
+    ai.openaiCompatiblePreset,
+    ai.localOpenaiCompatibleBaseUrl,
+    ai.localOpenaiCompatiblePreset,
+    ai.cloudOpenaiCompatibleBaseUrl,
+    ai.cloudOpenaiCompatiblePreset,
+  ]);
 
   return (
     <div className="space-y-5">
@@ -1836,7 +1858,13 @@ function providerModel(ai: AiPublicConfig, provider: AiProviderId): string {
   if (provider === 'anthropic') return ai.anthropicModel;
   if (provider === 'claude-account') return ai.claudeAccountModel;
   if (provider === 'codex-account') return ai.codexAccountModel;
-  if (provider === 'openai-compatible') return ai.openaiCompatibleModel;
+  if (provider === 'openai-compatible') {
+    // Prefer whichever split slot matches the current default instance; fall back to legacy.
+    const isLocal = ai.defaultProviderInstanceId === 'local-openai-compatible';
+    return isLocal
+      ? (ai.localOpenaiCompatibleModel || ai.openaiCompatibleModel)
+      : (ai.cloudOpenaiCompatibleModel || ai.openaiCompatibleModel);
+  }
   return ai.ollamaModel;
 }
 
@@ -1867,7 +1895,11 @@ function FeatureRoutingSection({ ai, providerStatuses, providerAvailability, onS
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const openAICompatiblePreset = presetFor(ai.openaiCompatiblePreset);
+  const isLocalInstance = ai.defaultProviderInstanceId === 'local-openai-compatible';
+  const openAICompatiblePreset = presetFor(
+    isLocalInstance ? (ai.localOpenaiCompatiblePreset ?? ai.openaiCompatiblePreset)
+                    : (ai.cloudOpenaiCompatiblePreset ?? ai.openaiCompatiblePreset),
+  );
   // Effort is local state only — not yet persisted. The backend contract for
   // per-feature effort in featureRoutes is pending (Phase 7). Wire here when ready.
   const [featureEfforts, setFeatureEfforts] = useState<Partial<Record<AiFeatureId, string>>>({});
@@ -1955,8 +1987,8 @@ function FeatureRoutingSection({ ai, providerStatuses, providerAvailability, onS
                 ? 'Anthropic API key missing in the Anthropic API card.'
                 : selectedProvider === 'openai-compatible'
                   && openAICompatiblePreset.requiresKey
-                  && !ai.hasOpenAICompatibleKey
-                    ? 'This cloud endpoint preset needs an API key — add it in the Custom endpoint card.'
+                  && !(ai.hasCloudOpenAICompatibleKey || ai.hasLocalOpenAICompatibleKey || ai.hasOpenAICompatibleKey)
+                    ? 'This endpoint preset needs an API key — add it in the External / Cloud card.'
                     : providerAvailability[selectedProvider] && providerAvailability[selectedProvider]?.availability !== 'available'
                       ? (providerAvailability[selectedProvider]?.reason ?? 'Selected method is not available right now.')
                       : selectedProvider === 'ollama' && providerStatuses.ollama === 'unreachable'
@@ -2435,7 +2467,7 @@ function CodexAccountDetail({
     <div className="space-y-3">
       <div className="flex items-center gap-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
         <span className="font-semibold">Beta</span>
-        <span>— Codex account requires a separate Codex CLI component to be installed and running on this machine and uses your ChatGPT/Codex login. This feature is in development and may not be fully operational. This is separate from OpenAI API billing.</span>
+        <span>— Codex account login uses a local Codex runtime installed on this machine and your ChatGPT/Codex subscription. This is a different billing surface from OpenAI API keys. This feature is in development and may not be fully operational.</span>
       </div>
 
       {!available && (
@@ -2565,22 +2597,34 @@ export default function AiAgentsTab() {
       ? (ai.codexAccountAuthenticated ? 'connected' : 'key-needed')
       : 'upcoming');
   const ollamaStatus: ProviderCardProps['status'] = probeStatuses.ollama ?? 'not-tested';
-  const compatiblePreset = presetFor(ai.openaiCompatiblePreset);
-  const localCompatibleActive = openAICompatiblePresetMatchesMode(ai.openaiCompatiblePreset, ai.openaiCompatibleBaseUrl, 'local');
-  const cloudCompatibleActive = openAICompatiblePresetMatchesMode(ai.openaiCompatiblePreset, ai.openaiCompatibleBaseUrl, 'cloud');
-  const compatibleRequiresKey = cloudCompatibleActive && ai.openaiCompatiblePreset === 'custom'
-    ? true
-    : compatiblePreset.requiresKey;
-  const compatibleStatus: ProviderCardProps['status'] = probeStatuses['openai-compatible']
-    ?? (compatibleRequiresKey && !ai.hasOpenAICompatibleKey ? 'key-needed' : 'not-tested');
+  // ── Local OpenAI-compatible derived state (uses split localOpenaiCompatible* fields) ──
+  const localCompatiblePreset = presetFor(ai.localOpenaiCompatiblePreset ?? ai.openaiCompatiblePreset);
+  const localCompatibleActive = openAICompatiblePresetMatchesMode(
+    ai.localOpenaiCompatiblePreset ?? ai.openaiCompatiblePreset,
+    ai.localOpenaiCompatibleBaseUrl ?? ai.openaiCompatibleBaseUrl,
+    'local',
+  );
+  const localCompatibleStatus: ProviderCardProps['status'] = probeStatuses['openai-compatible']
+    ?? (localCompatiblePreset.requiresKey && !ai.hasLocalOpenAICompatibleKey ? 'key-needed' : 'not-tested');
   const localCompatibleLabel = localCompatibleActive
-    ? `${compatiblePreset.label} · ${ai.openaiCompatibleModel || 'choose a model'}`
+    ? `${localCompatiblePreset.label} · ${ai.localOpenaiCompatibleModel || ai.openaiCompatibleModel || 'choose a model'}`
     : `${presetFor(LOCAL_COMPATIBLE_DEFAULT_PRESET).label} · not configured`;
+
+  // ── Cloud OpenAI-compatible derived state (uses split cloudOpenaiCompatible* fields) ──
+  const cloudCompatiblePreset = presetFor(ai.cloudOpenaiCompatiblePreset ?? ai.openaiCompatiblePreset);
+  const cloudCompatibleActive = openAICompatiblePresetMatchesMode(
+    ai.cloudOpenaiCompatiblePreset ?? ai.openaiCompatiblePreset,
+    ai.cloudOpenaiCompatibleBaseUrl ?? ai.openaiCompatibleBaseUrl,
+    'cloud',
+  );
+  const cloudCompatibleRequiresKey = (ai.cloudOpenaiCompatiblePreset ?? ai.openaiCompatiblePreset) === 'custom'
+    ? true
+    : cloudCompatiblePreset.requiresKey;
+  const cloudCompatibleStatus: ProviderCardProps['status'] = probeStatuses['openai-compatible']
+    ?? (cloudCompatibleRequiresKey && !ai.hasCloudOpenAICompatibleKey ? 'key-needed' : 'not-tested');
   const cloudCompatibleLabel = cloudCompatibleActive
-    ? `${compatiblePreset.label} · ${ai.openaiCompatibleModel || 'choose a model'}`
+    ? `${cloudCompatiblePreset.label} · ${ai.cloudOpenaiCompatibleModel || ai.openaiCompatibleModel || 'choose a model'}`
     : `${presetFor(CLOUD_COMPATIBLE_DEFAULT_PRESET).label} · not configured`;
-  const localCompatibleStatus: ProviderCardProps['status'] = localCompatibleActive ? compatibleStatus : 'not-tested';
-  const cloudCompatibleStatus: ProviderCardProps['status'] = cloudCompatibleActive ? compatibleStatus : 'not-tested';
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -2637,11 +2681,25 @@ export default function AiAgentsTab() {
     }),
     'codex-account': capabilityState('codex-account-app-server', { availability: ai.codexAccountAvailable ? (ai.codexAccountAuthenticated ? 'available' : 'auth-required') : 'unavailable', reason: ai.codexAccountAvailable ? 'Sign in with Codex account to enable this method.' : 'Codex account method is disabled by server configuration.', featureRoutable: true }),
     ollama: capabilityState('ollama-local', { availability: 'available', featureRoutable: true }),
-    'openai-compatible': capabilityState(`openai-compatible:${ai.openaiCompatiblePreset}`, { availability: 'available', featureRoutable: true }),
+    'openai-compatible': capabilityState(
+      `openai-compatible:${ai.defaultProviderInstanceId === 'local-openai-compatible' ? (ai.localOpenaiCompatiblePreset ?? ai.openaiCompatiblePreset) : (ai.cloudOpenaiCompatiblePreset ?? ai.openaiCompatiblePreset)}`,
+      { availability: 'available', featureRoutable: true },
+    ),
   };
 
-  const setDefaultProvider = async (provider: AiProviderId) => {
-    await patch('ai', { provider });
+  /** Maps legacy AiProviderId to the new provider-instance ID for non-openai-compatible providers. */
+  const PROVIDER_TO_INSTANCE_ID: Partial<Record<AiProviderId, AiProviderInstanceId>> = {
+    anthropic:        'claude-api',
+    'claude-account': 'claude-account',
+    openai:           'openai-api',
+    'codex-account':  'codex-account',
+    ollama:           'ollama',
+    // openai-compatible has two instances; callers pass an explicit instanceId instead.
+  };
+
+  const setDefaultProvider = async (provider: AiProviderId, instanceId?: AiProviderInstanceId) => {
+    const resolved = instanceId ?? PROVIDER_TO_INSTANCE_ID[provider];
+    await patch('ai', { provider, ...(resolved ? { defaultProviderInstanceId: resolved } : {}) });
   };
 
   const saveOpenAI = async (model: string, key?: string) => {
@@ -2664,17 +2722,31 @@ export default function AiAgentsTab() {
     await patch('ai', { ollamaModel: model, ollamaBaseUrl: baseUrl });
   };
 
-  const saveOpenAICompatible = async (
+  const saveLocalOpenAICompatible = async (
     preset: AiOpenAICompatiblePresetId,
     model: string,
     baseUrl: string,
     key?: string,
   ) => {
     await patch('ai', {
-      openaiCompatiblePreset: preset,
-      openaiCompatibleModel: model,
-      openaiCompatibleBaseUrl: baseUrl,
-      ...(key ? { openaiCompatibleApiKey: key } : {}),
+      localOpenaiCompatiblePreset: preset,
+      localOpenaiCompatibleModel: model,
+      localOpenaiCompatibleBaseUrl: baseUrl,
+      ...(key ? { localOpenaiCompatibleApiKey: key } : {}),
+    });
+  };
+
+  const saveCloudOpenAICompatible = async (
+    preset: AiOpenAICompatiblePresetId,
+    model: string,
+    baseUrl: string,
+    key?: string,
+  ) => {
+    await patch('ai', {
+      cloudOpenaiCompatiblePreset: preset,
+      cloudOpenaiCompatibleModel: model,
+      cloudOpenaiCompatibleBaseUrl: baseUrl,
+      ...(key ? { cloudOpenaiCompatibleApiKey: key } : {}),
     });
   };
 
@@ -2892,24 +2964,27 @@ export default function AiAgentsTab() {
                 label={localServerOpt.label}
                 icon="🧩"
                 isDefault={
-                  ai.provider === 'openai-compatible'
-                  && ai.openaiCompatiblePreset === localServerPresetId
-                  && isLikelyLocalUrl(ai.openaiCompatibleBaseUrl)
+                  ai.defaultProviderInstanceId === 'local-openai-compatible'
+                  || (ai.provider === 'openai-compatible'
+                      && (ai.localOpenaiCompatiblePreset ?? ai.openaiCompatiblePreset) === localServerPresetId
+                      && isLikelyLocalUrl(ai.localOpenaiCompatibleBaseUrl ?? ai.openaiCompatibleBaseUrl))
                 }
                 status={localCompatibleStatus}
                 modelLabel={
-                  ai.openaiCompatiblePreset === localServerPresetId && isLikelyLocalUrl(ai.openaiCompatibleBaseUrl)
-                    ? `${localServerOpt.label} · ${ai.openaiCompatibleModel || 'choose a model'}`
+                  (ai.localOpenaiCompatiblePreset ?? ai.openaiCompatiblePreset) === localServerPresetId
+                  && isLikelyLocalUrl(ai.localOpenaiCompatibleBaseUrl ?? ai.openaiCompatibleBaseUrl)
+                    ? `${localServerOpt.label} · ${ai.localOpenaiCompatibleModel || ai.openaiCompatibleModel || 'choose a model'}`
                     : `${localServerOpt.label} · not configured`
                 }
-                onSetDefault={() => void setDefaultProvider('openai-compatible')}
+                onSetDefault={() => void setDefaultProvider('openai-compatible', 'local-openai-compatible')}
                 actions={(
                   <ProviderProbe
                     buildConfig={() => ({
                       provider: 'openai-compatible',
-                      openaiCompatiblePreset: ai.openaiCompatiblePreset,
-                      openaiCompatibleModel: ai.openaiCompatibleModel,
-                      openaiCompatibleBaseUrl: ai.openaiCompatibleBaseUrl,
+                      providerInstanceId: 'local-openai-compatible' as AiProviderInstanceId,
+                      openaiCompatiblePreset: ai.localOpenaiCompatiblePreset ?? ai.openaiCompatiblePreset,
+                      openaiCompatibleModel: ai.localOpenaiCompatibleModel || ai.openaiCompatibleModel,
+                      openaiCompatibleBaseUrl: ai.localOpenaiCompatibleBaseUrl ?? ai.openaiCompatibleBaseUrl,
                     })}
                     onStatusChange={(status) => setProbeStatus('openai-compatible', status)}
                     testLabel="Test saved"
@@ -2918,10 +2993,10 @@ export default function AiAgentsTab() {
                 )}
               >
                 <OpenAICompatibleDetail
-                  preset={ai.openaiCompatiblePreset}
-                  model={ai.openaiCompatibleModel}
-                  baseUrl={ai.openaiCompatibleBaseUrl}
-                  hasKey={ai.hasOpenAICompatibleKey}
+                  preset={ai.localOpenaiCompatiblePreset ?? ai.openaiCompatiblePreset}
+                  model={ai.localOpenaiCompatibleModel || ai.openaiCompatibleModel}
+                  baseUrl={ai.localOpenaiCompatibleBaseUrl ?? ai.openaiCompatibleBaseUrl}
+                  hasKey={ai.hasLocalOpenAICompatibleKey}
                   mode="local"
                   allowedPresets={[localServerPresetId]}
                   guidance={
@@ -2929,8 +3004,7 @@ export default function AiAgentsTab() {
                       ? 'Custom local endpoints should use a localhost, 127.0.0.1, or .local URL.'
                       : `${localServerOpt.label} runs a local OpenAI-compatible server. Ensure it is running before testing.`
                   }
-                  sharedConfigNotice="Seedbank currently stores one OpenAI-compatible profile. Saving this local server replaces any existing endpoint in that shared slot."
-                  onSave={saveOpenAICompatible}
+                  onSave={saveLocalOpenAICompatible}
                 />
               </ProviderCard>
             )}
@@ -2943,19 +3017,24 @@ export default function AiAgentsTab() {
               Connect to hosted services: OpenRouter, Groq, Mistral, Together, Fireworks, or a custom cloud endpoint.
             </p>
             <ProviderCard
-              label={cloudCompatibleActive ? `${compatiblePreset.label}` : 'Cloud provider'}
+              label={cloudCompatibleActive ? cloudCompatiblePreset.label : 'Cloud provider'}
               icon="☁️"
-              isDefault={ai.provider === 'openai-compatible' && cloudCompatibleActive}
+              isDefault={
+                ai.defaultProviderInstanceId === 'cloud-openai-compatible'
+                || (ai.provider === 'openai-compatible' && cloudCompatibleActive
+                    && ai.defaultProviderInstanceId !== 'local-openai-compatible')
+              }
               status={cloudCompatibleStatus}
               modelLabel={cloudCompatibleLabel}
-              onSetDefault={() => void setDefaultProvider('openai-compatible')}
+              onSetDefault={() => void setDefaultProvider('openai-compatible', 'cloud-openai-compatible')}
               actions={(
                 <ProviderProbe
                   buildConfig={() => ({
                     provider: 'openai-compatible',
-                    openaiCompatiblePreset: ai.openaiCompatiblePreset,
-                    openaiCompatibleModel: ai.openaiCompatibleModel,
-                    openaiCompatibleBaseUrl: ai.openaiCompatibleBaseUrl,
+                    providerInstanceId: 'cloud-openai-compatible' as AiProviderInstanceId,
+                    openaiCompatiblePreset: ai.cloudOpenaiCompatiblePreset ?? ai.openaiCompatiblePreset,
+                    openaiCompatibleModel: ai.cloudOpenaiCompatibleModel || ai.openaiCompatibleModel,
+                    openaiCompatibleBaseUrl: ai.cloudOpenaiCompatibleBaseUrl ?? ai.openaiCompatibleBaseUrl,
                   })}
                   onStatusChange={(status) => setProbeStatus('openai-compatible', status)}
                   testLabel="Test saved"
@@ -2964,15 +3043,14 @@ export default function AiAgentsTab() {
               )}
             >
               <OpenAICompatibleDetail
-                preset={ai.openaiCompatiblePreset}
-                model={ai.openaiCompatibleModel}
-                baseUrl={ai.openaiCompatibleBaseUrl}
-                hasKey={ai.hasOpenAICompatibleKey}
+                preset={ai.cloudOpenaiCompatiblePreset ?? ai.openaiCompatiblePreset}
+                model={ai.cloudOpenaiCompatibleModel || ai.openaiCompatibleModel}
+                baseUrl={ai.cloudOpenaiCompatibleBaseUrl ?? ai.openaiCompatibleBaseUrl}
+                hasKey={ai.hasCloudOpenAICompatibleKey}
                 mode="cloud"
                 allowedPresets={cloudPresetMethodIds}
                 guidance="Custom cloud endpoints should use a remote HTTPS URL from the hosted service."
-                sharedConfigNotice="Seedbank currently stores one OpenAI-compatible profile. Saving this cloud endpoint replaces any existing endpoint in that shared slot."
-                onSave={saveOpenAICompatible}
+                onSave={saveCloudOpenAICompatible}
               />
             </ProviderCard>
           </div>
