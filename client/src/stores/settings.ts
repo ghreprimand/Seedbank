@@ -173,6 +173,7 @@ const DEFAULT_SETTINGS: AggregateSettings = {
     openaiModel: 'gpt-4.1-mini',
     anthropicModel: 'claude-sonnet-4-20250514',
     claudeAccountModel: 'claude-sonnet-latest',
+    claudeAccountCompact: true,
     codexAccountModel: 'codex-recommended',
     ollamaModel: 'llama3.2',
     ollamaBaseUrl: 'http://localhost:11434',

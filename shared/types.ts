@@ -574,6 +574,9 @@ export interface AiOllamaModelCapabilities {
   vision: boolean;
   thinking: boolean;
   contextWindow?: number;
+  contextManagement?: boolean;
+  compact?: boolean;
+  promptCaching?: boolean;
 }
 
 export type AiOllamaModelResidency = 'resident' | 'idle' | 'not-loaded';
@@ -752,6 +755,7 @@ export interface AiPublicConfig {
   openaiModel: string;
   anthropicModel: string;
   claudeAccountModel: string;
+  claudeAccountCompact: boolean;
   codexAccountModel: string;
   ollamaModel: string;
   ollamaBaseUrl: string;
@@ -968,6 +972,7 @@ export interface AiConfigInput {
   openaiModel?: string;
   anthropicModel?: string;
   claudeAccountModel?: string;
+  claudeAccountCompact?: boolean;
   codexAccountModel?: string;
   ollamaModel?: string;
   ollamaBaseUrl?: string;

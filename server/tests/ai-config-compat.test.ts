@@ -179,3 +179,20 @@ test('Feature route effort and verbosity persist and resolve only for supported 
     db.close();
   }
 });
+
+test('Claude account compaction defaults on and explicit off persists', () => {
+  const { db, repository, service } = aiFixture();
+  try {
+    repository.setSetting('ai.config', {
+      provider: 'claude-account',
+      claudeAccountModel: 'claude-sonnet-latest',
+    });
+    assert.equal(service.getPublicConfig().claudeAccountCompact, true);
+
+    const updated = service.configure({ claudeAccountCompact: false });
+    assert.equal(updated.claudeAccountCompact, false);
+    assert.equal(service.getConfig().claudeAccountCompact, false);
+  } finally {
+    db.close();
+  }
+});

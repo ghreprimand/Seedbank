@@ -144,6 +144,7 @@ function summarizeOllamaCapabilities(diag: AiOllamaDiagnostics | null): string |
 interface ProviderProbeProps {
   buildConfig: () => AiConfigInput;
   onPickModel?: (model: string) => void;
+  onModelsListed?: (models: AiModelInfo[]) => void;
   onStatusChange?: (status: ProviderCardStatus) => void;
   testLabel?: string;
   listLabel?: string;
@@ -152,6 +153,7 @@ interface ProviderProbeProps {
 function ProviderProbe({
   buildConfig,
   onPickModel,
+  onModelsListed,
   onStatusChange,
   testLabel = 'Test',
   listLabel = 'List models',
@@ -190,6 +192,7 @@ function ProviderProbe({
       const result = await listAiModels(buildConfig());
       applyDiagnostics(result);
       setModels(result.models);
+      onModelsListed?.(result.models);
       setMessage(result.ok ? `${result.models.length} models found${result.normalizedBaseUrl ? ` · ${result.normalizedBaseUrl}` : ''}` : result.message ?? 'Model discovery failed.');
     } catch (err) {
       setMessage(err instanceof Error ? err.message : String(err));
@@ -2110,18 +2113,22 @@ function FeatureRoutingSection({ ai, providerStatuses, providerAvailability, onS
 
 function ClaudeAccountDetail({
   model,
+  compactEnabled,
   onSave,
   authenticated,
   available,
   onStatusChange,
 }: {
   model: string;
-  onSave: (model: string) => Promise<void>;
+  compactEnabled: boolean;
+  onSave: (model: string, compactEnabled: boolean) => Promise<void>;
   authenticated: boolean;
   available: boolean;
   onStatusChange?: (status: ProviderCardProps['status']) => void;
 }) {
   const [localModel, setLocalModel] = useState(model);
+  const [compact, setCompact] = useState(compactEnabled);
+  const [listedModels, setListedModels] = useState<AiModelInfo[]>([]);
   const [loginLoading, setLoginLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [loginResult, setLoginResult] = useState<ClaudeAccountLoginResult | null>(null);
@@ -2133,6 +2140,10 @@ function ClaudeAccountDetail({
   const [logoutLoading, setLogoutLoading] = useState(false);
   const [error, setError] = useState('');
   const refreshSettings = useSettingsStore((s) => s.refresh);
+
+  useEffect(() => {
+    setCompact(compactEnabled);
+  }, [compactEnabled]);
 
   const refreshStatus = async () => {
     if (!available) {
@@ -2221,11 +2232,17 @@ function ClaudeAccountDetail({
   const handleSave = async () => {
     setSaving(true);
     try {
-      await onSave(localModel);
+      await onSave(localModel, compact);
     } finally {
       setSaving(false);
     }
   };
+
+  const compactSupported = listedModels.some((item) => (
+    item.id === localModel
+    || item.name === localModel
+    || item.displayName === localModel
+  ) && item.capabilities?.compact === true);
 
   return (
     <div className="space-y-3">
@@ -2367,6 +2384,20 @@ function ClaudeAccountDetail({
           <p className="text-[10px] text-neutral-500">
             Use an alias like <code>claude-sonnet-latest</code> or a specific version like <code>claude-sonnet-4-20250514</code>.
           </p>
+          {compactSupported && (
+            <label className="flex items-start gap-2 rounded border border-neutral-200 bg-neutral-50 px-2 py-1.5 text-[11px] text-neutral-700">
+              <input
+                type="checkbox"
+                checked={compact}
+                onChange={(event) => setCompact(event.target.checked)}
+                className="mt-0.5"
+              />
+              <span>
+                <span className="font-medium">Use Claude context compaction</span>
+                <span className="block text-neutral-500">On by default for compact-capable Claude account models.</span>
+              </span>
+            </label>
+          )}
           <button
             onClick={handleSave}
             disabled={saving}
@@ -2375,8 +2406,9 @@ function ClaudeAccountDetail({
             {saving ? 'Saving…' : 'Save'}
           </button>
           <ProviderProbe
-            buildConfig={() => ({ provider: 'claude-account', claudeAccountModel: localModel })}
+            buildConfig={() => ({ provider: 'claude-account', claudeAccountModel: localModel, claudeAccountCompact: compact })}
             onPickModel={setLocalModel}
+            onModelsListed={setListedModels}
             onStatusChange={onStatusChange}
             testLabel="Test connection"
             listLabel="List models"
@@ -2702,8 +2734,8 @@ export default function AiAgentsTab() {
     await patch('ai', { anthropicModel: model, ...(key ? { anthropicApiKey: key } : {}) });
   };
 
-  const saveClaudeAccount = async (model: string) => {
-    await patch('ai', { claudeAccountModel: model });
+  const saveClaudeAccount = async (model: string, compactEnabled: boolean) => {
+    await patch('ai', { claudeAccountModel: model, claudeAccountCompact: compactEnabled });
   };
 
   const saveCodexAccount = async (model: string) => {
@@ -2861,6 +2893,7 @@ export default function AiAgentsTab() {
               >
                 <ClaudeAccountDetail
                   model={ai.claudeAccountModel || 'claude-sonnet-latest'}
+                  compactEnabled={ai.claudeAccountCompact !== false}
                   onSave={saveClaudeAccount}
                   authenticated={ai.claudeAccountAuthenticated}
                   available={ai.claudeAccountAvailable}

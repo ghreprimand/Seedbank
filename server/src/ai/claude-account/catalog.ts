@@ -20,6 +20,9 @@ export interface ClaudeCatalogModel {
   aliases?: string[];
   supportsThinking?: boolean;
   supportsVision?: boolean;
+  supportsContextManagement?: boolean;
+  supportsCompact?: boolean;
+  supportsPromptCaching?: boolean;
   supportedReasoningEfforts?: Array<'low' | 'medium' | 'high'>;
   maxInputTokens?: number;
   maxOutputTokens?: number;
@@ -96,6 +99,23 @@ function detectVisionCapability(hints: unknown): boolean | undefined {
     const rec = hints as Record<string, unknown>;
     if (typeof rec.vision === 'boolean') return rec.vision;
     if (typeof rec.image === 'boolean') return rec.image;
+  }
+  return undefined;
+}
+
+function detectNamedCapability(hints: unknown, names: RegExp[]): boolean | undefined {
+  if (typeof hints === 'boolean') return hints;
+  if (typeof hints === 'string') return names.some((pattern) => pattern.test(hints));
+  if (Array.isArray(hints)) {
+    return hints.some((item) => detectNamedCapability(item, names) === true);
+  }
+  if (hints && typeof hints === 'object') {
+    const rec = hints as Record<string, unknown>;
+    const entries = Object.entries(rec);
+    for (const [key, value] of entries) {
+      if (names.some((pattern) => pattern.test(key)) && value !== false && value !== null) return true;
+      if (detectNamedCapability(value, names) === true) return true;
+    }
   }
   return undefined;
 }
@@ -184,6 +204,24 @@ async function fetchCatalog(): Promise<ClaudeCatalogSnapshot> {
         const supportsVision = modalityHints
           .map((item) => detectVisionCapability(item))
           .find((value): value is boolean => typeof value === 'boolean');
+        const capabilityHints = [
+          m.capabilities,
+          (m as Record<string, unknown>).context_management,
+          (m as Record<string, unknown>).supports_context_management,
+          (m as Record<string, unknown>).compact,
+          (m as Record<string, unknown>).supports_compact,
+          (m as Record<string, unknown>).prompt_caching,
+          (m as Record<string, unknown>).cache_control,
+        ];
+        const supportsContextManagement = capabilityHints
+          .map((item) => detectNamedCapability(item, [/context[-_ ]?management/i, /clear[-_ ]?(thinking|tool)/i]))
+          .find((value): value is boolean => typeof value === 'boolean');
+        const supportsCompact = capabilityHints
+          .map((item) => detectNamedCapability(item, [/compact/i, /compaction/i]))
+          .find((value): value is boolean => typeof value === 'boolean');
+        const supportsPromptCaching = capabilityHints
+          .map((item) => detectNamedCapability(item, [/prompt[-_ ]?cach/i, /cache[-_ ]?control/i]))
+          .find((value): value is boolean => typeof value === 'boolean');
         return {
           id: m.id,
           displayName,
@@ -191,6 +229,9 @@ async function fetchCatalog(): Promise<ClaudeCatalogSnapshot> {
           aliases: [...new Set([...(Array.isArray(m.aliases) ? m.aliases.filter((item): item is string => typeof item === 'string') : []), ...deriveAliases(m.id, friendlyAlias)])],
           supportsThinking: detectThinkingCapability(m.id, m.supports_reasoning ?? m.capabilities),
           ...(supportsVision !== undefined ? { supportsVision } : {}),
+          ...(supportsContextManagement !== undefined ? { supportsContextManagement } : {}),
+          ...(supportsCompact !== undefined ? { supportsCompact } : {}),
+          ...(supportsPromptCaching !== undefined ? { supportsPromptCaching } : {}),
           ...(supportedReasoningEfforts ? { supportedReasoningEfforts } : {}),
           maxInputTokens: m.max_input_tokens,
           maxOutputTokens: m.max_tokens,

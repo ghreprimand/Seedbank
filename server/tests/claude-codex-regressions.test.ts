@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { dataDir } from '../src/db.js';
 import { saveTokens, clearTokens } from '../src/ai/claude-account/auth.js';
-import { getCatalog } from '../src/ai/claude-account/catalog.js';
+import { getCatalog, resetCatalogCacheForTests } from '../src/ai/claude-account/catalog.js';
 import { ensureLiveTokens } from '../src/ai/claude-account/oauth.js';
 import { ClaudeAccountProvider } from '../src/ai/providers.js';
 import { codexAccountSession } from '../src/ai/codex-account/session.js';
@@ -24,6 +24,7 @@ async function withAuthSnapshot(run: () => Promise<void>): Promise<void> {
   try {
     await run();
   } finally {
+    resetCatalogCacheForTests();
     if (previous) {
       await fs.mkdir(path.dirname(AUTH_PATH), { recursive: true });
       await fs.writeFile(AUTH_PATH, previous);
@@ -133,9 +134,28 @@ test('Claude account inference requests include account-beta identity headers', 
     });
 
     const originalFetch = globalThis.fetch;
-    const calls: Array<{ url: string; headers: Headers }> = [];
+    const calls: Array<{ url: string; headers: Headers; body?: unknown }> = [];
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-      calls.push({ url: String(input), headers: new Headers(init?.headers) });
+      calls.push({
+        url: String(input),
+        headers: new Headers(init?.headers),
+        body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined,
+      });
+      if (String(input).includes('/v1/models')) {
+        return new Response(JSON.stringify({
+          data: [{
+            id: 'claude-sonnet-latest',
+            capabilities: {
+              context_management: true,
+              compact: true,
+              prompt_caching: true,
+            },
+          }],
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
       return new Response(JSON.stringify({ content: [{ text: 'ok' }], usage: { input_tokens: 1, output_tokens: 1 } }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -149,12 +169,73 @@ test('Claude account inference requests include account-beta identity headers', 
       globalThis.fetch = originalFetch;
     }
 
-    const request = calls[0];
+    const request = calls.find((call) => call.url === 'https://api.anthropic.com/v1/messages');
     assert.ok(request, 'expected one inference request');
     assert.equal(request.url, 'https://api.anthropic.com/v1/messages');
-    assert.equal(request.headers.get('anthropic-beta'), 'claude-code-20250219,oauth-2025-04-20');
+    assert.equal(request.headers.get('anthropic-beta'), 'claude-code-20250219,oauth-2025-04-20,context-management-2025-06-27,compact-2026-01-12');
     assert.equal(request.headers.get('x-app'), 'cli');
     assert.match(request.headers.get('user-agent') ?? '', /Claude|Seedbank|Codex/i);
+    assert.deepEqual((request.body as { context_management?: { edits?: Array<{ type?: string }> } }).context_management?.edits?.map((edit) => edit.type), [
+      'clear_thinking_20251015',
+      'clear_tool_uses_20250919',
+      'compact_20260112',
+    ]);
+    assert.deepEqual((request.body as { cache_control?: unknown }).cache_control, { type: 'ephemeral' });
+  });
+});
+
+test('Claude account compact can be explicitly disabled while retaining prompt caching', async () => {
+  await withAuthSnapshot(async () => {
+    await saveTokens({
+      accessToken: 'token-compact-off',
+      refreshToken: 'refresh-compact-off',
+      expiresAt: Date.now() + 60_000,
+      tokenType: 'Bearer',
+      scope: 'user:inference',
+      obtainedAt: Date.now(),
+    });
+
+    const originalFetch = globalThis.fetch;
+    const calls: Array<{ url: string; headers: Headers; body?: unknown }> = [];
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({
+        url: String(input),
+        headers: new Headers(init?.headers),
+        body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined,
+      });
+      if (String(input).includes('/v1/models')) {
+        return new Response(JSON.stringify({
+          data: [{
+            id: 'claude-sonnet-latest',
+            capabilities: {
+              context_management: true,
+              compact: true,
+              prompt_caching: true,
+            },
+          }],
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response(JSON.stringify({ content: [{ text: 'ok' }], usage: { input_tokens: 1, output_tokens: 1 } }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }) as typeof fetch;
+
+    try {
+      const provider = new ClaudeAccountProvider();
+      await provider.complete([{ role: 'user', content: 'hello' }], { ...claudeConfig(), claudeAccountCompact: false });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    const request = calls.find((call) => call.url === 'https://api.anthropic.com/v1/messages');
+    assert.ok(request, 'expected one inference request');
+    assert.equal(request.headers.get('anthropic-beta'), 'claude-code-20250219,oauth-2025-04-20');
+    assert.equal('context_management' in (request.body as Record<string, unknown>), false);
+    assert.deepEqual((request.body as { cache_control?: unknown }).cache_control, { type: 'ephemeral' });
   });
 });
 

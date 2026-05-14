@@ -18,6 +18,8 @@ const OLLAMA_REQUEST_TIMEOUT_MS = 120_000;
 const OLLAMA_KEEP_ALIVE = '5m';
 const OLLAMA_SMOKE_PROMPT = 'Reply with exactly: pong';
 const CLAUDE_ACCOUNT_BETA_HEADER = 'claude-code-20250219,oauth-2025-04-20';
+const CLAUDE_CONTEXT_MANAGEMENT_BETA = 'context-management-2025-06-27';
+const CLAUDE_COMPACT_BETA = 'compact-2026-01-12';
 const CLAUDE_ACCOUNT_USER_AGENT = 'claude-cli/2.1.75';
 
 export class AiProviderError extends Error {
@@ -889,14 +891,70 @@ export class ClaudeAccountProvider implements AiProvider {
     return config.claudeAccountModel?.trim() || 'claude-sonnet-latest';
   }
 
-  private claudeAccountHeaders(accessToken: string): Record<string, string> {
+  private claudeAccountHeaders(accessToken: string, betaHeaders: string[] = []): Record<string, string> {
     return {
       Authorization: `Bearer ${accessToken}`,
       'anthropic-version': '2023-06-01',
-      'anthropic-beta': CLAUDE_ACCOUNT_BETA_HEADER,
+      'anthropic-beta': [CLAUDE_ACCOUNT_BETA_HEADER, ...betaHeaders].join(','),
       'user-agent': CLAUDE_ACCOUNT_USER_AGENT,
       'x-app': 'cli',
       'Content-Type': 'application/json',
+    };
+  }
+
+  private async claudeNativeOptions(model: string, config: AiStoredConfig): Promise<{ betaHeaders: string[]; body: Record<string, unknown> }> {
+    const body: Record<string, unknown> = {
+      cache_control: { type: 'ephemeral' },
+    };
+    const betaHeaders: string[] = [];
+
+    let modelMeta: Awaited<ReturnType<typeof import('./claude-account/catalog.js').getCatalog>>['models'][number] | undefined;
+    try {
+      const { getCatalog } = await import('./claude-account/catalog.js');
+      const catalog = await getCatalog();
+      modelMeta = catalog.models.find((item) => (
+        item.id === model
+        || item.friendlyAlias === model
+        || item.aliases?.includes(model)
+      ));
+    } catch {
+      return { betaHeaders, body };
+    }
+
+    if (config.claudeAccountCompact === false) return { betaHeaders, body };
+
+    const supportsCompact = modelMeta?.supportsCompact === true;
+    const supportsContextManagement = modelMeta?.supportsContextManagement === true || supportsCompact;
+    if (!supportsContextManagement) return { betaHeaders, body };
+
+    betaHeaders.push(CLAUDE_CONTEXT_MANAGEMENT_BETA);
+    if (supportsCompact) betaHeaders.push(CLAUDE_COMPACT_BETA);
+    body.context_management = {
+      edits: [
+        { type: 'clear_thinking_20251015' },
+        { type: 'clear_tool_uses_20250919' },
+        ...(supportsCompact ? [{ type: 'compact_20260112' }] : []),
+      ],
+    };
+    return { betaHeaders, body };
+  }
+
+  private async body(messages: AiProviderMessage[], config: AiStoredConfig, stream = false): Promise<{ betaHeaders: string[]; body: Record<string, unknown> }> {
+    const model = this.configuredModel(config);
+    const options = await this.claudeNativeOptions(model, config);
+    return {
+      betaHeaders: options.betaHeaders,
+      body: {
+        model,
+        max_tokens: 800,
+        system: systemPrompt(messages),
+        messages: messages.filter((m) => m.role !== 'system').map((m) => ({
+          role: m.role,
+          content: m.content,
+        })),
+        ...options.body,
+        ...(stream ? { stream: true } : {}),
+      },
     };
   }
 
@@ -939,20 +997,12 @@ export class ClaudeAccountProvider implements AiProvider {
 
   async complete(messages: AiProviderMessage[], config: AiStoredConfig): Promise<AiProviderResult> {
     const accessToken = await this.requireTokens();
-    const model = this.configuredModel(config);
+    const { betaHeaders, body } = await this.body(messages, config);
     try {
       const response = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
         method: 'POST',
-        headers: this.claudeAccountHeaders(accessToken),
-        body: JSON.stringify({
-          model,
-          max_tokens: 800,
-          system: systemPrompt(messages),
-          messages: messages.filter((m) => m.role !== 'system').map((m) => ({
-            role: m.role,
-            content: m.content,
-          })),
-        }),
+        headers: this.claudeAccountHeaders(accessToken, betaHeaders),
+        body: JSON.stringify(body),
       });
       await assertOk(this.id, response, 'Claude account request');
       const payload = await response.json() as {
@@ -976,21 +1026,12 @@ export class ClaudeAccountProvider implements AiProvider {
     onDelta: (delta: string) => void,
   ): Promise<AiProviderResult> {
     const accessToken = await this.requireTokens();
-    const model = this.configuredModel(config);
+    const { betaHeaders, body } = await this.body(messages, config, true);
     try {
       const response = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
         method: 'POST',
-        headers: this.claudeAccountHeaders(accessToken),
-        body: JSON.stringify({
-          model,
-          max_tokens: 800,
-          system: systemPrompt(messages),
-          messages: messages.filter((m) => m.role !== 'system').map((m) => ({
-            role: m.role,
-            content: m.content,
-          })),
-          stream: true,
-        }),
+        headers: this.claudeAccountHeaders(accessToken, betaHeaders),
+        body: JSON.stringify(body),
       });
       await assertOk(this.id, response, 'Claude account stream');
       let text = '';
@@ -1057,6 +1098,9 @@ export class ClaudeAccountProvider implements AiProvider {
             vision: m.supportsVision === true,
             thinking: m.supportsThinking === true || Boolean(m.supportedReasoningEfforts?.length),
             ...(typeof m.maxInputTokens === 'number' ? { contextWindow: m.maxInputTokens } : {}),
+            ...(m.supportsContextManagement !== undefined ? { contextManagement: m.supportsContextManagement } : {}),
+            ...(m.supportsCompact !== undefined ? { compact: m.supportsCompact } : {}),
+            ...(m.supportsPromptCaching !== undefined ? { promptCaching: m.supportsPromptCaching } : {}),
           },
         })),
         claudeAccount: { authenticated: true, catalogFresh: catalog.fresh },

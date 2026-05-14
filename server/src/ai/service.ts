@@ -211,6 +211,7 @@ const DEFAULT_CONFIG: AiStoredConfig = {
   openaiModel: 'gpt-4.1-mini',
   anthropicModel: 'claude-sonnet-4-20250514',
   claudeAccountModel: 'claude-sonnet-latest',
+  claudeAccountCompact: true,
   codexAccountModel: 'codex-recommended',
   ollamaModel: 'llama3.2',
   ollamaBaseUrl: 'http://localhost:11434',
@@ -1002,6 +1003,7 @@ function publicConfig(config: AiStoredConfig): AiPublicConfig {
     openaiModel: config.openaiModel,
     anthropicModel: config.anthropicModel,
     claudeAccountModel: config.claudeAccountModel,
+    claudeAccountCompact: config.claudeAccountCompact !== false,
     codexAccountModel: config.codexAccountModel,
     ollamaModel: config.ollamaModel,
     ollamaBaseUrl: config.ollamaBaseUrl,
@@ -1639,6 +1641,9 @@ export class AiService {
       openaiModel: input.openaiModel?.trim() || current.openaiModel,
       anthropicModel: input.anthropicModel?.trim() || current.anthropicModel,
       claudeAccountModel: input.claudeAccountModel?.trim() || current.claudeAccountModel,
+      claudeAccountCompact: typeof input.claudeAccountCompact === 'boolean'
+        ? input.claudeAccountCompact
+        : current.claudeAccountCompact !== false,
       codexAccountModel: input.codexAccountModel?.trim() || current.codexAccountModel,
       ollamaModel: input.ollamaModel?.trim() || current.ollamaModel,
       ollamaBaseUrl: input.ollamaBaseUrl?.trim() || current.ollamaBaseUrl,
