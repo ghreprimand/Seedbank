@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { EventEmitter } from 'node:events';
-import { JsonRpcClient, type JsonRpcNotification } from './jsonRpc.js';
+import { JsonRpcClient, JsonRpcRequestError, type JsonRpcNotification } from './jsonRpc.js';
 import type { AiProviderMessage, AiProviderResult, AiUsage } from '../types.js';
 
 const CLIENT_NAME = 'seedbank';
@@ -98,7 +98,7 @@ interface TurnCompletedNotification {
   turn: {
     id: string;
     status: string;
-    error?: { message?: string } | null;
+    error?: CodexFailureError | null;
   };
 }
 
@@ -106,10 +106,24 @@ interface TextDeltaNotification {
   delta?: string;
 }
 
+interface CodexFailureError {
+  message?: string;
+  code?: number;
+  data?: unknown;
+  codexErrorInfo?: unknown;
+  additionalDetails?: unknown;
+}
+
+interface CodexErrorNotification {
+  error?: CodexFailureError | null;
+}
+
 interface ActiveTurn {
   turnId: string | null;
   text: string;
   usage: AiUsage;
+  reasoningStarted: boolean;
+  assistantStarted: boolean;
   resolve: (result: AiProviderResult) => void;
   reject: (err: Error) => void;
 }
@@ -332,6 +346,8 @@ class CodexAppServerSession extends EventEmitter {
         turnId: turn.turn.id,
         text: '',
         usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+        reasoningStarted: false,
+        assistantStarted: false,
         resolve: (result) => {
           clearTimeout(timeout);
           resolve({ ...result, resolvedModelId: resolvedModel });
@@ -411,17 +427,37 @@ class CodexAppServerSession extends EventEmitter {
 
   private request<T>(method: string, params: unknown, timeoutMs: number): Promise<T> {
     if (!this.rpc) return Promise.reject(new Error('Codex app-server is not running.'));
-    return withTimeout(this.rpc.request<T>(method, params), timeoutMs, `${method} timed out.`);
+    return withTimeout(this.rpc.request<T>(method, params), timeoutMs, `${method} timed out.`)
+      .catch((error) => {
+        throw codexRequestError(method, error);
+      });
   }
 
   private onNotification(notification: JsonRpcNotification): void {
     const active = this.activeTurn;
     if (!active) return;
+    if (notification.method === 'error') {
+      const params = notification.params as CodexErrorNotification;
+      if (params.error) {
+        this.activeTurn = null;
+        this.emit(`turn:${active.turnId}:done`);
+        active.reject(codexTurnError(params.error));
+      }
+      return;
+    }
+    if (notification.method === 'item/reasoning/textDelta' || notification.method === 'item/reasoning/summaryTextDelta') {
+      const params = notification.params as TextDeltaNotification;
+      if (params.delta) {
+        const emitted = appendReasoningDelta(active, params.delta);
+        this.emit(`turn:${active.turnId}:delta`, emitted);
+      }
+      return;
+    }
     if (notification.method === 'item/agentMessage/delta') {
       const params = notification.params as TextDeltaNotification;
       if (params.delta) {
-        active.text += params.delta;
-        this.emit(`turn:${active.turnId}:delta`, params.delta);
+        const emitted = appendAssistantDelta(active, params.delta);
+        this.emit(`turn:${active.turnId}:delta`, emitted);
       }
       return;
     }
@@ -442,7 +478,7 @@ class CodexAppServerSession extends EventEmitter {
       this.activeTurn = null;
       this.emit(`turn:${active.turnId}:done`);
       if (params.turn.status === 'failed') {
-        active.reject(new Error(params.turn.error?.message ?? 'Codex account app-server turn failed.'));
+        active.reject(codexTurnError(params.turn.error));
         return;
       }
       active.resolve({ text: active.text, usage: active.usage });
@@ -467,6 +503,126 @@ function userPrompt(messages: AiProviderMessage[]): string {
     .filter((message) => message.role !== 'system')
     .map((message) => `${message.role === 'assistant' ? 'Assistant' : 'User'}: ${message.content}`)
     .join('\n\n');
+}
+
+function appendReasoningDelta(active: ActiveTurn, delta: string): string {
+  const prefix = active.reasoningStarted ? '' : (active.text ? '\n\n[Reasoning] ' : '[Reasoning] ');
+  active.reasoningStarted = true;
+  active.text += `${prefix}${delta}`;
+  return `${prefix}${delta}`;
+}
+
+function appendAssistantDelta(active: ActiveTurn, delta: string): string {
+  const prefix = !active.assistantStarted && active.reasoningStarted ? '\n\n' : '';
+  active.assistantStarted = true;
+  active.text += `${prefix}${delta}`;
+  return `${prefix}${delta}`;
+}
+
+function codexTurnError(error: CodexFailureError | null | undefined): Error {
+  const message = codexErrorMessage({
+    method: 'turn/start',
+    baseMessage: error?.message,
+    code: typeof error?.code === 'number' ? error.code : undefined,
+    data: error?.data,
+    codexErrorInfo: error?.codexErrorInfo,
+    additionalDetails: error?.additionalDetails,
+  });
+  return new Error(message);
+}
+
+function codexRequestError(method: string, error: unknown): Error {
+  if (error instanceof JsonRpcRequestError) {
+    return new Error(codexErrorMessage({
+      method,
+      baseMessage: error.rpcError.message,
+      code: error.rpcError.code,
+      data: error.rpcError.data,
+    }));
+  }
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+function codexErrorMessage(input: {
+  method: string;
+  baseMessage?: string;
+  code?: number;
+  data?: unknown;
+  codexErrorInfo?: unknown;
+  additionalDetails?: unknown;
+}): string {
+  const payload = detectCodexErrorInfo(input.codexErrorInfo ?? input.data);
+  const detail = compactDetail(input.baseMessage || extractDetailText(input.additionalDetails) || extractDetailText(input.data));
+  const withDetail = (message: string) => detail ? `${message} (${detail})` : message;
+
+  const kind = payload.kind.toLowerCase();
+  if (kind.includes('unauthorized') || detail.toLowerCase().includes('unauthorized') || detail.toLowerCase().includes('auth')) {
+    return withDetail('Codex account authentication is required or expired. Open Settings → AI & Agents and log in again.');
+  }
+  if (kind.includes('usagelimitexceeded') || detail.toLowerCase().includes('usage limit') || detail.toLowerCase().includes('rate limit')) {
+    return withDetail('Codex account usage limit has been reached. Wait and retry, or switch to another provider/model.');
+  }
+  if (kind.includes('contextwindowexceeded') || detail.toLowerCase().includes('context window') || detail.toLowerCase().includes('request too large')) {
+    return withDetail('Codex request exceeded the model context window. Reduce prompt/context size or pick a larger-context model.');
+  }
+  if (
+    kind.includes('internalservererror')
+    || kind.includes('httpconnectionfailed')
+    || kind.includes('responsestreamconnectionfailed')
+    || kind.includes('responsestreamdisconnected')
+    || kind.includes('responsetoomanyfailedattempts')
+    || payload.httpStatusCode === 429
+    || (typeof payload.httpStatusCode === 'number' && payload.httpStatusCode >= 500)
+  ) {
+    return withDetail('Codex service is temporarily unavailable or overloaded. Retry shortly.');
+  }
+  if (input.code === -32601 || input.code === -32602 || kind.includes('badrequest')) {
+    return withDetail(`Codex request ${input.method} was rejected by app-server`);
+  }
+  return withDetail(`Codex app-server ${input.method} failed`);
+}
+
+function detectCodexErrorInfo(value: unknown): { kind: string; httpStatusCode?: number } {
+  if (typeof value === 'string') return { kind: value };
+  if (!value || typeof value !== 'object') return { kind: '' };
+
+  const direct = value as { kind?: unknown; type?: unknown; httpStatusCode?: unknown };
+  if (typeof direct.kind === 'string' || typeof direct.type === 'string') {
+    return {
+      kind: typeof direct.kind === 'string' ? direct.kind : String(direct.type),
+      ...(typeof direct.httpStatusCode === 'number' ? { httpStatusCode: direct.httpStatusCode } : {}),
+    };
+  }
+
+  const entries = Object.entries(value as Record<string, unknown>);
+  if (entries.length === 1) {
+    const [kind, payload] = entries[0];
+    if (payload && typeof payload === 'object') {
+      const status = (payload as { httpStatusCode?: unknown }).httpStatusCode;
+      return { kind, ...(typeof status === 'number' ? { httpStatusCode: status } : {}) };
+    }
+    return { kind };
+  }
+
+  return { kind: '' };
+}
+
+function extractDetailText(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (!value || typeof value !== 'object') return '';
+  const record = value as Record<string, unknown>;
+  if (typeof record.message === 'string') return record.message;
+  if (Array.isArray(record.additionalDetails)) {
+    const firstText = record.additionalDetails.find((item) => typeof item === 'string');
+    if (typeof firstText === 'string') return firstText;
+  }
+  return '';
+}
+
+function compactDetail(value: string, max = 180): string {
+  const text = value.replace(/\s+/g, ' ').trim();
+  if (!text) return '';
+  return text.length > max ? `${text.slice(0, max)}…` : text;
 }
 
 function killCodexProcess(proc: ChildProcess | null): void {

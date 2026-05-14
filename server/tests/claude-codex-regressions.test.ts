@@ -8,6 +8,7 @@ import { getCatalog } from '../src/ai/claude-account/catalog.js';
 import { ensureLiveTokens } from '../src/ai/claude-account/oauth.js';
 import { ClaudeAccountProvider } from '../src/ai/providers.js';
 import { codexAccountSession } from '../src/ai/codex-account/session.js';
+import { JsonRpcRequestError } from '../src/ai/codex-account/jsonRpc.js';
 import type { AiStoredConfig } from '../src/ai/types.js';
 
 const AUTH_PATH = path.join(dataDir, 'claude-auth.json');
@@ -289,6 +290,136 @@ test('Codex timeout triggers turn/interrupt before rejecting', async () => {
   }
 
   assert.equal(interruptCalled, true);
+});
+
+test('Codex reasoning notifications stream labeled text before assistant delta', async () => {
+  const prev = process.env.SEEDBANK_ENABLE_CODEX_ACCOUNT;
+  process.env.SEEDBANK_ENABLE_CODEX_ACCOUNT = '1';
+
+  const session = codexAccountSession as unknown as Record<string, unknown>;
+  const originalEnsureStarted = session.ensureStarted as () => Promise<void>;
+  const originalResolveModel = session.resolveModel as (model: string) => Promise<string>;
+  const originalRequest = session.request as (method: string, params: unknown, timeoutMs: number) => Promise<unknown>;
+
+  const deltas: string[] = [];
+
+  session.ensureStarted = async () => {};
+  session.resolveModel = async () => 'gpt-5.2-codex';
+  session.request = async (method: string) => {
+    if (method === 'thread/start') return { thread: { id: 'thread-reasoning' } };
+    if (method === 'turn/start') {
+      setTimeout(() => {
+        (session.onNotification as (n: unknown) => void)({
+          method: 'item/reasoning/summaryTextDelta',
+          params: { delta: 'Thinking through options.' },
+        });
+        (session.onNotification as (n: unknown) => void)({
+          method: 'item/agentMessage/delta',
+          params: { delta: 'Final answer.' },
+        });
+        (session.onNotification as (n: unknown) => void)({
+          method: 'turn/completed',
+          params: { turn: { id: 'turn-reasoning', status: 'completed' } },
+        });
+      }, 0);
+      return { turn: { id: 'turn-reasoning' } };
+    }
+    throw new Error(`Unexpected method: ${method}`);
+  };
+
+  try {
+    const result = await codexAccountSession.complete([{ role: 'user', content: 'hello' }], 'codex-recommended', (delta) => {
+      deltas.push(delta);
+    });
+    assert.match(result.text, /\[Reasoning\]/);
+    assert.match(result.text, /Thinking through options\./);
+    assert.match(result.text, /Final answer\./);
+    assert.ok(deltas.length >= 2, 'expected reasoning and assistant deltas');
+    assert.match(deltas[0] ?? '', /\[Reasoning\]/);
+  } finally {
+    session.ensureStarted = originalEnsureStarted;
+    session.resolveModel = originalResolveModel;
+    session.request = originalRequest;
+    session.activeTurn = null;
+    if (prev === undefined) delete process.env.SEEDBANK_ENABLE_CODEX_ACCOUNT;
+    else process.env.SEEDBANK_ENABLE_CODEX_ACCOUNT = prev;
+  }
+});
+
+test('Codex failed-turn unauthorized error surfaces actionable login message', async () => {
+  const prev = process.env.SEEDBANK_ENABLE_CODEX_ACCOUNT;
+  process.env.SEEDBANK_ENABLE_CODEX_ACCOUNT = '1';
+
+  const session = codexAccountSession as unknown as Record<string, unknown>;
+  const originalEnsureStarted = session.ensureStarted as () => Promise<void>;
+  const originalResolveModel = session.resolveModel as (model: string) => Promise<string>;
+  const originalRequest = session.request as (method: string, params: unknown, timeoutMs: number) => Promise<unknown>;
+
+  session.ensureStarted = async () => {};
+  session.resolveModel = async () => 'gpt-5.2-codex';
+  session.request = async (method: string) => {
+    if (method === 'thread/start') return { thread: { id: 'thread-unauthorized' } };
+    if (method === 'turn/start') {
+      setTimeout(() => {
+        (session.onNotification as (n: unknown) => void)({
+          method: 'turn/completed',
+          params: {
+            turn: {
+              id: 'turn-unauthorized',
+              status: 'failed',
+              error: {
+                message: '401 Unauthorized',
+                codexErrorInfo: 'Unauthorized',
+              },
+            },
+          },
+        });
+      }, 0);
+      return { turn: { id: 'turn-unauthorized' } };
+    }
+    throw new Error(`Unexpected method: ${method}`);
+  };
+
+  try {
+    await assert.rejects(
+      () => codexAccountSession.complete([{ role: 'user', content: 'hello' }], 'codex-recommended'),
+      /authentication|log in again|settings/i,
+    );
+  } finally {
+    session.ensureStarted = originalEnsureStarted;
+    session.resolveModel = originalResolveModel;
+    session.request = originalRequest;
+    session.activeTurn = null;
+    if (prev === undefined) delete process.env.SEEDBANK_ENABLE_CODEX_ACCOUNT;
+    else process.env.SEEDBANK_ENABLE_CODEX_ACCOUNT = prev;
+  }
+});
+
+test('Codex JSON-RPC context-window errors map to actionable message', async () => {
+  const session = codexAccountSession as unknown as Record<string, unknown>;
+  const originalRpc = session.rpc;
+
+  session.rpc = {
+    request: async () => {
+      throw new JsonRpcRequestError(
+        {
+          code: -32000,
+          message: 'request too large',
+          data: { codexErrorInfo: 'ContextWindowExceeded' },
+        },
+        'turn/start',
+      );
+    },
+  };
+
+  try {
+    await assert.rejects(
+      () => (session.request as (method: string, params: unknown, timeoutMs: number) => Promise<unknown>)('turn/start', {}, 1_000),
+      /context window/i,
+    );
+  } finally {
+    session.rpc = originalRpc;
+  }
 });
 
 test('ensureLiveTokens refreshes expired Claude token with single-flight lock', async () => {
