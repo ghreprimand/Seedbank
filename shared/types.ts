@@ -420,6 +420,46 @@ export interface AiProviderInstanceDescriptor {
   presetId?: AiOpenAICompatiblePresetId;
 }
 
+export type AiProviderRegistryRequiredField =
+  | 'apiKey'
+  | 'accountLogin'
+  | 'runtime'
+  | 'baseUrl'
+  | 'model'
+  | 'preset';
+
+export interface AiProviderInstanceRegistryEntry {
+  id: AiProviderInstanceId;
+  provider: AiProviderId;
+  family: AiProviderFamily;
+  connectionMode: AiProviderInstanceConnectionMode;
+  dataResidency: AiProviderDataResidency;
+  requiredFields: AiProviderRegistryRequiredField[];
+  supportsModelDiscovery: boolean;
+  supportsHealthCheck: boolean;
+  supportsPreflight: boolean;
+  supportsUsageAuditMetadata: boolean;
+}
+
+export type AiProviderDiagnosticCode =
+  | 'missing_key'
+  | 'invalid_url'
+  | 'unreachable_endpoint'
+  | 'model_missing'
+  | 'auth_required'
+  | 'runtime_unavailable'
+  | 'content_residency';
+
+export interface AiProviderInstanceDiagnostic {
+  instanceId: AiProviderInstanceId;
+  provider: AiProviderId;
+  code: AiProviderDiagnosticCode;
+  message: string;
+  severity: 'info' | 'warning' | 'error';
+  dataResidency?: AiProviderDataResidency;
+  detail?: string;
+}
+
 export interface AiProviderInstanceConfig {
   id: AiProviderInstanceId;
   provider: AiProviderId;
@@ -513,6 +553,7 @@ export function isAiProviderId(value: unknown): value is AiProviderId {
 
 export interface AiProviderHealth {
   provider: AiProviderId;
+  providerInstanceId?: AiProviderInstanceId;
   ok: boolean;
   code: 'ok' | AiProviderErrorCode;
   message: string;
@@ -525,6 +566,7 @@ export interface AiProviderHealth {
   contentLeavesDevice?: boolean;
   normalizedBaseUrl?: string;
   ollama?: AiOllamaDiagnostics;
+  diagnostics?: AiProviderInstanceDiagnostic[];
 }
 
 export interface AiOllamaModelCapabilities {

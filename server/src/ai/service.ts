@@ -12,6 +12,8 @@ import type {
   AiOpenAICompatiblePresetId,
   AiPreflightResult,
   AiProviderDescriptor,
+  AiProviderInstanceDiagnostic,
+  AiProviderInstanceRegistryEntry,
   AiProviderHealth,
   AiProviderId,
   AiProviderInstanceConfig,
@@ -40,6 +42,7 @@ import {
 import {
   AI_PROVIDER_DESCRIPTORS,
   AI_PROVIDER_INSTANCE_DESCRIPTORS,
+  AI_PROVIDER_INSTANCE_REGISTRY,
   localOpenAICompatiblePreset,
   openAICompatiblePreset,
   providerInstanceDescriptor,
@@ -604,6 +607,16 @@ function toAvailability(available: boolean, reason?: string): { available: AiPro
     : { available: 'unavailable', ...(reason ? { availabilityReason: reason } : {}) };
 }
 
+function isValidAbsoluteUrl(value: string | undefined): boolean {
+  if (!value?.trim()) return false;
+  try {
+    const url = new URL(value.trim());
+    return Boolean(url.protocol && url.host);
+  } catch {
+    return false;
+  }
+}
+
 function isLocalOpenAICompatibleConfig(preset: AiOpenAICompatiblePresetId, baseUrl: string): boolean {
   return localOpenAICompatiblePreset(preset) || isLikelyLocalUrl(baseUrl);
 }
@@ -693,6 +706,100 @@ function materializeProviderInstances(config: AiStoredConfig): Record<AiProvider
       local: false,
     },
   };
+}
+
+function diagnosticsForInstanceConfig(instance: AiProviderInstanceConfig): AiProviderInstanceDiagnostic[] {
+  const diagnostics: AiProviderInstanceDiagnostic[] = [
+    {
+      instanceId: instance.id,
+      provider: instance.provider,
+      code: 'content_residency',
+      message: `Content residency: ${instance.dataResidency}.`,
+      severity: 'info',
+      dataResidency: instance.dataResidency,
+    },
+  ];
+
+  if (instance.baseUrl && !isValidAbsoluteUrl(instance.baseUrl)) {
+    diagnostics.push({
+      instanceId: instance.id,
+      provider: instance.provider,
+      code: 'invalid_url',
+      message: `Invalid base URL for ${instance.label}.`,
+      severity: 'error',
+      detail: instance.baseUrl,
+      dataResidency: instance.dataResidency,
+    });
+  }
+
+  if (instance.available === 'auth-required') {
+    diagnostics.push({
+      instanceId: instance.id,
+      provider: instance.provider,
+      code: instance.requiresApiKey && !instance.hasApiKey ? 'missing_key' : 'auth_required',
+      message: instance.requiresApiKey && !instance.hasApiKey
+        ? `${instance.label} requires an API key.`
+        : `${instance.label} requires account login/authentication.`,
+      severity: 'error',
+      ...(instance.availabilityReason ? { detail: instance.availabilityReason } : {}),
+      dataResidency: instance.dataResidency,
+    });
+  } else if (instance.available === 'unavailable') {
+    diagnostics.push({
+      instanceId: instance.id,
+      provider: instance.provider,
+      code: 'runtime_unavailable',
+      message: `${instance.label} runtime is unavailable.`,
+      severity: 'error',
+      ...(instance.availabilityReason ? { detail: instance.availabilityReason } : {}),
+      dataResidency: instance.dataResidency,
+    });
+  }
+
+  return diagnostics;
+}
+
+function healthDiagnostics(
+  health: AiProviderHealth,
+  instance: AiProviderInstanceConfig,
+): AiProviderInstanceDiagnostic[] {
+  if (health.ok) return [];
+  const mappedCode = health.code === 'bad_url'
+    ? 'invalid_url'
+    : health.code === 'unreachable'
+      ? 'unreachable_endpoint'
+      : health.code === 'model_missing'
+        ? 'model_missing'
+        : health.code === 'not_configured'
+          ? (instance.requiresApiKey ? 'missing_key' : 'auth_required')
+          : null;
+  if (!mappedCode) return [];
+  return [{
+    instanceId: instance.id,
+    provider: instance.provider,
+    code: mappedCode,
+    message: health.message,
+    severity: 'error',
+    ...(health.status !== undefined ? { detail: `HTTP ${health.status}` } : {}),
+    dataResidency: instance.dataResidency,
+  }];
+}
+
+function dedupeDiagnostics(diagnostics: AiProviderInstanceDiagnostic[]): AiProviderInstanceDiagnostic[] {
+  const seen = new Set<string>();
+  const result: AiProviderInstanceDiagnostic[] = [];
+  for (const diagnostic of diagnostics) {
+    const key = [
+      diagnostic.instanceId,
+      diagnostic.code,
+      diagnostic.message,
+      diagnostic.detail ?? '',
+    ].join('|');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(diagnostic);
+  }
+  return result;
 }
 
 function defaultProviderInstanceForLegacy(config: AiStoredConfig): AiProviderInstanceId {
@@ -1164,6 +1271,18 @@ export class AiService {
     return AI_PROVIDER_DESCRIPTORS;
   }
 
+  getProviderInstanceRegistry(): Record<AiProviderInstanceId, AiProviderInstanceRegistryEntry> {
+    return AI_PROVIDER_INSTANCE_REGISTRY;
+  }
+
+  getProviderInstanceDiagnostics(input: AiConfigPatch = {}): AiProviderInstanceDiagnostic[] {
+    const config = this.mergeConfig(input);
+    return AI_PROVIDER_INSTANCE_IDS.flatMap((instanceId) => {
+      const instance = config.providerInstances[instanceId];
+      return instance ? diagnosticsForInstanceConfig(instance) : [];
+    });
+  }
+
   getMethodCapabilities(): AiMethodCapability[] {
     const config = this.getPublicConfig();
     const presets = ([
@@ -1416,15 +1535,25 @@ export class AiService {
 
   async testProvider(input: AiConfigPatch = {}): Promise<AiProviderHealth> {
     const config = this.mergeConfig(input);
+    const providerInstanceId = config.defaultProviderInstanceId;
+    const instance = config.providerInstances[providerInstanceId];
     const health = await this.provider(config).health(config);
     const metadata = metadataForConfig(config, health.model ?? modelFor(config));
+    const diagnostics = instance
+      ? dedupeDiagnostics([
+          ...diagnosticsForInstanceConfig(instance),
+          ...healthDiagnostics(health, instance),
+        ])
+      : [];
     return {
       ...health,
+      providerInstanceId,
       providerFamily: metadata.providerFamily,
       transport: metadata.transport,
       requestedModel: metadata.requestedModel,
       resolvedModelId: metadata.resolvedModelId,
       contentLeavesDevice: metadata.contentLeavesDevice,
+      diagnostics,
     };
   }
 

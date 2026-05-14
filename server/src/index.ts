@@ -1718,7 +1718,13 @@ app.get('/api/ai/config', requireScope('read:ideas'), asyncRoute((_req, res) => 
 }));
 
 app.get('/api/ai/providers', requireScope('read:ideas'), asyncRoute((_req, res) => {
-  res.json({ providers: aiService.getProviderDescriptors() });
+  const config = aiService.getPublicConfig();
+  res.json({
+    providers: aiService.getProviderDescriptors(),
+    providerInstances: config.providerInstances,
+    providerInstanceRegistry: aiService.getProviderInstanceRegistry(),
+    diagnostics: aiService.getProviderInstanceDiagnostics(),
+  });
 }));
 
 app.get('/api/ai/method-capabilities', requireScope('read:ideas'), asyncRoute((_req, res) => {
@@ -1753,6 +1759,18 @@ app.post('/api/ai/test', requireScope('write:ideas'), asyncRoute(async (req, res
 
 app.post('/api/ai/models', requireScope('write:ideas'), asyncRoute(async (req, res) => {
   res.json(await aiService.listModels((req.body ?? {}) as AiConfigPatch));
+}));
+
+app.post('/api/ai/list-models', requireScope('write:ideas'), asyncRoute(async (req, res) => {
+  res.json(await aiService.listModels((req.body ?? {}) as AiConfigPatch));
+}));
+
+app.get('/api/settings/ai', requireScope('read:ideas'), asyncRoute((_req, res) => {
+  res.json(aiService.getPublicConfig());
+}));
+
+app.post('/api/settings/ai', requireScope('write:ideas'), asyncRoute((req, res) => {
+  res.json(aiService.configure((req.body ?? {}) as AiConfigPatch));
 }));
 
 // ── Claude account auth endpoints ─────────────────────────────────────────────
