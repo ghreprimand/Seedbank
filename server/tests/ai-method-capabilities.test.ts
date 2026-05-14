@@ -67,12 +67,13 @@ test('AI method capabilities expose routable chat methods and account env gates'
       const codexAccount = methods.find((method) => method.id === 'codex-account-app-server');
       assert.equal(codexAccount?.featureRoutable, true);
       assert.equal(codexAccount?.channel, 'chat-model');
-      assert.equal(codexAccount?.availability, 'unavailable');
+      // Gate off → auth-required (not hard-disabled) so the pill stays clickable in the UI.
+      assert.equal(codexAccount?.availability, 'auth-required');
       assert.match(codexAccount?.availabilityReason ?? '', /SEEDBANK_ENABLE_CODEX_ACCOUNT=1/);
 
-      // Claude account must also report unavailable (not auth-required) until gate is enabled.
+      // Claude account: gate off reports auth-required so the method pill is always selectable.
       const claudeAccount = methods.find((method) => method.id === 'claude-account-native');
-      assert.equal(claudeAccount?.availability, 'unavailable');
+      assert.equal(claudeAccount?.availability, 'auth-required');
       assert.match(claudeAccount?.availabilityReason ?? '', /SEEDBANK_ENABLE_CLAUDE_ACCOUNT=1/);
 
       const openrouter = methods.find((method) => method.id === 'openai-compatible:openrouter');

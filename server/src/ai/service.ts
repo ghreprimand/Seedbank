@@ -1423,8 +1423,8 @@ export class AiService {
 
     const codexAvailability = !config.codexAccountAvailable
       ? {
-          availability: 'unavailable' as const,
-          availabilityReason: 'Codex account app-server is disabled in this build. Set SEEDBANK_ENABLE_CODEX_ACCOUNT=1 to opt in.',
+          availability: 'auth-required' as const,
+          availabilityReason: 'Codex account login requires SEEDBANK_ENABLE_CODEX_ACCOUNT=1 on the server. Enable it, then sign in.',
         }
       : config.codexAccountAuthenticated
         ? { availability: 'available' as const }
@@ -1433,7 +1433,7 @@ export class AiService {
     return [
       {
         id: 'anthropic-api-key',
-        label: 'Anthropic API key',
+        label: 'API key',
         serviceFamily: 'claude',
         connectionMethod: 'api-key',
         channel: 'chat-model',
@@ -1443,7 +1443,7 @@ export class AiService {
       },
       {
         id: 'claude-account-native',
-        label: 'Claude account (native OAuth)',
+        label: 'Account login',
         serviceFamily: 'claude',
         connectionMethod: 'account',
         channel: 'chat-model',
@@ -1453,7 +1453,7 @@ export class AiService {
         ...(() => {
           const gate = claudeAccountRuntimeAvailability();
           if (!gate.available) {
-            return { availability: 'unavailable' as const, availabilityReason: gate.reason };
+            return { availability: 'auth-required' as const, availabilityReason: gate.reason };
           }
           return config.claudeAccountAuthenticated
             ? { availability: 'available' as const }
@@ -1462,7 +1462,7 @@ export class AiService {
       },
       {
         id: 'openai-api-key',
-        label: 'OpenAI API key',
+        label: 'API key',
         serviceFamily: 'codex-openai',
         connectionMethod: 'api-key',
         channel: 'chat-model',
@@ -1472,7 +1472,7 @@ export class AiService {
       },
       {
         id: 'codex-account-app-server',
-        label: 'Codex account (app-server)',
+        label: 'Account login',
         serviceFamily: 'codex-openai',
         connectionMethod: 'account',
         channel: 'chat-model',
