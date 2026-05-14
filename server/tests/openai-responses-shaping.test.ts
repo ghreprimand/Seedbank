@@ -112,6 +112,40 @@ test('OpenAI complete omits unsupported effort/verbosity fields for unsupported 
   }
 });
 
+test('OpenAI complete can request field suggestion JSON schema output', async () => {
+  const provider = new OpenAIProvider();
+  const config = baseConfig('gpt-4.1-mini');
+
+  const originalFetch = globalThis.fetch;
+  let capturedBody: Record<string, unknown> | null = null;
+  globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+    capturedBody = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
+    return new Response(JSON.stringify({
+      output_text: '{"suggestion":"Better pitch","rationale":"Clearer"}',
+      usage: { input_tokens: 1, output_tokens: 1 },
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }) as typeof fetch;
+
+  try {
+    const result = await provider.complete(
+      [{ role: 'user', content: 'hello' }],
+      config,
+      { responseFormat: { kind: 'field_suggestion_v1' } },
+    );
+    assert.equal(result.text, '{"suggestion":"Better pitch","rationale":"Clearer"}');
+    const text = capturedBody?.text as { format?: { type?: string; name?: string; strict?: boolean; schema?: unknown } } | undefined;
+    assert.equal(text?.format?.type, 'json_schema');
+    assert.equal(text?.format?.name, 'field_suggestion_v1');
+    assert.equal(text?.format?.strict, true);
+    assert.deepEqual((text?.format?.schema as { required?: string[] } | undefined)?.required, ['suggestion', 'rationale']);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('OpenAI stream request includes stream flag and gated effort/verbosity fields', async () => {
   const provider = new OpenAIProvider();
   const config = {
