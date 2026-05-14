@@ -408,6 +408,7 @@ export const MANUAL_GROUPS: ManualGroup[] = [
           { type: 'ul', items: [
             'Cloud OpenAI-compatible method — OpenRouter, Groq, Mistral, Together, Fireworks, and custom cloud endpoint URLs.',
           ]},
+          { type: 'p', text: 'Important: the Local OpenAI-compatible and Cloud OpenAI-compatible cards edit one shared OpenAI-compatible configuration. Saving either card replaces the same preset/base URL/model/key values.' },
           { type: 'h3', text: 'Provider API keys vs. Seedbank tokens' },
           { type: 'p', text: 'Provider API keys (OpenAI API, Anthropic API, OpenRouter, or another custom endpoint) are stored server-side, encrypted at rest. The browser never sees the raw value — only a "has key" boolean. These are separate from Seedbank personal access tokens, which are bearer tokens for the Seedbank REST API itself (Settings → API & Server).' },
           { type: 'h3', text: 'Global default provider' },

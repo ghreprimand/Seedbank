@@ -565,10 +565,11 @@ interface OpenAICompatibleDetailProps {
   hasKey: boolean;
   allowedPresets?: AiOpenAICompatiblePresetId[];
   guidance?: string;
+  sharedConfigNotice?: string;
   onSave: (preset: AiOpenAICompatiblePresetId, model: string, baseUrl: string, key?: string) => Promise<void>;
 }
 
-function OpenAICompatibleDetail({ preset, model, baseUrl, hasKey, allowedPresets, guidance, onSave }: OpenAICompatibleDetailProps) {
+function OpenAICompatibleDetail({ preset, model, baseUrl, hasKey, allowedPresets, guidance, sharedConfigNotice, onSave }: OpenAICompatibleDetailProps) {
   const presetList = (allowedPresets && allowedPresets.length > 0)
     ? OPENAI_COMPATIBLE_PRESETS.filter((item) => allowedPresets.includes(item.id))
     : OPENAI_COMPATIBLE_PRESETS;
@@ -623,6 +624,11 @@ function OpenAICompatibleDetail({ preset, model, baseUrl, hasKey, allowedPresets
       </p>
       {guidance && (
         <p className="text-[11px] text-ink-500 leading-relaxed">{guidance}</p>
+      )}
+      {sharedConfigNotice && (
+        <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
+          {sharedConfigNotice}
+        </div>
       )}
       <label className="block text-xs text-ink-500">
         Preset
@@ -1933,11 +1939,13 @@ function ClaudeAccountDetail({
   model,
   onSave,
   authenticated,
+  available,
   onStatusChange,
 }: {
   model: string;
   onSave: (model: string) => Promise<void>;
   authenticated: boolean;
+  available: boolean;
   onStatusChange?: (status: ProviderCardProps['status']) => void;
 }) {
   const [localModel, setLocalModel] = useState(model);
@@ -1953,6 +1961,11 @@ function ClaudeAccountDetail({
   const refreshSettings = useSettingsStore((s) => s.refresh);
 
   const refreshStatus = async () => {
+    if (!available) {
+      setExpiresAt(null);
+      onStatusChange?.('upcoming');
+      return;
+    }
     setRefreshing(true);
     setError('');
     try {
@@ -1969,11 +1982,13 @@ function ClaudeAccountDetail({
   };
 
   useEffect(() => {
+    if (!available) return;
     void refreshStatus();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [available]);
 
   const handleStartLogin = async () => {
+    if (!available) return;
     setLoginLoading(true);
     setError('');
     try {
@@ -1989,6 +2004,7 @@ function ClaudeAccountDetail({
   };
 
   const handleCompleteManual = async () => {
+    if (!available) return;
     const callbackUrl = manualCallbackUrl.trim();
     if (!callbackUrl) {
       setError('Paste the full callback URL from the browser after login.');
@@ -2008,6 +2024,7 @@ function ClaudeAccountDetail({
   };
 
   const handleLogout = async () => {
+    if (!available) return;
     setLogoutLoading(true);
     setError('');
     try {
@@ -2031,12 +2048,25 @@ function ClaudeAccountDetail({
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2 text-[11px] text-violet-700 bg-violet-50 border border-violet-200 rounded px-2 py-1.5">
-        <span className="font-semibold">Coming soon</span>
-        <span>— Claude account is exposed for setup/testing, but this RC does not treat it as a normal production routing path yet.</span>
-      </div>
-
-      {!authenticated ? (
+      {!available ? (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-[11px] text-violet-700 bg-violet-50 border border-violet-200 rounded px-2 py-1.5">
+            <span className="font-semibold">Unavailable</span>
+            <span>— Claude account OAuth is disabled in this RC build unless explicitly enabled by the operator.</span>
+          </div>
+          <p className="text-[11px] text-ink-500 leading-relaxed">
+            To use Claude models now, use the <span className="font-semibold text-ink-700">Anthropic API</span> method with an API key from{' '}
+            <a
+              href="https://console.anthropic.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:text-sage-700"
+            >
+              console.anthropic.com
+            </a>.
+          </p>
+        </div>
+      ) : !authenticated ? (
         <div className="space-y-2">
           <div className="flex flex-wrap gap-2">
             <button
@@ -2576,6 +2606,7 @@ export default function AiAgentsTab() {
                   model={ai.claudeAccountModel || 'claude-sonnet-latest'}
                   onSave={saveClaudeAccount}
                   authenticated={ai.claudeAccountAuthenticated}
+                  available={ai.claudeAccountAvailable}
                   onStatusChange={(status) => setProbeStatus('claude-account', status)}
                 />
               </ProviderCard>
@@ -2733,6 +2764,7 @@ export default function AiAgentsTab() {
                 hasKey={ai.hasOpenAICompatibleKey}
                 allowedPresets={localPresetMethodIds}
                 guidance="For the custom preset, use a localhost URL to keep inference on this machine."
+                sharedConfigNotice="Shared OpenAI-compatible configuration: saving here replaces the current local/cloud endpoint settings used by the other OpenAI-compatible card."
                 onSave={saveOpenAICompatible}
               />
             </ProviderCard>
@@ -2771,6 +2803,7 @@ export default function AiAgentsTab() {
                 hasKey={ai.hasOpenAICompatibleKey}
                 allowedPresets={cloudPresetMethodIds}
                 guidance="For the custom preset, use a remote URL when you intend cloud processing."
+                sharedConfigNotice="Shared OpenAI-compatible configuration: saving here replaces the current local/cloud endpoint settings used by the other OpenAI-compatible card."
                 onSave={saveOpenAICompatible}
               />
             </ProviderCard>

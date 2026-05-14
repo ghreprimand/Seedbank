@@ -17,6 +17,8 @@ Settings → AI & Agents is organized by service family first, then connection m
 - **Local inference**: Ollama + local OpenAI-compatible servers (LM Studio, vLLM, llama.cpp, LocalAI, custom localhost URL)
 - **External/cloud routers**: OpenRouter, Groq, Mistral, Together, Fireworks, custom cloud endpoint
 
+The local and cloud OpenAI-compatible cards are two views of one shared OpenAI-compatible configuration. Saving either card replaces the same preset/base URL/model/key values.
+
 **OpenAI API** — enter your API key and model name (e.g. `gpt-4.1-mini`). Calls are made server-side to `api.openai.com`. Idea content is sent to OpenAI's servers.
 
 **Anthropic API** — enter your API key and model name (e.g. `claude-sonnet-4-20250514`). Calls are made server-side to `api.anthropic.com`. Works well for reflective critique and longer contextual responses. Idea content is sent to Anthropic's servers.
