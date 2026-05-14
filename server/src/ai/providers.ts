@@ -1010,12 +1010,19 @@ export class ClaudeAccountProvider implements AiProvider {
   }
 
   private async mapClaudeAuthError(error: unknown): Promise<AiProviderError> {
-    const { ClaudeAccountNoAuthError, ClaudeAccountRefreshError } = await import('./claude-account/oauth.js');
+    const { ClaudeAccountNoAuthError, ClaudeAccountRefreshError, ClaudeAccountScopeError } = await import('./claude-account/oauth.js');
     if (error instanceof ClaudeAccountNoAuthError) {
       return new AiProviderError(
         this.id,
         'not_configured',
         'Claude account is not logged in. Open Settings → AI & Agents and click "Log in with Claude" to authenticate.',
+      );
+    }
+    if (error instanceof ClaudeAccountScopeError) {
+      return new AiProviderError(
+        this.id,
+        'not_configured',
+        `Claude account login is missing the ${error.missingScopes.join(', ')} scope. Reconnect your Claude account from Settings → AI & Agents.`,
       );
     }
     if (error instanceof ClaudeAccountRefreshError) {
