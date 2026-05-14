@@ -31,31 +31,40 @@ The header API-status pill (top-right, next to the gear icon) is now a link that
 
 Replaces the settings popover that used to live inside the inline AI chat panel.
 
-### Provider cards
+### Service areas and methods
 
-Six provider cards appear in four labeled groups:
+AI & Agents is now organized by **service family first**, then **connection method**:
 
-- **Direct API providers** — **OpenAI API**, **Anthropic API**
-- **Local inference** — **Ollama**
-- **External & custom endpoints** — **Custom / OpenAI-compatible endpoint**
-- **Account & subscription transports** — **Claude account**, **Codex account**
+- **Claude service**
+  - Anthropic API key method (chat/model routing)
+  - Claude account/native OAuth method (chat/model routing; coming-soon posture in RC)
+  - Claude Code CLI method (file-producing agent method; not chat routing)
+- **Codex/OpenAI service**
+  - OpenAI API key method (chat/model routing)
+  - Codex account/app-server method (chat/model routing; opt-in experimental)
+  - Codex CLI method (file-producing agent method; not chat routing)
+- **Local inference**
+  - Ollama
+  - Local OpenAI-compatible servers: LM Studio, vLLM, llama.cpp, LocalAI, custom localhost URL
+- **External / cloud routers**
+  - OpenRouter, Groq, Mistral, Together, Fireworks, custom cloud endpoint
 
-Each provider card shows:
+Chat/model-capable method cards show status (`connected`, `key needed`, `unreachable`, `local`, `not tested`, `upcoming`), model/base URL state, and setup/test/list actions.
 
-- A status pill: `connected`, `key needed`, `unreachable`, `local`, `not tested`, or `upcoming`.
-- The configured model name.
-- A **Set default** button (radio-like) to choose which provider the Thinking Partner uses.
-- An expandable details row for model, API key where needed, and the base URL for local/custom endpoints.
-
-The default provider is stored server-side and read by Thinking Partner and other AI surfaces. You no longer configure providers from within the chat panel itself.
+Global default routing remains provider-based and stored server-side.
 
 **Provider API keys vs. Seedbank tokens.** Provider API keys (OpenAI API, Anthropic API, OpenRouter, Groq, Mistral, Together, Fireworks, or another custom endpoint) are credentials for external AI services — stored server-side, encrypted at rest, never exposed to the browser. `hasOpenAIKey`, `hasAnthropicKey`, and `hasOpenAICompatibleKey` booleans in the public config indicate whether a key is stored. These are entirely separate from **Seedbank personal access tokens** (Settings → API & Server), which are bearer tokens for the Seedbank REST API itself.
 
 > **Data flow:** Ollama and local endpoints send content only to the configured local host. Cloud providers (OpenAI API, Anthropic API, and remote OpenAI-compatible endpoints) send content to external servers. All AI calls are proxied server-side; the browser communicates only with the local Seedbank server.
 
-### Custom / OpenAI-compatible endpoint
+### OpenAI-compatible endpoint methods
 
-Use the **Custom / OpenAI-compatible endpoint** card for OpenRouter, Groq, Mistral, Together, Fireworks, LM Studio, vLLM, llama.cpp, LocalAI, or another service that accepts OpenAI Chat Completions requests. Configure the preset, base URL, API key when required, and model name. For advanced routing, fallback, or multi-model strategies, use a gateway like OpenRouter or LiteLLM as the base URL.
+OpenAI-compatible configuration appears in two method areas:
+
+- **Local inference method card** (LM Studio, vLLM, llama.cpp, LocalAI, or custom localhost URL)
+- **External/cloud router method card** (OpenRouter, Groq, Mistral, Together, Fireworks, or custom cloud URL)
+
+Both cards configure the same OpenAI-compatible provider settings (preset, base URL, optional key, model), but are separated in the UI to avoid mixing local and cloud usage patterns.
 
 ### Account providers
 
@@ -67,7 +76,8 @@ Use the **Custom / OpenAI-compatible endpoint** card for OpenRouter, Groq, Mistr
 **Feature Defaults** let you route individual features (Thinking Partner, field suggestions, health checks, Discover insights) to a specific provider/model instead of the global default.
 
 - Routes can inherit the global default or pin a provider/model.
-- Unavailable account routes are intentionally visible for roadmap clarity, but save is blocked when a route targets unavailable account transports.
+- Only **chat/model-capable methods** are routable. CLI file agents are intentionally excluded.
+- Unavailable account routes may appear for visibility, but save is blocked when a route targets unavailable account transports.
 
 ### Token budget & usage
 
@@ -81,19 +91,16 @@ The **Usage & Guardrails** section includes a daily token limit plus advanced sa
 
 Usage readouts show tokens consumed in the last 24 hours and last 7 days (from `ai_usage`).
 
-### Agents
+### CLI agent methods
 
-Two agent cards appear here — **Claude Code** and **Codex CLI**. Each card lets you:
+Claude Code and Codex CLI link controls are now embedded in their respective service areas rather than a detached section.
 
-1. Enter an explicit path to the CLI binary (e.g. `/usr/local/bin/claude`), or leave it blank and click the detect button to find the binary on `$PATH`.
-2. Link the agent — the server runs `<cli> --version` to validate the binary. Version is stored server-side; no credentials enter the browser.
-3. Unlink at any time.
+- They are **file-producing methods** used by Develop/Continue with agent workflows.
+- They are **not** used as normal chat/model routing methods in Feature Defaults.
+- Authentication remains CLI-managed (`claude auth login`, `OPENAI_API_KEY`, or tool-specific config); Seedbank stores only binary path/link state.
+- Runs execute in per-idea scratch workspaces and are not OS-sandboxed.
 
-**Agent authentication** is CLI-managed, not Seedbank-managed. Claude Code uses `claude auth login` or `ANTHROPIC_API_KEY` in the environment; Codex CLI uses `OPENAI_API_KEY` or its own config file. Seedbank only stores the binary path and a linked flag. Agents inherit the environment variables of the Seedbank server process.
-
-**Workspace boundaries:** Seedbank sets the agent's working directory to a per-idea scratch workspace and validates applied file paths for directory traversal. The agent process is not OS-sandboxed — only link binaries you trust.
-
-See [`docs/AGENTS.md`](./AGENTS.md) and [`docs/AI_GUIDE.md`](./AI_GUIDE.md) for the full agent workflow, safety rails, and transcript storage.
+See [`docs/AGENTS.md`](./AGENTS.md) and [`docs/AI_GUIDE.md`](./AI_GUIDE.md) for full agent workflow and safety details.
 
 ---
 

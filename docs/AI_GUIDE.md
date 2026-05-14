@@ -8,14 +8,14 @@ Seedbank's AI features are designed to help you develop your own ideas. The AI i
 
 Provider configuration lives in **Settings → AI & Agents**. Navigate there via the gear icon (⚙) in the header, or go directly to `/settings/ai-agents`.
 
-### Built-in providers
+### Service-first setup
 
-Settings now shows six provider cards arranged in four groups:
+Settings → AI & Agents is organized by service family first, then connection method:
 
-- **Direct API providers**: OpenAI API, Anthropic API
-- **Local inference**: Ollama
-- **External & custom endpoints**: Custom / OpenAI-compatible endpoint
-- **Account & subscription transports**: Claude account, Codex account
+- **Claude service**: Anthropic API key, Claude account/native OAuth, Claude Code CLI
+- **Codex/OpenAI service**: OpenAI API key, Codex account/app-server, Codex CLI
+- **Local inference**: Ollama + local OpenAI-compatible servers (LM Studio, vLLM, llama.cpp, LocalAI, custom localhost URL)
+- **External/cloud routers**: OpenRouter, Groq, Mistral, Together, Fireworks, custom cloud endpoint
 
 **OpenAI API** — enter your API key and model name (e.g. `gpt-4.1-mini`). Calls are made server-side to `api.openai.com`. Idea content is sent to OpenAI's servers.
 
@@ -25,9 +25,11 @@ Settings now shows six provider cards arranged in four groups:
 
 **Custom / OpenAI-compatible endpoint** — choose a preset or enter a compatible endpoint URL, API key when required, and model name. Use this for OpenRouter, Groq, Mistral, Together, Fireworks, LM Studio, vLLM, llama.cpp, LocalAI, or another service that accepts OpenAI Chat Completions requests.
 
-**Claude account** — shown as coming soon/unavailable in this RC.
+**Claude account** — account-auth method with login/status controls shown in the Claude service area. RC posture is still coming-soon/unavailable for normal production routing.
 
-**Codex account** — experimental account transport, available only with explicit server opt-in (`SEEDBANK_ENABLE_CODEX_ACCOUNT`). This is not OpenAI API billing and not the same as linked Codex CLI agent launching.
+**Codex account** — experimental account-auth method, available only with explicit server opt-in (`SEEDBANK_ENABLE_CODEX_ACCOUNT`). This is not OpenAI API billing and not the same as linked Codex CLI agent launching.
+
+**Claude Code CLI / Codex CLI** — file-producing agent methods inside their respective service areas. These are review-first development tools, not Feature Defaults chat providers.
 
 ### Choosing a default provider
 
@@ -57,6 +59,7 @@ Feature Defaults let you route each AI feature independently (Thinking Partner, 
 
 - Inherit the global default provider/model, or
 - Pin a specific provider/model per feature.
+- Route only chat/model-capable methods. CLI agent methods are intentionally excluded from chat routing.
 
 Unavailable account transports can appear as options for visibility, but save is blocked when a route targets unavailable account providers.
 
