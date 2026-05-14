@@ -606,6 +606,14 @@ function preferredOpenAICompatiblePreset(
   return presetList.find((item) => item.id !== 'custom')?.id ?? presetList[0]?.id ?? preferred;
 }
 
+interface OpenAICompatibleDraftState {
+  signature: string;
+  selectedPreset: AiOpenAICompatiblePresetId;
+  model: string;
+  url: string;
+  key: string;
+}
+
 function OpenAICompatibleDetail({ preset, model, baseUrl, hasKey, mode, allowedPresets, guidance, sharedConfigNotice, onSave }: OpenAICompatibleDetailProps) {
   const presetList = (allowedPresets && allowedPresets.length > 0)
     ? OPENAI_COMPATIBLE_PRESETS.filter((item) => allowedPresets.includes(item.id))
@@ -616,10 +624,27 @@ function OpenAICompatibleDetail({ preset, model, baseUrl, hasKey, mode, allowedP
   const draftDefaults = openAICompatibleDefaults(draftPreset, mode);
   const draftUrl = currentPresetFitsCard ? baseUrl : draftDefaults.baseUrl;
   const draftModel = currentPresetFitsCard ? model : draftDefaults.model;
-  const [selectedPreset, setSelectedPreset] = useState<AiOpenAICompatiblePresetId>(draftPreset);
-  const [m, setM] = useState(draftModel);
-  const [url, setUrl] = useState(draftUrl);
-  const [key, setKey] = useState('');
+  const draftSignature = `${mode}|${draftPreset}|${draftModel}|${draftUrl}`;
+  const [draft, setDraft] = useState<OpenAICompatibleDraftState>(() => ({
+    signature: draftSignature,
+    selectedPreset: draftPreset,
+    model: draftModel,
+    url: draftUrl,
+    key: '',
+  }));
+  const currentDraft = draft.signature === draftSignature
+    ? draft
+    : {
+        signature: draftSignature,
+        selectedPreset: draftPreset,
+        model: draftModel,
+        url: draftUrl,
+        key: '',
+      };
+  const selectedPreset = currentDraft.selectedPreset;
+  const m = currentDraft.model;
+  const url = currentDraft.url;
+  const key = currentDraft.key;
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -636,18 +661,13 @@ function OpenAICompatibleDetail({ preset, model, baseUrl, hasKey, mode, allowedP
         ? 'optional for most local servers'
         : 'usually required for cloud endpoints';
 
-  useEffect(() => {
-    setSelectedPreset(draftPreset);
-    setUrl(draftUrl);
-    setM(draftModel);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [preset, baseUrl, model, mode, allowedPresets?.join('|')]);
+  const updateDraft = (patch: Partial<Omit<OpenAICompatibleDraftState, 'signature'>>) => {
+    setDraft({ ...currentDraft, ...patch });
+  };
 
   const changePreset = (next: AiOpenAICompatiblePresetId) => {
     const presetConfig = openAICompatibleDefaults(next, mode);
-    setSelectedPreset(next);
-    setUrl(presetConfig.baseUrl);
-    setM(presetConfig.model);
+    updateDraft({ selectedPreset: next, url: presetConfig.baseUrl, model: presetConfig.model });
   };
 
   const save = async () => {
@@ -656,7 +676,7 @@ function OpenAICompatibleDetail({ preset, model, baseUrl, hasKey, mode, allowedP
     setSaveError(null);
     try {
       await onSave(selectedPreset, m, url, key || undefined);
-      setKey('');
+      updateDraft({ key: '' });
       setSaved(true);
       setTimeout(() => setSaved(false), 1500);
     } catch (err) {
@@ -710,7 +730,7 @@ function OpenAICompatibleDetail({ preset, model, baseUrl, hasKey, mode, allowedP
         {urlLabel}
         <input
           value={url}
-          onChange={(e) => setUrl(e.target.value)}
+          onChange={(e) => updateDraft({ url: e.target.value })}
           className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800"
         />
       </label>
@@ -718,7 +738,7 @@ function OpenAICompatibleDetail({ preset, model, baseUrl, hasKey, mode, allowedP
         Model
         <input
           value={m}
-          onChange={(e) => setM(e.target.value)}
+          onChange={(e) => updateDraft({ model: e.target.value })}
           placeholder="List models, then choose one"
           className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800"
         />
@@ -733,7 +753,7 @@ function OpenAICompatibleDetail({ preset, model, baseUrl, hasKey, mode, allowedP
         <input
           type="password"
           value={key}
-          onChange={(e) => setKey(e.target.value)}
+          onChange={(e) => updateDraft({ key: e.target.value })}
           placeholder={keyPlaceholder}
           className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800 placeholder:text-ink-300"
         />
@@ -755,7 +775,7 @@ function OpenAICompatibleDetail({ preset, model, baseUrl, hasKey, mode, allowedP
           openaiCompatibleBaseUrl: url,
           ...(key ? { openaiCompatibleApiKey: key } : {}),
         })}
-        onPickModel={setM}
+        onPickModel={(nextModel) => updateDraft({ model: nextModel })}
         testLabel="Test draft"
         listLabel="List draft models"
       />
@@ -1615,7 +1635,6 @@ function GuardrailsSection({ ai, onSaveBudget, onSaveGuardrails }: GuardrailsSec
     void getAiUsageDetail()
       .then(setDetail)
       .catch(() => void getAiUsage().then(setBasicUsage).catch(() => {}));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // usage counters: mount-only is intentional
 
   useEffect(() => {
@@ -2010,6 +2029,7 @@ function ClaudeAccountDetail({
   const [manualCallbackUrl, setManualCallbackUrl] = useState('');
   const [completing, setCompleting] = useState(false);
   const [expiresAt, setExpiresAt] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
   const [saving, setSaving] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
   const [error, setError] = useState('');
@@ -2039,9 +2059,15 @@ function ClaudeAccountDetail({
 
   useEffect(() => {
     if (!available) return;
-    void refreshStatus();
+    const timeout = window.setTimeout(() => void refreshStatus(), 0);
+    return () => window.clearTimeout(timeout);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [available]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setNow(Date.now()), 60_000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   const handleStartLogin = async () => {
     if (!available) return;
@@ -2125,7 +2151,7 @@ function ClaudeAccountDetail({
       ) : !authenticated ? (
         <div className="space-y-2">
           {/* Stale/expired session messaging — expiresAt is populated by the initial refreshStatus() call */}
-          {expiresAt !== null && expiresAt < Date.now() && (
+          {expiresAt !== null && expiresAt < now && (
             <div className="flex items-center gap-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
               <span className="font-semibold">Session expired</span>
               <span>— Your previous Claude account session expired. Sign in again to continue.</span>
@@ -2199,7 +2225,7 @@ function ClaudeAccountDetail({
       ) : (
         <div className="space-y-2">
           {/* Near-expiry reauth prompt — warn if token expires within 30 minutes */}
-          {expiresAt !== null && expiresAt - Date.now() < 30 * 60_000 && expiresAt > Date.now() && (
+          {expiresAt !== null && expiresAt - now < 30 * 60_000 && expiresAt > now && (
             <div className="flex items-center gap-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
               <span className="font-semibold">Token expiring soon</span>
               <span>— Your session expires at {new Date(expiresAt).toLocaleTimeString()}. Re-login to avoid interruption.</span>
@@ -2490,10 +2516,13 @@ export default function AiAgentsTab() {
   const cloudCompatibleStatus: ProviderCardProps['status'] = cloudCompatibleActive ? compatibleStatus : 'not-tested';
 
   useEffect(() => {
-    if (ai.provider === 'claude-account') setClaudeMethod('claude-account-native');
-    if (ai.provider === 'anthropic') setClaudeMethod('anthropic-api-key');
-    if (ai.provider === 'codex-account') setOpenaiMethod('codex-account-app-server');
-    if (ai.provider === 'openai') setOpenaiMethod('openai-api-key');
+    const timeout = window.setTimeout(() => {
+      if (ai.provider === 'claude-account') setClaudeMethod('claude-account-native');
+      if (ai.provider === 'anthropic') setClaudeMethod('anthropic-api-key');
+      if (ai.provider === 'codex-account') setOpenaiMethod('codex-account-app-server');
+      if (ai.provider === 'openai') setOpenaiMethod('openai-api-key');
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, [ai.provider]);
 
   useEffect(() => {
