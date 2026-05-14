@@ -1,16 +1,14 @@
 /**
  * Settings → AI & Agents
  *
- * A1  Provider cards — OpenAI API, Anthropic API, Ollama, OpenRouter / custom endpoint
- * A2  Default-provider radio (built into cards)
- * A3  Token budget + usage readout
- * A4  Linked-agent cards — Claude Code, Codex CLI
+ * A1  Service-first method areas — Claude, Codex/OpenAI, local inference, cloud routers
+ * A2  Default-provider routing controls (chat/model-capable methods only)
+ * A3  Feature Defaults + Usage & Guardrails
  */
 import { useEffect, useState } from 'react';
 import { HelpButton } from '@/help/HelpPopover';
 import {
   AlertTriangle,
-  Bot,
   Check,
   ChevronDown,
   ChevronRight,
@@ -23,7 +21,6 @@ import {
   Shield,
   Terminal,
   Unlink,
-  Zap,
 } from 'lucide-react';
 import { aiProviderLabel, isAiProviderId } from '@/lib/types';
 import type {
@@ -33,6 +30,7 @@ import type {
   AiFeatureId,
   AiFeatureRoute,
   AiGuardrailsConfig,
+  AiMethodCapability,
   AiModelListResult,
   AiModelInfo,
   AiOllamaDiagnostics,
@@ -54,17 +52,21 @@ import {
   getAiUsage,
   getAiUsageDetail,
   preflightAiRequest,
+  getAiMethodCapabilities,
   listAiModels,
   linkAgent,
   testAiProvider,
   unlinkAgent,
   getClaudeAccountStatus,
+  startClaudeAccountLogin,
+  completeClaudeAccountLogin,
   logoutClaudeAccount,
   getCodexAccountStatus,
   startCodexAccountLogin,
   logoutCodexAccount,
   type AiUsageDetail,
   type AiUsageSummary,
+  type ClaudeAccountLoginResult,
   type CodexAccountLoginResult,
 } from '@/api/client';
 
@@ -98,6 +100,9 @@ const OPENAI_COMPATIBLE_PRESETS: Array<{
 function presetFor(id: AiOpenAICompatiblePresetId) {
   return OPENAI_COMPATIBLE_PRESETS.find((preset) => preset.id === id) ?? OPENAI_COMPATIBLE_PRESETS[0];
 }
+
+const LOCAL_METHOD_PRESETS = new Set<AiOpenAICompatiblePresetId>(['lm-studio', 'vllm', 'llama-cpp', 'localai', 'custom']);
+const CLOUD_METHOD_PRESETS = new Set<AiOpenAICompatiblePresetId>(['openrouter', 'groq', 'mistral', 'together', 'fireworks', 'custom']);
 
 function describeOllamaResidency(residency: AiOllamaModelResidency | undefined): string {
   if (!residency) return 'unknown';
@@ -558,11 +563,17 @@ interface OpenAICompatibleDetailProps {
   model: string;
   baseUrl: string;
   hasKey: boolean;
+  allowedPresets?: AiOpenAICompatiblePresetId[];
+  guidance?: string;
   onSave: (preset: AiOpenAICompatiblePresetId, model: string, baseUrl: string, key?: string) => Promise<void>;
 }
 
-function OpenAICompatibleDetail({ preset, model, baseUrl, hasKey, onSave }: OpenAICompatibleDetailProps) {
-  const [selectedPreset, setSelectedPreset] = useState<AiOpenAICompatiblePresetId>(preset);
+function OpenAICompatibleDetail({ preset, model, baseUrl, hasKey, allowedPresets, guidance, onSave }: OpenAICompatibleDetailProps) {
+  const presetList = (allowedPresets && allowedPresets.length > 0)
+    ? OPENAI_COMPATIBLE_PRESETS.filter((item) => allowedPresets.includes(item.id))
+    : OPENAI_COMPATIBLE_PRESETS;
+  const safePreset = presetList.some((item) => item.id === preset) ? preset : presetList[0]?.id ?? preset;
+  const [selectedPreset, setSelectedPreset] = useState<AiOpenAICompatiblePresetId>(safePreset);
   const [m, setM] = useState(model);
   const [url, setUrl] = useState(baseUrl);
   const [key, setKey] = useState('');
@@ -570,6 +581,14 @@ function OpenAICompatibleDetail({ preset, model, baseUrl, hasKey, onSave }: Open
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const selected = presetFor(selectedPreset);
+
+  useEffect(() => {
+    const nextPreset = presetList.some((item) => item.id === preset)
+      ? preset
+      : presetList[0]?.id ?? preset;
+    setSelectedPreset(nextPreset);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preset, allowedPresets?.join('|')]);
 
   const changePreset = (next: AiOpenAICompatiblePresetId) => {
     const presetConfig = presetFor(next);
@@ -602,6 +621,9 @@ function OpenAICompatibleDetail({ preset, model, baseUrl, hasKey, onSave }: Open
         this machine. <span className="font-medium">Cloud services</span> (OpenRouter, Groq, Mistral, Together,
         Fireworks) send content to external servers and typically require an API key.
       </p>
+      {guidance && (
+        <p className="text-[11px] text-ink-500 leading-relaxed">{guidance}</p>
+      )}
       <label className="block text-xs text-ink-500">
         Preset
         <select
@@ -609,16 +631,24 @@ function OpenAICompatibleDetail({ preset, model, baseUrl, hasKey, onSave }: Open
           onChange={(event) => changePreset(event.target.value as AiOpenAICompatiblePresetId)}
           className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800"
         >
-          <optgroup label="Local servers (stays on this machine)">
-            {OPENAI_COMPATIBLE_PRESETS.filter((p) => LOCAL_OPTGROUP_PRESETS.has(p.id)).map((item) => (
+          {allowedPresets ? (
+            presetList.map((item) => (
               <option key={item.id} value={item.id}>{item.label}</option>
-            ))}
-          </optgroup>
-          <optgroup label="Cloud / external services">
-            {OPENAI_COMPATIBLE_PRESETS.filter((p) => CLOUD_COMPATIBLE_PRESETS.has(p.id)).map((item) => (
-              <option key={item.id} value={item.id}>{item.label}</option>
-            ))}
-          </optgroup>
+            ))
+          ) : (
+            <>
+              <optgroup label="Local servers (stays on this machine)">
+                {OPENAI_COMPATIBLE_PRESETS.filter((p) => LOCAL_OPTGROUP_PRESETS.has(p.id)).map((item) => (
+                  <option key={item.id} value={item.id}>{item.label}</option>
+                ))}
+              </optgroup>
+              <optgroup label="Cloud / external services">
+                {OPENAI_COMPATIBLE_PRESETS.filter((p) => CLOUD_COMPATIBLE_PRESETS.has(p.id)).map((item) => (
+                  <option key={item.id} value={item.id}>{item.label}</option>
+                ))}
+              </optgroup>
+            </>
+          )}
         </select>
       </label>
       <label className="block text-xs text-ink-500">
@@ -822,6 +852,80 @@ function AgentCard({
             The binary path is stored server-side only — no credentials enter the browser.
           </p>
         </div>
+      )}
+    </div>
+  );
+}
+
+interface ServiceMethodOption {
+  id: string;
+  label: string;
+  capability: 'chat' | 'agent' | 'chat+agent';
+  availability?: AiMethodCapability['availability'];
+  availabilityReason?: string;
+}
+
+function methodCapabilityLabel(capability: ServiceMethodOption['capability']): string {
+  if (capability === 'chat') return 'chat/model routing';
+  if (capability === 'agent') return 'file-producing agent';
+  return 'chat + file agent';
+}
+
+function optionFromMethodCapability(method: AiMethodCapability): ServiceMethodOption {
+  const capability: ServiceMethodOption['capability'] = method.channel === 'file-agent'
+    ? 'agent'
+    : 'chat';
+  return {
+    id: method.id,
+    label: method.label,
+    capability,
+    availability: method.availability,
+    availabilityReason: method.availabilityReason,
+  };
+}
+
+function ServiceMethodSwitch({
+  title,
+  value,
+  onChange,
+  options,
+}: {
+  title: string;
+  value: string;
+  onChange: (next: string) => void;
+  options: ServiceMethodOption[];
+}) {
+  return (
+    <div className="space-y-2">
+      <p className="text-[11px] font-mono uppercase tracking-wider text-ink-500">{title}</p>
+      <div className="flex flex-wrap gap-2">
+        {options.map((option) => {
+          const active = value === option.id;
+          const disabled = option.availability === 'unavailable';
+          return (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => onChange(option.id)}
+              disabled={disabled}
+              className={`px-2.5 py-1.5 rounded-card border text-[11px] transition-colors ${
+                active
+                  ? 'border-sage-300 bg-sage-50 text-sage-800'
+                  : 'border-ink-200 bg-paper text-ink-600 hover:border-sage-300 hover:text-sage-700'
+              } ${disabled ? 'opacity-60 cursor-not-allowed hover:border-ink-200 hover:text-ink-600' : ''}`}
+            >
+              <span className="font-medium">{option.label}</span>
+              <span className="ml-2 font-mono text-[10px] text-ink-400">{methodCapabilityLabel(option.capability)}</span>
+              {option.availability === 'auth-required' && <span className="ml-2 font-mono text-[10px] text-amber-600">auth required</span>}
+              {option.availability === 'unavailable' && <span className="ml-2 font-mono text-[10px] text-red-600">unavailable</span>}
+            </button>
+          );
+        })}
+      </div>
+      {options.find((option) => option.id === value)?.availabilityReason && (
+        <p className="text-[11px] text-ink-500">
+          {options.find((option) => option.id === value)?.availabilityReason}
+        </p>
       )}
     </div>
   );
@@ -1638,11 +1742,11 @@ function providerLabel(provider: AiProviderId): string {
 interface FeatureRoutingSectionProps {
   ai: AiPublicConfig;
   providerStatuses: Partial<Record<AiProviderId, ProviderCardStatus>>;
-  accountSetupIssues: Partial<Record<'claude-account' | 'codex-account', string>>;
+  providerAvailability: Partial<Record<AiProviderId, { availability: AiMethodCapability['availability']; reason?: string; featureRoutable: boolean }>>;
   onSave: (routes: AiPublicConfig['featureRoutes']) => Promise<void>;
 }
 
-function FeatureRoutingSection({ ai, providerStatuses, accountSetupIssues, onSave }: FeatureRoutingSectionProps) {
+function FeatureRoutingSection({ ai, providerStatuses, providerAvailability, onSave }: FeatureRoutingSectionProps) {
   const [routes, setRoutes] = useState(ai.featureRoutes);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -1654,18 +1758,22 @@ function FeatureRoutingSection({ ai, providerStatuses, accountSetupIssues, onSav
   };
 
   const save = async () => {
-    // Synchronous gate: prevent saving routes to providers that are operationally unavailable.
-    // claude-account login is not available in this RC; codex-account requires the opt-in env flag.
+    // Synchronous gate: prevent saving routes to providers/methods marked unavailable
+    // by the backend method-capability contract.
     const unavailableProviders = Object.values(routes).filter((route) => {
       if (route.provider === 'default') return false;
-      if (route.provider === 'claude-account') return true;
-      if (route.provider === 'codex-account' && !ai.codexAccountAvailable) return true;
-      return false;
+      const availability = providerAvailability[route.provider];
+      if (!availability) return false;
+      if (!availability.featureRoutable) return true;
+      return availability.availability === 'unavailable';
     });
     if (unavailableProviders.length > 0) {
+      const reasons = unavailableProviders
+        .map((route) => (route.provider === 'default' ? null : providerAvailability[route.provider]?.reason))
+        .filter(Boolean)
+        .join(' ');
       setSaveError(
-        'One or more features are routed to an unavailable provider (Claude account or Codex account). ' +
-        'Change those routes to an available provider before saving.'
+        `One or more features are routed to an unavailable method. Change those routes before saving.${reasons ? ` ${reasons}` : ''}`
       );
       return;
     }
@@ -1699,7 +1807,9 @@ function FeatureRoutingSection({ ai, providerStatuses, accountSetupIssues, onSav
               alwaysShow
             />
           </div>
-          <p className="text-xs text-ink-400 mt-1">Route each AI feature to the global provider or a specific provider/model.</p>
+          <p className="text-xs text-ink-400 mt-1">
+            Route each AI feature to the global provider or a specific chat/model-capable provider. CLI file agents are intentionally excluded.
+          </p>
         </div>
         <button
           type="button"
@@ -1722,17 +1832,15 @@ function FeatureRoutingSection({ ai, providerStatuses, accountSetupIssues, onSav
               ? null
               : selectedProvider === 'openai' && !ai.hasOpenAIKey
                 ? 'OpenAI API key missing in the OpenAI API card.'
-                : selectedProvider === 'anthropic' && !ai.hasAnthropicKey
-                  ? 'Anthropic API key missing in the Anthropic API card.'
-                  : selectedProvider === 'openai-compatible'
-                    && openAICompatiblePreset.requiresKey
-                    && !ai.hasOpenAICompatibleKey
+              : selectedProvider === 'anthropic' && !ai.hasAnthropicKey
+                ? 'Anthropic API key missing in the Anthropic API card.'
+                : selectedProvider === 'openai-compatible'
+                  && openAICompatiblePreset.requiresKey
+                  && !ai.hasOpenAICompatibleKey
                     ? 'This cloud endpoint preset needs an API key — add it in the Custom endpoint card.'
-                    : selectedProvider === 'claude-account' && !ai.claudeAccountAuthenticated
-                      ? (accountSetupIssues['claude-account'] ?? 'Claude account is not signed in.')
-                      : selectedProvider === 'codex-account' && !ai.codexAccountAuthenticated
-                        ? (accountSetupIssues['codex-account'] ?? 'Codex account is not signed in.')
-                        : selectedProvider === 'ollama' && providerStatuses.ollama === 'unreachable'
+                    : providerAvailability[selectedProvider] && providerAvailability[selectedProvider]?.availability !== 'available'
+                      ? (providerAvailability[selectedProvider]?.reason ?? 'Selected method is not available right now.')
+                      : selectedProvider === 'ollama' && providerStatuses.ollama === 'unreachable'
                           ? 'Ollama host is unreachable. Check the Ollama base URL and daemon.'
                           : null;
           const providerHint =
@@ -1833,10 +1941,71 @@ function ClaudeAccountDetail({
   onStatusChange?: (status: ProviderCardProps['status']) => void;
 }) {
   const [localModel, setLocalModel] = useState(model);
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loginResult, setLoginResult] = useState<ClaudeAccountLoginResult | null>(null);
+  const [manualCallbackUrl, setManualCallbackUrl] = useState('');
+  const [completing, setCompleting] = useState(false);
+  const [expiresAt, setExpiresAt] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
   const [error, setError] = useState('');
   const refreshSettings = useSettingsStore((s) => s.refresh);
+
+  const refreshStatus = async () => {
+    setRefreshing(true);
+    setError('');
+    try {
+      const status = await getClaudeAccountStatus();
+      setExpiresAt(status.expiresAt ?? null);
+      onStatusChange?.(status.authenticated ? 'connected' : 'upcoming');
+      await refreshSettings();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      onStatusChange?.('unreachable');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    void refreshStatus();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleStartLogin = async () => {
+    setLoginLoading(true);
+    setError('');
+    try {
+      const result = await startClaudeAccountLogin();
+      setLoginResult(result);
+      window.open(result.authorizationUrl, '_blank', 'noopener');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      onStatusChange?.('unreachable');
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const handleCompleteManual = async () => {
+    const callbackUrl = manualCallbackUrl.trim();
+    if (!callbackUrl) {
+      setError('Paste the full callback URL from the browser after login.');
+      return;
+    }
+    setCompleting(true);
+    setError('');
+    try {
+      await completeClaudeAccountLogin(callbackUrl);
+      setManualCallbackUrl('');
+      await refreshStatus();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setCompleting(false);
+    }
+  };
 
   const handleLogout = async () => {
     setLogoutLoading(true);
@@ -1862,42 +2031,91 @@ function ClaudeAccountDetail({
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2 text-[11px] text-ink-600 bg-ink-50 border border-ink-200 rounded px-2 py-1.5">
+      <div className="flex items-center gap-2 text-[11px] text-violet-700 bg-violet-50 border border-violet-200 rounded px-2 py-1.5">
         <span className="font-semibold">Coming soon</span>
-        <span>— Claude account login and runtime support are not yet available in this version. This provider will become active in an upcoming update.</span>
+        <span>— Claude account is exposed for setup/testing, but this RC does not treat it as a normal production routing path yet.</span>
       </div>
 
       {!authenticated ? (
         <div className="space-y-2">
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={handleStartLogin}
+              disabled={loginLoading}
+              className="px-3 py-1.5 text-[12px] font-medium bg-neutral-800 text-white rounded hover:bg-neutral-900 disabled:opacity-50"
+            >
+              {loginLoading ? 'Starting…' : 'Start Claude login'}
+            </button>
+            <button
+              type="button"
+              onClick={() => void refreshStatus()}
+              disabled={refreshing}
+              className="px-3 py-1.5 text-[12px] font-medium border border-neutral-300 rounded hover:bg-neutral-50 disabled:opacity-50"
+            >
+              {refreshing ? 'Refreshing…' : 'Refresh status'}
+            </button>
+          </div>
+
+          {loginResult && (
+            <div className="space-y-1.5 p-2 bg-neutral-50 border border-neutral-200 rounded text-[11px]">
+              <p>{loginResult.manualFallback ? 'Manual callback required for this environment.' : 'Browser login opened in a new tab.'}</p>
+              {loginResult.manualReason && <p className="text-ink-500">{loginResult.manualReason}</p>}
+            </div>
+          )}
+
+          <div className="space-y-2 p-2 bg-paper-warm border border-ink-100 rounded">
+            <label className="block text-[11px] text-ink-600">
+              Manual callback URL (fallback)
+              <input
+                type="text"
+                value={manualCallbackUrl}
+                onChange={(event) => setManualCallbackUrl(event.target.value)}
+                placeholder="Paste the full redirect URL from your browser"
+                className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-xs text-ink-800"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={handleCompleteManual}
+              disabled={completing}
+              className="px-3 py-1.5 text-[12px] font-medium border border-ink-200 text-ink-700 rounded hover:bg-ink-50 disabled:opacity-50"
+            >
+              {completing ? 'Completing…' : 'Complete login from pasted URL'}
+            </button>
+          </div>
+
           <div className="flex items-start gap-2 px-2.5 py-2 bg-paper-warm border border-ink-100 rounded text-[11px] text-ink-700">
             <Info className="w-3.5 h-3.5 mt-0.5 shrink-0 text-ink-400" />
             <div>
-              <p className="font-semibold">Login not yet available</p>
+              <p className="font-semibold">Need Claude model access now?</p>
               <p className="mt-0.5 text-ink-600">
-                Claude account login is not operational in this version. Account support
-                will arrive in an upcoming update.
+                Use the Anthropic API method above with an API key from{' '}
+                <a
+                  href="https://console.anthropic.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:text-sage-700"
+                >
+                  console.anthropic.com
+                </a>.
               </p>
             </div>
           </div>
-          <p className="text-[11px] text-ink-500 leading-relaxed">
-            To use Claude models now, use the{' '}
-            <span className="font-semibold text-ink-700">Anthropic API</span>{' '}
-            provider card and enter an Anthropic API key. Get a key at{' '}
-            <a
-              href="https://console.anthropic.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline hover:text-sage-700"
-            >
-              console.anthropic.com
-            </a>
-            .
-          </p>
         </div>
       ) : (
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <span className="text-[11px] text-green-700 font-medium">✓ Logged in</span>
+            {expiresAt && <span className="text-[11px] text-ink-500">expires {new Date(expiresAt).toLocaleString()}</span>}
+            <button
+              type="button"
+              onClick={() => void refreshStatus()}
+              disabled={refreshing}
+              className="px-2 py-1 text-[11px] text-ink-500 hover:text-ink-700 underline disabled:opacity-50"
+            >
+              {refreshing ? 'Refreshing…' : 'Refresh'}
+            </button>
             <button
               onClick={handleLogout}
               disabled={logoutLoading}
@@ -1948,11 +2166,13 @@ function CodexAccountDetail({
   model,
   onSave,
   authenticated,
+  available,
   onStatusChange,
 }: {
   model: string;
   onSave: (model: string) => Promise<void>;
   authenticated: boolean;
+  available: boolean;
   onStatusChange?: (status: ProviderCardProps['status']) => void;
 }) {
   const [localModel, setLocalModel] = useState(model);
@@ -2023,6 +2243,12 @@ function CodexAccountDetail({
         <span className="font-semibold">Beta</span>
         <span>— Codex account requires a separate Codex CLI component to be installed and running on this machine and uses your ChatGPT/Codex login. This feature is in development and may not be fully operational. This is separate from OpenAI API billing.</span>
       </div>
+
+      {!available && (
+        <div className="text-[11px] text-ink-600 bg-ink-50 border border-ink-200 rounded px-2 py-1.5">
+          Runtime unavailable: enable <code className="font-mono">SEEDBANK_ENABLE_CODEX_ACCOUNT</code> on the server to expose this method.
+        </div>
+      )}
 
       {!authenticated ? (
         <div className="space-y-2">
@@ -2119,7 +2345,13 @@ export default function AiAgentsTab() {
   const offline = useSettingsOffline();
   const patch = useSettingsStore((s) => s.patch);
   const [probeStatuses, setProbeStatuses] = useState<Partial<Record<AiProviderId, ProviderCardStatus>>>({});
-  const [accountSetupIssues, setAccountSetupIssues] = useState<Partial<Record<'claude-account' | 'codex-account', string>>>({});
+  const [methodCapabilities, setMethodCapabilities] = useState<AiMethodCapability[]>([]);
+  const [claudeMethod, setClaudeMethod] = useState<string>(
+    ai.provider === 'claude-account' ? 'claude-account-native' : 'anthropic-api-key',
+  );
+  const [openaiMethod, setOpenaiMethod] = useState<string>(
+    ai.provider === 'codex-account' ? 'codex-account-app-server' : 'openai-api-key',
+  );
 
   const setProbeStatus = (provider: AiProviderId, status: ProviderCardStatus) => {
     setProbeStatuses((current) => ({ ...current, [provider]: status }));
@@ -2139,45 +2371,60 @@ export default function AiAgentsTab() {
   const compatiblePreset = presetFor(ai.openaiCompatiblePreset);
   const compatibleStatus: ProviderCardProps['status'] = probeStatuses['openai-compatible']
     ?? (compatiblePreset.requiresKey && !ai.hasOpenAICompatibleKey ? 'key-needed' : 'not-tested');
+  const compatiblePresetIsCustom = ai.openaiCompatiblePreset === 'custom';
+  const compatibleCustomLocal = compatiblePresetIsCustom && isLikelyLocalUrl(ai.openaiCompatibleBaseUrl);
+  const compatibleCustomCloud = compatiblePresetIsCustom && !isLikelyLocalUrl(ai.openaiCompatibleBaseUrl);
+  const localCompatibleActive = LOCAL_METHOD_PRESETS.has(ai.openaiCompatiblePreset) && (ai.openaiCompatiblePreset !== 'custom' || compatibleCustomLocal);
+  const cloudCompatibleActive = CLOUD_METHOD_PRESETS.has(ai.openaiCompatiblePreset) && (ai.openaiCompatiblePreset !== 'custom' || compatibleCustomCloud);
+  const localCompatibleStatus: ProviderCardProps['status'] = localCompatibleActive ? compatibleStatus : 'not-tested';
+  const cloudCompatibleStatus: ProviderCardProps['status'] = cloudCompatibleActive ? compatibleStatus : 'not-tested';
+
+  useEffect(() => {
+    if (ai.provider === 'claude-account') setClaudeMethod('claude-account-native');
+    if (ai.provider === 'anthropic') setClaudeMethod('anthropic-api-key');
+    if (ai.provider === 'codex-account') setOpenaiMethod('codex-account-app-server');
+    if (ai.provider === 'openai') setOpenaiMethod('openai-api-key');
+  }, [ai.provider]);
 
   useEffect(() => {
     if (offline) return;
-    let cancelled = false;
-    void (async () => {
-      const next: Partial<Record<'claude-account' | 'codex-account', string>> = {};
-      try {
-        const status = await getClaudeAccountStatus();
-        if (!cancelled && !status.authenticated) {
-          next['claude-account'] = 'Claude account login is not yet available. Route this feature to the Anthropic API provider to use Claude models.';
-        }
-      } catch (err) {
-        if (!cancelled) {
-          next['claude-account'] = err instanceof Error ? err.message : 'Claude account status is unavailable.';
-        }
-      }
-
-      try {
-        const status = await getCodexAccountStatus();
-        if (!cancelled && !status.authenticated) {
-          next['codex-account'] = status.requiresOpenaiAuth
-            ? 'Sign in from the Codex account card before routing features here.'
-            : 'Codex account is not ready yet. Use the Codex card to log in or refresh status.';
-        }
-      } catch (err) {
-        if (!cancelled) {
-          const message = err instanceof Error ? err.message : String(err);
-          next['codex-account'] = /(enoent|not found|app-server|codex)/i.test(message)
-            ? 'Codex account component is not responding. Verify it is installed and running, then refresh the Codex account card.'
-            : message;
-        }
-      }
-
-      if (!cancelled) setAccountSetupIssues(next);
-    })();
-    return () => {
-      cancelled = true;
-    };
+    void getAiMethodCapabilities()
+      .then(setMethodCapabilities)
+      .catch(() => {});
   }, [offline]);
+
+  const claudeMethodOptions = methodCapabilities.filter((method) => method.serviceFamily === 'claude');
+  const openaiMethodOptions = methodCapabilities.filter((method) => method.serviceFamily === 'codex-openai');
+  const localMethods = methodCapabilities.filter((method) => method.serviceFamily === 'local-inference' && method.providerId === 'openai-compatible');
+  const cloudMethods = methodCapabilities.filter((method) => method.serviceFamily === 'external-router' && method.providerId === 'openai-compatible');
+  const localPresetMethodIds: AiOpenAICompatiblePresetId[] = (
+    methodCapabilities.length > 0
+      ? [...new Set([...localMethods.map((method) => method.presetId).filter(Boolean), 'custom'])]
+      : ['lm-studio', 'vllm', 'llama-cpp', 'localai', 'custom']
+  ) as AiOpenAICompatiblePresetId[];
+  const cloudPresetMethodIds: AiOpenAICompatiblePresetId[] = (
+    methodCapabilities.length > 0
+      ? [...new Set([...cloudMethods.map((method) => method.presetId).filter(Boolean), 'custom'])]
+      : ['openrouter', 'groq', 'mistral', 'together', 'fireworks', 'custom']
+  ) as AiOpenAICompatiblePresetId[];
+  const methodById = new Map(methodCapabilities.map((method) => [method.id, method]));
+  const capabilityState = (
+    id: string,
+    fallback: { availability: AiMethodCapability['availability']; reason?: string; featureRoutable: boolean },
+  ) => {
+    const method = methodById.get(id);
+    return method
+      ? { availability: method.availability, reason: method.availabilityReason, featureRoutable: method.featureRoutable }
+      : fallback;
+  };
+  const providerAvailability: Partial<Record<AiProviderId, { availability: AiMethodCapability['availability']; reason?: string; featureRoutable: boolean }>> = {
+    openai: capabilityState('openai-api-key', { availability: ai.hasOpenAIKey ? 'available' : 'auth-required', reason: ai.hasOpenAIKey ? undefined : 'OpenAI API key is not configured.', featureRoutable: true }),
+    anthropic: capabilityState('anthropic-api-key', { availability: ai.hasAnthropicKey ? 'available' : 'auth-required', reason: ai.hasAnthropicKey ? undefined : 'Anthropic API key is not configured.', featureRoutable: true }),
+    'claude-account': capabilityState('claude-account-native', { availability: ai.claudeAccountAuthenticated ? 'available' : 'auth-required', reason: ai.claudeAccountAuthenticated ? undefined : 'Sign in with Claude account to enable this method.', featureRoutable: true }),
+    'codex-account': capabilityState('codex-account-app-server', { availability: ai.codexAccountAvailable ? (ai.codexAccountAuthenticated ? 'available' : 'auth-required') : 'unavailable', reason: ai.codexAccountAvailable ? 'Sign in with Codex account to enable this method.' : 'Codex account method is disabled by server configuration.', featureRoutable: true }),
+    ollama: capabilityState('ollama-local', { availability: 'available', featureRoutable: true }),
+    'openai-compatible': capabilityState(`openai-compatible:${ai.openaiCompatiblePreset}`, { availability: 'available', featureRoutable: true }),
+  };
 
   const setDefaultProvider = async (provider: AiProviderId) => {
     await patch('ai', { provider });
@@ -2245,8 +2492,6 @@ export default function AiAgentsTab() {
     await refresh();
   };
 
-  const anyLinked = agents.claudeLinked || agents.codexLinked;
-
   return (
     <div className="space-y-8">
       {offline && (
@@ -2255,60 +2500,45 @@ export default function AiAgentsTab() {
         </div>
       )}
 
-      {/* ── A1 + A2: Provider cards ─────────────────────────────────────────── */}
+      {/* ── A1 + A2: Service areas + methods ────────────────────────────────── */}
       <section className="space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             <h3 className="text-xs font-mono uppercase tracking-wider text-ink-500">
-              AI Providers
+              AI Services
             </h3>
             <HelpButton
               helpId="ai-providers"
               title="Choosing an AI Provider"
-              summary="Providers come in four families: direct API-key (OpenAI API, Anthropic API), local inference (Ollama, local custom servers), external cloud endpoints (OpenRouter, Groq, Mistral, and similar), and account/subscription transports (Claude account, Codex account)."
-              details="Direct API providers bill per token and require an API key. Local inference keeps idea content on this machine. External endpoints send content to cloud servers and need an API key. Account transports use subscription login — Claude account is not yet available; Codex account is experimental. Project Graduation is separate and controls only file scaffolding."
+              summary="Settings are grouped by service family first (Claude, Codex/OpenAI, Local inference, Cloud routers), then by connection method (API key, account transport, or CLI agent)."
+              details="Feature Defaults routes only chat/model-capable methods. CLI methods launch review-first file work and are intentionally separate from chat routing."
               manualSection="provider-chooser"
               alwaysShow
             />
           </div>
         </div>
         <p className="text-xs text-ink-400">
-          Select a global default provider. All AI features — Thinking Partner, field suggestions,
-          health checks, and Discover insights — use this provider unless you override them
-          individually in <span className="font-medium text-ink-500">Feature Defaults</span> below.
-          Expand a provider card to edit the model or API key; use Test / List models to verify.
+          Configure each service area by method. Global default + Feature Defaults apply to chat/model-capable
+          methods only. CLI methods (Claude Code and Codex CLI) are file-producing agent tools, not chat routes.
         </p>
 
         <div className="space-y-4">
-          {/* ── Direct API providers ──────────────────────────────────────── */}
-          <div>
-            <p className="text-[10px] font-mono uppercase tracking-wider text-ink-400 mb-1.5">Direct API providers</p>
-            <div className="space-y-2">
-              {/* OpenAI */}
-              <ProviderCard
-                label={aiProviderLabel('openai')}
-                icon="🤖"
-                isDefault={ai.provider === 'openai'}
-                status={openaiStatus}
-                modelLabel={ai.openaiModel}
-                onSetDefault={() => void setDefaultProvider('openai')}
-                actions={(
-                  <ProviderProbe
-                    buildConfig={() => ({ provider: 'openai', openaiModel: ai.openaiModel })}
-                    onStatusChange={(status) => setProbeStatus('openai', status)}
-                    testLabel="Test saved"
-                    listLabel="List saved models"
-                  />
-                )}
-              >
-                <OpenAIDetail
-                  model={ai.openaiModel}
-                  hasKey={ai.hasOpenAIKey}
-                  onSave={saveOpenAI}
-                />
-              </ProviderCard>
-
-              {/* Anthropic */}
+          <div className="rounded-card border border-ink-100 bg-paper p-3 space-y-3">
+            <p className="text-[10px] font-mono uppercase tracking-wider text-ink-400">Claude Service</p>
+            <ServiceMethodSwitch
+              title="Method"
+              value={claudeMethod}
+              onChange={(next) => setClaudeMethod(next)}
+              options={(claudeMethodOptions.length > 0
+                ? claudeMethodOptions
+                : [
+                    { id: 'anthropic-api-key', label: 'Anthropic API key', channel: 'chat-model', availability: 'available' as const },
+                    { id: 'claude-account-native', label: 'Claude account', channel: 'chat-model', availability: 'auth-required' as const },
+                    { id: 'claude-code-cli-agent', label: 'Claude Code CLI', channel: 'file-agent', availability: 'unavailable' as const },
+                  ] as AiMethodCapability[]
+              ).map(optionFromMethodCapability)}
+            />
+            {claudeMethod === 'anthropic-api-key' && (
               <ProviderCard
                 label={aiProviderLabel('anthropic')}
                 icon="🧠"
@@ -2331,85 +2561,8 @@ export default function AiAgentsTab() {
                   onSave={saveAnthropic}
                 />
               </ProviderCard>
-            </div>
-          </div>
-
-          {/* ── Local inference ───────────────────────────────────────────── */}
-          <div>
-            <p className="text-[10px] font-mono uppercase tracking-wider text-ink-400 mb-1.5">Local inference</p>
-            <div className="space-y-2">
-              {/* Ollama */}
-              <ProviderCard
-                label={aiProviderLabel('ollama')}
-                icon="🦙"
-                isDefault={ai.provider === 'ollama'}
-                status={ollamaStatus}
-                modelLabel={`${ai.ollamaModel} · ${ai.ollamaBaseUrl}`}
-                onSetDefault={() => void setDefaultProvider('ollama')}
-                actions={(
-                  <ProviderProbe
-                    buildConfig={() => ({ provider: 'ollama', ollamaModel: ai.ollamaModel, ollamaBaseUrl: ai.ollamaBaseUrl })}
-                    onStatusChange={(status) => setProbeStatus('ollama', status)}
-                    testLabel="Run saved smoke test"
-                    listLabel="List saved models"
-                  />
-                )}
-              >
-                <OllamaDetail
-                  model={ai.ollamaModel}
-                  baseUrl={ai.ollamaBaseUrl}
-                  onSave={saveOllama}
-                />
-              </ProviderCard>
-            </div>
-          </div>
-
-          {/* ── External / cloud endpoints ────────────────────────────────── */}
-          <div>
-            <p className="text-[10px] font-mono uppercase tracking-wider text-ink-400 mb-1.5">External &amp; custom endpoints</p>
-            <div className="space-y-2">
-              {/* Custom / OpenAI-compatible endpoint */}
-              <ProviderCard
-                label={aiProviderLabel('openai-compatible')}
-                icon="🔌"
-                isDefault={ai.provider === 'openai-compatible'}
-                status={compatibleStatus}
-                modelLabel={`${compatiblePreset.label} · ${ai.openaiCompatibleModel || 'choose a model'}`}
-                onSetDefault={() => void setDefaultProvider('openai-compatible')}
-                actions={(
-                  <ProviderProbe
-                    buildConfig={() => ({
-                      provider: 'openai-compatible',
-                      openaiCompatiblePreset: ai.openaiCompatiblePreset,
-                      openaiCompatibleModel: ai.openaiCompatibleModel,
-                      openaiCompatibleBaseUrl: ai.openaiCompatibleBaseUrl,
-                    })}
-                    onStatusChange={(status) => setProbeStatus('openai-compatible', status)}
-                    testLabel="Test saved"
-                    listLabel="List saved models"
-                  />
-                )}
-              >
-                <OpenAICompatibleDetail
-                  preset={ai.openaiCompatiblePreset}
-                  model={ai.openaiCompatibleModel}
-                  baseUrl={ai.openaiCompatibleBaseUrl}
-                  hasKey={ai.hasOpenAICompatibleKey}
-                  onSave={saveOpenAICompatible}
-                />
-              </ProviderCard>
-            </div>
-          </div>
-
-          {/* ── Account / subscription transports ────────────────────────── */}
-          <div>
-            <p className="text-[10px] font-mono uppercase tracking-wider text-ink-400 mb-1.5">Account &amp; subscription transports</p>
-            <p className="text-[11px] text-ink-400 mb-2">
-              These use subscription/account login rather than API-key billing and are separate from the
-              OpenAI API and Anthropic API providers above. Account transports are not linked CLI agents.
-            </p>
-            <div className="space-y-2">
-              {/* Claude Account (subscription — coming soon) */}
+            )}
+            {claudeMethod === 'claude-account-native' && (
               <ProviderCard
                 label={aiProviderLabel('claude-account')}
                 icon="🟣"
@@ -2426,8 +2579,67 @@ export default function AiAgentsTab() {
                   onStatusChange={(status) => setProbeStatus('claude-account', status)}
                 />
               </ProviderCard>
+            )}
+            {claudeMethod === 'claude-code-cli-agent' && (
+              <div className="space-y-2">
+                <AgentCard
+                  provider="claude"
+                  label="Claude Code"
+                  description="File-producing agent method. Not used for Feature Defaults chat routing."
+                  docsUrl="https://docs.anthropic.com/en/docs/claude-code"
+                  isLinked={agents.claudeLinked}
+                  version={agents.claudeVersion}
+                  onLink={(path) => handleLink('claude', path)}
+                  onDetect={() => handleDetect('claude')}
+                  onUnlink={() => handleUnlink('claude')}
+                />
+                <p className="text-[11px] text-ink-400">
+                  This method launches review-first file work from idea pages. It does not route Thinking Partner/chat traffic.
+                </p>
+              </div>
+            )}
+          </div>
 
-              {/* Codex Account (subscription — experimental) */}
+          <div className="rounded-card border border-ink-100 bg-paper p-3 space-y-3">
+            <p className="text-[10px] font-mono uppercase tracking-wider text-ink-400">Codex / OpenAI Service</p>
+            <ServiceMethodSwitch
+              title="Method"
+              value={openaiMethod}
+              onChange={(next) => setOpenaiMethod(next)}
+              options={(openaiMethodOptions.length > 0
+                ? openaiMethodOptions
+                : [
+                    { id: 'openai-api-key', label: 'OpenAI API key', channel: 'chat-model', availability: 'available' as const },
+                    { id: 'codex-account-app-server', label: 'Codex account', channel: 'chat-model', availability: 'auth-required' as const },
+                    { id: 'codex-cli-agent', label: 'Codex CLI', channel: 'file-agent', availability: 'unavailable' as const },
+                  ] as AiMethodCapability[]
+              ).map(optionFromMethodCapability)}
+            />
+            {openaiMethod === 'openai-api-key' && (
+              <ProviderCard
+                label={aiProviderLabel('openai')}
+                icon="🤖"
+                isDefault={ai.provider === 'openai'}
+                status={openaiStatus}
+                modelLabel={ai.openaiModel}
+                onSetDefault={() => void setDefaultProvider('openai')}
+                actions={(
+                  <ProviderProbe
+                    buildConfig={() => ({ provider: 'openai', openaiModel: ai.openaiModel })}
+                    onStatusChange={(status) => setProbeStatus('openai', status)}
+                    testLabel="Test saved"
+                    listLabel="List saved models"
+                  />
+                )}
+              >
+                <OpenAIDetail
+                  model={ai.openaiModel}
+                  hasKey={ai.hasOpenAIKey}
+                  onSave={saveOpenAI}
+                />
+              </ProviderCard>
+            )}
+            {openaiMethod === 'codex-account-app-server' && (
               <ProviderCard
                 label={aiProviderLabel('codex-account')}
                 icon="⌁"
@@ -2441,10 +2653,127 @@ export default function AiAgentsTab() {
                   model={ai.codexAccountModel || 'codex-recommended'}
                   onSave={saveCodexAccount}
                   authenticated={ai.codexAccountAuthenticated}
+                  available={ai.codexAccountAvailable}
                   onStatusChange={(status) => setProbeStatus('codex-account', status)}
                 />
               </ProviderCard>
-            </div>
+            )}
+            {openaiMethod === 'codex-cli-agent' && (
+              <div className="space-y-2">
+                <AgentCard
+                  provider="codex"
+                  label="Codex CLI"
+                  description="File-producing agent method. Not used for Feature Defaults chat routing."
+                  docsUrl="https://github.com/openai/codex"
+                  isLinked={agents.codexLinked}
+                  version={agents.codexVersion}
+                  onLink={(path) => handleLink('codex', path)}
+                  onDetect={() => handleDetect('codex')}
+                  onUnlink={() => handleUnlink('codex')}
+                />
+                <p className="text-[11px] text-ink-400">
+                  This method launches review-first file work from idea pages. It does not route Thinking Partner/chat traffic.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-card border border-ink-100 bg-paper p-3 space-y-2">
+            <p className="text-[10px] font-mono uppercase tracking-wider text-ink-400">Local Inference</p>
+            <p className="text-[11px] text-ink-400">
+              Configure local model servers (Ollama, LM Studio, vLLM, llama.cpp, LocalAI, or a custom localhost endpoint).
+            </p>
+            <ProviderCard
+              label={aiProviderLabel('ollama')}
+              icon="🦙"
+              isDefault={ai.provider === 'ollama'}
+              status={ollamaStatus}
+              modelLabel={`${ai.ollamaModel} · ${ai.ollamaBaseUrl}`}
+              onSetDefault={() => void setDefaultProvider('ollama')}
+              actions={(
+                <ProviderProbe
+                  buildConfig={() => ({ provider: 'ollama', ollamaModel: ai.ollamaModel, ollamaBaseUrl: ai.ollamaBaseUrl })}
+                  onStatusChange={(status) => setProbeStatus('ollama', status)}
+                  testLabel="Run saved smoke test"
+                  listLabel="List saved models"
+                />
+              )}
+            >
+              <OllamaDetail
+                model={ai.ollamaModel}
+                baseUrl={ai.ollamaBaseUrl}
+                onSave={saveOllama}
+              />
+            </ProviderCard>
+            <ProviderCard
+              label="Local OpenAI-compatible servers"
+              icon="🧩"
+              isDefault={ai.provider === 'openai-compatible' && localCompatibleActive}
+              status={localCompatibleStatus}
+              modelLabel={`${compatiblePreset.label} · ${ai.openaiCompatibleModel || 'choose a model'}`}
+              onSetDefault={() => void setDefaultProvider('openai-compatible')}
+              actions={(
+                <ProviderProbe
+                  buildConfig={() => ({
+                    provider: 'openai-compatible',
+                    openaiCompatiblePreset: ai.openaiCompatiblePreset,
+                    openaiCompatibleModel: ai.openaiCompatibleModel,
+                    openaiCompatibleBaseUrl: ai.openaiCompatibleBaseUrl,
+                  })}
+                  onStatusChange={(status) => setProbeStatus('openai-compatible', status)}
+                  testLabel="Test saved"
+                  listLabel="List saved models"
+                />
+              )}
+            >
+              <OpenAICompatibleDetail
+                preset={ai.openaiCompatiblePreset}
+                model={ai.openaiCompatibleModel}
+                baseUrl={ai.openaiCompatibleBaseUrl}
+                hasKey={ai.hasOpenAICompatibleKey}
+                allowedPresets={localPresetMethodIds}
+                guidance="For the custom preset, use a localhost URL to keep inference on this machine."
+                onSave={saveOpenAICompatible}
+              />
+            </ProviderCard>
+          </div>
+
+          <div className="rounded-card border border-ink-100 bg-paper p-3 space-y-2">
+            <p className="text-[10px] font-mono uppercase tracking-wider text-ink-400">External / Cloud Routers</p>
+            <p className="text-[11px] text-ink-400">
+              Configure hosted OpenAI-compatible services (OpenRouter, Groq, Mistral, Together, Fireworks, or a custom cloud endpoint).
+            </p>
+            <ProviderCard
+              label="Cloud OpenAI-compatible endpoints"
+              icon="☁️"
+              isDefault={ai.provider === 'openai-compatible' && cloudCompatibleActive}
+              status={cloudCompatibleStatus}
+              modelLabel={`${compatiblePreset.label} · ${ai.openaiCompatibleModel || 'choose a model'}`}
+              onSetDefault={() => void setDefaultProvider('openai-compatible')}
+              actions={(
+                <ProviderProbe
+                  buildConfig={() => ({
+                    provider: 'openai-compatible',
+                    openaiCompatiblePreset: ai.openaiCompatiblePreset,
+                    openaiCompatibleModel: ai.openaiCompatibleModel,
+                    openaiCompatibleBaseUrl: ai.openaiCompatibleBaseUrl,
+                  })}
+                  onStatusChange={(status) => setProbeStatus('openai-compatible', status)}
+                  testLabel="Test saved"
+                  listLabel="List saved models"
+                />
+              )}
+            >
+              <OpenAICompatibleDetail
+                preset={ai.openaiCompatiblePreset}
+                model={ai.openaiCompatibleModel}
+                baseUrl={ai.openaiCompatibleBaseUrl}
+                hasKey={ai.hasOpenAICompatibleKey}
+                allowedPresets={cloudPresetMethodIds}
+                guidance="For the custom preset, use a remote URL when you intend cloud processing."
+                onSave={saveOpenAICompatible}
+              />
+            </ProviderCard>
           </div>
         </div>
       </section>
@@ -2462,7 +2791,7 @@ export default function AiAgentsTab() {
             ollama: ollamaStatus,
             'openai-compatible': compatibleStatus,
           }}
-          accountSetupIssues={accountSetupIssues}
+          providerAvailability={providerAvailability}
           onSave={saveFeatureRoutes}
         />
       </section>
@@ -2476,72 +2805,6 @@ export default function AiAgentsTab() {
             await patch('ai', { guardrails: guardrailsPatch });
           }}
         />
-      </section>
-
-      {/* ── A4: Linked agents ───────────────────────────────────────────────── */}
-      <section className="space-y-3">
-        <div className="flex items-center gap-1.5">
-          <h3 className="text-xs font-mono uppercase tracking-wider text-ink-500">
-            Linked Agents
-          </h3>
-          <HelpButton
-            helpId="linked-agents"
-            title="Linked CLI Agents"
-            summary="Link Claude Code or Codex CLI by binary path. Seedbank spawns the agent in a per-idea scratch workspace when you click 'Develop with agent' on an idea."
-            details="Credentials stay in your OS keychain or CLI tool. Seedbank stores only the binary path and a linked flag."
-            manualSection="agents"
-            alwaysShow
-          />
-        </div>
-        <p className="text-xs text-ink-400">
-          Link a local CLI agent so Seedbank can spawn it to develop an idea or continue work
-          on a graduated project. The CLI path is stored server-side only.
-        </p>
-
-        {!anyLinked && (
-          <div className="flex items-start gap-3 p-4 bg-paper-warm border border-ink-100 rounded-card">
-            <Bot className="w-5 h-5 text-ink-300 mt-0.5 shrink-0" />
-            <div>
-              <p className="text-sm font-medium text-ink-600">No agents linked yet</p>
-              <p className="text-xs text-ink-400 mt-0.5">
-                Link Claude Code or the Codex CLI below to unlock the{' '}
-                <span className="font-mono">Develop with agent</span> button on each idea.
-              </p>
-            </div>
-          </div>
-        )}
-
-        <AgentCard
-          provider="claude"
-          label="Claude Code"
-          description="Anthropic's Claude Code CLI — spawned in a scratch workspace seeded with your idea fields."
-          docsUrl="https://docs.anthropic.com/en/docs/claude-code"
-          isLinked={agents.claudeLinked}
-          version={agents.claudeVersion}
-          onLink={(path) => handleLink('claude', path)}
-          onDetect={() => handleDetect('claude')}
-          onUnlink={() => handleUnlink('claude')}
-        />
-
-        <AgentCard
-          provider="codex"
-          label="Codex CLI"
-          description="OpenAI's Codex CLI — spawned in a scratch workspace seeded with your idea fields."
-          docsUrl="https://github.com/openai/codex"
-          isLinked={agents.codexLinked}
-          version={agents.codexVersion}
-          onLink={(path) => handleLink('codex', path)}
-          onDetect={() => handleDetect('codex')}
-          onUnlink={() => handleUnlink('codex')}
-        />
-
-        <div className="mt-2 flex items-center gap-1.5 text-[11px] text-ink-400">
-          <Zap className="w-3 h-3" />
-          <span>
-            Agent runs use a per-idea scratch workspace; the agent process is not OS-sandboxed.
-            Proposed file changes require your explicit approval before being saved as idea attachments.
-          </span>
-        </div>
       </section>
 
       {/* Inline help covers the agents guide — external link placeholder removed */}

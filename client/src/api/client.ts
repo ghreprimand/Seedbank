@@ -12,6 +12,7 @@ import type {
   AiFieldAssistChatRequest,
   AiFieldAssistMessage,
   AiFieldSuggestionRequest,
+  AiMethodCapability,
   AiModelListResult,
   AiProviderDescriptor,
   AiProviderHealth,
@@ -584,6 +585,11 @@ export async function updateAiConfig(config: AiConfigInput): Promise<AiPublicCon
 export async function getAiProviders(): Promise<AiProviderDescriptor[]> {
   const response = await request<{ providers: AiProviderDescriptor[] }>('/api/ai/providers');
   return response.providers;
+}
+
+export async function getAiMethodCapabilities(): Promise<AiMethodCapability[]> {
+  const response = await request<{ methods: AiMethodCapability[] }>('/api/ai/method-capabilities');
+  return response.methods;
 }
 
 export async function testAiProvider(config: AiConfigInput): Promise<AiProviderHealth> {

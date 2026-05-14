@@ -91,6 +91,7 @@ const DEFAULT_SETTINGS: AggregateSettings = {
     hasOpenAIKey: false,
     hasAnthropicKey: false,
     hasOpenAICompatibleKey: false,
+    claudeAccountAvailable: false,
     claudeAccountAuthenticated: false,
     codexAccountAvailable: false,
     codexAccountAuthenticated: false,
