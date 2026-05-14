@@ -4,6 +4,24 @@ Newest entries at the top.
 
 ---
 
+## 2026-05-14 — Default Quality Gates Stabilized
+
+This pass closed the audit's first priority before larger server modularization work: make the default quality gates trustworthy and green.
+
+The server test flake was narrowed to Claude account tests that share process-level state (`globalThis.fetch`, account auth files, and catalog cache). Those tests now explicitly opt out of Node's per-file test concurrency, so `npm run test -w server` no longer depends on manually passing `--test-concurrency=1`.
+
+The client lint failures were resolved without disabling React hook rules. The affected AI/settings components now avoid synchronous state syncing in effects by using derived values or render-time draft resets where local editable state is still needed. The cleanup touched the AI Assist route picker, AI & Agents method/server selectors, Claude account compact toggle, Feature Defaults drafts, model picker custom mode, provider-card auto-expand behavior, and Discover category-label dependency handling.
+
+Validation:
+- `npm run lint`
+- `npm run typecheck`
+- `npm run test -w server`
+- Playwright smoke check confirmed the app rendered without browser console or page errors.
+
+No behavior bugs were uncovered during this phase, so the larger modularization work remains a follow-up.
+
+---
+
 ## 2026-05-14 — Granular Help Accuracy Pass + Docs/Manual Truth Sweep
 
 This pass tightened contextual help and documentation to match the live code paths exactly.
