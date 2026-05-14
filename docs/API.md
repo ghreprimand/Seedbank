@@ -441,11 +441,13 @@ Scope expectations (bearer mode):
 - `GET /api/ai/usage` (`read:ideas`)
 - `GET /api/ai/usage/detail` (`read:ideas`) - grouped usage plus recent guardrail/provider audit events
 - `POST /api/ai/config` (`write:ideas`, legacy update route)
-- `POST /api/ai/preflight` (`read:ideas`) - resolves feature route, budget state, allowlist blockers, and local/remote privacy metadata
+- `POST /api/ai/preflight` (`read:ideas`) - resolves feature route, budget state, allowlist blockers, and local/remote privacy metadata. Accepts optional `providerInstanceId`, `model`, `effort`, and `verbosity` to preview a temporary route override.
 - `GET /api/ai/conversations/:ideaId` (`read:ideas`)
-- `POST /api/ai/suggest` (`ai:suggest`) - field suggestions accept an optional `prompt`, `omitCurrentValue`, and `aiConfirmationToken`
-- `POST /api/ai/field-chat` (`ai:suggest`, SSE) - modal-local field assistance using the `field-suggestions` route; accepts `aiConfirmationToken`
+- `POST /api/ai/suggest` (`ai:suggest`) - field suggestions accept optional `prompt`, `omitCurrentValue`, `aiConfirmationToken`, `providerInstanceId`, `model`, `effort`, and `verbosity`
+- `POST /api/ai/field-chat` (`ai:suggest`, SSE) - modal-local field assistance using the `field-suggestions` route; accepts `aiConfirmationToken` plus the same optional provider/model override fields as `POST /api/ai/suggest`
 - `POST /api/ai/chat` (`ai:suggest`, SSE) - Thinking Partner chat; accepts `aiConfirmationToken`
+
+The provider/model override fields are request-scoped. They let the Ask AI modal run one suggestion or field-assist chat against another configured provider instance without changing Settings → AI & Agents → Feature Defaults.
 
 ## Backups, Project Graduation, Import/Export
 

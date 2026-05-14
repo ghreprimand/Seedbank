@@ -14,10 +14,10 @@ Settings → AI & Agents is organized by service family first, then connection m
 
 - **Claude service**: Anthropic API key, Claude account/native OAuth, Claude Code CLI
 - **Codex/OpenAI service**: OpenAI API key, Codex account/app-server, Codex CLI
-- **Local inference**: Ollama + local OpenAI-compatible servers (LM Studio, vLLM, llama.cpp, LocalAI, custom localhost URL)
-- **External/cloud routers**: OpenRouter, Groq, Mistral, Together, Fireworks, custom cloud endpoint
+- **Local inference**: Ollama plus as many local OpenAI-compatible servers as you configure (LM Studio, vLLM, llama.cpp, LocalAI, custom localhost URL)
+- **External/cloud routers**: OpenRouter, Groq, Mistral, Together, Fireworks, or other custom cloud endpoints
 
-The local and cloud OpenAI-compatible cards are two views of one shared OpenAI-compatible configuration. Saving either card replaces the same preset/base URL/model/key values.
+Each provider method is stored as a provider instance. Built-in instances cover OpenAI API, Anthropic API, Claude account, Codex account, Ollama, local OpenAI-compatible, and cloud OpenAI-compatible. You can also add additional local or external instances, such as "LM Studio laptop", "Ollama server", "OpenRouter personal", or "Groq work". Each saved instance has its own label, URL, model list, enabled state, health/probe status, and routing identity.
 
 **OpenAI API** — enter your API key and model name (e.g. `gpt-4.1-mini`). Calls are made server-side to `api.openai.com`. Idea content is sent to OpenAI's servers.
 
@@ -25,7 +25,7 @@ The local and cloud OpenAI-compatible cards are two views of one shared OpenAI-c
 
 **Ollama** — configure the base URL (usually `http://localhost:11434`) and model name (e.g. `llama3.2`). No API key required. Calls stay on the configured Ollama host. Useful for local-only experimentation or privacy-sensitive archives.
 
-**Custom / OpenAI-compatible endpoint** — choose a preset or enter a compatible endpoint URL, API key when required, and model name. Use this for OpenRouter, Groq, Mistral, Together, Fireworks, LM Studio, vLLM, llama.cpp, LocalAI, or another service that accepts OpenAI Chat Completions requests.
+**Custom / OpenAI-compatible endpoint** — choose a preset or enter a compatible endpoint URL, API key when required, and model name. Use this for OpenRouter, Groq, Mistral, Together, Fireworks, LM Studio, vLLM, llama.cpp, LocalAI, or another service that accepts OpenAI Chat Completions requests. Local and cloud instances are stored separately so a local LM Studio server does not overwrite an OpenRouter setup.
 
 **Claude account** — account-auth method with login/status controls shown in the Claude service area. Use this to route AI chat through a Claude.ai subscription with OAuth tokens rather than an Anthropic API key.
 
@@ -33,13 +33,21 @@ The local and cloud OpenAI-compatible cards are two views of one shared OpenAI-c
 
 **Claude Code CLI / Codex CLI** — file-producing agent methods inside their respective service areas. These are review-first development tools, not Feature Defaults chat providers.
 
+### Model discovery and saved instances
+
+When a provider becomes usable, Seedbank tries to discover available models and persists them under that provider instance. Discovery runs after API-key saves, Claude/Codex account login/status checks, manual **List saved models**, server startup, and a background refresh cycle. Provider cards show how many models are available, and expanded cards show a preview of the catalog.
+
+For broad catalog providers such as OpenRouter, you can choose which discovered models are enabled in Seedbank. Enabled models are the ones shown in Feature Defaults and in Ask AI's temporary provider/model picker.
+
+The provider health badge is also stored per instance. If you test an Ollama server and it connects, leaving and returning to Settings keeps the card visibly connected until a later probe changes that status.
+
 ### Choosing a default provider
 
-A **Set default** radio button on each provider card determines which provider the Thinking Partner and field suggestions use. The default is stored server-side.
+A **Set default** radio button on each provider card sets the global default provider instance. Feature Defaults can inherit that global default or override it per feature. The global default also has a default model and effort selector in Feature Defaults.
 
 ### Provider API keys vs. Seedbank tokens
 
-**Provider API keys** (OpenAI API, Anthropic API, OpenRouter, Groq, Mistral, Together, Fireworks, or another custom endpoint) are credentials for external AI services. They are stored server-side, encrypted at rest. Public API responses expose only booleans such as `hasOpenAIKey`, `hasAnthropicKey`, and `hasOpenAICompatibleKey` — the raw key value is never sent to the browser. All AI calls are proxied through the Seedbank server; the browser has no direct contact with the provider.
+**Provider API keys** (OpenAI API, Anthropic API, OpenRouter, Groq, Mistral, Together, Fireworks, or another custom endpoint) are credentials for external AI services. They are stored server-side, encrypted at rest. Public API responses expose only key-presence booleans such as `hasOpenAIKey`, `hasAnthropicKey`, `hasLocalOpenAICompatibleKey`, and `hasCloudOpenAICompatibleKey` — the raw key value is never sent to the browser. All AI calls are proxied through the Seedbank server; the browser has no direct contact with the provider.
 
 **Seedbank personal access tokens** are a separate concept. They are bearer tokens you generate in **Settings → API & Server** to call the Seedbank REST API from scripts, external tools, or remote hosts. They do not interact with provider API keys.
 
@@ -62,8 +70,16 @@ Feature Defaults let you route each AI feature independently (Thinking Partner, 
 - Inherit the global default provider/model, or
 - Pin a specific provider/model per feature.
 - Route only chat/model-capable methods. CLI agent methods are intentionally excluded from chat routing.
+- Pick from discovered models when available; free-text model IDs remain possible for custom endpoints.
+- Set reasoning effort when the selected provider/model supports it.
 
 Unavailable account transports can appear as options for visibility, but save is blocked when a route targets unavailable account providers.
+
+### Ask AI provider/model picker
+
+The field-level **Ask AI** modal starts with the effective `field-suggestions` route. If Field suggestions is set to **Use global default**, the modal uses the global default provider/model; otherwise it uses the feature override.
+
+The provider/model pill in the modal header is clickable. It opens a temporary picker of configured, enabled provider instances and their available models. Changing that picker affects the current Ask AI run only — it does not rewrite Settings. Preflight privacy warnings, confirmation prompts, one-shot suggestions, and field-assist chat all use the selected provider/model.
 
 ### Advanced routing and fallback
 
@@ -92,7 +108,8 @@ Advanced controls support stricter policy and spend constraints:
 
 - **Local-only mode** to block remote-provider execution.
 - **Cloud alerts** when selected routes send content off-machine.
-- **Per-feature caps** and additional provider/model caps.
+- **Provider methods** to enable or disable concrete configured instances. Disabled instances disappear from setup cards and Feature Defaults and are blocked server-side.
+- **Per-feature caps** and additional provider/model/instance caps.
 - **Model allowlist** to permit only approved model IDs.
 
 ---
@@ -125,6 +142,7 @@ Supported fields:
 | Field | Prompt goal |
 |---|---|
 | `pitch` | Sharpen a one-line explanation |
+| `fullNotes` | Expand or refine the full notes section |
 | `risks` | Identify missing blockers or failure modes |
 | `techStack` | Suggest implementation tools and constraints |
 | `hook` | Clarify the 30-second demo |

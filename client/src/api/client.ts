@@ -687,7 +687,10 @@ export async function suggestIdeaField(
   ideaId: string,
   field: AiSuggestionField,
   currentValue: string,
-  options: Pick<AiFieldSuggestionRequest, 'prompt' | 'omitCurrentValue' | 'aiConfirmationToken'> = {},
+  options: Pick<
+    AiFieldSuggestionRequest,
+    'prompt' | 'omitCurrentValue' | 'aiConfirmationToken' | 'providerInstanceId' | 'model' | 'effort' | 'verbosity'
+  > = {},
 ): Promise<AiSuggestion> {
   return request<AiSuggestion>('/api/ai/suggest', {
     method: 'POST',
@@ -720,6 +723,10 @@ async function streamAiMessage(
     field?: AiSuggestionField;
     currentValue?: string;
     aiConfirmationToken?: string;
+    providerInstanceId?: string;
+    model?: string;
+    effort?: string;
+    verbosity?: string;
   },
   onDelta: (delta: string) => void,
 ): Promise<AiChatMessage> {

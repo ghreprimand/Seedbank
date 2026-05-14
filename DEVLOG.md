@@ -4,6 +4,18 @@ Newest entries at the top.
 
 ---
 
+## 2026-05-14 — AI Settings Persistence, Model Discovery, and Ask AI Route Selection
+
+This session completed the AI & Agents settings refactor that moved the former monolithic settings tab into focused components under `client/src/pages/settings/ai/`. The tab now treats provider methods as persistent provider instances: account-login methods, API-key methods, local servers, and OpenAI-compatible cloud routers can each carry their own label, configured model, discovered models, enabled-model subset, probe status, guardrail state, and routing identity.
+
+The server now persists discovered model catalogs on provider instances and refreshes them after auth/key events, account status checks, startup, and a background cycle. Claude account and Codex account model catalogs are populated automatically after login/status checks; local and external OpenAI-compatible instances can be added, listed, enabled, disabled, and routed independently. Probe/test results are persisted as `lastProbeStatus` and `lastProbedAt`, so cards no longer revert to "not tested" after navigation.
+
+Feature Defaults were upgraded to choose provider instance, model, and reasoning effort. Discovered-model dropdowns are used where available while preserving custom model entry for custom endpoints. The Ask AI modal now starts from the effective Field suggestions route and exposes a clickable provider/model pill for per-run route overrides; preflight, one-shot suggestions, and field-assist chat all execute against that temporary selection without changing permanent settings.
+
+Guardrails were tightened so disabled provider methods are hidden from setup and Feature Defaults and blocked server-side. The advanced controls now present a single concrete "Provider methods" enable list instead of separate duplicated provider-family and provider-instance lists.
+
+The About page and generated OpenAPI response now read the running server/package version instead of displaying the previous hard-coded `2.1.0` value. No release tag was created as part of this work.
+
 ## 2026-05-14 — AI Settings Frontend: Provider-Instance Routing, Claude Account Polish, Cloud Endpoint Guardrails
 
 This session delivered three focused frontend-only commits on the AI settings surface. `f72351a` migrated Feature Defaults routing to configured provider instances (instead of coarse provider IDs), added instance-aware availability gating and model hints, surfaced compact provider-instance diagnostics in AI Services, updated the AI Assist modal badge to show effective provider instance/model/effort context, and aligned default client settings shape with provider-instance contracts in `client/src/stores/settings.ts`. Primary files were `client/src/pages/settings/AiAgentsTab.tsx`, `client/src/components/AiAssistModal.tsx`, and `client/src/stores/settings.ts`.
