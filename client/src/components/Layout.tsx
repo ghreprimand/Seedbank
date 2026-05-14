@@ -10,6 +10,33 @@ import ManualModal from '@/help/ManualModal';
 import { HelpProvider } from '@/help/HelpContext';
 import HelpExperience from '@/help/HelpExperience';
 import { useFilterStore } from '@/stores/filters';
+import { useSettingsStore } from '@/stores/settings';
+import type { ShortcutBinding } from '@/lib/types';
+
+// ── Shortcut helpers (exported for use in GeneralTab) ─────────────────────────
+
+/** Canonical defaults — used when the user has not overridden a binding. */
+export const DEFAULT_SHORTCUTS = {
+  focusSearch:      { key: '/' } as ShortcutBinding,
+  openQuickCapture: { key: 'n' } as ShortcutBinding,
+  openManual:       { key: '?' } as ShortcutBinding,
+} as const;
+
+/** Returns true when a KeyboardEvent matches the given binding. */
+export function matchBinding(e: KeyboardEvent, b: ShortcutBinding): boolean {
+  return (
+    e.key.toLowerCase() === b.key.toLowerCase() &&
+    !!e.ctrlKey  === !!b.ctrl  &&
+    !!e.altKey   === !!b.alt   &&
+    !!e.shiftKey === !!b.shift &&
+    !!e.metaKey  === !!b.meta
+  );
+}
+
+/** True when the binding needs a modifier key, i.e. it is safe to fire while isTyping. */
+function hasModifier(b: ShortcutBinding): boolean {
+  return !!(b.ctrl || b.alt || b.meta);
+}
 
 export default function Layout() {
   const [isCaptureOpen, setIsCaptureOpen] = useState(false);
@@ -29,6 +56,14 @@ export default function Layout() {
   const setQuery = useFilterStore((s) => s.setQuery);
   const searchRef = useRef<HTMLInputElement>(null);
 
+  // Resolve effective bindings — stored overrides merged with defaults
+  const storedShortcuts = useSettingsStore((s) => s.data?.ui?.shortcuts ?? {});
+  const shortcuts = {
+    focusSearch:      storedShortcuts.focusSearch      ?? DEFAULT_SHORTCUTS.focusSearch,
+    openQuickCapture: storedShortcuts.openQuickCapture ?? DEFAULT_SHORTCUTS.openQuickCapture,
+    openManual:       storedShortcuts.openManual       ?? DEFAULT_SHORTCUTS.openManual,
+  };
+
   // When the user types in search and they're not on the board, navigate there
   const handleSearchChange = (value: string) => {
     setQuery(value);
@@ -37,18 +72,17 @@ export default function Layout() {
     }
   };
 
-  // Global keyboard shortcuts: "/" focuses search, "N" opens quick capture, "Esc" closes modals
+  // Global keyboard shortcuts — driven by user-configured bindings
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const tag = document.activeElement?.tagName;
       const isTyping = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
 
-      // Esc — close any open modal or mobile search
+      // Esc — always reserved: close any open modal or blur search
       if (e.key === 'Escape') {
         if (manualOpen) { setManualOpen(false); return; }
         if (isCaptureOpen) { setIsCaptureOpen(false); return; }
         if (mobileSearchOpen) { setMobileSearchOpen(false); return; }
-        // Blur focused search input on Esc
         if (document.activeElement === searchRef.current) {
           searchRef.current?.blur();
           return;
@@ -56,25 +90,25 @@ export default function Layout() {
         return;
       }
 
-      // Skip other shortcuts when typing in a field
-      if (isTyping || e.metaKey || e.ctrlKey || e.altKey) return;
+      // For bindings without modifiers, skip when user is typing in a field
+      // For bindings with modifiers (ctrl/alt/meta), fire even while typing
+      const focusSearch      = shortcuts.focusSearch;
+      const openQuickCapture = shortcuts.openQuickCapture;
+      const openManualB      = shortcuts.openManual;
 
-      // "/" — focus search
-      if (e.key === '/') {
+      if (matchBinding(e, focusSearch) && (!isTyping || hasModifier(focusSearch))) {
         e.preventDefault();
         searchRef.current?.focus();
         return;
       }
 
-      // "N" — open quick capture
-      if (e.key === 'n' || e.key === 'N') {
+      if (matchBinding(e, openQuickCapture) && (!isTyping || hasModifier(openQuickCapture))) {
         e.preventDefault();
         setIsCaptureOpen(true);
         return;
       }
 
-      // "?" — open manual
-      if (e.key === '?') {
+      if (matchBinding(e, openManualB) && (!isTyping || hasModifier(openManualB))) {
         e.preventDefault();
         setManualOpen(true);
         return;
@@ -82,7 +116,7 @@ export default function Layout() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [isCaptureOpen, mobileSearchOpen, manualOpen]);
+  }, [isCaptureOpen, mobileSearchOpen, manualOpen, shortcuts]);
 
   return (
     <HelpProvider onOpenManual={openManual}>

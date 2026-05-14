@@ -1,5 +1,28 @@
 # Changelog
 
+## 2.3.0 — Customizable Keyboard Shortcuts & Cloud Backup Guide
+
+### Customizable keyboard shortcuts
+
+- **All three main shortcuts are now remappable.** Settings → General replaces the static shortcut reference table with a live `ShortcutRecorder` widget for each action (Focus search, Open quick capture, Open manual). Click any binding to enter recording mode, press the desired key combination, and it saves immediately.
+- **Modifier key support.** Ctrl, Alt, Shift, and ⌘ can be combined with any letter or number. Modifier-backed bindings fire even while a text field is focused; plain-key bindings are suppressed while typing.
+- **Conflict detection.** A warning appears if two actions share the same binding. Blocked: bare modifiers, Esc, Tab, F-keys, and browser-reserved combos (Ctrl+W/T/N/R/S/A/C/V/X/Z/Y etc.).
+- **Reset to default.** A ↺ icon appears next to any customised binding; clicking it removes the stored override and restores the original key.
+- **Esc permanently reserved.** Close modal / blur search always uses Esc; it is shown as a locked row.
+- Bindings are stored server-side under `ui.shortcuts` and survive restarts. The client resolves effective bindings at mount time (stored overrides merged over `DEFAULT_SHORTCUTS`).
+- New shared types: `ShortcutBinding`, `ShortcutConfig` in `shared/types.ts`.
+- New component: `client/src/components/ShortcutRecorder.tsx`.
+
+### Cloud backup documentation & in-app guide
+
+- **Cloud Backup Setup manual section** added — full step-by-step rclone install and config instructions for Google Drive, Dropbox, OneDrive, Backblaze B2, Amazon S3 (and S3-compatible: Cloudflare R2, Wasabi, MinIO), and SFTP/SSH. Covers headless server OAuth, config file location, and a verification recipe.
+- **"Cloud setup guide" button** in Settings → Backups → Offsite destinations opens the manual directly to the cloud setup section.
+- The rclone "not installed" and "no remotes" warning banners now include inline links to the relevant manual section.
+- New `code` block type in the manual renderer displays terminal commands in a dark monospace block.
+- `docs/SETTINGS.md` updated for both features.
+
+---
+
 ## 2.2.0 — Expanded Themes, In-App Manual & Contextual Help
 
 Seedbank v2.2.0 completes the theme catalog, adds a comprehensive searchable in-app user manual, and layers in a quiet contextual help system — all while tightening platform-neutral documentation and public-repo hygiene.

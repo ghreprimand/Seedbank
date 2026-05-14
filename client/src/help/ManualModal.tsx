@@ -67,6 +67,12 @@ function BlockRenderer({ block }: { block: ManualBlock }) {
           <span className="text-ink-500">{block.description}</span>
         </div>
       );
+    case 'code':
+      return (
+        <pre className="my-3 px-3 py-2.5 bg-ink-900 text-green-300 text-xs font-mono rounded-card overflow-x-auto leading-relaxed whitespace-pre-wrap">
+          {block.text}
+        </pre>
+      );
   }
 }
 
