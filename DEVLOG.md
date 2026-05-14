@@ -4,6 +4,14 @@ Newest entries at the top.
 
 ---
 
+## 2026-05-14 — AI Settings Frontend: Provider-Instance Routing, Claude Account Polish, Cloud Endpoint Guardrails
+
+This session delivered three focused frontend-only commits on the AI settings surface. `f72351a` migrated Feature Defaults routing to configured provider instances (instead of coarse provider IDs), added instance-aware availability gating and model hints, surfaced compact provider-instance diagnostics in AI Services, updated the AI Assist modal badge to show effective provider instance/model/effort context, and aligned default client settings shape with provider-instance contracts in `client/src/stores/settings.ts`. Primary files were `client/src/pages/settings/AiAgentsTab.tsx`, `client/src/components/AiAssistModal.tsx`, and `client/src/stores/settings.ts`.
+
+`39e12e8` polished Claude account login UX in `AiAgentsTab.tsx` by removing release-candidate placeholder tone, clarifying signed-out/auth-required state messaging, and improving manual callback wording while keeping the existing account-login callback flow intact. Terminology remains user-facing (`API key` vs `Account login`) without introducing CLI/native/app-server phrasing in normal UI copy.
+
+`1815c2c` hardened External/Cloud endpoint UX in `AiAgentsTab.tsx`: added explicit cloud residency/data-leaves-device warnings, added custom-cloud HTTPS/non-local URL guardrails in-form, disabled Save for unsafe custom cloud URLs, and cleared stale cloud API key state when cloud preset/base URL changes without a replacement key. Targeted verification for each slice was `npm --prefix client run -s typecheck`, passing cleanly.
+
 ## 2026-05-13 — Backend Capability Contract And Account Runtime Truthfulness
 
 This session delivered three backend slices to support the RC AI & Agents truthfulness gate and the new service-family-first IA model. First, preflight metadata was corrected in `97eee68` so account aliases (`codex-recommended`, `codex-fast`, `claude-*-latest`) no longer appear as authoritative `resolvedModelId` values. Second, Codex account runtime was made explicit and truthful in `db37483`: the app-server path is now opt-in (`SEEDBANK_ENABLE_CODEX_ACCOUNT`) with deterministic unavailable/auth-required messaging when disabled or not signed in, plus focused gate tests.
