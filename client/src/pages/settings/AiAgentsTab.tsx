@@ -965,42 +965,87 @@ function cloudProviderLabel(ai: AiPublicConfig): string {
   return 'the AI provider';
 }
 
-function PrivacyNotice({ ai, preflight }: { ai: AiPublicConfig; preflight?: AiPreflightResult | null }) {
-  // If preflight is available, trust its authoritative `contentLeavesMachine` field.
-  // Exception: when the provider is openai-compatible with the 'custom' preset, the user
-  // controls the URL and can point it at any remote host. Even if the current URL is localhost
-  // the residency claim 'local' would be misleading, so we always show 'mixed' for custom preset.
-  // Determine which split slot is active for the default provider instance.
-  const isLocalInstance = ai.defaultProviderInstanceId === 'local-openai-compatible';
-  const activePreset = ai.provider === 'openai-compatible'
-    ? (isLocalInstance ? ai.localOpenaiCompatiblePreset : ai.cloudOpenaiCompatiblePreset)
-    : ai.openaiCompatiblePreset;
-  const activeBaseUrl = ai.provider === 'openai-compatible'
-    ? (isLocalInstance ? ai.localOpenaiCompatibleBaseUrl : ai.cloudOpenaiCompatibleBaseUrl)
-    : ai.openaiCompatibleBaseUrl;
-  const isCustomPreset = ai.provider === 'openai-compatible' && activePreset === 'custom';
-  const isOpenAICompatibleRemote = ai.provider === 'openai-compatible'
-    && !isCustomPreset
-    && !isLikelyLocalUrl(activeBaseUrl);
-  const residency: DataResidency = isCustomPreset
-    ? 'mixed'
-    : isOpenAICompatibleRemote
-      ? 'cloud'
-    : preflight != null
-      ? (preflight.local ? 'local' : preflight.contentLeavesMachine ? 'cloud' : 'mixed')
-      : dataResidency(ai);
+/**
+ * Derive data residency for the PrivacyNotice.
+ *
+ * Priority order:
+ *  1. Preflight result — authoritative because the backend resolves the full
+ *     feature config including feature overrides.
+ *  2. Provider-instance registry — `dataResidency` field set by the backend
+ *     for the default instance; avoids hard-coding provider logic in the UI.
+ *  3. Legacy fallback — preset/URL heuristics for the openai-compatible split.
+ */
+function deriveResidency(
+  ai: AiPublicConfig,
+  preflight: AiPreflightResult | null | undefined,
+): DataResidency {
+  // 1. Preflight is authoritative.
+  if (preflight != null) {
+    if (preflight.local) return 'local';
+    const leavesDevice = preflight.contentLeavesDevice ?? preflight.contentLeavesMachine;
+    if (leavesDevice) return 'cloud';
+    return 'mixed';
+  }
 
-  if (residency === 'local') {
+  // 2. Use provider-instance registry when available.
+  const defaultInstance = ai.providerInstances[ai.defaultProviderInstanceId];
+  if (defaultInstance) {
+    if (defaultInstance.dataResidency === 'local') return 'local';
+    if (defaultInstance.dataResidency === 'cloud') return 'cloud';
+    // 'user-controlled' falls through to legacy heuristic.
+  }
+
+  // 3. Legacy heuristic (openai-compatible split).
+  return dataResidency(ai);
+}
+
+/**
+ * Return a human-readable label for the default provider instance, used in
+ * PrivacyNotice copy. Falls back to `cloudProviderLabel()` which uses the
+ * legacy provider/preset fields.
+ */
+function defaultInstanceLabel(ai: AiPublicConfig): string {
+  const instance = ai.providerInstances[ai.defaultProviderInstanceId];
+  if (instance?.label) return instance.label;
+  return cloudProviderLabel(ai);
+}
+
+/**
+ * True when the default provider uses account login (OAuth/app-server) rather
+ * than a direct API key. Account providers send content to cloud servers and
+ * need distinct copy to avoid implying a direct key relationship.
+ */
+function isAccountLoginProvider(ai: AiPublicConfig): boolean {
+  const instance = ai.providerInstances[ai.defaultProviderInstanceId];
+  if (instance) return instance.family === 'account';
+  return ai.provider === 'claude-account' || ai.provider === 'codex-account';
+}
+
+function PrivacyNotice({ ai, preflight }: { ai: AiPublicConfig; preflight?: AiPreflightResult | null }) {
+  const residency = deriveResidency(ai, preflight);
+  const providerLabel = defaultInstanceLabel(ai);
+  const isAccount = isAccountLoginProvider(ai);
+
+  // For local-instance openai-compatible with 'custom' preset, we cannot claim
+  // local residency even if the current URL looks local — user can change it.
+  const isLocalInstance = ai.defaultProviderInstanceId === 'local-openai-compatible';
+  const activePreset = isLocalInstance ? ai.localOpenaiCompatiblePreset : ai.cloudOpenaiCompatiblePreset;
+  const isUserControlledCustom = ai.provider === 'openai-compatible' && activePreset === 'custom';
+
+  const effectiveResidency: DataResidency = isUserControlledCustom ? 'mixed' : residency;
+
+  if (effectiveResidency === 'local') {
+    const localLabel = ai.provider === 'ollama' ? 'Ollama' : providerLabel;
     return (
       <div className="flex items-start gap-2.5 px-3 py-2.5 bg-sage-50 border border-sage-200 rounded-card">
         <Lock className="w-4 h-4 text-sage-600 mt-0.5 shrink-0" />
         <div>
           <p className="text-sm font-medium text-sage-800">Current default provider runs locally</p>
           <p className="text-xs text-sage-700 mt-0.5 leading-relaxed">
-            The global default ({' '}
-            <span className="font-semibold">{ai.provider === 'ollama' ? 'Ollama' : presetFor(activePreset).label}</span>
-            ) sends idea content only to the configured local host. Individual Feature Defaults may route to different providers.
-            To keep every AI feature local, set local providers for each Feature Default or enable{' '}
+            The global default (<span className="font-semibold">{localLabel}</span>) sends idea
+            content only to the configured local host. Individual Feature Defaults may route to
+            different providers. To keep every AI feature local, set local providers for each
+            Feature Default or enable{' '}
             <span className="font-medium">Local-only mode</span> in Advanced guardrails.
           </p>
         </div>
@@ -1008,17 +1053,20 @@ function PrivacyNotice({ ai, preflight }: { ai: AiPublicConfig; preflight?: AiPr
     );
   }
 
-  if (residency === 'cloud') {
+  if (effectiveResidency === 'cloud') {
+    const serverDescription = isAccount
+      ? `${providerLabel}'s servers via your account login`
+      : `${providerLabel}'s servers`;
     return (
       <div className="flex items-start gap-2.5 px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-card">
         <Shield className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
         <div>
           <p className="text-sm font-medium text-amber-800">
-            Idea content is sent to {cloudProviderLabel(ai)}
+            Idea content is sent to <span className="font-semibold">{providerLabel}</span>
           </p>
           <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
             When AI features run, field content from your ideas is sent to{' '}
-            <span className="font-semibold">{cloudProviderLabel(ai)}'s</span> servers for processing.
+            <span className="font-semibold">{serverDescription}</span> for processing.
             To keep all inference local, switch to Ollama or a local custom endpoint (LM Studio, vLLM, llama.cpp).
           </p>
         </div>
@@ -1118,7 +1166,7 @@ interface UsageAuditSectionProps {
   basicUsage: AiUsageSummary | null;
 }
 
-type UsageTab = 'feature' | 'provider' | 'events';
+type UsageTab = 'feature' | 'provider' | 'model' | 'events';
 
 function UsageBucketTable({ rows }: { rows: AiUsageBucket[] }) {
   if (!rows.length) return <p className="text-[11px] text-ink-400 italic">No activity in this window.</p>;
@@ -1200,8 +1248,17 @@ function UsageAuditSection({ detail, basicUsage }: UsageAuditSectionProps) {
 
   const byFeature = detail?.raw.byFeature ?? [];
   const byProvider = detail?.raw.byProvider ?? [];
+  const byModel = detail?.raw.byModel ?? [];
   const auditEvents = detail?.raw.recentAuditEvents ?? [];
   const hasDetail = Boolean(detail);
+
+  type TabDef = { id: UsageTab; label: string };
+  const tabs: TabDef[] = [
+    { id: 'feature', label: 'By feature' },
+    { id: 'provider', label: 'By provider' },
+    { id: 'model', label: 'By model' },
+    { id: 'events', label: `Events${auditEvents.length ? ` (${auditEvents.length})` : ''}` },
+  ];
 
   return (
     <div className="space-y-2">
@@ -1215,24 +1272,25 @@ function UsageAuditSection({ detail, basicUsage }: UsageAuditSectionProps) {
         <div className="space-y-2">
           {/* Tab bar */}
           <div className="flex gap-0 border border-ink-100 rounded-card overflow-hidden w-fit">
-            {(['feature', 'provider', 'events'] as UsageTab[]).map((tab) => (
+            {tabs.map((tab) => (
               <button
-                key={tab}
+                key={tab.id}
                 type="button"
-                onClick={() => setActiveTab(tab)}
+                onClick={() => setActiveTab(tab.id)}
                 className={`px-3 py-1 text-[11px] font-medium transition-colors
-                  ${activeTab === tab
+                  ${activeTab === tab.id
                     ? 'bg-sage-100 text-sage-800 border-r border-ink-100'
                     : 'bg-paper-warm text-ink-400 hover:text-ink-700 border-r border-ink-100'
                   } last:border-r-0`}
               >
-                {tab === 'feature' ? 'By feature' : tab === 'provider' ? 'By provider' : `Events${auditEvents.length ? ` (${auditEvents.length})` : ''}`}
+                {tab.label}
               </button>
             ))}
           </div>
-          {activeTab === 'feature'   && <UsageBucketTable rows={byFeature} />}
-          {activeTab === 'provider'  && <UsageBucketTable rows={byProvider} />}
-          {activeTab === 'events'    && <AuditEventTable events={auditEvents} />}
+          {activeTab === 'feature'  && <UsageBucketTable rows={byFeature} />}
+          {activeTab === 'provider' && <UsageBucketTable rows={byProvider} />}
+          {activeTab === 'model'    && <UsageBucketTable rows={byModel} />}
+          {activeTab === 'events'   && <AuditEventTable events={auditEvents} />}
         </div>
       ) : (
         <p className="text-[11px] text-ink-400">

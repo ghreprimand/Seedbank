@@ -642,6 +642,7 @@ export default function AiAssistModal({
   onClose,
   featureKey,
 }: AiAssistModalProps) {
+  const ai = useAiSettings();
   const [view, setView] = useState<ModalView>('intent-select');
   const [selectedIntent, setSelectedIntent] = useState<AiAssistIntent | null>(null);
   const [selectedPlaybookId, setSelectedPlaybookId] = useState<string | undefined>();
@@ -874,15 +875,37 @@ export default function AiAssistModal({
             )}
 
             {/* Provider info */}
-            <div className="px-3 py-2 bg-paper-warm border border-ink-100 rounded-card text-xs text-ink-600">
-              <span className="font-medium">Provider:</span>{' '}
-              {providerName(pendingPreflight.provider)} · {pendingPreflight.model}
-              {pendingPreflight.contentLeavesMachine && (
-                <span className="ml-2 text-amber-600 font-medium">
-                  · idea content will be sent off-device
-                </span>
-              )}
-            </div>
+            {(() => {
+              // Prefer the provider instance label from the settings store over
+              // the legacy providerName() lookup, since account-login and
+              // custom-cloud providers have richer labels there.
+              const featureId = (featureKey ?? 'field-suggestions') as keyof typeof ai.effectiveFeatureRoutes;
+              const effective = ai.effectiveFeatureRoutes[featureId] ?? ai.effectiveFeatureRoutes['field-suggestions'] ?? ai.effectiveFeatureRoutes.default;
+              const instanceLabel = effective
+                ? (ai.providerInstances[effective.providerInstanceId]?.label ?? providerName(pendingPreflight.provider))
+                : providerName(pendingPreflight.provider);
+              const leavesDevice = pendingPreflight.contentLeavesDevice ?? pendingPreflight.contentLeavesMachine;
+              const modelLabel = pendingPreflight.resolvedModelId ?? pendingPreflight.model;
+              return (
+                <div className="px-3 py-2 bg-paper-warm border border-ink-100 rounded-card text-xs text-ink-600 space-y-0.5">
+                  <div>
+                    <span className="font-medium">Provider:</span>{' '}
+                    {instanceLabel}
+                    {modelLabel ? <span className="text-ink-400"> · {modelLabel}</span> : null}
+                  </div>
+                  {leavesDevice && (
+                    <div className="text-amber-600 font-medium">
+                      Idea content will be sent off this device to {instanceLabel}'s servers.
+                    </div>
+                  )}
+                  {leavesDevice === false && (
+                    <div className="text-sage-600">
+                      Inference runs locally — idea content stays on this device.
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             <div className="flex items-center gap-2">
               <button
