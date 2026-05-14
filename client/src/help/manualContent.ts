@@ -790,7 +790,7 @@ export const MANUAL_GROUPS: ManualGroup[] = [
             'POST /api/ai/suggest — field suggestion (requires ai:suggest scope)',
             'POST /api/integrations/:id/graduate/:ideaId — graduate an idea',
           ]},
-          { type: 'tip', text: 'The full endpoint list with request/response shapes is in docs/API.md in the project repository.' },
+          { type: 'tip', text: 'The full endpoint list with request/response shapes is in [docs/API.md](https://github.com/ghreprimand/Seedbank/blob/main/docs/API.md).' },
         ],
       },
       {
@@ -839,12 +839,12 @@ export const MANUAL_GROUPS: ManualGroup[] = [
         title: 'Privacy & Data Storage',
         keywords: ['privacy', 'data', 'storage', 'local', 'sqlite', 'where', 'database', 'file'],
         blocks: [
-          { type: 'p', text: 'Seedbank is a local-first app. All your data stays on your machine.' },
+          { type: 'p', text: 'Seedbank is local-first. Your idea data stays on your machine unless you enable cloud AI providers or offsite backup destinations.' },
           { type: 'ul', items: [
             'Database: <seedbank-data-dir>/seedbank.db (SQLite). Default location shown in Settings → API & Server → Server Info.',
             'Backups: <seedbank-data-dir>/backups/',
             'JSON exports: <seedbank-data-dir>/exports/',
-            'No data is sent to any cloud service by Seedbank itself.',
+            'Seedbank does not send idea data to cloud services unless you configure a cloud AI provider or offsite backup destination.',
           ]},
           { type: 'tip', text: 'AI features send idea content to your configured AI provider. Local providers (Ollama, LM Studio, vLLM, llama.cpp, LocalAI at localhost) keep content on this machine. Cloud providers (OpenAI API, Anthropic API, OpenRouter, Groq, Mistral, and others) send content to external servers. Feature Defaults can route individual features to different providers — verify each route if privacy matters.' },
         ],

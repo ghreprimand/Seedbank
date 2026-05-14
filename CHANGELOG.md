@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Manual readability, linking, and privacy-copy accuracy
+
+- Improved in-app manual readability across themes by switching manual `code` and `tip` blocks to stronger neutral contrast tokens in `ManualModal`.
+- Added inline markdown-link rendering in manual text blocks (`p`, `ul`, `tip`) so repo-doc references can be clickable.
+- Updated API reference mentions to link directly to `docs/API.md` in the GitHub repository (manual tip + Settings → API & Server).
+- Reframed absolute “always local” one-liners to conditional wording when cloud AI providers or offsite backup destinations are enabled.
+- Updated About tagline to: “Local by default, cloud only if you opt in.”
+
 ## 2.3.0 — Customizable Keyboard Shortcuts & Cloud Backup Guide
 
 ### Customizable keyboard shortcuts
