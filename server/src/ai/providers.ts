@@ -17,6 +17,8 @@ const REQUEST_TIMEOUT_MS = 8_000;
 const OLLAMA_REQUEST_TIMEOUT_MS = 120_000;
 const OLLAMA_KEEP_ALIVE = '5m';
 const OLLAMA_SMOKE_PROMPT = 'Reply with exactly: pong';
+const CLAUDE_ACCOUNT_BETA_HEADER = 'claude-code-20250219,oauth-2025-04-20';
+const CLAUDE_ACCOUNT_USER_AGENT = 'claude-cli/2.1.75';
 
 export class AiProviderError extends Error {
   constructor(
@@ -843,17 +845,52 @@ export class ClaudeAccountProvider implements AiProvider {
     return config.claudeAccountModel?.trim() || 'claude-sonnet-latest';
   }
 
-  private async requireTokens(): Promise<string> {
-    const { ensureLiveTokens } = await import('./claude-account/oauth.js');
-    const tokens = await ensureLiveTokens();
-    if (!tokens) {
-      throw new AiProviderError(
+  private claudeAccountHeaders(accessToken: string): Record<string, string> {
+    return {
+      Authorization: `Bearer ${accessToken}`,
+      'anthropic-version': '2023-06-01',
+      'anthropic-beta': CLAUDE_ACCOUNT_BETA_HEADER,
+      'user-agent': CLAUDE_ACCOUNT_USER_AGENT,
+      'x-app': 'cli',
+      'Content-Type': 'application/json',
+    };
+  }
+
+  private async mapClaudeAuthError(error: unknown): Promise<AiProviderError> {
+    const { ClaudeAccountNoAuthError, ClaudeAccountRefreshError } = await import('./claude-account/oauth.js');
+    if (error instanceof ClaudeAccountNoAuthError) {
+      return new AiProviderError(
         this.id,
         'not_configured',
         'Claude account is not logged in. Open Settings → AI & Agents and click "Log in with Claude" to authenticate.',
       );
     }
-    return tokens.accessToken;
+    if (error instanceof ClaudeAccountRefreshError) {
+      if (typeof error.status === 'number') {
+        return new AiProviderError(
+          this.id,
+          'http_error',
+          `Claude account token refresh failed (${error.status}). Reconnect your Claude account.`,
+          error.status,
+        );
+      }
+      return new AiProviderError(
+        this.id,
+        'unreachable',
+        `Claude account token refresh failed. ${boundedDetail(error.message || 'Check your network and retry login.')}`,
+      );
+    }
+    return providerFetchError(this.id, error);
+  }
+
+  private async requireTokens(): Promise<string> {
+    try {
+      const { ensureLiveTokens } = await import('./claude-account/oauth.js');
+      const tokens = await ensureLiveTokens();
+      return tokens.accessToken;
+    } catch (error) {
+      throw await this.mapClaudeAuthError(error);
+    }
   }
 
   async complete(messages: AiProviderMessage[], config: AiStoredConfig): Promise<AiProviderResult> {
@@ -862,11 +899,7 @@ export class ClaudeAccountProvider implements AiProvider {
     try {
       const response = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'anthropic-version': '2023-06-01',
-          'Content-Type': 'application/json',
-        },
+        headers: this.claudeAccountHeaders(accessToken),
         body: JSON.stringify({
           model,
           max_tokens: 800,
@@ -903,11 +936,7 @@ export class ClaudeAccountProvider implements AiProvider {
     try {
       const response = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'anthropic-version': '2023-06-01',
-          'Content-Type': 'application/json',
-        },
+        headers: this.claudeAccountHeaders(accessToken),
         body: JSON.stringify({
           model,
           max_tokens: 800,
@@ -951,16 +980,8 @@ export class ClaudeAccountProvider implements AiProvider {
   async health(config: AiStoredConfig): Promise<AiProviderHealth> {
     const model = this.configuredModel(config);
     try {
-      // Health requires live auth — unauthenticated is not_configured, not healthy
-      const { ensureLiveTokens } = await import('./claude-account/oauth.js');
-      const tokens = await ensureLiveTokens();
-      if (!tokens) {
-        throw new AiProviderError(
-          this.id,
-          'not_configured',
-          'Claude account is not logged in. Open Settings → AI & Agents and click "Log in with Claude" to authenticate.',
-        );
-      }
+      // Health requires live auth — unauthenticated is not_configured, not healthy.
+      await this.requireTokens();
       const models = await this.listModels(config);
       if (!models.ok) {
         throw new AiProviderError(this.id, models.code ?? 'unknown', models.message ?? 'Claude account model discovery failed.');
@@ -976,22 +997,9 @@ export class ClaudeAccountProvider implements AiProvider {
 
   async listModels(_config: AiStoredConfig): Promise<AiModelListResult> {
     try {
-      const { getCatalog, getBundledModels } = await import('./claude-account/catalog.js');
       const { ensureLiveTokens } = await import('./claude-account/oauth.js');
-      const tokens = await ensureLiveTokens();
-      if (!tokens) {
-        // Not authenticated — return bundled models with clear labeling
-        const bundled = getBundledModels();
-        return {
-          provider: this.id,
-          ok: true,
-          models: bundled.map((m) => ({
-            id: m.id,
-            displayName: m.friendlyAlias ?? m.displayName,
-          })),
-          claudeAccount: { authenticated: false, catalogFresh: false },
-        };
-      }
+      await ensureLiveTokens();
+      const { getCatalog } = await import('./claude-account/catalog.js');
       const catalog = await getCatalog();
       return {
         provider: this.id,
@@ -1003,7 +1011,21 @@ export class ClaudeAccountProvider implements AiProvider {
         claudeAccount: { authenticated: true, catalogFresh: catalog.fresh },
       };
     } catch (error) {
-      const normalized = providerFetchError(this.id, error);
+      const { ClaudeAccountNoAuthError } = await import('./claude-account/oauth.js');
+      if (error instanceof ClaudeAccountNoAuthError) {
+        const { getBundledModels } = await import('./claude-account/catalog.js');
+        const bundled = getBundledModels();
+        return {
+          provider: this.id,
+          ok: true,
+          models: bundled.map((m) => ({
+            id: m.id,
+            displayName: m.friendlyAlias ?? m.displayName,
+          })),
+          claudeAccount: { authenticated: false, catalogFresh: false },
+        };
+      }
+      const normalized = await this.mapClaudeAuthError(error);
       return {
         provider: this.id,
         ok: false,
