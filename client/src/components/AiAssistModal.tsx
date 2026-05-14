@@ -121,16 +121,23 @@ function providerName(provider: string): string {
 
 function ProviderBadge({ featureKey }: { featureKey?: string }) {
   const ai = useAiSettings();
+  const featureId = (featureKey ?? 'field-suggestions') as keyof typeof ai.effectiveFeatureRoutes;
   const effective =
-    ai.effectiveFeatureRoutes[(featureKey ?? 'field-suggestions') as keyof typeof ai.effectiveFeatureRoutes] ??
+    ai.effectiveFeatureRoutes[featureId] ??
     ai.effectiveFeatureRoutes['field-suggestions'] ??
     ai.effectiveFeatureRoutes.default;
 
   if (!effective) return null;
+  const instance = ai.providerInstances[effective.providerInstanceId];
+  const route = ai.featureRoutes[featureId as keyof typeof ai.featureRoutes] ?? ai.featureRoutes.default;
+  const routeEffort = (route as { effort?: string } | undefined)?.effort;
 
-  const display = effective.model
-    ? `${effective.model} · ${providerName(effective.provider)}`
-    : providerName(effective.provider);
+  const parts = [
+    instance?.label ?? providerName(effective.provider),
+    effective.model || undefined,
+    routeEffort ? `effort:${routeEffort}` : undefined,
+  ].filter(Boolean);
+  const display = parts.join(' · ');
 
   return (
     <span
@@ -138,8 +145,8 @@ function ProviderBadge({ featureKey }: { featureKey?: string }) {
                  font-mono text-ink-400 bg-paper-warm border border-ink-100 shrink-0"
       title={
         effective.inherited
-          ? `Global default: ${providerName(effective.provider)}`
-          : `Feature override: ${providerName(effective.provider)}`
+          ? `Global default: ${instance?.label ?? providerName(effective.provider)}`
+          : `Feature override: ${instance?.label ?? providerName(effective.provider)}`
       }
     >
       <Bot className="w-2.5 h-2.5" />
