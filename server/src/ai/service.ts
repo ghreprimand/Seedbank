@@ -1,4 +1,3 @@
-import { extractSuggestion } from "./utils/suggestion-parser.js";
 import { aiProviderLabel, isAiProviderId } from '../../../shared/types.js';
 import type {
   AiProviderDiagnosticCode,
@@ -32,10 +31,8 @@ import type {
   AiBudgetState,
   AiReasoningEffort,
   AiTextVerbosity,
-  Idea,
 } from '../../../shared/types.js';
 import { v4 as uuid } from 'uuid';
-import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { SeedbankRepository } from '../repository.js';
 import { encryptSecret } from './crypto.js';
 import {
@@ -58,28 +55,27 @@ import type { AiConfigPatch, AiProvider, AiProviderMessage, AiProviderResult, Ai
 import { codexAccountRuntimeAvailability } from './codex-account/session.js';
 import { claudeAccountRuntimeAvailability } from './claude-account/auth.js';
 import { AiStore, type AiExecutionMetadata } from './store.js';
-
-const THINKING_PARTNER_PROMPT = [
-  'You are a creative thinking partner.',
-  'Your role is to help the user develop THEIR idea through questions, reflections, and gentle challenges.',
-  'Never generate ideas unprompted. Ask before suggesting.',
-  'Focus on drawing out what the user already intuitively knows.',
-  'Keep responses concise and practical. Prefer one or two thoughtful questions over broad ideation.',
-].join(' ');
-
-/**
- * System prompt for isolated field-assist conversations.
- * Unlike the Thinking Partner, this mode is explicitly task-focused:
- * the user has already selected an intent, so the AI should act on it
- * directly rather than asking before suggesting.
- */
-const FIELD_ASSIST_PROMPT = [
-  'You are helping a user refine a specific field of their idea.',
-  'Respond concisely and practically.',
-  'When asked to write or rewrite text, provide a concrete answer immediately without asking for permission first.',
-  'Focus only on the specified field — do not comment on or modify other parts of the idea.',
-  'Keep responses brief; the user can ask follow-up questions if they want more.',
-].join(' ');
+import {
+  featureForMode,
+  fieldAssistConversationMessages,
+  messagesForChat,
+  parseSuggestion,
+  promptForFieldAssist,
+  promptForMode,
+  promptForSuggestion,
+} from './prompts.js';
+import {
+  createConfirmationToken,
+  GUARDRAIL_SETTINGS_HINT,
+  guardrailError,
+  SimpleRateLimiter,
+  validConfirmationToken,
+} from './guardrails.js';
+import {
+  recordProviderFailure as recordProviderFailureEvent,
+  usageDetail,
+  usageSummary,
+} from './usage.js';
 
 function isClaudeServiceMethod(value: unknown): value is AiClaudeServiceMethod {
   return value === 'anthropic-api-key' || value === 'claude-account-native';
@@ -303,21 +299,6 @@ const DEFAULT_CONFIG: AiStoredConfig = {
 
 const AI_CONFIG_KEY = 'ai.config';
 const LEGACY_AI_CONFIG_KEY = 'ai:config';
-const GUARDRAIL_SETTINGS_HINT = 'Review Settings -> AI & Agents -> Usage & Guardrails.';
-const CONFIRMATION_TOKEN_TTL_MS = 10 * 60 * 1000;
-const confirmationSecret = randomBytes(32).toString('hex');
-
-class SimpleRateLimiter {
-  private readonly hits = new Map<string, number[]>();
-
-  check(key: string, limit = 20, windowMs = 60_000): void {
-    const now = Date.now();
-    const recent = (this.hits.get(key) ?? []).filter((timestamp) => now - timestamp < windowMs);
-    if (recent.length >= limit) throw new Error('AI rate limit reached. Wait a minute before trying again.');
-    recent.push(now);
-    this.hits.set(key, recent);
-  }
-}
 
 interface AiGuardrailCheckOptions {
   confirmationToken?: string;
@@ -1284,179 +1265,6 @@ function apiKeyAvailability(connected: boolean, label: string): Pick<AiMethodCap
     : { availability: 'auth-required', availabilityReason: `${label} key is not configured.` };
 }
 
-function ideaContext(idea: Idea): string {
-  return [
-    'Current idea context:',
-    JSON.stringify({
-      title: idea.title,
-      pitch: idea.pitch,
-      category: idea.category,
-      stage: idea.stage,
-      tags: idea.tags,
-      moodLabels: idea.moodLabels,
-      fullNotes: idea.fullNotes,
-      hook: idea.hook,
-      whyItMightWork: idea.whyItMightWork,
-      risks: idea.risks,
-      techStack: idea.techStack,
-      jamScore: idea.jamScore,
-      excitementScore: idea.excitementScore,
-      graduatedTo: idea.graduatedTo,
-    }, null, 2),
-  ].join('\n');
-}
-
-function messagesForChat(idea: Idea, history: AiChatMessage[], nextUserMessage: string): AiProviderMessage[] {
-  return [
-    { role: 'system', content: THINKING_PARTNER_PROMPT },
-    { role: 'system', content: ideaContext(idea) },
-    ...history.slice(-20).map((message) => ({ role: message.role, content: message.content })),
-    { role: 'user', content: nextUserMessage },
-  ];
-}
-
-const FIELD_SUGGESTION_PROMPTS: Record<AiSuggestionField, string> = {
-  pitch: 'Help sharpen this pitch into a clearer one-line version.',
-  fullNotes: 'Help expand, organize, and clarify these full notes while preserving the user\'s raw thinking.',
-  risks: 'Identify concrete risks, blind spots, or blockers the user may be missing.',
-  techStack: 'Suggest technologies that fit the idea and explain the fit briefly.',
-  hook: 'Help find a concise demo hook for this idea.',
-  whyItMightWork: 'Strengthen the argument for why this idea might work.',
-};
-
-function promptForSuggestion(idea: Idea, field: AiSuggestionField, currentValue: string): AiProviderMessage[] {
-  return [
-    {
-      role: 'system',
-      content: [
-        THINKING_PARTNER_PROMPT,
-        'For this request, return only JSON with keys "suggestion" and "rationale".',
-        'The suggestion must revise or extend the target field, not replace the user as the source of creativity.',
-      ].join(' '),
-    },
-    { role: 'system', content: ideaContext(idea) },
-    {
-      role: 'user',
-      content: [
-        FIELD_SUGGESTION_PROMPTS[field],
-        '',
-        `Target field: ${field}`,
-        `Current value: ${currentValue || '(empty)'}`,
-      ].join('\n'),
-    },
-  ];
-}
-
-function promptForFieldAssist(
-  idea: Idea,
-  field: AiSuggestionField,
-  currentValue: string,
-  customPrompt?: string,
-  omitCurrentValue = false,
-): AiProviderMessage[] {
-  const currentValueLines = omitCurrentValue
-    ? []
-    : [
-        '',
-        `Current value: ${currentValue || '(empty)'}`,
-      ];
-  return [
-    {
-      role: 'system',
-      content: [
-        FIELD_ASSIST_PROMPT,
-        'For this field-assist request, return only JSON with keys "suggestion" and "rationale".',
-        'The suggestion must revise or extend the target field, not replace the user as the source of creativity.',
-      ].join(' '),
-    },
-    { role: 'system', content: ideaContext(idea) },
-    {
-      role: 'user',
-      content: [
-        customPrompt?.trim() || FIELD_SUGGESTION_PROMPTS[field],
-        '',
-        `Target field: ${field}`,
-        ...currentValueLines,
-      ].join('\n'),
-    },
-  ];
-}
-
-function fieldAssistConversationMessages(
-  idea: Idea,
-  field: AiSuggestionField,
-  currentValue: string,
-  history: AiFieldAssistMessage[] | undefined,
-  nextUserMessage: string,
-): AiProviderMessage[] {
-  const safeHistory = (history ?? [])
-    .filter((message) => (message.role === 'user' || message.role === 'assistant') && message.content.trim())
-    .slice(-20)
-    .map((message) => ({
-      role: message.role,
-      content: message.content.trim(),
-    }));
-
-  return [
-    {
-      role: 'system',
-      content: [
-        FIELD_ASSIST_PROMPT,
-        'You are assisting with one specific Seedbank idea field in a modal-local conversation.',
-        'Do not use or update the persistent Thinking Partner conversation.',
-        'Keep replies focused on the target field. If you draft field text, make it easy to apply.',
-      ].join(' '),
-    },
-    { role: 'system', content: ideaContext(idea) },
-    {
-      role: 'system',
-      content: [
-        `Target field: ${field}`,
-        `Current value: ${currentValue || '(empty)'}`,
-      ].join('\n'),
-    },
-    ...safeHistory,
-    { role: 'user', content: nextUserMessage },
-  ];
-}
-
-function promptForMode(mode: string, context: unknown, prompt?: string): AiProviderMessage[] {
-  return [
-    {
-      role: 'system',
-      content: [
-        THINKING_PARTNER_PROMPT,
-        'Answer this Seedbank assistance request directly and concisely.',
-        'Do not modify user data. Return plain text only.',
-      ].join(' '),
-    },
-    {
-      role: 'user',
-      content: [
-        `Mode: ${mode}`,
-        prompt ? `Prompt: ${prompt}` : '',
-        'Context:',
-        JSON.stringify(context ?? {}, null, 2),
-      ].filter(Boolean).join('\n'),
-    },
-  ];
-}
-
-function featureForMode(mode: string): AiFeatureId {
-  if (mode === 'health-check') return 'health-check';
-  if (mode === 'pattern-insights' || mode === 'smart-cross-pollinate') return 'discover-insights';
-  return 'default';
-}
-
-function parseSuggestion(field: AiSuggestionField, text: string): AiSuggestion {
-  const { suggestion, rationale } = extractSuggestion(text);
-  return {
-    field,
-    suggestion,
-    rationale,
-  };
-}
-
 function shouldRetryWithoutStructuredSuggestion(error: unknown): boolean {
   if (error instanceof AiProviderError) {
     return error.provider === 'openai' && error.status === 400;
@@ -1570,54 +1378,6 @@ async function resolveExecutionModel(config: AiStoredConfig): Promise<string> {
     }
   }
   return requested;
-}
-
-function guardrailError(message: string, statusCode: number): Error {
-  return Object.assign(new Error(message), { statusCode });
-}
-
-function confirmationPayload(feature: AiFeatureId, provider: AiProviderId, model: string): string {
-  return JSON.stringify({
-    feature,
-    provider,
-    model,
-    exp: Date.now() + CONFIRMATION_TOKEN_TTL_MS,
-  });
-}
-
-function signConfirmationPayload(payload: string): string {
-  return createHmac('sha256', confirmationSecret).update(payload).digest('base64url');
-}
-
-function createConfirmationToken(feature: AiFeatureId, provider: AiProviderId, model: string): string {
-  const payload = Buffer.from(confirmationPayload(feature, provider, model)).toString('base64url');
-  return `${payload}.${signConfirmationPayload(payload)}`;
-}
-
-function validConfirmationToken(token: string | undefined, feature: AiFeatureId, provider: AiProviderId, model: string): boolean {
-  if (!token) return false;
-  const [payload, signature] = token.split('.');
-  if (!payload || !signature) return false;
-  const expected = signConfirmationPayload(payload);
-  const actualBuffer = Buffer.from(signature);
-  const expectedBuffer = Buffer.from(expected);
-  if (actualBuffer.length !== expectedBuffer.length || !timingSafeEqual(actualBuffer, expectedBuffer)) return false;
-
-  try {
-    const parsed = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as {
-      feature?: unknown;
-      provider?: unknown;
-      model?: unknown;
-      exp?: unknown;
-    };
-    return parsed.feature === feature
-      && parsed.provider === provider
-      && parsed.model === model
-      && typeof parsed.exp === 'number'
-      && parsed.exp >= Date.now();
-  } catch {
-    return false;
-  }
 }
 
 export class AiService {
@@ -2172,30 +1932,11 @@ export class AiService {
   }
 
   getUsageSummary(): { last24h: number; last7d: number } {
-    const now = Date.now();
-    const since24h = new Date(now - 24 * 60 * 60 * 1000).toISOString();
-    const since7d = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString();
-    return {
-      last24h: this.store.tokensSince(since24h),
-      last7d: this.store.tokensSince(since7d),
-    };
+    return usageSummary(this.store);
   }
 
   getUsageDetail(): AiUsageDetail {
-    const now = Date.now();
-    const since24h = new Date(now - 24 * 60 * 60 * 1000).toISOString();
-    const since7d = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString();
-    return {
-      windows: {
-        last24h: this.store.tokensSince(since24h),
-        last7d: this.store.tokensSince(since7d),
-      },
-      byRoute24h: this.store.routeUsageBuckets(since24h),
-      byFeature: this.store.usageBuckets(since7d, 'feature'),
-      byProvider: this.store.usageBuckets(since7d, 'provider'),
-      byModel: this.store.usageBuckets(since7d, 'model'),
-      recentAuditEvents: this.store.recentAuditEvents(),
-    };
+    return usageDetail(this.store);
   }
 
   private provider(config: AiStoredConfig): AiProvider {
@@ -2384,9 +2125,15 @@ export class AiService {
   }
 
   private recordProviderFailure(feature: AiFeatureId, config: AiStoredConfig, error: unknown): void {
-    const message = error instanceof Error ? error.message : String(error);
     const model = modelFor(config);
-    this.store.recordAuditEvent('provider_error', feature, config.provider, model, message, metadataForConfig(config, model));
+    recordProviderFailureEvent({
+      store: this.store,
+      feature,
+      provider: config.provider,
+      model,
+      error,
+      metadata: metadataForConfig(config, model),
+    });
   }
 
   private async recordUsage(
