@@ -301,6 +301,13 @@ function ProviderCard({
 }: ProviderCardProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
 
+  // Auto-expand when defaultExpanded transitions to true after mount
+  // (e.g. session expiry while page is open — surfaces the login action).
+  // Does NOT force-collapse on login so the user stays in context.
+  useEffect(() => {
+    if (defaultExpanded) setExpanded(true);
+  }, [defaultExpanded]);
+
   return (
     <div className={`rounded-card border transition-colors ${isDefault ? 'border-sage-300 bg-paper' : 'border-ink-100 bg-paper'}`}>
       {/* Header row */}
