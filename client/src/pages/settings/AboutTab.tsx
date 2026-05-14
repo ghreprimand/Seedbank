@@ -34,7 +34,7 @@ export default function AboutTab() {
       </div>
 
       <p className="text-xs font-mono text-ink-300 pt-4 border-t border-ink-100">
-        Built with care. Your data stays local.
+        Built with care. Local by default, cloud only if you opt in.
       </p>
     </div>
   );

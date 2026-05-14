@@ -4,6 +4,30 @@ Newest entries at the top.
 
 ---
 
+## 2026-05-14 — Manual Contrast Fixes, Repo Doc Linking, and Conditional Privacy Copy
+
+This pass addressed readability and wording issues reported in live theme testing of the in-app manual.
+
+Manual rendering updates:
+- `client/src/help/ManualModal.tsx` now renders manual `code` blocks with neutral, high-contrast theme tokens (`bg-ink-100`, `border-ink-300`, `text-ink-900`) instead of low-contrast green-on-green styling in darker palettes.
+- Manual `tip` callouts were moved to neutral readable surfaces (`bg-paper-warm`, `border-ink-300`, `text-ink-800`) to avoid contrast collapse in dark themes.
+- Added lightweight inline markdown-link support for manual `p`, `ul`, and `tip` blocks so referenced repo docs can be clicked directly.
+
+Documentation/copy updates:
+- Updated the manual REST reference tip to include a direct link to `docs/API.md` in the repository.
+- Updated Settings → API & Server (`ApiServerTab`) to link `docs/API.md` directly instead of showing plain text only.
+- Reframed absolute-local privacy statements to be conditional when cloud AI or offsite backup destinations are enabled.
+- Updated the About one-liner to: “Local by default, cloud only if you opt in.”
+
+Validation:
+- `npm run typecheck`
+- `npm run lint`
+
+Privacy/safety:
+- No secrets, keys, tokens, private paths, or machine-specific credentials were introduced in this change set.
+
+---
+
 ## 2026-05-14 — Server Route Modularization and AI Service Helper Split
 
 This pass continued the codebase audit cleanup after the default quality gates were stabilized.

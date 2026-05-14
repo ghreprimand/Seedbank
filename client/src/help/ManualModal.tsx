@@ -30,6 +30,34 @@ interface ManualModalProps {
 
 // ── Block renderer ────────────────────────────────────────────────────────────
 
+const INLINE_MARKDOWN_LINK_RE = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
+
+function renderInlineText(text: string): React.ReactNode {
+  const matches = Array.from(text.matchAll(INLINE_MARKDOWN_LINK_RE));
+  if (matches.length === 0) return text;
+
+  const parts: React.ReactNode[] = [];
+  let cursor = 0;
+  for (const [matchText, label, href] of matches) {
+    const index = text.indexOf(matchText, cursor);
+    if (index > cursor) parts.push(text.slice(cursor, index));
+    parts.push(
+      <a
+        key={`${href}-${index}`}
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline decoration-sage-300 underline-offset-2 hover:text-sage-800 focus:outline-none focus:ring-2 focus:ring-sage-300 rounded-sm"
+      >
+        {label}
+      </a>,
+    );
+    cursor = index + matchText.length;
+  }
+  if (cursor < text.length) parts.push(text.slice(cursor));
+  return parts;
+}
+
 function BlockRenderer({ block }: { block: ManualBlock }) {
   switch (block.type) {
     case 'h3':
@@ -39,23 +67,23 @@ function BlockRenderer({ block }: { block: ManualBlock }) {
         </h3>
       );
     case 'p':
-      return <p className="text-sm text-ink-600 leading-relaxed mb-3">{block.text}</p>;
+      return <p className="text-sm text-ink-600 leading-relaxed mb-3">{renderInlineText(block.text)}</p>;
     case 'ul':
       return (
         <ul className="space-y-1.5 mb-3 ml-1">
           {block.items.map((item, i) => (
             <li key={i} className="flex gap-2 text-sm text-ink-600 leading-relaxed">
               <ChevronRight className="w-3.5 h-3.5 text-sage-400 shrink-0 mt-0.5" />
-              <span>{item}</span>
+              <span>{renderInlineText(item)}</span>
             </li>
           ))}
         </ul>
       );
     case 'tip':
       return (
-        <div className="my-3 px-3 py-2.5 bg-sage-50 border border-sage-200 rounded-card text-sm text-sage-700 leading-relaxed">
-          <span className="font-semibold text-sage-600">Tip: </span>
-          {block.text}
+        <div className="my-3 px-3 py-2.5 bg-paper-warm border border-ink-300 rounded-card text-sm text-ink-800 leading-relaxed">
+          <span className="font-semibold text-sage-700">Tip: </span>
+          {renderInlineText(block.text)}
         </div>
       );
     case 'kbd':
@@ -69,7 +97,7 @@ function BlockRenderer({ block }: { block: ManualBlock }) {
       );
     case 'code':
       return (
-        <pre className="my-3 px-3 py-2.5 bg-ink-900 text-green-300 text-xs font-mono rounded-card overflow-x-auto leading-relaxed whitespace-pre-wrap">
+        <pre className="my-3 px-3 py-2.5 bg-ink-100 border border-ink-300 text-ink-900 text-xs font-mono rounded-card overflow-x-auto leading-relaxed whitespace-pre-wrap">
           {block.text}
         </pre>
       );

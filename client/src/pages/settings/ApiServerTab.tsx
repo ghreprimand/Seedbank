@@ -484,6 +484,7 @@ function WebhooksSection() {
 
 function OpenApiSection() {
   const specUrl = apiUrl('/api/openapi.json');
+  const restDocsUrl = 'https://github.com/ghreprimand/Seedbank/blob/main/docs/API.md';
   return (
     <section className="space-y-2" data-help="settings-api-reference">
       <h3 className="text-xs font-mono uppercase tracking-wider text-ink-500">API Reference</h3>
@@ -505,7 +506,16 @@ function OpenApiSection() {
       </div>
       <p className="text-[11px] text-ink-500 font-mono break-all">{specUrl}</p>
       <p className="text-[11px] text-ink-500">
-        Full REST reference: <code className="font-mono">docs/API.md</code> in the project repo.
+        Full REST reference:{' '}
+        <a
+          href={restDocsUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline decoration-sage-300 underline-offset-2 hover:text-sage-700"
+        >
+          <code className="font-mono">docs/API.md</code>
+        </a>
+        .
       </p>
     </section>
   );
