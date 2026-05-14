@@ -13,6 +13,7 @@ import type {
   AiOpenAICompatiblePresetId,
   AiPreflightResult,
   AiProviderDescriptor,
+  AiProviderFamily,
   AiProviderInstanceDiagnostic,
   AiProviderInstanceRegistryEntry,
   AiProviderHealth,
@@ -260,6 +261,7 @@ const DEFAULT_CONFIG: AiStoredConfig = {
     allowedModels: [],
     featureDailyTokenBudgets: {},
     providerDailyTokenBudgets: {},
+    providerFamilyDailyTokenBudgets: {},
     providerInstanceDailyTokenBudgets: {},
     modelDailyTokenBudgets: {},
     warnOnRemoteProvider: true,
@@ -460,6 +462,7 @@ function defaultGuardrails(): AiGuardrailsConfig {
     allowedModels: [],
     featureDailyTokenBudgets: {},
     providerDailyTokenBudgets: {},
+    providerFamilyDailyTokenBudgets: {},
     providerInstanceDailyTokenBudgets: {},
     modelDailyTokenBudgets: {},
     warnOnRemoteProvider: true,
@@ -525,6 +528,13 @@ function sanitizeGuardrails(input: unknown, current?: AiGuardrailsConfig): AiGua
       ...sanitizeBudgetMap(
         source.providerDailyTokenBudgets,
         ['openai', 'anthropic', 'ollama', 'openai-compatible', 'claude-account', 'codex-account'] as const,
+      ),
+    },
+    providerFamilyDailyTokenBudgets: {
+      ...defaults.providerFamilyDailyTokenBudgets,
+      ...sanitizeBudgetMap(
+        source.providerFamilyDailyTokenBudgets,
+        ['api', 'local', 'custom-endpoint', 'account'] as const,
       ),
     },
     providerInstanceDailyTokenBudgets: {
@@ -1807,6 +1817,7 @@ export class AiService {
     const guardrails = sanitizeGuardrails(config.guardrails);
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const model = modelFor(config);
+    const providerFamily: AiProviderFamily | undefined = metadataForConfig(config).providerFamily;
     const providerInstanceId = normalizeDefaultProviderInstance(config.defaultProviderInstanceId);
     const budgetValues: AiBudgetState[] = [
       {
@@ -1835,6 +1846,15 @@ export class AiService {
         remaining: null,
         window: 'day',
         enabled: (guardrails.providerDailyTokenBudgets[config.provider] ?? 0) > 0,
+      },
+      {
+        scope: 'provider-family',
+        id: providerFamily ?? 'unknown',
+        limit: providerFamily ? (guardrails.providerFamilyDailyTokenBudgets[providerFamily] ?? 0) : 0,
+        used: providerFamily ? this.store.tokensSince(since, { providerFamily }) : 0,
+        remaining: null,
+        window: 'day',
+        enabled: providerFamily ? ((guardrails.providerFamilyDailyTokenBudgets[providerFamily] ?? 0) > 0) : false,
       },
       {
         scope: 'provider-instance',

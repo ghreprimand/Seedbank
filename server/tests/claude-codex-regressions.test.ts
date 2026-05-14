@@ -77,6 +77,7 @@ function claudeConfig(): AiStoredConfig {
       allowedModels: [],
       featureDailyTokenBudgets: {},
       providerDailyTokenBudgets: {},
+      providerFamilyDailyTokenBudgets: {},
       modelDailyTokenBudgets: {},
       warnOnRemoteProvider: true,
       requireConfirmationForRemoteProvider: false,

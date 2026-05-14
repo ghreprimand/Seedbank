@@ -46,6 +46,7 @@ function baseConfig(model = 'gpt-5-mini'): AiStoredConfig {
       allowedModels: [],
       featureDailyTokenBudgets: {},
       providerDailyTokenBudgets: {},
+      providerFamilyDailyTokenBudgets: {},
       modelDailyTokenBudgets: {},
       warnOnRemoteProvider: true,
       requireConfirmationForRemoteProvider: false,

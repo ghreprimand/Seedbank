@@ -161,3 +161,36 @@ test('provider-instance daily budgets use provider instance usage keys', () => {
     db.close();
   }
 });
+
+test('provider-family daily budgets use provider-family usage keys', () => {
+  const { db, store, service } = aiFixture();
+  try {
+    service.configure({
+      defaultProviderInstanceId: 'local-openai-compatible',
+      localOpenaiCompatibleModel: 'local-model',
+      featureRoutes: {
+        'thinking-partner': {
+          provider: 'openai-compatible',
+          providerInstanceId: 'local-openai-compatible',
+          model: 'local-model',
+        },
+      },
+      guardrails: {
+        providerFamilyDailyTokenBudgets: { 'custom-endpoint': 5 },
+      },
+    });
+    store.recordUsage(
+      'openai-compatible',
+      'local-model',
+      'thinking-partner',
+      { inputTokens: 2, outputTokens: 3, totalTokens: 5 },
+      { providerFamily: 'custom-endpoint' },
+    );
+
+    const result = service.preflight('thinking-partner');
+    assert.equal(result.allowed, false);
+    assert.ok(result.blockers.some((blocker) => /provider-family budget custom-endpoint reached/i.test(blocker)));
+  } finally {
+    db.close();
+  }
+});

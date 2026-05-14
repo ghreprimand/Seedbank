@@ -38,6 +38,7 @@ test('AI usage records execution metadata without changing configured-model budg
     );
 
     assert.equal(store.tokensSince('1970-01-01T00:00:00.000Z', { model: 'codex-recommended' }), 5);
+    assert.equal(store.tokensSince('1970-01-01T00:00:00.000Z', { providerFamily: 'account' }), 5);
     assert.equal(store.tokensSince('1970-01-01T00:00:00.000Z', { providerInstanceId: 'codex-account' }), 5);
     assert.equal(store.tokensSince('1970-01-01T00:00:00.000Z', { model: 'gpt-5.2-codex' }), 0);
 

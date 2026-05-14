@@ -154,13 +154,17 @@ export class AiStore {
 
   tokensSince(
     sinceIso: string,
-    filters: { provider?: string; providerInstanceId?: string; model?: string; routePrefix?: string } = {},
+    filters: { provider?: string; providerFamily?: AiProviderFamily; providerInstanceId?: string; model?: string; routePrefix?: string } = {},
   ): number {
     const clauses = ['created_at >= ?'];
     const params: unknown[] = [sinceIso];
     if (filters.provider) {
       clauses.push('provider = ?');
       params.push(filters.provider);
+    }
+    if (filters.providerFamily) {
+      clauses.push('provider_family = ?');
+      params.push(filters.providerFamily);
     }
     if (filters.providerInstanceId) {
       clauses.push('provider_instance_id = ?');

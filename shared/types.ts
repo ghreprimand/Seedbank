@@ -658,7 +658,7 @@ export interface AiEffectiveFeatureRoute {
 export type AiReasoningEffort = 'minimal' | 'low' | 'medium' | 'high';
 export type AiTextVerbosity = 'low' | 'medium' | 'high';
 
-export type AiBudgetScope = 'global' | 'feature' | 'provider' | 'provider-instance' | 'model';
+export type AiBudgetScope = 'global' | 'feature' | 'provider' | 'provider-family' | 'provider-instance' | 'model';
 
 export interface AiBudgetState {
   scope: AiBudgetScope;
@@ -677,6 +677,7 @@ export interface AiGuardrailsConfig {
   allowedModels: string[];
   featureDailyTokenBudgets: Partial<Record<AiFeatureId, number>>;
   providerDailyTokenBudgets: Partial<Record<AiProviderId, number>>;
+  providerFamilyDailyTokenBudgets: Partial<Record<AiProviderFamily, number>>;
   providerInstanceDailyTokenBudgets: Partial<Record<AiProviderInstanceId, number>>;
   modelDailyTokenBudgets: Record<string, number>;
   warnOnRemoteProvider: boolean;
