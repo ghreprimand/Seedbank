@@ -37,11 +37,11 @@ AI & Agents is now organized by **service family first**, then **connection meth
 
 - **Claude service**
   - Anthropic API key method (chat/model routing)
-  - Claude account/native OAuth method (chat/model routing; coming-soon posture in RC)
+  - Claude account/native OAuth method (chat/model routing; account login required)
   - Claude Code CLI method (file-producing agent method; not chat routing)
 - **Codex/OpenAI service**
   - OpenAI API key method (chat/model routing)
-  - Codex account/app-server method (chat/model routing; opt-in experimental)
+  - Codex account/app-server method (chat/model routing; account login required)
   - Codex CLI method (file-producing agent method; not chat routing)
 - **Local inference**
   - Ollama
@@ -49,7 +49,7 @@ AI & Agents is now organized by **service family first**, then **connection meth
 - **External / cloud routers**
   - OpenRouter, Groq, Mistral, Together, Fireworks, custom cloud endpoint
 
-Chat/model-capable method cards show status (`connected`, `key needed`, `unreachable`, `local`, `not tested`, `upcoming`), model/base URL state, and setup/test/list actions.
+Chat/model-capable method cards show status (`connected`, `key needed`, `unreachable`, `local`, `not tested`), model/base URL state, and setup/test/list actions.
 
 Global default routing remains provider-based and stored server-side.
 
@@ -68,8 +68,8 @@ Both cards configure the same OpenAI-compatible provider settings (preset, base 
 
 ### Account providers
 
-- **Claude account** appears as **coming soon** (`upcoming`) in this RC and is not available as a normal connected provider path yet.
-- **Codex account** is experimental and runtime-gated behind `SEEDBANK_ENABLE_CODEX_ACCOUNT`. It is an opt-in account transport, not OpenAI API key billing, and not the same feature as linked Codex CLI agent launching.
+- **Claude account** is an account-login transport for Claude.ai subscriptions. Login and logout from the Claude account card; token refresh is automatic.
+- **Codex account** is an account-login transport through the local Codex app-server. If Codex is missing or cannot start, the card reports that runtime failure directly.
 
 ### Feature Defaults
 
