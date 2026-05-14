@@ -212,10 +212,63 @@ install_if_needed() {
 }
 
 build_if_needed() {
-  if [[ ! -f "$SEEDBANK_DIR/client/dist/index.html" || ! -d "$SEEDBANK_DIR/server/dist" ]]; then
-    notify "Seedbank setup" "Building missing dist output"
+  local client_output="$SEEDBANK_DIR/client/dist/index.html"
+  local server_output="$SEEDBANK_DIR/server/dist/server/src/index.js"
+  local build_reason=""
+
+  if [[ ! -f "$client_output" || ! -f "$server_output" ]]; then
+    build_reason="missing dist output"
+  elif sources_newer_than "$client_output" \
+    "package.json" \
+    "package-lock.json" \
+    "client/package.json" \
+    "client/index.html" \
+    "client/vite.config.ts" \
+    "client/tsconfig.json" \
+    "client/tsconfig.app.json" \
+    "client/tsconfig.node.json" \
+    "client/src" \
+    "client/public" \
+    "shared"; then
+    build_reason="client sources changed"
+  elif sources_newer_than "$server_output" \
+    "package.json" \
+    "package-lock.json" \
+    "server/package.json" \
+    "server/tsconfig.json" \
+    "server/src" \
+    "shared"; then
+    build_reason="server sources changed"
+  fi
+
+  if [[ -n "$build_reason" ]]; then
+    notify "Seedbank setup" "Building $build_reason"
     (cd "$SEEDBANK_DIR" && npm run build) >> "$LOG_FILE" 2>&1
   fi
+}
+
+sources_newer_than() {
+  local output="$1"
+  shift
+
+  [[ -e "$output" ]] || return 0
+
+  local relative_path path newer_file
+  for relative_path in "$@"; do
+    path="$SEEDBANK_DIR/$relative_path"
+    [[ -e "$path" ]] || continue
+
+    if [[ -d "$path" ]]; then
+      newer_file=$(find "$path" \
+        \( -path '*/node_modules' -o -path '*/.git' -o -path '*/dist' \) -prune \
+        -o -type f -newer "$output" -print -quit)
+      [[ -n "$newer_file" ]] && return 0
+    elif [[ "$path" -nt "$output" ]]; then
+      return 0
+    fi
+  done
+
+  return 1
 }
 
 launch_process() {
