@@ -6,12 +6,16 @@ import type {
   AiFeatureId,
   AiFeatureRoute,
   AiGuardrailsConfig,
+  AiModelInfo,
   AiModelListResult,
   AiOpenAICompatiblePresetId,
   AiPreflightResult,
   AiProviderDescriptor,
   AiProviderHealth,
   AiProviderId,
+  AiProviderInstanceConfig,
+  AiProviderInstanceId,
+  AiProviderInstanceAvailability,
   AiPublicConfig,
   AiMethodCapability,
   AiSuggestion,
@@ -32,7 +36,13 @@ import {
   OpenAICompatibleProvider,
   OpenAIProvider,
 } from './providers.js';
-import { AI_PROVIDER_DESCRIPTORS, openAICompatiblePreset } from './registry.js';
+import {
+  AI_PROVIDER_DESCRIPTORS,
+  AI_PROVIDER_INSTANCE_DESCRIPTORS,
+  localOpenAICompatiblePreset,
+  openAICompatiblePreset,
+  providerInstanceDescriptor,
+} from './registry.js';
 import type { AiConfigPatch, AiProvider, AiProviderMessage, AiStoredConfig } from './types.js';
 import { codexAccountEnabledByEnv } from './codex-account/session.js';
 import { claudeAccountEnabledByEnv, claudeAccountRuntimeAvailability } from './claude-account/auth.js';
@@ -61,6 +71,135 @@ const FIELD_ASSIST_PROMPT = [
 ].join(' ');
 
 const DEFAULT_CONFIG: AiStoredConfig = {
+  defaultProviderInstanceId: 'ollama',
+  providerInstances: {
+    'claude-api': {
+      id: 'claude-api',
+      provider: 'anthropic',
+      label: AI_PROVIDER_INSTANCE_DESCRIPTORS['claude-api'].label,
+      family: AI_PROVIDER_INSTANCE_DESCRIPTORS['claude-api'].family,
+      connectionMode: AI_PROVIDER_INSTANCE_DESCRIPTORS['claude-api'].connectionMode,
+      dataResidency: AI_PROVIDER_INSTANCE_DESCRIPTORS['claude-api'].dataResidency,
+      capabilities: AI_PROVIDER_INSTANCE_DESCRIPTORS['claude-api'].capabilities,
+      featureRoutable: true,
+      modelDiscovery: true,
+      configuredModel: 'claude-sonnet-4-20250514',
+      discoveredModels: [],
+      available: 'auth-required',
+      requiresApiKey: true,
+      hasApiKey: false,
+      local: false,
+    },
+    'claude-account': {
+      id: 'claude-account',
+      provider: 'claude-account',
+      label: AI_PROVIDER_INSTANCE_DESCRIPTORS['claude-account'].label,
+      family: AI_PROVIDER_INSTANCE_DESCRIPTORS['claude-account'].family,
+      connectionMode: AI_PROVIDER_INSTANCE_DESCRIPTORS['claude-account'].connectionMode,
+      dataResidency: AI_PROVIDER_INSTANCE_DESCRIPTORS['claude-account'].dataResidency,
+      capabilities: AI_PROVIDER_INSTANCE_DESCRIPTORS['claude-account'].capabilities,
+      featureRoutable: true,
+      modelDiscovery: true,
+      configuredModel: 'claude-sonnet-latest',
+      discoveredModels: [],
+      available: 'unavailable',
+      requiresApiKey: false,
+      hasApiKey: false,
+      local: false,
+      authenticated: false,
+    },
+    'openai-api': {
+      id: 'openai-api',
+      provider: 'openai',
+      label: AI_PROVIDER_INSTANCE_DESCRIPTORS['openai-api'].label,
+      family: AI_PROVIDER_INSTANCE_DESCRIPTORS['openai-api'].family,
+      connectionMode: AI_PROVIDER_INSTANCE_DESCRIPTORS['openai-api'].connectionMode,
+      dataResidency: AI_PROVIDER_INSTANCE_DESCRIPTORS['openai-api'].dataResidency,
+      capabilities: AI_PROVIDER_INSTANCE_DESCRIPTORS['openai-api'].capabilities,
+      featureRoutable: true,
+      modelDiscovery: true,
+      configuredModel: 'gpt-4.1-mini',
+      discoveredModels: [],
+      available: 'auth-required',
+      requiresApiKey: true,
+      hasApiKey: false,
+      local: false,
+    },
+    'codex-account': {
+      id: 'codex-account',
+      provider: 'codex-account',
+      label: AI_PROVIDER_INSTANCE_DESCRIPTORS['codex-account'].label,
+      family: AI_PROVIDER_INSTANCE_DESCRIPTORS['codex-account'].family,
+      connectionMode: AI_PROVIDER_INSTANCE_DESCRIPTORS['codex-account'].connectionMode,
+      dataResidency: AI_PROVIDER_INSTANCE_DESCRIPTORS['codex-account'].dataResidency,
+      capabilities: AI_PROVIDER_INSTANCE_DESCRIPTORS['codex-account'].capabilities,
+      featureRoutable: true,
+      modelDiscovery: true,
+      configuredModel: 'codex-recommended',
+      discoveredModels: [],
+      available: 'unavailable',
+      requiresApiKey: false,
+      hasApiKey: false,
+      local: false,
+      authenticated: false,
+    },
+    ollama: {
+      id: 'ollama',
+      provider: 'ollama',
+      label: AI_PROVIDER_INSTANCE_DESCRIPTORS.ollama.label,
+      family: AI_PROVIDER_INSTANCE_DESCRIPTORS.ollama.family,
+      connectionMode: AI_PROVIDER_INSTANCE_DESCRIPTORS.ollama.connectionMode,
+      dataResidency: AI_PROVIDER_INSTANCE_DESCRIPTORS.ollama.dataResidency,
+      capabilities: AI_PROVIDER_INSTANCE_DESCRIPTORS.ollama.capabilities,
+      featureRoutable: true,
+      modelDiscovery: true,
+      configuredModel: 'llama3.2',
+      discoveredModels: [],
+      available: 'available',
+      requiresApiKey: false,
+      hasApiKey: false,
+      local: true,
+      baseUrl: 'http://localhost:11434',
+    },
+    'local-openai-compatible': {
+      id: 'local-openai-compatible',
+      provider: 'openai-compatible',
+      label: AI_PROVIDER_INSTANCE_DESCRIPTORS['local-openai-compatible'].label,
+      family: AI_PROVIDER_INSTANCE_DESCRIPTORS['local-openai-compatible'].family,
+      connectionMode: AI_PROVIDER_INSTANCE_DESCRIPTORS['local-openai-compatible'].connectionMode,
+      dataResidency: AI_PROVIDER_INSTANCE_DESCRIPTORS['local-openai-compatible'].dataResidency,
+      capabilities: AI_PROVIDER_INSTANCE_DESCRIPTORS['local-openai-compatible'].capabilities,
+      featureRoutable: true,
+      modelDiscovery: true,
+      configuredModel: '',
+      discoveredModels: [],
+      available: 'available',
+      requiresApiKey: false,
+      hasApiKey: false,
+      local: true,
+      baseUrl: 'http://localhost:1234/v1',
+      presetId: 'lm-studio',
+    },
+    'cloud-openai-compatible': {
+      id: 'cloud-openai-compatible',
+      provider: 'openai-compatible',
+      label: AI_PROVIDER_INSTANCE_DESCRIPTORS['cloud-openai-compatible'].label,
+      family: AI_PROVIDER_INSTANCE_DESCRIPTORS['cloud-openai-compatible'].family,
+      connectionMode: AI_PROVIDER_INSTANCE_DESCRIPTORS['cloud-openai-compatible'].connectionMode,
+      dataResidency: AI_PROVIDER_INSTANCE_DESCRIPTORS['cloud-openai-compatible'].dataResidency,
+      capabilities: AI_PROVIDER_INSTANCE_DESCRIPTORS['cloud-openai-compatible'].capabilities,
+      featureRoutable: true,
+      modelDiscovery: true,
+      configuredModel: 'openai/gpt-4o-mini',
+      discoveredModels: [],
+      available: 'auth-required',
+      requiresApiKey: true,
+      hasApiKey: false,
+      local: false,
+      baseUrl: 'https://openrouter.ai/api/v1',
+      presetId: 'openrouter',
+    },
+  },
   provider: 'ollama',
   openaiModel: 'gpt-4.1-mini',
   anthropicModel: 'claude-sonnet-4-20250514',
@@ -68,16 +207,22 @@ const DEFAULT_CONFIG: AiStoredConfig = {
   codexAccountModel: 'codex-recommended',
   ollamaModel: 'llama3.2',
   ollamaBaseUrl: 'http://localhost:11434',
+  localOpenaiCompatiblePreset: 'lm-studio',
+  localOpenaiCompatibleModel: '',
+  localOpenaiCompatibleBaseUrl: 'http://localhost:1234/v1',
+  cloudOpenaiCompatiblePreset: 'openrouter',
+  cloudOpenaiCompatibleModel: 'openai/gpt-4o-mini',
+  cloudOpenaiCompatibleBaseUrl: 'https://openrouter.ai/api/v1',
   openaiCompatiblePreset: 'openrouter',
   openaiCompatibleModel: 'openai/gpt-4o-mini',
   openaiCompatibleBaseUrl: 'https://openrouter.ai/api/v1',
   dailyTokenBudget: 200000,
   featureRoutes: {
-    'thinking-partner': { provider: 'default' },
-    'field-suggestions': { provider: 'default' },
-    'health-check': { provider: 'default' },
-    'discover-insights': { provider: 'default' },
-    default: { provider: 'default' },
+    'thinking-partner': { provider: 'default', providerInstanceId: 'ollama' },
+    'field-suggestions': { provider: 'default', providerInstanceId: 'ollama' },
+    'health-check': { provider: 'default', providerInstanceId: 'ollama' },
+    'discover-insights': { provider: 'default', providerInstanceId: 'ollama' },
+    default: { provider: 'default', providerInstanceId: 'ollama' },
   },
   guardrails: {
     featureEnabled: {
@@ -146,6 +291,24 @@ const AI_FEATURE_IDS: AiFeatureId[] = [
   'default',
 ];
 
+const AI_PROVIDER_INSTANCE_IDS: AiProviderInstanceId[] = [
+  'claude-api',
+  'claude-account',
+  'openai-api',
+  'codex-account',
+  'ollama',
+  'local-openai-compatible',
+  'cloud-openai-compatible',
+];
+
+function isProviderInstanceId(value: unknown): value is AiProviderInstanceId {
+  return typeof value === 'string' && AI_PROVIDER_INSTANCE_IDS.includes(value as AiProviderInstanceId);
+}
+
+function providerInstanceToProvider(instanceId: AiProviderInstanceId): AiProviderId {
+  return providerInstanceDescriptor(instanceId).provider;
+}
+
 const FEATURE_ROUTABLE_PROVIDERS: ReadonlySet<AiProviderId> = new Set([
   'openai',
   'anthropic',
@@ -161,22 +324,45 @@ function isFeatureRoutableProvider(provider: AiProviderId): boolean {
 
 function defaultFeatureRoutes(): Record<AiFeatureId, AiFeatureRoute> {
   return {
-    'thinking-partner': { provider: 'default' },
-    'field-suggestions': { provider: 'default' },
-    'health-check': { provider: 'default' },
-    'discover-insights': { provider: 'default' },
-    default: { provider: 'default' },
+    'thinking-partner': { provider: 'default', providerInstanceId: 'ollama' },
+    'field-suggestions': { provider: 'default', providerInstanceId: 'ollama' },
+    'health-check': { provider: 'default', providerInstanceId: 'ollama' },
+    'discover-insights': { provider: 'default', providerInstanceId: 'ollama' },
+    default: { provider: 'default', providerInstanceId: 'ollama' },
   };
 }
 
 function sanitizeFeatureRoute(value: unknown): AiFeatureRoute | undefined {
-  const route = value as { provider?: unknown; model?: unknown } | undefined;
+  const route = value as { provider?: unknown; providerInstanceId?: unknown; model?: unknown } | undefined;
   if (!route) return undefined;
-  if (route.provider === 'default') return { provider: 'default' };
+  if (route.provider === 'default') {
+    const providerInstanceId = isProviderInstanceId(route.providerInstanceId) ? route.providerInstanceId : 'ollama';
+    return { provider: 'default', providerInstanceId };
+  }
+  if (isProviderInstanceId(route.providerInstanceId)) {
+    const provider = providerInstanceToProvider(route.providerInstanceId);
+    return {
+      provider,
+      providerInstanceId: route.providerInstanceId,
+      ...(typeof route.model === 'string' && route.model.trim() ? { model: route.model.trim() } : {}),
+    };
+  }
   if (!isProvider(route.provider)) return undefined;
   if (!isFeatureRoutableProvider(route.provider)) return { provider: 'default' };
+  const providerInstanceId = route.provider === 'anthropic'
+    ? 'claude-api'
+    : route.provider === 'openai'
+      ? 'openai-api'
+      : route.provider === 'claude-account'
+        ? 'claude-account'
+        : route.provider === 'codex-account'
+          ? 'codex-account'
+          : route.provider === 'ollama'
+            ? 'ollama'
+            : 'cloud-openai-compatible';
   return {
     provider: route.provider,
+    providerInstanceId,
     ...(typeof route.model === 'string' && route.model.trim() ? { model: route.model.trim() } : {}),
   };
 }
@@ -291,6 +477,32 @@ function sanitizeGuardrails(input: unknown, current?: AiGuardrailsConfig): AiGua
   };
 }
 
+function sanitizeDiscoveredModels(input: unknown): AiModelInfo[] {
+  if (!Array.isArray(input)) return [];
+  return input
+    .map((row) => {
+      if (!row || typeof row !== 'object') return null;
+      const item = row as { id?: unknown; name?: unknown; displayName?: unknown; capabilities?: unknown };
+      if (typeof item.id !== 'string' || !item.id.trim()) return null;
+      const normalized: AiModelInfo = { id: item.id.trim() };
+      if (typeof item.name === 'string' && item.name.trim()) normalized.name = item.name.trim();
+      if (typeof item.displayName === 'string' && item.displayName.trim()) normalized.displayName = item.displayName.trim();
+      if (item.capabilities && typeof item.capabilities === 'object') {
+        const caps = item.capabilities as { tools?: unknown; vision?: unknown; thinking?: unknown; contextWindow?: unknown };
+        normalized.capabilities = {
+          tools: caps.tools === true,
+          vision: caps.vision === true,
+          thinking: caps.thinking === true,
+          ...(typeof caps.contextWindow === 'number' && Number.isFinite(caps.contextWindow) && caps.contextWindow > 0
+            ? { contextWindow: Math.floor(caps.contextWindow) }
+            : {}),
+        };
+      }
+      return normalized;
+    })
+    .filter((value): value is AiModelInfo => Boolean(value));
+}
+
 function applyModelOverride(config: AiStoredConfig, provider: AiProviderId, model: string): AiStoredConfig {
   if (!model.trim()) return config;
   if (provider === 'openai') return { ...config, openaiModel: model.trim() };
@@ -301,21 +513,77 @@ function applyModelOverride(config: AiStoredConfig, provider: AiProviderId, mode
   return { ...config, ollamaModel: model.trim() };
 }
 
+function normalizeDefaultProviderInstance(value: unknown): AiProviderInstanceId {
+  return isProviderInstanceId(value) ? value : DEFAULT_CONFIG.defaultProviderInstanceId;
+}
+
+function applyProviderInstance(config: AiStoredConfig, providerInstanceId: AiProviderInstanceId): AiStoredConfig {
+  if (providerInstanceId === 'claude-api') {
+    return { ...config, provider: 'anthropic', anthropicModel: config.providerInstances['claude-api'].configuredModel || config.anthropicModel };
+  }
+  if (providerInstanceId === 'claude-account') {
+    return { ...config, provider: 'claude-account', claudeAccountModel: config.providerInstances['claude-account'].configuredModel || config.claudeAccountModel };
+  }
+  if (providerInstanceId === 'openai-api') {
+    return { ...config, provider: 'openai', openaiModel: config.providerInstances['openai-api'].configuredModel || config.openaiModel };
+  }
+  if (providerInstanceId === 'codex-account') {
+    return { ...config, provider: 'codex-account', codexAccountModel: config.providerInstances['codex-account'].configuredModel || config.codexAccountModel };
+  }
+  if (providerInstanceId === 'ollama') {
+    return {
+      ...config,
+      provider: 'ollama',
+      ollamaModel: config.providerInstances.ollama.configuredModel || config.ollamaModel,
+      ollamaBaseUrl: config.providerInstances.ollama.baseUrl || config.ollamaBaseUrl,
+    };
+  }
+  if (providerInstanceId === 'local-openai-compatible') {
+    return {
+      ...config,
+      provider: 'openai-compatible',
+      openaiCompatiblePreset: config.localOpenaiCompatiblePreset,
+      openaiCompatibleModel: config.localOpenaiCompatibleModel,
+      openaiCompatibleBaseUrl: config.localOpenaiCompatibleBaseUrl,
+    };
+  }
+  return {
+    ...config,
+    provider: 'openai-compatible',
+    openaiCompatiblePreset: config.cloudOpenaiCompatiblePreset,
+    openaiCompatibleModel: config.cloudOpenaiCompatibleModel,
+    openaiCompatibleBaseUrl: config.cloudOpenaiCompatibleBaseUrl,
+  };
+}
+
 function resolveFeatureConfig(config: AiStoredConfig, feature: AiFeatureId): AiStoredConfig {
   const routes = sanitizeFeatureRoutes(config.featureRoutes);
   const route = routes[feature] ?? routes.default;
-  if (route.provider === 'default') return config;
+  const defaultInstanceId = normalizeDefaultProviderInstance(config.defaultProviderInstanceId);
+  if (route.provider === 'default') {
+    const instanceId = route.providerInstanceId ?? defaultInstanceId;
+    return applyProviderInstance(config, instanceId);
+  }
+  if (route.providerInstanceId) {
+    return applyModelOverride(applyProviderInstance(config, route.providerInstanceId), providerInstanceToProvider(route.providerInstanceId), route.model ?? '');
+  }
   return applyModelOverride({ ...config, provider: route.provider }, route.provider, route.model ?? '');
 }
 
 function effectiveFeatureRoutes(config: AiStoredConfig): Record<AiFeatureId, AiEffectiveFeatureRoute> {
   const routes = sanitizeFeatureRoutes(config.featureRoutes);
+  const defaultInstanceId = normalizeDefaultProviderInstance(config.defaultProviderInstanceId);
   return AI_FEATURE_IDS.reduce<Record<AiFeatureId, AiEffectiveFeatureRoute>>((acc, feature) => {
     const resolved = resolveFeatureConfig(config, feature);
+    const route = routes[feature];
+    const providerInstanceId = route?.provider === 'default'
+      ? (route.providerInstanceId ?? defaultInstanceId)
+      : (route?.providerInstanceId ?? defaultInstanceId);
     acc[feature] = {
       provider: resolved.provider,
+      providerInstanceId,
       model: modelFor(resolved),
-      inherited: routes[feature]?.provider === 'default',
+      inherited: route?.provider === 'default',
     };
     return acc;
   }, {} as Record<AiFeatureId, AiEffectiveFeatureRoute>);
@@ -329,6 +597,118 @@ function migrateKnownStaleModelDefaults(config: AiStoredConfig): AiStoredConfig 
       ? DEFAULT_CONFIG.anthropicModel
       : config.anthropicModel,
   };
+}
+
+function toAvailability(available: boolean, reason?: string): { available: AiProviderInstanceAvailability; availabilityReason?: string } {
+  return available
+    ? { available: 'available' }
+    : { available: 'unavailable', ...(reason ? { availabilityReason: reason } : {}) };
+}
+
+function isLocalOpenAICompatibleConfig(preset: AiOpenAICompatiblePresetId, baseUrl: string): boolean {
+  return localOpenAICompatiblePreset(preset) || isLikelyLocalUrl(baseUrl);
+}
+
+function materializeProviderInstances(config: AiStoredConfig): Record<AiProviderInstanceId, AiProviderInstanceConfig> {
+  const claudeGate = claudeAccountRuntimeAvailability();
+  const codexGate = codexAccountEnabledByEnv();
+  const cloudKeyPresent = Boolean(config.cloudOpenaiCompatibleApiKeyEncrypted ?? config.openaiCompatibleApiKeyEncrypted);
+  const localKeyPresent = Boolean(config.localOpenaiCompatibleApiKeyEncrypted);
+
+  const current = config.providerInstances ?? DEFAULT_CONFIG.providerInstances;
+
+  return {
+    'claude-api': {
+      ...current['claude-api'],
+      ...AI_PROVIDER_INSTANCE_DESCRIPTORS['claude-api'],
+      configuredModel: config.anthropicModel,
+      available: config.anthropicApiKeyEncrypted ? 'available' : 'auth-required',
+      availabilityReason: config.anthropicApiKeyEncrypted ? undefined : 'Anthropic API key is not configured.',
+      requiresApiKey: true,
+      hasApiKey: Boolean(config.anthropicApiKeyEncrypted),
+      local: false,
+    },
+    'claude-account': {
+      ...current['claude-account'],
+      ...AI_PROVIDER_INSTANCE_DESCRIPTORS['claude-account'],
+      configuredModel: config.claudeAccountModel,
+      ...toAvailability(claudeGate.available, claudeGate.reason),
+      authenticated: claudeAccountAuthenticatedCache,
+      requiresApiKey: false,
+      hasApiKey: false,
+      local: false,
+    },
+    'openai-api': {
+      ...current['openai-api'],
+      ...AI_PROVIDER_INSTANCE_DESCRIPTORS['openai-api'],
+      configuredModel: config.openaiModel,
+      available: config.openaiApiKeyEncrypted ? 'available' : 'auth-required',
+      availabilityReason: config.openaiApiKeyEncrypted ? undefined : 'OpenAI API key is not configured.',
+      requiresApiKey: true,
+      hasApiKey: Boolean(config.openaiApiKeyEncrypted),
+      local: false,
+    },
+    'codex-account': {
+      ...current['codex-account'],
+      ...AI_PROVIDER_INSTANCE_DESCRIPTORS['codex-account'],
+      configuredModel: config.codexAccountModel,
+      ...toAvailability(codexGate, codexGate ? undefined : 'Codex account app-server is disabled in this build. Set SEEDBANK_ENABLE_CODEX_ACCOUNT=1 to opt in.'),
+      authenticated: codexAccountAuthenticatedCache,
+      requiresApiKey: false,
+      hasApiKey: false,
+      local: false,
+    },
+    ollama: {
+      ...current.ollama,
+      ...AI_PROVIDER_INSTANCE_DESCRIPTORS.ollama,
+      configuredModel: config.ollamaModel,
+      baseUrl: config.ollamaBaseUrl,
+      available: 'available',
+      availabilityReason: undefined,
+      requiresApiKey: false,
+      hasApiKey: false,
+      local: true,
+    },
+    'local-openai-compatible': {
+      ...current['local-openai-compatible'],
+      ...AI_PROVIDER_INSTANCE_DESCRIPTORS['local-openai-compatible'],
+      configuredModel: config.localOpenaiCompatibleModel,
+      presetId: config.localOpenaiCompatiblePreset,
+      baseUrl: config.localOpenaiCompatibleBaseUrl,
+      available: 'available',
+      availabilityReason: undefined,
+      requiresApiKey: false,
+      hasApiKey: localKeyPresent,
+      local: true,
+    },
+    'cloud-openai-compatible': {
+      ...current['cloud-openai-compatible'],
+      ...AI_PROVIDER_INSTANCE_DESCRIPTORS['cloud-openai-compatible'],
+      configuredModel: config.cloudOpenaiCompatibleModel,
+      presetId: config.cloudOpenaiCompatiblePreset,
+      baseUrl: config.cloudOpenaiCompatibleBaseUrl,
+      available: cloudKeyPresent ? 'available' : 'auth-required',
+      availabilityReason: cloudKeyPresent ? undefined : 'Cloud OpenAI-compatible API key is not configured.',
+      requiresApiKey: true,
+      hasApiKey: cloudKeyPresent,
+      local: false,
+    },
+  };
+}
+
+function defaultProviderInstanceForLegacy(config: AiStoredConfig): AiProviderInstanceId {
+  if (isProviderInstanceId(config.defaultProviderInstanceId)) return config.defaultProviderInstanceId;
+  if (config.provider === 'anthropic') return 'claude-api';
+  if (config.provider === 'claude-account') return 'claude-account';
+  if (config.provider === 'openai') return 'openai-api';
+  if (config.provider === 'codex-account') return 'codex-account';
+  if (config.provider === 'ollama') return 'ollama';
+  if (config.provider === 'openai-compatible') {
+    return isLocalOpenAICompatibleConfig(config.openaiCompatiblePreset, config.openaiCompatibleBaseUrl)
+      ? 'local-openai-compatible'
+      : 'cloud-openai-compatible';
+  }
+  return 'ollama';
 }
 
 // Cached Claude account auth status — refreshed by async calls.
@@ -346,7 +726,13 @@ export function setCachedCodexAccountAuth(authenticated: boolean): void {
 
 function publicConfig(config: AiStoredConfig): AiPublicConfig {
   const routes = sanitizeFeatureRoutes(config.featureRoutes);
+  const providerInstances = materializeProviderInstances(config);
+  const defaultProviderInstanceId = defaultProviderInstanceForLegacy(config);
+  const hasLocalOpenAICompatibleKey = Boolean(config.localOpenaiCompatibleApiKeyEncrypted);
+  const hasCloudOpenAICompatibleKey = Boolean(config.cloudOpenaiCompatibleApiKeyEncrypted ?? config.openaiCompatibleApiKeyEncrypted);
   return {
+    defaultProviderInstanceId,
+    providerInstances,
     provider: config.provider,
     openaiModel: config.openaiModel,
     anthropicModel: config.anthropicModel,
@@ -354,6 +740,12 @@ function publicConfig(config: AiStoredConfig): AiPublicConfig {
     codexAccountModel: config.codexAccountModel,
     ollamaModel: config.ollamaModel,
     ollamaBaseUrl: config.ollamaBaseUrl,
+    localOpenaiCompatiblePreset: config.localOpenaiCompatiblePreset,
+    localOpenaiCompatibleModel: config.localOpenaiCompatibleModel,
+    localOpenaiCompatibleBaseUrl: config.localOpenaiCompatibleBaseUrl,
+    cloudOpenaiCompatiblePreset: config.cloudOpenaiCompatiblePreset,
+    cloudOpenaiCompatibleModel: config.cloudOpenaiCompatibleModel,
+    cloudOpenaiCompatibleBaseUrl: config.cloudOpenaiCompatibleBaseUrl,
     openaiCompatiblePreset: config.openaiCompatiblePreset,
     openaiCompatibleModel: config.openaiCompatibleModel,
     openaiCompatibleBaseUrl: config.openaiCompatibleBaseUrl,
@@ -363,7 +755,9 @@ function publicConfig(config: AiStoredConfig): AiPublicConfig {
     guardrails: sanitizeGuardrails(config.guardrails),
     hasOpenAIKey: Boolean(config.openaiApiKeyEncrypted),
     hasAnthropicKey: Boolean(config.anthropicApiKeyEncrypted),
-    hasOpenAICompatibleKey: Boolean(config.openaiCompatibleApiKeyEncrypted),
+    hasLocalOpenAICompatibleKey,
+    hasCloudOpenAICompatibleKey,
+    hasOpenAICompatibleKey: hasLocalOpenAICompatibleKey || hasCloudOpenAICompatibleKey,
     claudeAccountAvailable: claudeAccountEnabledByEnv(),
     claudeAccountAuthenticated: claudeAccountAuthenticatedCache,
     codexAccountAvailable: codexAccountEnabledByEnv(),
@@ -574,21 +968,6 @@ function isOpenAICompatiblePreset(value: unknown): value is AiOpenAICompatiblePr
     || value === 'custom';
 }
 
-function normalizedUrlIdentity(value: string | undefined): string {
-  if (!value?.trim()) return '';
-  try {
-    const url = new URL(value.trim());
-    url.hash = '';
-    url.search = '';
-    url.protocol = url.protocol.toLowerCase();
-    url.hostname = url.hostname.toLowerCase();
-    url.pathname = url.pathname.replace(/\/+$/, '') || '';
-    return url.toString().replace(/\/$/, '');
-  } catch {
-    return value.trim().replace(/\/+$/, '');
-  }
-}
-
 function isLikelyLocalUrl(value: string | undefined): boolean {
   if (!value?.trim()) return false;
   try {
@@ -732,12 +1111,45 @@ export class AiService {
   getConfig(): AiStoredConfig {
     const current = this.repository.getSetting<Partial<AiStoredConfig>>(AI_CONFIG_KEY);
     const legacy = this.repository.getSetting<Partial<AiStoredConfig>>(LEGACY_AI_CONFIG_KEY);
-    return migrateKnownStaleModelDefaults({
+    const merged = {
       ...DEFAULT_CONFIG,
       ...(current ?? legacy ?? {}),
       featureRoutes: sanitizeFeatureRoutes((current ?? legacy)?.featureRoutes),
       guardrails: sanitizeGuardrails((current ?? legacy)?.guardrails),
+    };
+
+    const localPreset = isOpenAICompatiblePreset(merged.localOpenaiCompatiblePreset)
+      ? merged.localOpenaiCompatiblePreset
+      : DEFAULT_CONFIG.localOpenaiCompatiblePreset;
+    const cloudPreset = isOpenAICompatiblePreset(merged.cloudOpenaiCompatiblePreset)
+      ? merged.cloudOpenaiCompatiblePreset
+      : DEFAULT_CONFIG.cloudOpenaiCompatiblePreset;
+    const legacyPreset = isOpenAICompatiblePreset(merged.openaiCompatiblePreset)
+      ? merged.openaiCompatiblePreset
+      : DEFAULT_CONFIG.openaiCompatiblePreset;
+    const legacyBaseUrl = merged.openaiCompatibleBaseUrl || DEFAULT_CONFIG.openaiCompatibleBaseUrl;
+    const legacyModel = merged.openaiCompatibleModel || DEFAULT_CONFIG.openaiCompatibleModel;
+    const localLegacy = isLocalOpenAICompatibleConfig(legacyPreset, legacyBaseUrl);
+
+    const normalized = migrateKnownStaleModelDefaults({
+      ...merged,
+      defaultProviderInstanceId: defaultProviderInstanceForLegacy(merged as AiStoredConfig),
+      localOpenaiCompatiblePreset: localPreset,
+      cloudOpenaiCompatiblePreset: cloudPreset,
+      localOpenaiCompatibleBaseUrl: merged.localOpenaiCompatibleBaseUrl
+        || (localLegacy ? legacyBaseUrl : DEFAULT_CONFIG.localOpenaiCompatibleBaseUrl),
+      cloudOpenaiCompatibleBaseUrl: merged.cloudOpenaiCompatibleBaseUrl
+        || (localLegacy ? DEFAULT_CONFIG.cloudOpenaiCompatibleBaseUrl : legacyBaseUrl),
+      localOpenaiCompatibleModel: merged.localOpenaiCompatibleModel
+        || (localLegacy ? legacyModel : DEFAULT_CONFIG.localOpenaiCompatibleModel),
+      cloudOpenaiCompatibleModel: merged.cloudOpenaiCompatibleModel
+        || (localLegacy ? DEFAULT_CONFIG.cloudOpenaiCompatibleModel : legacyModel),
+      providerInstances: merged.providerInstances ?? DEFAULT_CONFIG.providerInstances,
     });
+    return {
+      ...normalized,
+      providerInstances: materializeProviderInstances(normalized),
+    };
   }
 
   getPublicConfig(): AiPublicConfig {
@@ -765,7 +1177,7 @@ export class AiService {
       const preset = openAICompatiblePreset(presetId);
       const local = preset.local;
       const availability = preset.requiresApiKey
-        ? (config.hasOpenAICompatibleKey
+        ? (config.hasCloudOpenAICompatibleKey
           ? { availability: 'available' as const }
           : { availability: 'auth-required' as const, availabilityReason: `${preset.label} key is not configured.` })
         : { availability: 'available' as const };
@@ -859,30 +1271,83 @@ export class AiService {
   }
 
   private mergeConfig(input: AiConfigPatch, current = this.getConfig()): AiStoredConfig {
-    const preset = isOpenAICompatiblePreset(input.openaiCompatiblePreset)
-      ? input.openaiCompatiblePreset
-      : current.openaiCompatiblePreset;
-    const presetDescriptor = openAICompatiblePreset(preset);
-    const presetChanged = preset !== current.openaiCompatiblePreset;
-    const provider = isProvider(input.provider) ? input.provider : current.provider;
+    const requestedProviderInstanceId = isProviderInstanceId(input.providerInstanceId)
+      ? input.providerInstanceId
+      : undefined;
+    const requestedDefaultInstanceId = isProviderInstanceId(input.defaultProviderInstanceId)
+      ? input.defaultProviderInstanceId
+      : current.defaultProviderInstanceId;
+    const provider = isProvider(input.provider)
+      ? input.provider
+      : requestedProviderInstanceId
+        ? providerInstanceToProvider(requestedProviderInstanceId)
+      : input.defaultProviderInstanceId
+        ? providerInstanceToProvider(requestedDefaultInstanceId)
+        : current.provider;
     const budget = input.dailyTokenBudget === undefined
       ? current.dailyTokenBudget
       : Math.max(0, Math.floor(Number(input.dailyTokenBudget)));
 
-    const nextCompatibleBaseUrl = input.openaiCompatibleBaseUrl?.trim()
-      || (presetChanged ? presetDescriptor.baseUrl : current.openaiCompatibleBaseUrl)
-      || presetDescriptor.baseUrl
-      || '';
-    const compatibleBaseChanged = normalizedUrlIdentity(nextCompatibleBaseUrl) !== normalizedUrlIdentity(current.openaiCompatibleBaseUrl);
-    const compatibleIdentityChanged = presetChanged || compatibleBaseChanged;
-    const nextCompatibleKey = input.openaiCompatibleApiKey?.trim()
-      ? encryptSecret(input.openaiCompatibleApiKey.trim())
-      : compatibleIdentityChanged
-        ? undefined
-        : current.openaiCompatibleApiKeyEncrypted;
+    const nextLocalPreset = isOpenAICompatiblePreset(input.localOpenaiCompatiblePreset)
+      ? input.localOpenaiCompatiblePreset
+      : current.localOpenaiCompatiblePreset;
+    const nextCloudPreset = isOpenAICompatiblePreset(input.cloudOpenaiCompatiblePreset)
+      ? input.cloudOpenaiCompatiblePreset
+      : current.cloudOpenaiCompatiblePreset;
+    const legacyPreset = isOpenAICompatiblePreset(input.openaiCompatiblePreset)
+      ? input.openaiCompatiblePreset
+      : undefined;
+    const legacyBaseUrl = input.openaiCompatibleBaseUrl?.trim();
+    const legacyModel = input.openaiCompatibleModel?.trim();
+    const legacyTargetsLocal = legacyPreset
+      ? localOpenAICompatiblePreset(legacyPreset)
+      : legacyBaseUrl
+        ? isLikelyLocalUrl(legacyBaseUrl)
+        : false;
 
-    return {
+    const nextLocalBaseUrl = input.localOpenaiCompatibleBaseUrl?.trim()
+      || (legacyTargetsLocal ? legacyBaseUrl : undefined)
+      || current.localOpenaiCompatibleBaseUrl;
+    const nextCloudBaseUrl = input.cloudOpenaiCompatibleBaseUrl?.trim()
+      || (!legacyTargetsLocal ? legacyBaseUrl : undefined)
+      || current.cloudOpenaiCompatibleBaseUrl;
+    const nextLocalModel = input.localOpenaiCompatibleModel?.trim()
+      || (legacyTargetsLocal ? legacyModel : undefined)
+      || current.localOpenaiCompatibleModel;
+    const nextCloudModel = input.cloudOpenaiCompatibleModel?.trim()
+      || (!legacyTargetsLocal ? legacyModel : undefined)
+      || current.cloudOpenaiCompatibleModel;
+    const nextLocalKey = input.localOpenaiCompatibleApiKey?.trim()
+      ? encryptSecret(input.localOpenaiCompatibleApiKey.trim())
+      : legacyTargetsLocal && input.openaiCompatibleApiKey?.trim()
+        ? encryptSecret(input.openaiCompatibleApiKey.trim())
+        : current.localOpenaiCompatibleApiKeyEncrypted;
+    const nextCloudKey = input.cloudOpenaiCompatibleApiKey?.trim()
+      ? encryptSecret(input.cloudOpenaiCompatibleApiKey.trim())
+      : !legacyTargetsLocal && input.openaiCompatibleApiKey?.trim()
+        ? encryptSecret(input.openaiCompatibleApiKey.trim())
+        : current.cloudOpenaiCompatibleApiKeyEncrypted ?? current.openaiCompatibleApiKeyEncrypted;
+
+    const nextDefaultInstanceId = requestedDefaultInstanceId;
+    const legacyOpenAICompatiblePreset = nextDefaultInstanceId === 'local-openai-compatible'
+      ? nextLocalPreset
+      : nextDefaultInstanceId === 'cloud-openai-compatible'
+        ? nextCloudPreset
+        : current.openaiCompatiblePreset;
+    const legacyOpenAICompatibleModel = nextDefaultInstanceId === 'local-openai-compatible'
+      ? nextLocalModel
+      : nextDefaultInstanceId === 'cloud-openai-compatible'
+        ? nextCloudModel
+        : current.openaiCompatibleModel;
+    const legacyOpenAICompatibleBaseUrl = nextDefaultInstanceId === 'local-openai-compatible'
+      ? nextLocalBaseUrl
+      : nextDefaultInstanceId === 'cloud-openai-compatible'
+        ? nextCloudBaseUrl
+        : current.openaiCompatibleBaseUrl;
+
+    const next: AiStoredConfig = {
       ...current,
+      defaultProviderInstanceId: nextDefaultInstanceId,
       provider,
       openaiModel: input.openaiModel?.trim() || current.openaiModel,
       anthropicModel: input.anthropicModel?.trim() || current.anthropicModel,
@@ -890,17 +1355,46 @@ export class AiService {
       codexAccountModel: input.codexAccountModel?.trim() || current.codexAccountModel,
       ollamaModel: input.ollamaModel?.trim() || current.ollamaModel,
       ollamaBaseUrl: input.ollamaBaseUrl?.trim() || current.ollamaBaseUrl,
-      openaiCompatiblePreset: preset,
-      openaiCompatibleModel: input.openaiCompatibleModel?.trim()
-        || (presetChanged ? presetDescriptor.defaultModel : current.openaiCompatibleModel)
-        || presetDescriptor.defaultModel,
-      openaiCompatibleBaseUrl: nextCompatibleBaseUrl,
+      localOpenaiCompatiblePreset: nextLocalPreset,
+      localOpenaiCompatibleModel: nextLocalModel,
+      localOpenaiCompatibleBaseUrl: nextLocalBaseUrl,
+      cloudOpenaiCompatiblePreset: nextCloudPreset,
+      cloudOpenaiCompatibleModel: nextCloudModel,
+      cloudOpenaiCompatibleBaseUrl: nextCloudBaseUrl,
+      openaiCompatiblePreset: legacyOpenAICompatiblePreset,
+      openaiCompatibleModel: legacyOpenAICompatibleModel,
+      openaiCompatibleBaseUrl: legacyOpenAICompatibleBaseUrl,
       featureRoutes: sanitizeFeatureRoutes(input.featureRoutes, current.featureRoutes),
       guardrails: sanitizeGuardrails(input.guardrails, current.guardrails),
       dailyTokenBudget: Number.isFinite(budget) ? budget : current.dailyTokenBudget,
       openaiApiKeyEncrypted: input.openaiApiKey?.trim() ? encryptSecret(input.openaiApiKey.trim()) : current.openaiApiKeyEncrypted,
       anthropicApiKeyEncrypted: input.anthropicApiKey?.trim() ? encryptSecret(input.anthropicApiKey.trim()) : current.anthropicApiKeyEncrypted,
-      openaiCompatibleApiKeyEncrypted: nextCompatibleKey,
+      localOpenaiCompatibleApiKeyEncrypted: nextLocalKey,
+      cloudOpenaiCompatibleApiKeyEncrypted: nextCloudKey,
+      openaiCompatibleApiKeyEncrypted: nextCloudKey,
+    };
+    if (input.providerInstances && typeof input.providerInstances === 'object') {
+      const nextInstances = { ...next.providerInstances };
+      for (const instanceId of AI_PROVIDER_INSTANCE_IDS) {
+        const patch = input.providerInstances[instanceId];
+        if (!patch || typeof patch !== 'object') continue;
+        const currentInstance = nextInstances[instanceId] ?? materializeProviderInstances(next)[instanceId];
+        nextInstances[instanceId] = {
+          ...currentInstance,
+          ...(typeof patch.configuredModel === 'string' ? { configuredModel: patch.configuredModel.trim() } : {}),
+          ...(typeof patch.baseUrl === 'string' ? { baseUrl: patch.baseUrl.trim() } : {}),
+          ...(isOpenAICompatiblePreset(patch.presetId) ? { presetId: patch.presetId } : {}),
+          ...(patch.discoveredModels !== undefined ? { discoveredModels: sanitizeDiscoveredModels(patch.discoveredModels) } : {}),
+        };
+      }
+      next.providerInstances = nextInstances;
+    }
+    const withProviderInstance = requestedProviderInstanceId
+      ? applyProviderInstance(next, requestedProviderInstanceId)
+      : next;
+    return {
+      ...withProviderInstance,
+      providerInstances: materializeProviderInstances(withProviderInstance),
     };
   }
 

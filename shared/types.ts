@@ -315,9 +315,34 @@ export const AI_PROVIDER_IDS: readonly AiProviderId[] = [
   'codex-account',
 ] as const;
 
+export type AiProviderInstanceId =
+  | 'claude-api'
+  | 'claude-account'
+  | 'openai-api'
+  | 'codex-account'
+  | 'ollama'
+  | 'local-openai-compatible'
+  | 'cloud-openai-compatible';
+
+export const AI_PROVIDER_INSTANCE_IDS: readonly AiProviderInstanceId[] = [
+  'claude-api',
+  'claude-account',
+  'openai-api',
+  'codex-account',
+  'ollama',
+  'local-openai-compatible',
+  'cloud-openai-compatible',
+] as const;
+
 export type AiProviderFamily = 'api' | 'local' | 'custom-endpoint' | 'account';
 export type AiProviderAuthMode = 'api-key' | 'local-server' | 'account' | 'none';
 export type AiProviderDataResidency = 'cloud' | 'local' | 'user-controlled';
+export type AiProviderInstanceConnectionMode =
+  | 'api-key'
+  | 'account-login'
+  | 'local-server'
+  | 'openai-compatible-cloud'
+  | 'openai-compatible-local';
 
 export type AiOpenAICompatiblePresetId =
   | 'openrouter'
@@ -376,6 +401,46 @@ export type AiMethodServiceFamily = 'claude' | 'codex-openai' | 'local-inference
 export type AiMethodConnection = 'api-key' | 'account' | 'local-server' | 'openai-compatible' | 'cli-agent';
 export type AiMethodChannel = 'chat-model' | 'file-agent';
 export type AiMethodAvailability = 'available' | 'auth-required' | 'unavailable';
+export type AiProviderInstanceAvailability = 'available' | 'auth-required' | 'unavailable';
+
+export interface AiProviderInstanceDescriptor {
+  id: AiProviderInstanceId;
+  provider: AiProviderId;
+  label: string;
+  family: AiProviderFamily;
+  connectionMode: AiProviderInstanceConnectionMode;
+  dataResidency: AiProviderDataResidency;
+  capabilities: AiProviderCapability[];
+  featureRoutable: boolean;
+  modelDiscovery: boolean;
+  requiresApiKey: boolean;
+  local: boolean;
+  defaultModel: string;
+  baseUrl?: string;
+  presetId?: AiOpenAICompatiblePresetId;
+}
+
+export interface AiProviderInstanceConfig {
+  id: AiProviderInstanceId;
+  provider: AiProviderId;
+  label: string;
+  family: AiProviderFamily;
+  connectionMode: AiProviderInstanceConnectionMode;
+  dataResidency: AiProviderDataResidency;
+  capabilities: AiProviderCapability[];
+  featureRoutable: boolean;
+  modelDiscovery: boolean;
+  configuredModel: string;
+  discoveredModels: AiModelInfo[];
+  available: AiProviderInstanceAvailability;
+  availabilityReason?: string;
+  authenticated?: boolean;
+  requiresApiKey: boolean;
+  hasApiKey: boolean;
+  local: boolean;
+  baseUrl?: string;
+  presetId?: AiOpenAICompatiblePresetId;
+}
 
 export interface AiMethodCapability {
   id: string;
@@ -530,11 +595,13 @@ export type AiFeatureId =
 
 export interface AiFeatureRoute {
   provider: AiProviderId | 'default';
+  providerInstanceId?: AiProviderInstanceId;
   model?: string;
 }
 
 export interface AiEffectiveFeatureRoute {
   provider: AiProviderId;
+  providerInstanceId: AiProviderInstanceId;
   model: string;
   inherited: boolean;
 }
@@ -630,6 +697,8 @@ export interface AiUsageDetail {
 }
 
 export interface AiPublicConfig {
+  defaultProviderInstanceId: AiProviderInstanceId;
+  providerInstances: Record<AiProviderInstanceId, AiProviderInstanceConfig>;
   provider: AiProviderId;
   openaiModel: string;
   anthropicModel: string;
@@ -637,8 +706,17 @@ export interface AiPublicConfig {
   codexAccountModel: string;
   ollamaModel: string;
   ollamaBaseUrl: string;
+  localOpenaiCompatiblePreset: AiOpenAICompatiblePresetId;
+  localOpenaiCompatibleModel: string;
+  localOpenaiCompatibleBaseUrl: string;
+  cloudOpenaiCompatiblePreset: AiOpenAICompatiblePresetId;
+  cloudOpenaiCompatibleModel: string;
+  cloudOpenaiCompatibleBaseUrl: string;
+  /** Legacy combined OpenAI-compatible selection for compatibility. */
   openaiCompatiblePreset: AiOpenAICompatiblePresetId;
+  /** Legacy combined OpenAI-compatible model for compatibility. */
   openaiCompatibleModel: string;
+  /** Legacy combined OpenAI-compatible base URL for compatibility. */
   openaiCompatibleBaseUrl: string;
   dailyTokenBudget: number;
   featureRoutes: Record<AiFeatureId, AiFeatureRoute>;
@@ -646,6 +724,9 @@ export interface AiPublicConfig {
   guardrails: AiGuardrailsConfig;
   hasOpenAIKey: boolean;
   hasAnthropicKey: boolean;
+  hasLocalOpenAICompatibleKey: boolean;
+  hasCloudOpenAICompatibleKey: boolean;
+  /** Legacy aggregate flag for compatibility during UI transition. */
   hasOpenAICompatibleKey: boolean;
   /** true only when SEEDBANK_ENABLE_CLAUDE_ACCOUNT opt-in is set server-side */
   claudeAccountAvailable: boolean;
@@ -831,6 +912,9 @@ export interface AggregateSettings {
 }
 
 export interface AiConfigInput {
+  providerInstanceId?: AiProviderInstanceId;
+  defaultProviderInstanceId?: AiProviderInstanceId;
+  providerInstances?: Partial<Record<AiProviderInstanceId, Partial<AiProviderInstanceConfig>>>;
   provider?: AiProviderId;
   openaiModel?: string;
   anthropicModel?: string;
@@ -838,6 +922,14 @@ export interface AiConfigInput {
   codexAccountModel?: string;
   ollamaModel?: string;
   ollamaBaseUrl?: string;
+  localOpenaiCompatiblePreset?: AiOpenAICompatiblePresetId;
+  localOpenaiCompatibleModel?: string;
+  localOpenaiCompatibleBaseUrl?: string;
+  cloudOpenaiCompatiblePreset?: AiOpenAICompatiblePresetId;
+  cloudOpenaiCompatibleModel?: string;
+  cloudOpenaiCompatibleBaseUrl?: string;
+  localOpenaiCompatibleApiKey?: string;
+  cloudOpenaiCompatibleApiKey?: string;
   openaiCompatiblePreset?: AiOpenAICompatiblePresetId;
   openaiCompatibleModel?: string;
   openaiCompatibleBaseUrl?: string;
