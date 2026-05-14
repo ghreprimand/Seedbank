@@ -1006,7 +1006,14 @@ export class ClaudeAccountProvider implements AiProvider {
         ok: true,
         models: catalog.models.map((m) => ({
           id: m.id,
+          ...(m.friendlyAlias ? { name: m.friendlyAlias } : {}),
           displayName: m.friendlyAlias ?? m.displayName,
+          capabilities: {
+            tools: false,
+            vision: m.supportsVision === true,
+            thinking: m.supportsThinking === true || Boolean(m.supportedReasoningEfforts?.length),
+            ...(typeof m.maxInputTokens === 'number' ? { contextWindow: m.maxInputTokens } : {}),
+          },
         })),
         claudeAccount: { authenticated: true, catalogFresh: catalog.fresh },
       };

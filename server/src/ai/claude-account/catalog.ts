@@ -17,6 +17,10 @@ export interface ClaudeCatalogModel {
   id: string;
   displayName: string;
   friendlyAlias?: string;   // e.g. "Sonnet (latest)"
+  aliases?: string[];
+  supportsThinking?: boolean;
+  supportsVision?: boolean;
+  supportedReasoningEfforts?: Array<'low' | 'medium' | 'high'>;
   maxInputTokens?: number;
   maxOutputTokens?: number;
   createdAt?: string;
@@ -30,12 +34,12 @@ export interface ClaudeCatalogSnapshot {
 
 // Known models for offline/unauthenticated fallback.
 const BUNDLED_MODELS: ClaudeCatalogModel[] = [
-  { id: 'claude-sonnet-4-20250514', displayName: 'Claude Sonnet 4', friendlyAlias: 'Sonnet 4' },
-  { id: 'claude-sonnet-latest', displayName: 'Claude Sonnet (latest)', friendlyAlias: 'Sonnet (latest)' },
-  { id: 'claude-haiku-3-5-20241022', displayName: 'Claude 3.5 Haiku', friendlyAlias: 'Haiku 3.5' },
-  { id: 'claude-haiku-latest', displayName: 'Claude Haiku (latest)', friendlyAlias: 'Haiku (latest)' },
-  { id: 'claude-opus-4-20250514', displayName: 'Claude Opus 4', friendlyAlias: 'Opus 4' },
-  { id: 'claude-opus-latest', displayName: 'Claude Opus (latest)', friendlyAlias: 'Opus (latest)' },
+  { id: 'claude-sonnet-4-20250514', displayName: 'Claude Sonnet 4', friendlyAlias: 'Sonnet 4', aliases: ['sonnet-4'], supportsThinking: true, supportsVision: true, supportedReasoningEfforts: ['low', 'medium', 'high'] },
+  { id: 'claude-sonnet-latest', displayName: 'Claude Sonnet (latest)', friendlyAlias: 'Sonnet (latest)', aliases: ['sonnet-latest', 'sonnet'], supportsThinking: true, supportsVision: true, supportedReasoningEfforts: ['low', 'medium', 'high'] },
+  { id: 'claude-haiku-3-5-20241022', displayName: 'Claude 3.5 Haiku', friendlyAlias: 'Haiku 3.5', aliases: ['haiku-3.5'], supportsThinking: false, supportsVision: true },
+  { id: 'claude-haiku-latest', displayName: 'Claude Haiku (latest)', friendlyAlias: 'Haiku (latest)', aliases: ['haiku-latest', 'haiku'], supportsThinking: false, supportsVision: true },
+  { id: 'claude-opus-4-20250514', displayName: 'Claude Opus 4', friendlyAlias: 'Opus 4', aliases: ['opus-4'], supportsThinking: true, supportsVision: true, supportedReasoningEfforts: ['low', 'medium', 'high'] },
+  { id: 'claude-opus-latest', displayName: 'Claude Opus (latest)', friendlyAlias: 'Opus (latest)', aliases: ['opus-latest', 'opus'], supportsThinking: true, supportsVision: true, supportedReasoningEfforts: ['low', 'medium', 'high'] },
 ];
 
 // Friendly alias derivation from model ID patterns
@@ -53,7 +57,54 @@ function deriveFriendlyAlias(id: string, displayName: string): string | undefine
   return undefined;
 }
 
+function deriveAliases(id: string, friendlyAlias?: string): string[] {
+  const aliases: string[] = [];
+  if (friendlyAlias) aliases.push(friendlyAlias.toLowerCase().replace(/[()]/g, '').replace(/\s+/g, '-'));
+  if (id.startsWith('claude-')) aliases.push(id.replace(/^claude-/, ''));
+  if (id.includes('sonnet-latest')) aliases.push('sonnet-latest', 'sonnet');
+  if (id.includes('opus-latest')) aliases.push('opus-latest', 'opus');
+  if (id.includes('haiku-latest')) aliases.push('haiku-latest', 'haiku');
+  return [...new Set(aliases.map((item) => item.trim()).filter(Boolean))];
+}
+
+function normalizeEfforts(value: unknown): Array<'low' | 'medium' | 'high'> | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const efforts = value
+    .map((item) => (typeof item === 'string' ? item.trim().toLowerCase() : ''))
+    .filter((item): item is 'low' | 'medium' | 'high' => item === 'low' || item === 'medium' || item === 'high');
+  return efforts.length ? [...new Set(efforts)] : undefined;
+}
+
+function detectThinkingCapability(id: string, hints: unknown): boolean {
+  if (typeof hints === 'boolean') return hints;
+  if (Array.isArray(hints)) {
+    if (hints.some((item) => typeof item === 'string' && /reason|thinking/i.test(item))) return true;
+  } else if (hints && typeof hints === 'object') {
+    const rec = hints as Record<string, unknown>;
+    if (typeof rec.reasoning === 'boolean') return rec.reasoning;
+    if (typeof rec.thinking === 'boolean') return rec.thinking;
+  }
+  return /sonnet|opus/i.test(id);
+}
+
+function detectVisionCapability(hints: unknown): boolean | undefined {
+  if (typeof hints === 'boolean') return hints;
+  if (Array.isArray(hints)) {
+    return hints.some((item) => typeof item === 'string' && /vision|image/i.test(item));
+  }
+  if (hints && typeof hints === 'object') {
+    const rec = hints as Record<string, unknown>;
+    if (typeof rec.vision === 'boolean') return rec.vision;
+    if (typeof rec.image === 'boolean') return rec.image;
+  }
+  return undefined;
+}
+
 let cache: ClaudeCatalogSnapshot | null = null;
+
+export function resetCatalogCacheForTests(): void {
+  cache = null;
+}
 
 /**
  * Fetch the model catalog. Returns cached when fresh; refreshes in background.
@@ -110,6 +161,14 @@ async function fetchCatalog(): Promise<ClaudeCatalogSnapshot> {
       data?: Array<{
         id: string;
         display_name?: string;
+        aliases?: unknown;
+        capabilities?: unknown;
+        input_modalities?: unknown;
+        output_modalities?: unknown;
+        supported_reasoning_efforts?: unknown;
+        reasoning_efforts?: unknown;
+        supports_reasoning?: unknown;
+        supports_vision?: unknown;
         max_input_tokens?: number;
         max_tokens?: number;
         created_at?: string;
@@ -117,12 +176,27 @@ async function fetchCatalog(): Promise<ClaudeCatalogSnapshot> {
     };
     const raw = Array.isArray(body.data) ? body.data : [];
     const models: ClaudeCatalogModel[] = raw.map((m) => ({
-      id: m.id,
-      displayName: m.display_name ?? m.id,
-      friendlyAlias: deriveFriendlyAlias(m.id, m.display_name ?? ''),
-      maxInputTokens: m.max_input_tokens,
-      maxOutputTokens: m.max_tokens,
-      createdAt: m.created_at,
+      ...(() => {
+        const displayName = m.display_name ?? m.id;
+        const friendlyAlias = deriveFriendlyAlias(m.id, displayName);
+        const supportedReasoningEfforts = normalizeEfforts(m.supported_reasoning_efforts ?? m.reasoning_efforts);
+        const modalityHints = [m.capabilities, m.input_modalities, m.output_modalities, m.supports_vision];
+        const supportsVision = modalityHints
+          .map((item) => detectVisionCapability(item))
+          .find((value): value is boolean => typeof value === 'boolean');
+        return {
+          id: m.id,
+          displayName,
+          friendlyAlias,
+          aliases: [...new Set([...(Array.isArray(m.aliases) ? m.aliases.filter((item): item is string => typeof item === 'string') : []), ...deriveAliases(m.id, friendlyAlias)])],
+          supportsThinking: detectThinkingCapability(m.id, m.supports_reasoning ?? m.capabilities),
+          ...(supportsVision !== undefined ? { supportsVision } : {}),
+          ...(supportedReasoningEfforts ? { supportedReasoningEfforts } : {}),
+          maxInputTokens: m.max_input_tokens,
+          maxOutputTokens: m.max_tokens,
+          createdAt: m.created_at,
+        } satisfies ClaudeCatalogModel;
+      })(),
     }));
     return { fetchedAt: Date.now(), models, fresh: true };
   } finally {
