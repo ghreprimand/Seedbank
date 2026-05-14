@@ -11,7 +11,7 @@ import {
 } from '../../../shared/types.js';
 import { decryptSecret } from './crypto.js';
 import { localOpenAICompatiblePreset, openAICompatiblePreset } from './registry.js';
-import type { AiProvider, AiProviderMessage, AiProviderResult, AiStoredConfig, AiUsage } from './types.js';
+import type { AiProvider, AiProviderCompleteOptions, AiProviderMessage, AiProviderResult, AiStoredConfig, AiUsage } from './types.js';
 
 const REQUEST_TIMEOUT_MS = 8_000;
 const OLLAMA_REQUEST_TIMEOUT_MS = 120_000;
@@ -315,16 +315,42 @@ export class OpenAIProvider implements AiProvider {
     return undefined;
   }
 
-  private responsesBody(messages: AiProviderMessage[], config: AiStoredConfig, stream = false): Record<string, unknown> {
+  private fieldSuggestionFormat(): Record<string, unknown> {
+    return {
+      type: 'json_schema',
+      name: 'field_suggestion_v1',
+      strict: true,
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['suggestion', 'rationale'],
+        properties: {
+          suggestion: { type: 'string' },
+          rationale: { type: 'string' },
+        },
+      },
+    };
+  }
+
+  private responsesBody(
+    messages: AiProviderMessage[],
+    config: AiStoredConfig,
+    stream = false,
+    options: AiProviderCompleteOptions = {},
+  ): Record<string, unknown> {
     const model = config.openaiModel;
     const effort = this.supportsReasoningEffort(model) ? this.selectedEffort(config) : undefined;
     const verbosity = this.supportsTextVerbosity(model) ? this.selectedVerbosity(config) : undefined;
+    const text: Record<string, unknown> = {
+      ...(verbosity ? { verbosity } : {}),
+      ...(options.responseFormat?.kind === 'field_suggestion_v1' ? { format: this.fieldSuggestionFormat() } : {}),
+    };
     return {
       model,
       instructions: systemPrompt(messages),
       input: transcript(messages),
       ...(effort ? { reasoning: { effort } } : {}),
-      ...(verbosity ? { text: { verbosity } } : {}),
+      ...(Object.keys(text).length ? { text } : {}),
       ...(stream ? { stream: true } : {}),
     };
   }
@@ -335,7 +361,11 @@ export class OpenAIProvider implements AiProvider {
     return apiKey;
   }
 
-  async complete(messages: AiProviderMessage[], config: AiStoredConfig): Promise<AiProviderResult> {
+  async complete(
+    messages: AiProviderMessage[],
+    config: AiStoredConfig,
+    options: AiProviderCompleteOptions = {},
+  ): Promise<AiProviderResult> {
     try {
       const response = await fetchWithTimeout('https://api.openai.com/v1/responses', {
         method: 'POST',
@@ -343,7 +373,7 @@ export class OpenAIProvider implements AiProvider {
           Authorization: `Bearer ${this.apiKey(config)}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(this.responsesBody(messages, config)),
+        body: JSON.stringify(this.responsesBody(messages, config, false, options)),
       });
       await assertOk(this.id, response, 'OpenAI request');
       const payload = await response.json() as { usage?: unknown };

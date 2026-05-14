@@ -53,9 +53,15 @@ export interface AiProviderResult {
   resolvedModelId?: string;
 }
 
+export type AiProviderResponseFormat = { kind: 'field_suggestion_v1' };
+
+export interface AiProviderCompleteOptions {
+  responseFormat?: AiProviderResponseFormat;
+}
+
 export interface AiProvider {
   id: AiProviderId;
-  complete(messages: AiProviderMessage[], config: AiStoredConfig): Promise<AiProviderResult>;
+  complete(messages: AiProviderMessage[], config: AiStoredConfig, options?: AiProviderCompleteOptions): Promise<AiProviderResult>;
   stream(messages: AiProviderMessage[], config: AiStoredConfig, onDelta: (delta: string) => void): Promise<AiProviderResult>;
   health(config: AiStoredConfig): Promise<AiProviderHealth>;
   listModels(config: AiStoredConfig): Promise<AiModelListResult>;

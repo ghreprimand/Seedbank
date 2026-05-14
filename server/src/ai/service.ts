@@ -37,6 +37,7 @@ import type { SeedbankRepository } from '../repository.js';
 import { encryptSecret } from './crypto.js';
 import {
   AnthropicProvider,
+  AiProviderError,
   ClaudeAccountProvider,
   CodexAccountProvider,
   OllamaProvider,
@@ -51,7 +52,7 @@ import {
   openAICompatiblePreset,
   providerInstanceDescriptor,
 } from './registry.js';
-import type { AiConfigPatch, AiProvider, AiProviderMessage, AiStoredConfig } from './types.js';
+import type { AiConfigPatch, AiProvider, AiProviderMessage, AiProviderResult, AiStoredConfig } from './types.js';
 import { codexAccountEnabledByEnv } from './codex-account/session.js';
 import { claudeAccountEnabledByEnv, claudeAccountRuntimeAvailability } from './claude-account/auth.js';
 import { AiStore, type AiExecutionMetadata } from './store.js';
@@ -1251,6 +1252,14 @@ function parseSuggestion(field: AiSuggestionField, text: string): AiSuggestion {
     rationale,
   };
 }
+
+function shouldRetryWithoutStructuredSuggestion(error: unknown): boolean {
+  if (error instanceof AiProviderError) {
+    return error.provider === 'openai' && error.status === 400;
+  }
+  return false;
+}
+
 function isProvider(value: unknown): value is AiProviderId {
   return isAiProviderId(value);
 }
@@ -1813,6 +1822,21 @@ export class AiService {
     return provider;
   }
 
+  private async completeFieldSuggestion(
+    config: AiStoredConfig,
+    messages: AiProviderMessage[],
+  ): Promise<AiProviderResult> {
+    const provider = this.provider(config);
+    try {
+      return await provider.complete(messages, config, { responseFormat: { kind: 'field_suggestion_v1' } });
+    } catch (error) {
+      if (shouldRetryWithoutStructuredSuggestion(error)) {
+        return await provider.complete(messages, config);
+      }
+      throw error;
+    }
+  }
+
   private budgetStates(config: AiStoredConfig, feature: AiFeatureId): AiBudgetState[] {
     const guardrails = sanitizeGuardrails(config.guardrails);
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -2032,7 +2056,7 @@ export class AiService {
     this.checkGuardrails(config, 'field-suggestions', key, { confirmationToken });
 
     try {
-      const result = await this.provider(config).complete(promptForSuggestion(idea, field, currentValue), config);
+      const result = await this.completeFieldSuggestion(config, promptForSuggestion(idea, field, currentValue));
       await this.recordUsage(config, 'field-suggestions', result);
       return parseSuggestion(field, result.text);
     } catch (error) {
@@ -2056,9 +2080,9 @@ export class AiService {
     this.checkGuardrails(config, 'field-suggestions', key, { confirmationToken });
 
     try {
-      const result = await this.provider(config).complete(
-        promptForFieldAssist(idea, field, currentValue, customPrompt, omitCurrentValue),
+      const result = await this.completeFieldSuggestion(
         config,
+        promptForFieldAssist(idea, field, currentValue, customPrompt, omitCurrentValue),
       );
       await this.recordUsage(config, 'field-suggestions', result);
       return parseSuggestion(field, result.text);
