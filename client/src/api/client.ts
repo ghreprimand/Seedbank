@@ -609,6 +609,9 @@ export async function listAiModels(config: AiConfigInput): Promise<AiModelListRe
 // ── Claude account auth ────────────────────────────────────────────────────────
 
 export interface ClaudeAccountStatus {
+  /** False when the server gate (SEEDBANK_ENABLE_CLAUDE_ACCOUNT) is off. */
+  available?: boolean;
+  unavailableReason?: string;
   authenticated: boolean;
   expiresAt: number | null;
   obtainedAt: number | null;
@@ -643,6 +646,9 @@ export async function logoutClaudeAccount(): Promise<{ ok: true }> {
 // ── Codex account auth ────────────────────────────────────────────────────────
 
 export interface CodexAccountStatus {
+  /** False when the server gate (SEEDBANK_ENABLE_CODEX_ACCOUNT) is off. */
+  available?: boolean;
+  unavailableReason?: string;
   authenticated: boolean;
   accountEmail?: string;
   planType?: string;
