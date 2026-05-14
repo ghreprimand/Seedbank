@@ -1867,7 +1867,7 @@ function FeatureRoutingSection({ ai, providerStatuses, providerAvailability, onS
                     ? (ai.claudeAccountAuthenticated
                       ? 'Subscription login path (not API-key billing).'
                       : 'Claude account requires sign-in before routing features here.')
-                    : 'Claude account OAuth is disabled in this RC build. Use the Anthropic API provider for Claude models.')
+                    : 'Claude account login is not available in the current server configuration. Use the Anthropic API provider for Claude models.')
                   : selectedProvider === 'codex-account'
                     ? 'Codex account subscription transport — separate from OpenAI API billing. See the Codex account card for setup.'
                     : selectedProvider === 'openai-compatible'
@@ -2105,7 +2105,7 @@ function ClaudeAccountDetail({
         <div className="space-y-2">
           <div className="flex items-center gap-2 text-[11px] text-violet-700 bg-violet-50 border border-violet-200 rounded px-2 py-1.5">
             <span className="font-semibold">Unavailable</span>
-            <span>— Claude account OAuth is disabled in this RC build unless explicitly enabled by the operator.</span>
+            <span>— Claude account login is disabled by server configuration.</span>
           </div>
           <p className="text-[11px] text-ink-500 leading-relaxed">
             To use Claude models now, use the <span className="font-semibold text-ink-700">Anthropic API</span> method with an API key from{' '}
@@ -2121,6 +2121,10 @@ function ClaudeAccountDetail({
         </div>
       ) : !authenticated ? (
         <div className="space-y-2">
+          <div className="flex items-center gap-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
+            <span className="font-semibold">Sign-in required</span>
+            <span>— Log in with your Claude account subscription to enable this method.</span>
+          </div>
           {/* Stale/expired session messaging — expiresAt is populated by the initial refreshStatus() call */}
           {expiresAt !== null && expiresAt < now && (
             <div className="flex items-center gap-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
@@ -2135,7 +2139,7 @@ function ClaudeAccountDetail({
               disabled={loginLoading}
               className="px-3 py-1.5 text-[12px] font-medium bg-neutral-800 text-white rounded hover:bg-neutral-900 disabled:opacity-50"
             >
-              {loginLoading ? 'Starting…' : 'Start Claude login'}
+              {loginLoading ? 'Starting…' : 'Log in with Claude'}
             </button>
             <button
               type="button"
@@ -2149,14 +2153,14 @@ function ClaudeAccountDetail({
 
           {loginResult && (
             <div className="space-y-1.5 p-2 bg-neutral-50 border border-neutral-200 rounded text-[11px]">
-              <p>{loginResult.manualFallback ? 'Manual callback required for this environment.' : 'Browser login opened in a new tab.'}</p>
+              <p>{loginResult.manualFallback ? 'Manual callback is required in this environment.' : 'Browser sign-in opened in a new tab.'}</p>
               {loginResult.manualReason && <p className="text-ink-500">{loginResult.manualReason}</p>}
             </div>
           )}
 
           <div className="space-y-2 p-2 bg-paper-warm border border-ink-100 rounded">
             <label className="block text-[11px] text-ink-600">
-              Manual callback URL (fallback)
+              Callback URL
               <input
                 type="text"
                 value={manualCallbackUrl}
@@ -2171,7 +2175,7 @@ function ClaudeAccountDetail({
               disabled={completing}
               className="px-3 py-1.5 text-[12px] font-medium border border-ink-200 text-ink-700 rounded hover:bg-ink-50 disabled:opacity-50"
             >
-              {completing ? 'Completing…' : 'Complete login from pasted URL'}
+              {completing ? 'Completing…' : 'Complete login from callback URL'}
             </button>
           </div>
 
@@ -2536,7 +2540,7 @@ export default function AiAgentsTab() {
         : 'unavailable',
       reason: ai.claudeAccountAvailable
         ? (ai.claudeAccountAuthenticated ? undefined : 'Sign in with Claude account to enable this method.')
-        : 'Claude account OAuth is disabled in this release-candidate build. Use the Anthropic API method, or set SEEDBANK_ENABLE_CLAUDE_ACCOUNT=1 to opt in.',
+        : 'Claude account login is disabled by server configuration. Use the Anthropic API method, or set SEEDBANK_ENABLE_CLAUDE_ACCOUNT=1 to enable account login.',
       featureRoutable: true,
     }),
     'codex-account': capabilityState('codex-account-app-server', { availability: ai.codexAccountAvailable ? (ai.codexAccountAuthenticated ? 'available' : 'auth-required') : 'unavailable', reason: ai.codexAccountAvailable ? 'Sign in with Codex account to enable this method.' : 'Codex account method is disabled by server configuration.', featureRoutable: true }),
