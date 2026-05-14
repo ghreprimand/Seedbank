@@ -104,6 +104,11 @@ test('Claude catalog parsing includes aliases and capability metadata', async ()
             display_name: 'Claude Sonnet (latest)',
             max_input_tokens: 200000,
             supports_vision: true,
+            capabilities: {
+              context_management: true,
+              compact: true,
+              prompt_caching: true,
+            },
             supported_reasoning_efforts: ['low', 'medium', 'high'],
             aliases: ['sonnet-latest'],
           }],
@@ -122,6 +127,9 @@ test('Claude catalog parsing includes aliases and capability metadata', async ()
       assert.equal(model?.id, 'claude-sonnet-latest');
       assert.equal(model?.supportsThinking, true);
       assert.equal(model?.supportsVision, true);
+      assert.equal(model?.supportsContextManagement, true);
+      assert.equal(model?.supportsCompact, true);
+      assert.equal(model?.supportsPromptCaching, true);
       assert.equal(model?.maxInputTokens, 200000);
       assert.ok(model?.aliases?.includes('sonnet-latest'));
       assert.deepEqual(model?.supportedReasoningEfforts, ['low', 'medium', 'high']);
@@ -214,6 +222,7 @@ test('Claude provider listModels maps catalog capabilities into model metadata',
             display_name: 'Claude Opus 4',
             max_input_tokens: 262144,
             supports_vision: true,
+            capabilities: { context_management: true, compact: true },
             supported_reasoning_efforts: ['medium', 'high'],
           }],
         }), {
@@ -231,6 +240,8 @@ test('Claude provider listModels maps catalog capabilities into model metadata',
       const model = result.models.find((item) => item.id === 'claude-opus-4-20250514');
       assert.equal(model?.capabilities?.thinking, true);
       assert.equal(model?.capabilities?.vision, true);
+      assert.equal(model?.capabilities?.contextManagement, true);
+      assert.equal(model?.capabilities?.compact, true);
       assert.equal(model?.capabilities?.contextWindow, 262144);
     } finally {
       globalThis.fetch = originalFetch;

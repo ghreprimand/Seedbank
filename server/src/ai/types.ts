@@ -18,6 +18,7 @@ export interface AiStoredConfig extends Omit<
   | 'hasOpenAICompatibleKey'
   | 'effectiveFeatureRoutes'
   | 'claudeAccountAvailable'
+  | 'claudeAccountCompact'
   | 'codexAccountAvailable'
 > {
   openaiApiKeyEncrypted?: string;
@@ -27,6 +28,7 @@ export interface AiStoredConfig extends Omit<
   openaiReasoningEffort?: 'minimal' | 'low' | 'medium' | 'high';
   openaiTextVerbosity?: 'low' | 'medium' | 'high';
   codexReasoningEffort?: 'minimal' | 'low' | 'medium' | 'high';
+  claudeAccountCompact?: boolean;
   /**
    * Legacy shared key for pre-instance openai-compatible configuration.
    * Maintained for migration/backward compatibility.
