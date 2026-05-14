@@ -157,3 +157,57 @@ This wave established the application settings foundation.
 - Added the runtime theming system using CSS custom properties and persisted theme preferences.
 - Added a shared settings store that hydrates from the server, patches section-level settings, and falls back safely when offline.
 - Migrated backup, integration, and theme settings to the shared store.
+
+---
+
+## 2026-05-12 — Retrospective Detail: Docs, Screenshots, Themes, AI Foundations, And Release Packaging
+
+Backfilled from commit history after the public development log was created. This section intentionally avoids author emails, local machine paths, credentials, and environment-specific private values.
+
+The early May 12 work expanded the public documentation and API surface before the release-candidate push. Commits `542a5be` and `4ac12f9` added the standalone API reference and refreshed the architecture, integrations, settings, theming, agents, and AI guide docs. `41bed9e` then completed the API & Server settings tab UI, tying together server info, personal access token management, webhook configuration, and OpenAPI discovery. `41aa370`, `47b9619`, and `946292f` cleaned up stale links, updated the README and changelog for the current product state, and improved API error response polish.
+
+Screenshot and public-showcase tooling followed in `553d898`, `d16a35c`, `f1d6cb4`, `d7c3aea`, and `19e442c`. The screenshot capture workflow became deterministic and path-neutral, generated screenshot outputs were ignored by default, and curated README screenshots were added for the v2.2 presentation. The related safety pass guarded against destructive screenshot seed behavior during documentation refreshes.
+
+Theme and help work landed as a larger v2.2 slice. `8cf35b8` added four new themes, the in-app manual, and the contextual help system. Follow-up commits `ac8b580`, `7c44a4d`, `7d3be8a`, `50b9e59`, `3ce6603`, `342b91d`, and `3b46bf4` improved small-text contrast, tightened mobile/help behavior, expanded the theme count, renamed theme identities for distinctness, removed stale theme names from docs/scripts/comments, added legacy server-side theme migration, and documented the v2.2 release.
+
+The product framing shifted toward platform-neutral local operation through `28b1064`, `36e21a6`, `de6fd6c`, `b490b40`, `9f90c2c`, `642f03a`, `01e448e`, `49e088b`, `b516465`, `3763222`, `9f4ce20`, and `9a4d97f`. The docs were reframed around generic integrations rather than one specific downstream workflow, launcher-first setup, local/LAN security boundaries, neutral provider language, scoped AI extensibility guidance, and accurate agent workspace wording. Sensitive or overly specific scaffold metadata was scrubbed, a workspace-path leak was removed from scaffold context, and overbroad isolation claims were softened.
+
+The late May 12 release-candidate foundation commits (`40eb8d5`, `54ddcf5`, `692a752`, `d018d99`) added the first AI guardrail and integration foundations, improved AI assistance/settings UX, introduced archive-based release packaging, and updated setup/provider guidance. Those commits are the basis for the May 13 stabilization entry above.
+
+## 2026-05-11 — Persistent Backend, Project Graduation, Settings, API, Agents, And Local Launchers
+
+Backfilled from commit history after the public development log was created. This section intentionally avoids author emails, local machine paths, credentials, and environment-specific private values.
+
+Commit `633aabc` was the major architecture turn from browser-only/local-cache behavior into a persistent local application backend. It introduced the server-backed storage direction, project graduation support, and AI-assisted development workflows. This established Seedbank as a local-first app with a durable backend source of truth, while preserving the client-side experience and migration path.
+
+The public documentation pass in `dac81d8` expanded the repo from a working app into a public-showcase project. The docs were broadened to explain setup, architecture, integrations, AI assistance, settings, local-first storage, and safe operating boundaries. `d5ef26a` then added cross-platform launcher scripts and desktop integration so the app could be started more like a local product than a loose development server.
+
+The settings foundation landed through `ba33f73`, `c973847`, `4ebef09`, and `4cd2157`. The UI gained the initial settings page structure; the server gained namespaced settings and an aggregate settings endpoint; legacy settings migration received reviewer cleanup; and the client gained a settings store that hydrates from the API, persists section updates, mirrors relevant UI state, and falls back cleanly when offline.
+
+The server/API layer expanded through `fc92ac6`, `9de2496`, `fa5dac7`, and `2d73bd2`. Seedbank gained personal access token support, token-scoped auth middleware, server info, token-gated read-only MCP endpoints, outbound lifecycle webhooks, and a generated OpenAPI spec at `/api/openapi.json`. `f6de4b0` connected the client-side connection indicator to the API settings surface so server status became actionable from the UI.
+
+The first full theming system landed in `131a2db`: six themes, live theme switching, CSS-variable-backed tokens, and a no-FOUC boot path that applies the stored theme before React renders. This became the base for the larger theme expansion on May 12.
+
+The AI & Agents surface began in `34af635`. That slice added the AI & Agents settings tab, cleaned up the AI chat panel, and introduced agent run surfaces for local development assistance. Follow-up hardening commits `8c5f06a`, `1db7f0c`, `f557989`, and `57d4b4d` tightened agent output application: transcript paths were hidden, path traversal was blocked, symlink edge cases were handled, and client/server contract mismatches from review were resolved.
+
+## 2026-05-08 — Core Application Buildout: Data, Shell, Board, Detail, Import/Export, Discovery, Polish, And Docs
+
+Backfilled from commit history after the public development log was created. This section intentionally avoids author emails, local machine paths, credentials, and environment-specific private values.
+
+The main application buildout happened as a sequence of phase commits. `ad3cc38` created the data layer with shared types, Dexie schema, CRUD helpers, and automatic versioning. This gave ideas a structured local persistence model and made later import/export/version-history behavior possible.
+
+`47093c3` added the app shell, routing, and quick capture flow. This established the main navigation frame and the fast idea-entry path. `e7e8f78` built the Board view with a card grid, filter bar, search, and empty states, making the core idea library browsable. `ce041f9` added the Idea Detail/editor view so individual ideas could be opened, edited, scored, staged, and expanded beyond quick capture.
+
+`d82a4a5` added import and export support, creating the first durable migration/sharing path outside browser storage. `1a7beee` then added the discovery and "delight" features: Daily Seed, Cross-Pollinate, Idea Weather, and Draw from Storage. These shifted the product from a plain tracker toward an idea-recombination tool.
+
+Visual and interaction polish followed in `a6a4d6b` and `bc084d4`. The app received a more complete visual treatment, keyboard shortcuts, an error boundary, favicon work, README updates, and final pre-doc polish. `bd05fb2` added JSDoc coverage across source files, CHANGELOG content, and metadata updates.
+
+The review cleanup in `0fa0cf0` addressed Markdown round-trip behavior, switched to self-hosted fonts, and cleaned up lint findings. `1d306c3` normalized the README filename casing so docs links and repository conventions were consistent.
+
+## 2026-05-07 — Project Definition And Initial Vite/React Scaffold
+
+Backfilled from commit history after the public development log was created. This section intentionally avoids author emails, local machine paths, credentials, and environment-specific private values.
+
+Seedbank started with documentation-first product framing. `3049980` added the initial README, defining the project as an idea manager for capturing, growing, rediscovering, and eventually acting on project ideas. `1fac70f` clarified the README workflow so the intended user path and garden metaphor were easier to follow.
+
+The first implementation commit, `73e1f54`, scaffolded the app with Vite, React, TypeScript, Tailwind, path aliases, and Seedbank theme tokens. This established the frontend stack, base styling vocabulary, and project structure that the May 8 phase commits built on.

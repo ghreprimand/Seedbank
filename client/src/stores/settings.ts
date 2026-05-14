@@ -34,6 +34,7 @@ import {
 const DEFAULT_SETTINGS: AggregateSettings = {
   ui: {
     theme: { name: 'paper', matchSystem: false },
+    shortcuts: {}, // user overrides merged on top; effective defaults live in DEFAULT_SHORTCUTS (Layout.tsx)
   },
   categories: {
     schemaVersion: 1,

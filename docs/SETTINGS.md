@@ -8,7 +8,7 @@ Settings uses a tabbed shell. On desktop (`md+`) a left-rail sidebar lists every
 
 | Tab | Path | Purpose |
 |-----|------|---------|
-| General | `/settings/general` | Import / export, keyboard shortcut reference |
+| General | `/settings/general` | Import / export, customizable keyboard shortcuts |
 | AI & Agents | `/settings/ai-agents` | Provider config, feature routing, token budget |
 | Theme | `/settings/theme` | Color palette, system preference toggle |
 | API & Server | `/settings/api` | Server info, personal access tokens, webhooks, MCP |
@@ -27,8 +27,25 @@ A floating **?** control in the bottom-right corner toggles contextual help mode
 
 ## General
 
-- **Import / Export** — the import/export modal is launched here (previously in the header). The keyboard shortcut still works from any page.
-- **Shortcuts reference** — a static table of keyboard shortcuts available throughout the app.
+- **Import / Export** — the import/export modal is launched here. Export JSON (full archive with version history) or Markdown (human-readable). Both formats can be imported back.
+- **Keyboard shortcuts** — all three main shortcuts are user-configurable. Click any key badge to enter recording mode, then press the desired key (with optional modifiers). Changes persist immediately. Esc is always reserved and cannot be remapped.
+
+### Keyboard shortcut behaviour
+
+| Action | Default | Notes |
+|--------|---------|-------|
+| Focus search | `/` | |
+| Open quick capture | `N` | |
+| Open manual | `?` | |
+| Close modal / blur search | `Esc` | Reserved — cannot be changed |
+
+- **Modifier combinations** (Ctrl, Alt, ⌘, Shift) are supported. A binding with a modifier fires even while a text field is focused; a plain-key binding is suppressed while typing.
+- **Conflict detection** — if two actions share the same binding a warning appears on both rows. The browser-reserved combos (Ctrl+W, Ctrl+T, Ctrl+N, Ctrl+R, etc.) and bare modifier/function keys cannot be recorded.
+- **Reset** — click the reset icon (↺) next to any overridden binding to restore its default. The "default" label reappears once no override is stored.
+
+### Implementation
+
+Bindings are stored server-side under the `ui.shortcuts` settings key as a `ShortcutConfig` object (see `shared/types.ts`). The client reads them from the settings store on mount; `Layout.tsx` uses `matchBinding()` to compare against the live binding at keydown time. Defaults live in `DEFAULT_SHORTCUTS` exported from `Layout.tsx`.
 
 ---
 
@@ -207,7 +224,7 @@ All backup settings live here. Backups are written to `<seedbank-data-dir>/backu
 - **JSON archive export** — toggle full JSON archive snapshots on each backup run (written to `<seedbank-data-dir>/exports/`).
 - **Offsite destinations** — copy backups to additional locations after each run. Two types:
   - **Local / network folder** — a folder on this machine or a mounted network share. No extra software required; the easiest option.
-  - **Rclone remote** — copy to cloud storage or a remote server via [rclone](https://rclone.org). **Rclone is separate software** that must be installed and configured on the Seedbank machine before this destination type works. Install rclone, run `rclone config` to add a named remote, then enter the path here as `remote-name:folder` (e.g. `mys3:seedbank-backups` or `gdrive:backups/seedbank`). Run `rclone listremotes` to see configured remotes.
+  - **Rclone remote** — copy to cloud storage (Google Drive, Dropbox, OneDrive, Backblaze B2, S3/R2, SFTP, and 70+ other providers) or a remote server via [rclone](https://rclone.org). **Rclone is separate software** that must be installed and configured on the Seedbank machine before this destination type works. Install rclone, run `rclone config` to add a named remote, then enter the path here as `remote-name:folder` (e.g. `gdrive:backups/seedbank` or `mys3:seedbank-backups`). Run `rclone listremotes` to see configured remotes. The **Cloud setup guide** button in this section opens step-by-step instructions in the in-app manual.
 - **Test destination** — run a connectivity/writeability check before relying on a destination.
 - **Manual backup** — runs a backup immediately.
 - **Test restore (safe validation)** — reads and validates the latest local backup files without replacing live data. Validates what Seedbank has stored locally; rclone remote destinations are delivery targets and are not directly validated by this tool.
@@ -217,6 +234,17 @@ All backup settings live here. Backups are written to `<seedbank-data-dir>/backu
     3. Run **Test restore** so Seedbank validates the local copy before any real recovery action.
 
 The rclone status indicator in the backup summary shows whether rclone is installed and how many remotes are configured on this machine.
+
+### Cloud storage setup (rclone)
+
+Rclone handles auth and transfer for all cloud providers — Seedbank never sees credentials. The general flow:
+
+1. Install rclone (`brew install rclone` / `curl https://rclone.org/install.sh | sudo bash` / winget).
+2. Run `rclone config` and follow the interactive wizard for your provider.
+3. Enter the remote path in Settings → Backups as `remote-name:folder/path`.
+4. Click **Test destination** to verify.
+
+Full per-provider instructions (Google Drive, Dropbox, OneDrive, Backblaze B2, S3/R2/Wasabi, SFTP, headless server auth) are in the in-app manual under **Cloud Backup Setup** — accessible via the **Cloud setup guide** button in the Offsite destinations section, or by searching "rclone" in the manual.
 
 The header status pill continues to show last-backup time and links to this tab.
 

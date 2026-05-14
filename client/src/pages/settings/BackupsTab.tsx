@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { RefreshCw, Archive, HardDrive, Cloud, CircleCheck, CircleAlert, Info, AlertTriangle } from 'lucide-react';
+import { RefreshCw, Archive, HardDrive, Cloud, CircleCheck, CircleAlert, Info, AlertTriangle, BookOpen } from 'lucide-react';
 import {
   runBackupNow,
   testBackupDestination,
@@ -11,6 +11,7 @@ import {
 import { HelpButton } from '@/help/HelpPopover';
 import { useBackupsSettings, useSettingsStore } from '@/stores/settings';
 import { timeAgo } from '@/lib/timeago';
+import { useHelp } from '@/help/useHelp';
 
 const FREQUENCIES: BackupFrequency[] = ['daily', 'weekly', 'off'];
 
@@ -115,6 +116,7 @@ export default function BackupsTab() {
   const backups = useBackupsSettings();
   const patchSettings = useSettingsStore((s) => s.patch);
   const refreshSettings = useSettingsStore((s) => s.refresh);
+  const { openManual } = useHelp();
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -365,7 +367,7 @@ export default function BackupsTab() {
               alwaysShow
             />
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => setDestinationsDraft((current) => [...current, newDestination('local-path')])}
@@ -380,13 +382,29 @@ export default function BackupsTab() {
             >
               + Rclone remote
             </button>
+            <button
+              type="button"
+              onClick={() => openManual('cloud-backup-setup')}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-card border border-sage-200 text-sage-700 bg-sage-50 hover:bg-sage-100 transition-colors"
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              Cloud setup guide
+            </button>
           </div>
         </div>
 
         {destinationsDraft.length === 0 && (
           <div className="text-xs text-ink-500 border border-dashed border-ink-200 rounded-card p-3 space-y-1">
             <p>No destinations configured. Seedbank backups are stored locally on this machine.</p>
-            <p className="text-ink-400">Add a <strong className="font-medium text-ink-500">Local / network folder</strong> to copy backups to another drive or network share — no extra software needed. Add a <strong className="font-medium text-ink-500">Rclone remote</strong> to send backups to cloud storage (requires rclone installed and configured separately).</p>
+            <p className="text-ink-400">Add a <strong className="font-medium text-ink-500">Local / network folder</strong> to copy backups to another drive or network share — no extra software needed. Add a <strong className="font-medium text-ink-500">Rclone remote</strong> to send backups to Google Drive, Dropbox, S3, Backblaze, OneDrive, and more.{' '}
+            <button
+              type="button"
+              onClick={() => openManual('cloud-backup-setup')}
+              className="underline text-sage-700 hover:text-sage-800 font-medium"
+            >
+              See the cloud setup guide →
+            </button>
+          </p>
           </div>
         )}
 
@@ -463,7 +481,14 @@ export default function BackupsTab() {
                         <span>
                           Rclone is not installed on this machine. Install it from{' '}
                           <a href="https://rclone.org/install/" target="_blank" rel="noopener noreferrer" className="underline hover:text-amber-800">rclone.org</a>
-                          {' '}and run <code className="font-mono">rclone config</code> to add a remote before using this destination type.
+                          {' '}and run <code className="font-mono">rclone config</code> to add a remote before using this destination type.{' '}
+                          <button
+                            type="button"
+                            onClick={() => openManual('cloud-backup-setup')}
+                            className="underline hover:text-amber-800 font-medium"
+                          >
+                            See the step-by-step cloud setup guide.
+                          </button>
                         </span>
                       </div>
                     )}
@@ -471,7 +496,14 @@ export default function BackupsTab() {
                       <div className="flex items-start gap-1.5 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
                         <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                         <span>
-                          Rclone is installed but no remotes are configured yet. Run <code className="font-mono">rclone config</code> in a terminal to add a remote, then come back and enter the remote path above.
+                          Rclone is installed but no remotes are configured yet. Run <code className="font-mono">rclone config</code> in a terminal to add a remote, then come back and enter the remote path above.{' '}
+                          <button
+                            type="button"
+                            onClick={() => openManual('cloud-backup-setup')}
+                            className="underline hover:text-amber-800 font-medium"
+                          >
+                            See provider-specific instructions.
+                          </button>
                         </span>
                       </div>
                     )}

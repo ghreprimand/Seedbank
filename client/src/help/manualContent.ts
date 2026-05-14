@@ -26,7 +26,8 @@ export type ManualBlock =
   | { type: 'h3'; text: string }
   | { type: 'ul'; items: string[] }
   | { type: 'tip'; text: string }
-  | { type: 'kbd'; keys: string[]; description: string };
+  | { type: 'kbd'; keys: string[]; description: string }
+  | { type: 'code'; text: string };
 
 export interface ManualGroup {
   label: string;
@@ -337,9 +338,9 @@ export const MANUAL_GROUPS: ManualGroup[] = [
         id: 'settings-general',
         title: 'Settings — General',
         indexLabel: 'General',
-        keywords: ['settings', 'general', 'import', 'export', 'keyboard', 'shortcuts'],
+        keywords: ['settings', 'general', 'import', 'export', 'keyboard', 'shortcuts', 'hotkey', 'keybind', 'remap', 'custom'],
         blocks: [
-          { type: 'p', text: 'Settings → General contains import/export controls and a keyboard shortcut reference.' },
+          { type: 'p', text: 'Settings → General contains import/export controls and customizable keyboard shortcuts.' },
           { type: 'h3', text: 'Import / Export' },
           { type: 'ul', items: [
             'Export JSON — full archive of all ideas and version history.',
@@ -347,12 +348,20 @@ export const MANUAL_GROUPS: ManualGroup[] = [
             'Import — accepts Seedbank JSON archives and Markdown files.',
           ]},
           { type: 'h3', text: 'Keyboard shortcuts' },
+          { type: 'p', text: 'All three main shortcuts can be remapped to any key combination you prefer. Click the key badge next to an action, then press your desired key (with optional modifier keys held down). The new binding is saved immediately.' },
           { type: 'ul', items: [
-            'N — open quick capture.',
-            '/ — focus search.',
-            '? — open this manual.',
-            'Esc — close modals.',
+            'Focus search — default: / (forward slash). Moves focus to the search bar.',
+            'Open quick capture — default: N. Opens the quick idea capture modal.',
+            'Open manual — default: ? (Shift+/). Opens this manual.',
+            'Close modal / blur search — always Esc. This cannot be changed.',
           ]},
+          { type: 'h3', text: 'Using modifier keys' },
+          { type: 'p', text: 'Hold Ctrl, Alt, Shift, or ⌘ while pressing the key to record a modifier combination (e.g. Ctrl+K or Alt+N). Bindings that include a modifier key fire even while a text field is focused. Plain-key bindings (no modifiers) are silenced while you are typing.' },
+          { type: 'h3', text: 'Conflict detection' },
+          { type: 'p', text: 'If two actions share the same binding, a warning appears on both rows. Fix it by remapping one of them. Esc, Tab, F-keys, and common browser combos (Ctrl+W, Ctrl+T, etc.) are blocked and cannot be recorded.' },
+          { type: 'h3', text: 'Resetting to defaults' },
+          { type: 'p', text: 'Click the circular-arrow icon next to a customised binding to restore it to its default key. The "default" label reappears when no override is stored.' },
+          { type: 'tip', text: 'Changes take effect immediately — no page reload needed. The new binding is active the moment you finish recording.' },
         ],
       },
       {
@@ -517,7 +526,7 @@ export const MANUAL_GROUPS: ManualGroup[] = [
         id: 'settings-backups',
         title: 'Settings — Backups',
         indexLabel: 'Backups',
-        keywords: ['settings', 'backup', 'schedule', 'daily', 'weekly', 'manual', 'export', 'json', 'retention', 'restore', 'rclone', 'remote', 'destination', 'local', 'network', 'folder', 'cloud'],
+        keywords: ['settings', 'backup', 'schedule', 'daily', 'weekly', 'manual', 'export', 'json', 'retention', 'restore', 'rclone', 'remote', 'destination', 'local', 'network', 'folder', 'cloud', 'google drive', 'dropbox', 'onedrive', 's3', 'backblaze'],
         blocks: [
           { type: 'p', text: 'Settings → Backups controls automatic database backups, JSON archive exports, and optional offsite destinations.' },
           { type: 'h3', text: 'Backup frequency' },
@@ -534,11 +543,11 @@ export const MANUAL_GROUPS: ManualGroup[] = [
           { type: 'p', text: 'After each backup run, Seedbank can copy files to one or more destinations. Two types are available:' },
           { type: 'ul', items: [
             'Local / network folder — copy backup files to a folder on this machine or a mounted network share. No extra software required. This is the easiest option.',
-            'Rclone remote — copy files to cloud storage (Google Drive, S3, Backblaze, Dropbox, etc.) or a remote server. Requires rclone to be installed and configured separately on the Seedbank machine.',
+            'Rclone remote — copy files to cloud storage (Google Drive, S3, Backblaze, Dropbox, OneDrive, and 70+ other providers) or a remote server. Requires rclone to be installed and configured separately. See the "Cloud Backup Setup" guide for step-by-step instructions.',
           ]},
           { type: 'h3', text: 'What is rclone?' },
-          { type: 'p', text: 'Rclone is separate, open-source software that Seedbank does not include. You install and configure it on the same machine that runs the Seedbank server. Once installed, you run rclone config to add a named remote, then enter that remote\'s path in Seedbank as remote-name:folder (e.g. mys3:seedbank-backups or gdrive:backups/seedbank). Visit rclone.org to get started.' },
-          { type: 'tip', text: 'Run rclone listremotes in a terminal to see the names of your configured remotes.' },
+          { type: 'p', text: 'Rclone is separate, open-source software that Seedbank does not bundle. You install it on the same machine that runs the Seedbank server. Once installed, run rclone config to add a named remote, then enter that remote\'s path in Seedbank as remote-name:folder/path (e.g. gdrive:backups/seedbank or mys3:seedbank-backups). Visit rclone.org to download.' },
+          { type: 'tip', text: 'Run rclone listremotes in a terminal to see the names of your configured remotes. Run rclone version to confirm it is installed.' },
           { type: 'h3', text: 'Manual backup' },
           { type: 'p', text: 'Click "Run backup now" to trigger an immediate backup regardless of schedule.' },
           { type: 'h3', text: 'Test restore (safe validation)' },
@@ -547,6 +556,76 @@ export const MANUAL_GROUPS: ManualGroup[] = [
             'Remote restore-check recipe: 1) download the backup DB/JSON from your rclone destination, 2) place those files in your local backup/export folder on this machine, 3) run Test restore to validate the local copy.',
           ]},
           { type: 'tip', text: 'On startup, Seedbank runs backup schedule checks and only runs a backup when the current frequency is due (daily/weekly).' },
+        ],
+      },
+      {
+        id: 'cloud-backup-setup',
+        title: 'Cloud Backup Setup (rclone)',
+        indexLabel: 'Cloud Backup Setup',
+        keywords: ['rclone', 'cloud', 'backup', 'google drive', 'gdrive', 'dropbox', 'onedrive', 'backblaze', 'b2', 's3', 'sftp', 'ssh', 'r2', 'cloudflare', 'install', 'config', 'remote', 'setup'],
+        blocks: [
+          { type: 'p', text: 'Rclone is free, open-source software that knows how to copy files to 70+ cloud storage providers. You install it once on the Seedbank machine, add one or more named remotes via rclone config, then paste the remote path into Settings → Backups. No credentials ever touch Seedbank — rclone handles all auth.' },
+
+          { type: 'h3', text: 'Step 1 — Install rclone' },
+          { type: 'p', text: 'macOS (Homebrew):' },
+          { type: 'code', text: 'brew install rclone' },
+          { type: 'p', text: 'Linux (official installer — also works on Raspberry Pi / NAS):' },
+          { type: 'code', text: 'curl https://rclone.org/install.sh | sudo bash' },
+          { type: 'p', text: 'Windows — download the installer from rclone.org/downloads/ or use winget:' },
+          { type: 'code', text: 'winget install Rclone.Rclone' },
+          { type: 'p', text: 'Verify the install:' },
+          { type: 'code', text: 'rclone version' },
+
+          { type: 'h3', text: 'Step 2 — Add a remote (general)' },
+          { type: 'p', text: 'Run the interactive config wizard. It will ask you which provider you want and walk you through auth:' },
+          { type: 'code', text: 'rclone config' },
+          { type: 'ul', items: [
+            'Type n to create a new remote.',
+            'Enter a short name (no spaces) — e.g. gdrive, mybucket, myb2. You will use this name in Seedbank.',
+            'Choose your provider from the numbered list.',
+            'Follow the prompts for your provider (details per provider below).',
+            'At the end, run rclone listremotes to confirm the remote appears.',
+          ]},
+
+          { type: 'h3', text: 'Step 3 — Enter the path in Seedbank' },
+          { type: 'p', text: 'In Settings → Backups, click "+ Rclone remote", then set the remote path field to:' },
+          { type: 'code', text: 'remote-name:folder/path\n\nExamples:\n  gdrive:backups/seedbank\n  myb2:my-bucket-name/seedbank\n  mydropbox:Backups/Seedbank\n  sftp-nas:volume1/seedbank' },
+          { type: 'p', text: 'Click Test destination to verify the connection before saving.' },
+
+          { type: 'h3', text: 'Google Drive' },
+          { type: 'p', text: 'During rclone config, choose "Google Drive". When prompted, let rclone open a browser window and log in with your Google account. Accept the permissions. The token is stored locally; Seedbank never sees it.' },
+          { type: 'code', text: '# Example remote path for Google Drive:\ngdrive:Backups/Seedbank\n\n# List what is in the remote after setup:\nrclone ls gdrive:Backups/Seedbank' },
+          { type: 'tip', text: 'If you are running Seedbank on a headless server with no browser, add --auth-no-open-browser during rclone config and paste the URL into a browser on another machine.' },
+
+          { type: 'h3', text: 'Dropbox' },
+          { type: 'p', text: 'Choose "Dropbox" during rclone config. Rclone opens a browser window for OAuth. After auth, the token is stored in your rclone config file.' },
+          { type: 'code', text: '# Example remote path:\nmydropbox:Apps/Seedbank\n\n# Verify:\nrclone lsd mydropbox:' },
+
+          { type: 'h3', text: 'Microsoft OneDrive' },
+          { type: 'p', text: 'Choose "Microsoft OneDrive" during rclone config. Rclone opens a browser for Microsoft OAuth. Works with personal OneDrive, OneDrive for Business, and SharePoint libraries.' },
+          { type: 'code', text: '# Example remote path:\nonedrive:Backups/Seedbank\n\n# Verify:\nrclone lsd onedrive:' },
+
+          { type: 'h3', text: 'Backblaze B2' },
+          { type: 'p', text: 'Log in to backblaze.com → App Keys → Add a new application key. Copy the keyID and applicationKey. During rclone config choose "Backblaze B2" and paste those values.' },
+          { type: 'code', text: '# Example remote path (bucket:path):\nmyb2:my-bucket-name/seedbank\n\n# Create bucket if needed:\nrclone mkdir myb2:my-bucket-name\n\n# Verify:\nrclone ls myb2:my-bucket-name/seedbank' },
+
+          { type: 'h3', text: 'Amazon S3 (and S3-compatible: Cloudflare R2, Wasabi, MinIO, etc.)' },
+          { type: 'p', text: 'During rclone config choose "Amazon S3 Compliant Storage Providers". For AWS, choose "Amazon Web Services (AWS) S3". For R2 or Wasabi, choose "Cloudflare R2 Storage" or "Wasabi Object Storage" respectively. Enter your access key ID and secret access key. For AWS, choose the region that matches your bucket.' },
+          { type: 'code', text: '# AWS S3 example:\nmys3:my-bucket-name/seedbank\n\n# Cloudflare R2 example:\nmyr2:my-bucket-name/seedbank\n\n# Create the folder prefix:\nrclone mkdir mys3:my-bucket-name/seedbank\n\n# Verify:\nrclone ls mys3:my-bucket-name/seedbank' },
+          { type: 'tip', text: 'Create an IAM user with s3:PutObject, s3:GetObject, s3:ListBucket, and s3:DeleteObject on the target bucket. Use those credentials in rclone rather than your root AWS credentials.' },
+
+          { type: 'h3', text: 'SFTP / SSH (home server, NAS, VPS)' },
+          { type: 'p', text: 'During rclone config choose "SSH/SFTP Connection". Enter the hostname, port (default 22), username, and choose key file or password auth.' },
+          { type: 'code', text: '# Example remote path:\nsftp-nas:/volume1/backups/seedbank\n\n# Test connectivity:\nrclone ls sftp-nas:/volume1/backups/seedbank\n\n# Tip: use SSH key auth for unattended backups:\n# In rclone config, set key_file to your ~/.ssh/id_ed25519 path.' },
+
+          { type: 'h3', text: 'Verifying your setup' },
+          { type: 'p', text: 'After configuring a remote in rclone and adding it in Seedbank, run a manual backup and then check the remote:' },
+          { type: 'code', text: '# See what Seedbank has copied:\nrclone ls gdrive:Backups/Seedbank\n\n# Size on remote:\nrclone size gdrive:Backups/Seedbank\n\n# Sync a remote copy to a local folder for manual inspection:\nrclone copy gdrive:Backups/Seedbank ~/seedbank-remote-check/' },
+
+          { type: 'h3', text: 'Headless / server install' },
+          { type: 'p', text: 'For OAuth providers (Drive, Dropbox, OneDrive) on a server without a browser, run rclone config on a local machine that does have a browser, then copy the resulting rclone.conf to the server.' },
+          { type: 'code', text: '# Default config location:\n# Linux/Mac:  ~/.config/rclone/rclone.conf\n# Windows:    %APPDATA%\\rclone\\rclone.conf\n\n# Copy config to server:\nscp ~/.config/rclone/rclone.conf user@myserver:~/.config/rclone/rclone.conf' },
+          { type: 'tip', text: 'Keep your rclone.conf backed up separately — it contains the OAuth tokens that grant access to your cloud storage. Treat it like a password file.' },
         ],
       },
       {

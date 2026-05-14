@@ -824,6 +824,26 @@ export interface UiThemeConfig {
   matchSystem: boolean;
 }
 
+/**
+ * A single key binding — key + optional modifiers.
+ * `key` is a lowercase KeyboardEvent.key value (e.g. 'n', '/', '?', 'k').
+ * Esc is always reserved; single-key bindings fire only when not typing.
+ */
+export interface ShortcutBinding {
+  key: string;
+  ctrl?: boolean;
+  alt?: boolean;
+  shift?: boolean;
+  meta?: boolean;
+}
+
+/** User-configurable action → binding map. All fields optional; app supplies defaults. */
+export interface ShortcutConfig {
+  focusSearch?: ShortcutBinding;      // default: { key: '/' }
+  openQuickCapture?: ShortcutBinding; // default: { key: 'n' }
+  openManual?: ShortcutBinding;       // default: { key: '?' }
+}
+
 export type AgentProvider = 'claude' | 'codex';
 
 export interface AgentsPublicConfig {
@@ -976,6 +996,7 @@ export interface BackupStatus {
 export interface AggregateSettings {
   ui: {
     theme: UiThemeConfig;
+    shortcuts?: ShortcutConfig;
   };
   categories: CategorySettings;
   ai: AiPublicConfig;

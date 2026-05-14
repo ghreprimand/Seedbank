@@ -53,6 +53,8 @@ import type {
   Stage,
   ThemeName,
   UiThemeConfig,
+  ShortcutBinding,
+  ShortcutConfig,
   WebhooksConfig,
 } from '../../shared/types.js';
 import { DEFAULT_CATEGORY_DEFINITIONS } from '../../shared/types.js';
@@ -86,6 +88,7 @@ interface AgentStoredConfig {
 
 const SETTINGS_KEYS = {
   uiTheme: 'ui.theme',
+  uiShortcuts: 'ui.shortcuts',
   aiConfig: 'ai.config',
   aiConfigLegacy: 'ai:config',
   backupConfig: 'backup.config',
@@ -847,6 +850,64 @@ function uiThemeConfig(): UiThemeConfig {
   };
 }
 
+// ── Keyboard shortcut helpers ─────────────────────────────────────────────────
+
+/** Reserved / modifier keys that cannot be used as the primary key of a binding. */
+const RESERVED_KEYS = new Set([
+  'escape', 'tab', 'control', 'alt', 'shift', 'meta', 'os',
+  'capslock', 'numlock', 'scrolllock',
+  'f1','f2','f3','f4','f5','f6','f7','f8','f9','f10','f11','f12',
+]);
+
+/** Browser-reserved combos (ctrl/meta + key) that cannot be overridden. */
+const BROWSER_RESERVED_CTRL: Set<string> = new Set([
+  'w','t','n','r','l','p','s','a','c','v','x','z','y',
+  'f4', // alt+f4 is handled via 'alt' combos; ctrl+f4 = close tab
+]);
+
+function isValidBinding(b: unknown): b is ShortcutBinding {
+  if (!b || typeof b !== 'object') return false;
+  const candidate = b as Record<string, unknown>;
+  const key = typeof candidate.key === 'string' ? candidate.key.toLowerCase() : '';
+  if (!key || RESERVED_KEYS.has(key)) return false;
+
+  const hasCtrl = !!candidate.ctrl;
+  const hasMeta = !!candidate.meta;
+  if ((hasCtrl || hasMeta) && BROWSER_RESERVED_CTRL.has(key)) return false;
+
+  return true;
+}
+
+function sanitizeShortcutConfig(raw: unknown): ShortcutConfig {
+  if (!raw || typeof raw !== 'object') return {};
+  const obj = raw as Record<string, unknown>;
+  const result: ShortcutConfig = {};
+  const actions: (keyof ShortcutConfig)[] = ['focusSearch', 'openQuickCapture', 'openManual'];
+  for (const action of actions) {
+    const candidate = obj[action];
+    if (candidate === null) {
+      // null = reset to default (omit from stored config)
+    } else if (isValidBinding(candidate)) {
+      const b = candidate as ShortcutBinding;
+      result[action] = {
+        key: b.key.toLowerCase(),
+        ...(b.ctrl  ? { ctrl:  true } : {}),
+        ...(b.alt   ? { alt:   true } : {}),
+        ...(b.shift ? { shift: true } : {}),
+        ...(b.meta  ? { meta:  true } : {}),
+      };
+    }
+  }
+  return result;
+}
+
+function uiShortcutsConfig(): ShortcutConfig {
+  const stored = repository.getSetting<ShortcutConfig>(SETTINGS_KEYS.uiShortcuts) ?? {};
+  return sanitizeShortcutConfig(stored);
+}
+
+// ── End keyboard shortcut helpers ─────────────────────────────────────────────
+
 function webhooksConfig(): WebhooksConfig {
   const stored = repository.getSetting<Partial<WebhooksConfig>>(SETTINGS_KEYS.apiWebhooks) ?? {};
   const url = typeof stored.url === 'string' ? stored.url : null;
@@ -958,8 +1019,12 @@ function serverInfo(): ServerInfo {
 }
 
 function aggregateSettings(): AggregateSettings {
+  const shortcuts = uiShortcutsConfig();
   return {
-    ui: { theme: uiThemeConfig() },
+    ui: {
+      theme: uiThemeConfig(),
+      ...(Object.keys(shortcuts).length > 0 ? { shortcuts } : {}),
+    },
     categories: categoryConfig(),
     ai: aiService.getPublicConfig(),
     api: {
@@ -1411,7 +1476,7 @@ app.patch('/api/settings/:section', requireScope('write:ideas'), asyncRoute((req
       'hearth', 'rainwash',
       'woad', 'moss', 'peat', 'canopy',
     ];
-    const body = req.body as { theme?: Partial<UiThemeConfig> };
+    const body = req.body as { theme?: Partial<UiThemeConfig>; shortcuts?: unknown };
     if (body?.theme?.name !== undefined && !VALID_THEMES.includes(body.theme.name)) {
       res.status(400).json({ error: `Invalid theme name: ${String(body.theme.name)}` });
       return;
@@ -1424,6 +1489,36 @@ app.patch('/api/settings/:section', requireScope('write:ideas'), asyncRoute((req
         : current.matchSystem,
     };
     repository.setSetting(SETTINGS_KEYS.uiTheme, nextTheme);
+
+    // Persist keyboard shortcuts patch if provided
+    if (body?.shortcuts !== undefined) {
+      const currentShortcuts = uiShortcutsConfig();
+      // Merge incoming patch into existing config; null values remove the override
+      const rawPatch = (body.shortcuts ?? {}) as Record<string, unknown>;
+      const actions: (keyof ShortcutConfig)[] = ['focusSearch', 'openQuickCapture', 'openManual'];
+      const merged: ShortcutConfig = { ...currentShortcuts };
+      for (const action of actions) {
+        if (!(action in rawPatch)) continue;
+        const val = rawPatch[action];
+        if (val === null) {
+          delete merged[action]; // reset to default
+        } else if (isValidBinding(val)) {
+          const b = val as ShortcutBinding;
+          merged[action] = {
+            key: b.key.toLowerCase(),
+            ...(b.ctrl  ? { ctrl:  true } : {}),
+            ...(b.alt   ? { alt:   true } : {}),
+            ...(b.shift ? { shift: true } : {}),
+            ...(b.meta  ? { meta:  true } : {}),
+          };
+        } else {
+          res.status(400).json({ error: `Invalid binding for "${action}".` });
+          return;
+        }
+      }
+      repository.setSetting(SETTINGS_KEYS.uiShortcuts, merged);
+    }
+
     res.json(aggregateSettings());
     return;
   }
