@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Account reauth notice and documentation accuracy
+
+- Added a persistent Claude/Codex account reauth notice that appears only after this browser has previously seen a successful account auth and current status later requires sign-in again.
+- The notice links directly to Settings → AI & Agents (`/settings/ai-agents`) and includes a refresh action; intentional logout clears the browser-side reminder.
+- Updated README, repo docs, in-app manual, and contextual help to distinguish Claude native OAuth / Codex app-server account auth from the optional file-producing CLI agent runner.
+- Refreshed backup documentation to mention both startup safety snapshots and scheduled backup checks.
+
 ### Manual readability, linking, and privacy-copy accuracy
 
 - Improved in-app manual readability across themes by switching manual `code` and `tip` blocks to stronger neutral contrast tokens in `ManualModal`.

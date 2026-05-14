@@ -3,7 +3,7 @@
 Seedbank exposes a local-first REST API from the server package (`server/src/index.ts`) on `http://localhost:4800` by default.
 
 Source of truth:
-- Route behavior: `server/src/index.ts`
+- Route behavior: `server/src/index.ts` plus modular route registrars under `server/src/*/routes.ts`
 - Auth rules: `server/src/middleware/auth.ts`
 - OpenAPI document: `GET /api/openapi.json` (generated from `server/src/openapi.ts`)
 

@@ -37,6 +37,12 @@ export const HELP_CONTENT_MAP: Record<string, HelpEntry> = {
     body: 'Open deleted ideas and restore or purge them during the retention window.',
     manualSection: 'compost',
   },
+  'account-reauth-notice': {
+    title: 'Account Reauth Needed',
+    body: 'This persistent notice appears when Seedbank previously saw Claude or Codex account auth in this browser, but the current account transport is signed out.',
+    details: 'Use the Open AI settings link to jump directly to Settings → AI & Agents and sign in again. Intentional logout clears the reminder.',
+    manualSection: 'settings-ai',
+  },
 
   // Board
   'garden-page': {
@@ -195,13 +201,13 @@ export const HELP_CONTENT_MAP: Record<string, HelpEntry> = {
   'settings-ai-claude-service': {
     title: 'Claude Service',
     body: 'Methods for Claude-family routing: Anthropic API key or Claude account login.',
-    details: 'Both methods are chat/model routes available to Feature Defaults and Ask AI. Claude Code CLI is separate and file-producing.',
+    details: 'Both methods are chat/model routes available to Feature Defaults and Ask AI. Optional Claude Code CLI agent runs are separate and file-producing.',
     manualSection: 'settings-ai',
   },
   'settings-ai-codex-service': {
     title: 'Codex / OpenAI Service',
     body: 'Methods for OpenAI-family routing: OpenAI API key or Codex account login.',
-    details: 'Codex account is an account-login provider route via local app-server. It is not the external cloud-router section.',
+    details: 'Codex account is an account-login provider route via local app-server auth. It is not Codex CLI and not the external cloud-router section.',
     manualSection: 'settings-ai',
   },
   'settings-ai-local-models': {
@@ -388,7 +394,7 @@ export const HELP_CONTENT_MAP: Record<string, HelpEntry> = {
   },
   'agent-run-modal': {
     title: 'Agent Run Panel',
-    body: 'Run Claude Code or Codex CLI against a scratch workspace (or continued project path).',
+    body: 'Run an optional Claude Code or Codex CLI agent against a scratch workspace (or continued project path).',
     details: 'This is file-producing agent execution, separate from Thinking Partner chat and Ask AI field suggestions.',
     manualSection: 'agents',
   },

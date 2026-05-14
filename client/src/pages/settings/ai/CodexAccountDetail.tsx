@@ -10,6 +10,7 @@ import {
 } from '@/api/client';
 import type { AiModelInfo } from '@/lib/types';
 import { useSettingsStore } from '@/stores/settings';
+import { forgetAccountAuth, rememberAccountAuth } from '@/lib/accountAuthMemory';
 import { ModelPicker } from './ModelPicker';
 import { ProviderProbe } from './ProviderProbe';
 import type { ProviderCardStatus } from './types';
@@ -50,6 +51,7 @@ export function CodexAccountDetail({
     try {
       const status = await getCodexAccountStatus();
       setAccount(status.accountEmail ?? status.planType ?? null);
+      if (status.authenticated) rememberAccountAuth('codex-account');
       if (status.available === false) {
         setError(
           status.unavailableReason ??
@@ -87,6 +89,7 @@ export function CodexAccountDetail({
     setError('');
     try {
       await logoutCodexAccount();
+      forgetAccountAuth('codex-account');
       setLoginResult(null);
       setAccount(null);
       onStatusChange?.('key-needed');

@@ -3,7 +3,7 @@
 
 ## What is Seedbank?
 
-Seedbank is a **local-first, single-user app** you run on your own computer. It is not a hosted service or a SaaS product — your data never leaves your machine unless you explicitly export it or configure an AI provider.
+Seedbank is a **local-first, single-user app** you run on your own computer. It is not a hosted service or a SaaS product — your data stays on your machine unless you explicitly export it, configure a cloud AI provider, or add an offsite backup destination.
 
 Ideas are stored in a local SQLite database (`<seedbank-data-dir>/seedbank.db`). SQLite is the durable source of truth. Browser storage (IndexedDB) is used as a read-through cache for fast loads, an offline fallback when the server is unreachable, and a migration path for any ideas created before the backend was available. If you clear browser storage, your ideas are safe in the database.
 
@@ -72,11 +72,12 @@ On Linux/macOS (bash launcher), if port `5173` is occupied the launcher will pic
 - **Ten runtime themes** — Paper, Chalk, Meadow, Dusk (light), Hearth, Rainwash (mid-depth), and Woad, Moss, Peat, Canopy (dark); switchable live from Settings → Theme, with system dark/light auto-pairing (Paper ↔ Peat).
 - **Settings page** — a permanent `/settings` home for every configuration option: AI providers, agents, theme, API tokens, webhooks, backups, project graduation, and app info.
 - **Contextual help mode** — bottom-right help control toggles click-anywhere contextual guidance across pages, settings, and modals, with deep links into the in-app manual.
+- **Account reauth notice** — if Claude or Codex account auth was previously working in this browser and later requires sign-in again, a persistent notice links straight to Settings → AI & Agents.
 - **Personal access tokens** — generate scoped bearer tokens (`read:ideas`, `write:ideas`, `ai:suggest`, `mcp:read`, `agents:run`) for local scripting. Tokens are hashed at rest; creation is localhost-only.
 - **Outbound webhooks** — fire a JSON payload to any URL on `idea.created`, `idea.graduated`, or `idea.shipped`. Useful for Zapier, n8n, or local automation.
 - **Read-only MCP endpoints** — `/api/mcp/ideas`, `/api/mcp/ideas/:id`, and `/api/mcp/search` expose seeds as context for external Claude or Codex sessions; token-gated.
 - **OpenAPI spec** — machine-readable at `/api/openapi.json`; browsable from Settings → API & Server.
-- **Local CLI agent runs** — link a Claude Code or Codex CLI binary through the agents API (`POST /api/agents/link`), then launch a "Develop with agent" run from any idea in a per-idea scratch workspace. Transcript streamed live; proposed files reviewed and accepted before anything is saved. Runtime capped; kill switch always present.
+- **Optional local CLI agent runs** — link a Claude Code or Codex CLI binary through the agents API (`POST /api/agents/link`), then launch a "Develop with agent" run from any idea in a per-idea scratch workspace. This is separate from normal Claude/Codex account auth. Transcript streamed live; proposed files reviewed and accepted before anything is saved. Runtime capped; kill switch always present.
 - **Project graduation** — turn a mature idea into an external project scaffold via project-graduation adapters.
 - **Import/export** — full archive export to JSON or Markdown, plus import from Seedbank archives and Markdown.
 - **Compost bin** — deleted ideas are soft-deleted, recoverable for 30 days, then purged.
@@ -225,7 +226,7 @@ Seedbank stores durable data in:
 └── exports/
 ```
 
-On server startup, the current database is copied into `backups/`. The retention count is configurable in Settings → Backups (default: 10). The backup UI can run manual backups, configure daily/weekly/off scheduling, toggle JSON archive exports, and validate backups with a non-destructive restore test. When JSON export backups are enabled, full archive snapshots are written to `exports/`.
+On server startup, the current database is copied into `backups/` after migrations complete. The backup service also runs scheduled daily/weekly checks while the server is up. The retention count is configurable in Settings → Backups (default: 10). The backup UI can run manual backups, configure daily/weekly/off scheduling, toggle JSON archive exports, and validate backups with a non-destructive restore test. When JSON export backups are enabled, full archive snapshots are written to `exports/`.
 
 The first time the backend is available, the client can migrate existing browser IndexedDB ideas into SQLite while preserving IDs, timestamps, and versions.
 
@@ -233,11 +234,13 @@ The first time the backend is available, the client can migrate existing browser
 
 Built-in provider methods include **OpenAI API**, **Anthropic API**, **Claude account**, **Codex account**, **Ollama / local models**, and OpenAI-compatible local/cloud endpoints. OpenRouter, Groq, Mistral, Together, Fireworks, LM Studio, vLLM, llama.cpp, LocalAI, and custom gateways can be configured in Settings → AI & Agents.
 
-Provider settings are configured in **Settings → AI & Agents**. Local and external OpenAI-compatible services can be saved as separate provider instances, each with its own label, URL, model catalog, enabled-model subset, and health/probe status. When a provider connects, Seedbank discovers available models and stores them server-side for Feature Defaults and Ask AI routing.
+Provider settings are configured in **Settings → AI & Agents** (`/settings/ai-agents`). Local and external OpenAI-compatible services can be saved as separate provider instances, each with its own label, URL, model catalog, enabled-model subset, and health/probe status. When a provider connects, Seedbank discovers available models and stores them server-side for Feature Defaults and Ask AI routing.
+
+Claude account and Codex account are account transports for chat/model routing: Claude uses the native OAuth login flow in Seedbank, while Codex uses the local Codex app-server auth flow. If either account was previously authenticated in this browser but the current server status later requires sign-in again, Seedbank shows a persistent reauth notice with a direct link back to Settings → AI & Agents. The browser-side reminder stores only that this browser has seen a successful account auth before; credentials stay in the server-side account transport.
 
 Provider API keys (OpenAI, Anthropic, OpenRouter, Groq, Mistral, Together, Fireworks, or another compatible endpoint) are stored server-side, encrypted at rest; public config responses only expose whether a key exists. These are separate from **Seedbank personal access tokens** (Settings → API & Server), which are bearer tokens for the Seedbank REST API itself.
 
-To link a local CLI agent (Claude Code or Codex CLI), call `POST /api/agents/link` with `provider` and `cliPath`. Agents authenticate via their own CLI credentials (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `claude auth login`) — Seedbank stores only the binary path and a linked flag.
+The separate local CLI agent runner is optional and file-producing. If you use it, link Claude Code or Codex CLI through `POST /api/agents/link` with `provider` and `cliPath`. CLI agents authenticate through their own tooling and are not used for normal Claude/Codex chat provider auth.
 
 AI features include the Thinking Partner chat, contextual field suggestions, What If, Devil's Advocate, Scope Down, User Story, Idea Health Check, Smart Cross-Pollinate, and Pattern Insights. All AI features are opt-in. Feature Defaults choose the provider/model/effort for each feature, and the Ask AI modal lets you temporarily switch to another configured provider/model for a single run. See [docs/AI_GUIDE.md](docs/AI_GUIDE.md).
 
@@ -262,7 +265,7 @@ Quick endpoint groups: ideas, versions, integrations, AI (chat, suggest, usage),
 | [docs/SETTINGS.md](docs/SETTINGS.md) | Every Settings tab explained — what's stored where, offline behavior, server vs localStorage. |
 | [docs/THEMING.md](docs/THEMING.md) | Token model, the ten themes, dark-mode scale inversion, custom theme authoring. |
 | [docs/API.md](docs/API.md) | Full REST reference — endpoint list, token auth, webhook payloads, MCP surface. |
-| [docs/AGENTS.md](docs/AGENTS.md) | Claude Code / Codex CLI linkage, "Develop with agent" and "Continue with agent" surfaces, safety rails, transcript storage. |
+| [docs/AGENTS.md](docs/AGENTS.md) | Optional Claude Code / Codex CLI linkage, "Develop with agent" and "Continue with agent" surfaces, safety rails, transcript storage. |
 | [docs/AI_GUIDE.md](docs/AI_GUIDE.md) | Thinking Partner posture, provider setup, prompt modes, field suggestions, usage readout. |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System diagram, data-flow, settings store, token middleware, theme tokens, agent runner. |
 | [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md) | Graduation adapter interface, built-in adapters, and "Continue with agent" handoff. |
