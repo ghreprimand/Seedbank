@@ -10,7 +10,7 @@ import {
   type AiProviderId,
 } from '../../../shared/types.js';
 import { decryptSecret } from './crypto.js';
-import { openAICompatiblePreset } from './registry.js';
+import { localOpenAICompatiblePreset, openAICompatiblePreset } from './registry.js';
 import type { AiProvider, AiProviderMessage, AiProviderResult, AiStoredConfig, AiUsage } from './types.js';
 
 const REQUEST_TIMEOUT_MS = 8_000;
@@ -103,23 +103,33 @@ async function fetchWithTimeout(url: string, init?: RequestInit, timeoutMs = REQ
 }
 
 async function parseErrorBody(response: Response): Promise<string> {
+  // Read as text first — response.json() consumes the body stream and its
+  // parse failure leaves body.bodyUsed === true, making a subsequent text()
+  // call fail. Reading text first, then JSON.parse-ing, avoids that race.
   try {
-    const body = await response.json() as { error?: unknown; message?: unknown };
-    if (typeof body.error === 'string') return body.error;
-    if (typeof body.message === 'string') return body.message;
-    if (body.error && typeof body.error === 'object' && 'message' in body.error) {
-      const message = (body.error as { message?: unknown }).message;
-      if (typeof message === 'string') return message;
+    const text = await response.text();
+    const trimmed = text.trim();
+    if (!trimmed) return response.statusText || 'Provider request failed.';
+    // HTML error pages (nginx, CloudFlare, etc.) should not be forwarded raw.
+    if (trimmed.startsWith('<')) {
+      return 'Provider returned an HTML error page — check the base URL and endpoint configuration.';
     }
-  } catch {
+    // Try structured JSON extraction.
     try {
-      const text = await response.text();
-      if (text.trim()) return text.trim().slice(0, 300);
+      const body = JSON.parse(trimmed) as { error?: unknown; message?: unknown };
+      if (typeof body.error === 'string') return body.error;
+      if (typeof body.message === 'string') return body.message;
+      if (body.error && typeof body.error === 'object' && 'message' in body.error) {
+        const message = (body.error as { message?: unknown }).message;
+        if (typeof message === 'string') return message;
+      }
     } catch {
-      // keep the status text fallback
+      // Not JSON — fall through to bounded raw text.
     }
+    return boundedDetail(trimmed);
+  } catch {
+    return response.statusText || 'Provider request failed.';
   }
-  return response.statusText || 'Provider request failed.';
 }
 
 function boundedDetail(value: unknown, max = 240): string {
@@ -181,6 +191,17 @@ export function normalizeOllamaBaseUrl(raw: string): string {
 
 function normalizeOpenAICompatibleBaseUrl(raw: string, fallback: string): string {
   return normalizeBaseUrl(raw, 'openai-compatible', fallback);
+}
+
+function normalizeOpenAICompatibleV1BaseUrl(baseUrl: string): string {
+  const url = new URL(baseUrl);
+  const pathname = url.pathname.replace(/\/+$/, '');
+  if (!/\/v1$/i.test(pathname)) {
+    url.pathname = pathname ? `${pathname}/v1` : '/v1';
+  } else {
+    url.pathname = pathname;
+  }
+  return url.toString().replace(/\/$/, '');
 }
 
 function authHeaders(apiKey?: string): Record<string, string> {
@@ -1322,7 +1343,15 @@ export class OpenAICompatibleProvider implements AiProvider {
 
   private endpoint(config: AiStoredConfig): { baseUrl: string; apiKey?: string } {
     const preset = openAICompatiblePreset(config.openaiCompatiblePreset);
-    const baseUrl = normalizeOpenAICompatibleBaseUrl(config.openaiCompatibleBaseUrl, preset.baseUrl ?? OPENAI_COMPATIBLE_FALLBACK_URL);
+    const normalizedBaseUrl = normalizeOpenAICompatibleBaseUrl(
+      config.openaiCompatibleBaseUrl,
+      preset.baseUrl ?? OPENAI_COMPATIBLE_FALLBACK_URL,
+    );
+    const enforceV1BasePath = config.defaultProviderInstanceId === 'local-openai-compatible'
+      || localOpenAICompatiblePreset(config.openaiCompatiblePreset);
+    const baseUrl = enforceV1BasePath
+      ? normalizeOpenAICompatibleV1BaseUrl(normalizedBaseUrl)
+      : normalizedBaseUrl;
     const apiKey = decryptSecret(config.openaiCompatibleApiKeyEncrypted);
     if (preset.requiresApiKey && !apiKey) {
       throw new AiProviderError(this.id, 'not_configured', `${preset.label} API key is not configured.`);
