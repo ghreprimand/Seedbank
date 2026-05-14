@@ -118,7 +118,7 @@ function SnapshotViewer({
   const s = version.snapshot;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-900/30 backdrop-blur-sm animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-900/30 backdrop-blur-sm animate-fade-in" data-help="idea-version-history">
       <div className="bg-paper w-full max-w-lg max-h-[80vh] rounded-card shadow-modal border border-ink-100 flex flex-col animate-scale-in">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-ink-100">

@@ -353,8 +353,8 @@ export default function Discover() {
 
   if (ideas.length === 0) {
     return (
-      <div className="space-y-6 animate-fade-in">
-        <div>
+      <div className="space-y-6 animate-fade-in" data-help="discover-page">
+        <div data-help="discover-page">
           <div className="flex items-center gap-2">
             <h1 className="text-3xl font-serif font-semibold text-ink-900 tracking-tight">Discover</h1>
             <HelpButton
@@ -391,7 +391,7 @@ export default function Discover() {
   }
 
   return (
-    <div className="space-y-10 max-w-3xl mx-auto animate-fade-in">
+    <div className="space-y-10 max-w-3xl mx-auto animate-fade-in" data-help="discover-page">
       {/* Page header */}
       <div>
         <div className="flex items-center gap-2">
@@ -407,7 +407,7 @@ export default function Discover() {
       </div>
 
       {/* ── Daily Seed ────────────────────────────────────── */}
-      <section>
+      <section data-help="discover-daily-seed">
         <SectionHeader
           icon={<Sprout className="w-5 h-5 text-sage-600" />}
           title="Daily Seed"
@@ -434,7 +434,7 @@ export default function Discover() {
       </section>
 
       {/* ── Cross-Pollinate ───────────────────────────────── */}
-      <section>
+      <section data-help="discover-cross-pollinate">
         <SectionHeader
           icon={<Shuffle className="w-5 h-5 text-sage-600" />}
           title="Smart Cross-Pollinate"
@@ -477,7 +477,7 @@ export default function Discover() {
       </section>
 
       {/* ── Draw from Storage ─────────────────────────────── */}
-      <section>
+      <section data-help="discover-storage-draw">
         <SectionHeader
           icon={<Archive className="w-5 h-5 text-frost-600" />}
           title="Draw from Storage"
@@ -516,7 +516,7 @@ export default function Discover() {
       </section>
 
       {/* ── Idea Weather ──────────────────────────────────── */}
-      <section className="pb-8">
+      <section className="pb-8" data-help="discover-weather">
         <SectionHeader
           icon={<CloudSun className="w-5 h-5 text-amber-500" />}
           title="Idea Weather"
@@ -618,7 +618,7 @@ export default function Discover() {
           </div>
         )}
 
-        <div className="bg-paper border border-ink-100 rounded-card p-4 shadow-card">
+        <div className="bg-paper border border-ink-100 rounded-card p-4 shadow-card" data-help="discover-pattern-insight">
           <div className="flex items-start justify-between gap-3 mb-3">
             <div>
               <div className="flex items-center gap-1.5">

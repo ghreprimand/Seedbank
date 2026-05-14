@@ -77,15 +77,14 @@ High-level shape:
 ```json
 {
   "ui": { "theme": { "name": "paper", "matchSystem": false } },
+  "categories": { "items": [] },
   "ai": {
-    "provider": "openai",
-    "openaiModel": "gpt-4o",
-    "anthropicModel": "claude-opus-4-5",
-    "ollamaModel": "llama3.2",
-    "ollamaBaseUrl": "http://localhost:11434",
-    "dailyTokenBudget": 50000,
-    "hasOpenAIKey": false,
-    "hasAnthropicKey": false
+    "defaultProviderInstanceId": "ollama",
+    "providerInstances": {},
+    "featureRoutes": {},
+    "effectiveFeatureRoutes": {},
+    "guardrails": {},
+    "dailyTokenBudget": 200000
   },
   "api": {
     "tokens": [],
@@ -99,12 +98,14 @@ High-level shape:
   "integrations": [],
   "server": {
     "port": 4800,
-    "version": "2.1.0",
+    "version": "<runtime version>",
     "uptimeMs": 12345,
     "dbPath": "<seedbank-data-dir>/seedbank.db"
   }
 }
 ```
+
+`ai` now uses provider-instance routing (`defaultProviderInstanceId`, `providerInstances`, `featureRoutes`, `effectiveFeatureRoutes`, `guardrails`). Legacy top-level provider/model fields remain for compatibility and defaults.
 
 ### `PATCH /api/settings/:section` (`write:ideas`)
 
@@ -114,6 +115,7 @@ Supported sections:
 - `api`
 - `agents`
 - `backups`
+- `categories`
 
 Unsupported section values return `400`.
 
@@ -163,6 +165,8 @@ Body supports:
 Body supports:
 - `config.frequency`: `off|daily|weekly`
 - `config.exportJson`: boolean
+- `config.retentionCount`: integer
+- `config.destinations`: array of destination configs
 
 ### `GET /api/server/info` (`read:ideas`)
 
@@ -438,10 +442,24 @@ Scope expectations (bearer mode):
 ## AI Endpoints
 
 - `GET /api/ai/config` (`read:ideas`)
+- `GET /api/ai/providers` (`read:ideas`)
+- `GET /api/ai/method-capabilities` (`read:ideas`)
 - `GET /api/ai/usage` (`read:ideas`)
 - `GET /api/ai/usage/detail` (`read:ideas`) - grouped usage plus recent guardrail/provider audit events
 - `POST /api/ai/config` (`write:ideas`, legacy update route)
 - `POST /api/ai/preflight` (`read:ideas`) - resolves feature route, budget state, allowlist blockers, and local/remote privacy metadata. Accepts optional `providerInstanceId`, `model`, `effort`, and `verbosity` to preview a temporary route override.
+- `POST /api/ai/test` (`write:ideas`)
+- `POST /api/ai/models` (`write:ideas`)
+- `POST /api/ai/list-models` (`write:ideas`)
+- `GET /api/settings/ai` (`read:ideas`)
+- `POST /api/settings/ai` (`write:ideas`, legacy compatibility route)
+- `GET /api/ai/claude-account/status` (`read:ideas`)
+- `POST /api/ai/claude-account/login` (`write:ideas`)
+- `POST /api/ai/claude-account/login/complete` (`write:ideas`)
+- `POST /api/ai/claude-account/logout` (`write:ideas`)
+- `GET /api/ai/codex-account/status` (`read:ideas`)
+- `POST /api/ai/codex-account/login` (`write:ideas`)
+- `POST /api/ai/codex-account/logout` (`write:ideas`)
 - `GET /api/ai/conversations/:ideaId` (`read:ideas`)
 - `POST /api/ai/suggest` (`ai:suggest`) - field suggestions accept optional `prompt`, `omitCurrentValue`, `aiConfirmationToken`, `providerInstanceId`, `model`, `effort`, and `verbosity`
 - `POST /api/ai/field-chat` (`ai:suggest`, SSE) - modal-local field assistance using the `field-suggestions` route; accepts `aiConfirmationToken` plus the same optional provider/model override fields as `POST /api/ai/suggest`
@@ -460,6 +478,7 @@ The provider/model override fields are request-scoped. They let the Ask AI modal
 
 ### Project Graduation
 - `GET /api/integrations` (`read:ideas`)
+- `GET /api/integrations/:id/health` (`read:ideas`)
 - `POST /api/integrations/:id/configure` (`write:ideas`)
 - `POST /api/integrations/:id/graduate/:ideaId` (`write:ideas`)
 

@@ -201,14 +201,14 @@ export default function IdeaDetail() {
   }
 
   return (
-    <div className="space-y-6 max-w-3xl mx-auto pb-16 animate-fade-in">
+    <div className="space-y-6 max-w-3xl mx-auto pb-16 animate-fade-in" data-help="idea-detail-page">
       {/* ── Top bar ──────────────────────────────────────── */}
       <div className="flex items-center justify-between gap-4">
         <Link to="/" className="text-ink-400 hover:text-ink-600 text-sm flex items-center gap-1 transition-colors group">
           <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" /> Garden
         </Link>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5" data-help="idea-actions">
           {/* Save status */}
           <span className="text-[11px] font-mono text-ink-300 mr-1">
             {saveStatus === 'saving' && 'Saving…'}
@@ -282,7 +282,7 @@ export default function IdeaDetail() {
       </div>
 
       {/* ── Header: Title + Stage/Category selectors ─────── */}
-      <div className="space-y-3">
+      <div className="space-y-3" data-help="idea-header">
         <input
           type="text"
           value={idea.title}
@@ -406,7 +406,7 @@ export default function IdeaDetail() {
       )}
 
       {/* ── Editor sections ──────────────────────────────── */}
-      <div className="space-y-6">
+      <div className="space-y-6" data-help="idea-core-fields">
         <Section
           label="Pitch"
           hint="One-line hook — what is this?"
@@ -488,7 +488,7 @@ export default function IdeaDetail() {
           />
         </Section>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4" data-help="idea-tags-and-scores">
           <TagInput
             label="Tags"
             tags={idea.tags}
@@ -503,7 +503,7 @@ export default function IdeaDetail() {
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4" data-help="idea-tags-and-scores">
           <ScorePicker
             label="Personal Excitement"
             value={idea.excitementScore}
@@ -520,20 +520,24 @@ export default function IdeaDetail() {
           />
         </div>
 
-        <LinkEditor
-          links={idea.links}
-          onChange={(links) => update('links', links)}
-        />
+        <div data-help="idea-links-related">
+          <LinkEditor
+            links={idea.links}
+            onChange={(links) => update('links', links)}
+          />
+        </div>
 
-        <RelatedIdeasLinker
-          ideaId={idea.id}
-          relatedIds={idea.relatedIdeaIds}
-          onChange={(ids) => update('relatedIdeaIds', ids)}
-        />
+        <div data-help="idea-links-related">
+          <RelatedIdeasLinker
+            ideaId={idea.id}
+            relatedIds={idea.relatedIdeaIds}
+            onChange={(ids) => update('relatedIdeaIds', ids)}
+          />
+        </div>
       </div>
 
       {/* ── Thinking Partner ─────────────────────────────── */}
-      <div className="pt-5 border-t border-ink-100">
+      <div className="pt-5 border-t border-ink-100" data-help="health-check">
         <div className="flex items-center gap-1.5 mb-2">
           <span className="text-xs font-mono uppercase tracking-wider text-ink-400">Health Check</span>
           <HelpButton
@@ -547,7 +551,7 @@ export default function IdeaDetail() {
         <IdeaHealthCheck idea={idea} />
       </div>
 
-      <div className="pt-5 border-t border-ink-100 space-y-3">
+      <div className="pt-5 border-t border-ink-100 space-y-3" data-help="idea-thinking-partner">
         {anyAgentLinked && (
           <div className="flex items-center justify-end gap-2">
             <HelpButton
@@ -576,13 +580,13 @@ export default function IdeaDetail() {
       </div>
 
       {/* ── Version History ──────────────────────────────── */}
-      <div className="pt-5 border-t border-ink-100">
+      <div className="pt-5 border-t border-ink-100" data-help="idea-version-history">
         <VersionHistory ideaId={idea.id} onRestored={handleVersionRestored} />
       </div>
 
       {/* ── Delete confirmation modal ────────────────────── */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-900/30 backdrop-blur-sm animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-900/30 backdrop-blur-sm animate-fade-in" data-help="idea-delete-modal">
           <div className="bg-paper w-full max-w-sm rounded-card shadow-modal border border-ink-100 p-6 animate-scale-in">
             <h2 className="text-lg font-serif font-semibold text-ink-900 mb-2">
               Remove this seed?

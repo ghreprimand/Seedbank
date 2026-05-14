@@ -16,9 +16,9 @@ export default function GeneralTab() {
   const navigate = useNavigate();
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8" data-help="settings-general-data">
       {/* Import / Export */}
-      <section>
+      <section data-help="settings-general-data">
         <div className="flex items-center gap-2 mb-1">
           <h3 className="text-base font-serif font-semibold text-ink-800">Data</h3>
           <HelpButton
@@ -46,7 +46,7 @@ export default function GeneralTab() {
       </section>
 
       {/* Keyboard shortcuts */}
-      <section>
+      <section data-help="settings-general-shortcuts">
         <h3 className="text-base font-serif font-semibold text-ink-800 mb-1 flex items-center gap-2">
           <Keyboard className="w-4 h-4 text-ink-400" />
           Keyboard shortcuts

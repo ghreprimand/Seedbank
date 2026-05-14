@@ -263,8 +263,8 @@ export default function BackupsTab() {
   };
 
   return (
-    <div className="space-y-8 max-w-3xl">
-      <section className="flex items-start gap-4 p-4 bg-paper-warm border border-ink-100 rounded-card">
+    <div className="space-y-8 max-w-3xl" data-help="settings-backups-overview">
+      <section className="flex items-start gap-4 p-4 bg-paper-warm border border-ink-100 rounded-card" data-help="settings-backups-overview">
         <div className="mt-0.5 p-2 rounded-full bg-sage-50 border border-sage-100">
           <Archive className="w-4 h-4 text-sage-600" />
         </div>
@@ -281,7 +281,7 @@ export default function BackupsTab() {
         </div>
       </section>
 
-      <section>
+      <section data-help="settings-backup-schedule">
         <div className="flex items-center gap-2 mb-1">
           <h3 className="text-base font-serif font-semibold text-ink-800">Schedule</h3>
           <HelpButton
@@ -313,7 +313,7 @@ export default function BackupsTab() {
         </div>
       </section>
 
-      <section className="grid sm:grid-cols-2 gap-4">
+      <section className="grid sm:grid-cols-2 gap-4" data-help="settings-backup-schedule">
         <div className="rounded-card border border-ink-100 p-4 space-y-2">
           <div className="text-sm font-semibold text-ink-800">JSON archive export</div>
           <p className="text-xs text-ink-400">When enabled, each backup run also writes a full JSON archive snapshot.</p>
@@ -352,7 +352,7 @@ export default function BackupsTab() {
         </div>
       </section>
 
-      <section className="space-y-3">
+      <section className="space-y-3" data-help="settings-backup-destinations">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-1.5">
             <h3 className="text-base font-serif font-semibold text-ink-800">Offsite destinations</h3>
@@ -546,7 +546,7 @@ export default function BackupsTab() {
         </button>
       </section>
 
-      <section>
+      <section data-help="settings-backup-schedule">
         <h3 className="text-base font-serif font-semibold text-ink-800 mb-1">Manual backup</h3>
         <p className="text-sm text-ink-400 mb-3">Run a backup now, regardless of your schedule.</p>
         <button
@@ -586,7 +586,7 @@ export default function BackupsTab() {
         )}
       </section>
 
-      <section className="space-y-2">
+      <section className="space-y-2" data-help="settings-backup-restore-validation">
         <div className="flex items-center gap-1.5">
           <h3 className="text-base font-serif font-semibold text-ink-800">Test restore (safe validation)</h3>
           <HelpButton

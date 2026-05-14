@@ -611,7 +611,7 @@ export default function CategoriesTab() {
   const existingIds = new Set(items.map((i) => i.id));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-help="settings-categories-manager">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>

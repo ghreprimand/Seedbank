@@ -71,11 +71,12 @@ On Linux/macOS (bash launcher), if port `5173` is occupied the launcher will pic
 - **AI thinking partner** — chat, field suggestions, organic prompt modes, health checks, and archive insights.
 - **Ten runtime themes** — Paper, Chalk, Meadow, Dusk (light), Hearth, Rainwash (mid-depth), and Woad, Moss, Peat, Canopy (dark); switchable live from Settings → Theme, with system dark/light auto-pairing (Paper ↔ Peat).
 - **Settings page** — a permanent `/settings` home for every configuration option: AI providers, agents, theme, API tokens, webhooks, backups, project graduation, and app info.
-- **Personal access tokens** — generate scoped bearer tokens (`read:ideas`, `write:ideas`, `ai:suggest`) for local scripting. Tokens are hashed at rest; creation is localhost-only.
+- **Contextual help mode** — bottom-right help control toggles click-anywhere contextual guidance across pages, settings, and modals, with deep links into the in-app manual.
+- **Personal access tokens** — generate scoped bearer tokens (`read:ideas`, `write:ideas`, `ai:suggest`, `mcp:read`, `agents:run`) for local scripting. Tokens are hashed at rest; creation is localhost-only.
 - **Outbound webhooks** — fire a JSON payload to any URL on `idea.created`, `idea.graduated`, or `idea.shipped`. Useful for Zapier, n8n, or local automation.
-- **Read-only MCP endpoints** — `/api/mcp/ideas` and `/api/mcp/search` expose seeds as context for external Claude or Codex sessions; token-gated.
+- **Read-only MCP endpoints** — `/api/mcp/ideas`, `/api/mcp/ideas/:id`, and `/api/mcp/search` expose seeds as context for external Claude or Codex sessions; token-gated.
 - **OpenAPI spec** — machine-readable at `/api/openapi.json`; browsable from Settings → API & Server.
-- **Local CLI agent runs** — link a Claude Code or Codex CLI binary in Settings → AI & Agents; launch a "Develop with agent" run from any idea in a per-idea scratch workspace. Transcript streamed live; proposed files reviewed and accepted before anything is saved. Runtime capped; kill switch always present.
+- **Local CLI agent runs** — link a Claude Code or Codex CLI binary through the agents API (`POST /api/agents/link`), then launch a "Develop with agent" run from any idea in a per-idea scratch workspace. Transcript streamed live; proposed files reviewed and accepted before anything is saved. Runtime capped; kill switch always present.
 - **Project graduation** — turn a mature idea into an external project scaffold via project-graduation adapters.
 - **Import/export** — full archive export to JSON or Markdown, plus import from Seedbank archives and Markdown.
 - **Compost bin** — deleted ideas are soft-deleted, recoverable for 30 days, then purged.
@@ -236,7 +237,7 @@ Provider settings are configured in **Settings → AI & Agents**. Local and exte
 
 Provider API keys (OpenAI, Anthropic, OpenRouter, Groq, Mistral, Together, Fireworks, or another compatible endpoint) are stored server-side, encrypted at rest; public config responses only expose whether a key exists. These are separate from **Seedbank personal access tokens** (Settings → API & Server), which are bearer tokens for the Seedbank REST API itself.
 
-To link a local CLI agent (Claude Code or Codex CLI), point Seedbank at the binary path in Settings → AI & Agents. Agents authenticate via their own CLI credentials (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `claude auth login`) — Seedbank stores only the binary path and a linked flag.
+To link a local CLI agent (Claude Code or Codex CLI), call `POST /api/agents/link` with `provider` and `cliPath`. Agents authenticate via their own CLI credentials (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `claude auth login`) — Seedbank stores only the binary path and a linked flag.
 
 AI features include the Thinking Partner chat, contextual field suggestions, What If, Devil's Advocate, Scope Down, User Story, Idea Health Check, Smart Cross-Pollinate, and Pattern Insights. All AI features are opt-in. Feature Defaults choose the provider/model/effort for each feature, and the Ask AI modal lets you temporarily switch to another configured provider/model for a single run. See [docs/AI_GUIDE.md](docs/AI_GUIDE.md).
 

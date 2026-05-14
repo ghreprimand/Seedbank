@@ -192,7 +192,7 @@ export default function AiThinkingPanel({ idea, onApply }: AiThinkingPanelProps)
   };
 
   return (
-    <div className="border border-ink-100 rounded-card bg-paper shadow-card overflow-hidden">
+    <div className="border border-ink-100 rounded-card bg-paper shadow-card overflow-hidden" data-help="idea-thinking-partner">
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}

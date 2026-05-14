@@ -155,3 +155,20 @@ html { scroll-behavior: smooth; }
   background: var(--color-sage-200);
   color: var(--color-ink-900);
 }
+
+/* Contextual help mode affordance */
+body.help-mode-active [data-help] {
+  cursor: help;
+}
+
+body.help-mode-active [data-help]:hover {
+  outline: 2px dashed var(--color-sage-500);
+  outline-offset: 3px;
+  background: color-mix(in srgb, var(--color-sage-100) 45%, transparent);
+  border-radius: 6px;
+}
+
+body.help-mode-active [data-help]:has([data-help]:hover) {
+  outline: none;
+  background: transparent;
+}

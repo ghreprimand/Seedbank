@@ -135,7 +135,7 @@ export default function ImportExportModal({ onClose, onImported }: ImportExportM
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-900/30 backdrop-blur-sm animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-900/30 backdrop-blur-sm animate-fade-in" data-help="import-export-modal">
       <div className="bg-paper w-full max-w-lg rounded-card shadow-modal border border-ink-100 animate-scale-in">
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-5 pb-3">

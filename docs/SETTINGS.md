@@ -9,14 +9,19 @@ Settings uses a tabbed shell. On desktop (`md+`) a left-rail sidebar lists every
 | Tab | Path | Purpose |
 |-----|------|---------|
 | General | `/settings/general` | Import / export, keyboard shortcut reference |
-| AI & Agents | `/settings/ai-agents` | Provider config, agent linking, token budget |
+| AI & Agents | `/settings/ai-agents` | Provider config, feature routing, token budget |
 | Theme | `/settings/theme` | Color palette, system preference toggle |
 | API & Server | `/settings/api` | Server info, personal access tokens, webhooks, MCP |
 | Backups | `/settings/backups` | Schedule, retention, JSON export, destinations, manual run, restore validation |
+| Categories | `/settings/categories` | Add, rename, reorder, archive categories |
 | Project Graduation | `/settings/integrations` | Project folder creation — where to create project scaffolds when you graduate an idea |
 | About | `/settings/about` | Version, GitHub link, acknowledgements |
 
 The header API-status pill (top-right, next to the gear icon) is now a link that jumps to **API & Server** when clicked.
+
+### Contextual help mode
+
+A floating **?** control in the bottom-right corner toggles contextual help mode. When active, click UI sections to open a help popover for that surface, with optional deep-link into the in-app manual section. The control is collapsible to a compact chevron tab and can be exited with **Esc**.
 
 ---
 
@@ -38,11 +43,9 @@ AI & Agents is now organized by **service family first**, then **connection meth
 - **Claude service**
   - Anthropic API key method (chat/model routing)
   - Claude account/native OAuth method (chat/model routing; account login required)
-  - Claude Code CLI method (file-producing agent method; not chat routing)
 - **Codex/OpenAI service**
   - OpenAI API key method (chat/model routing)
   - Codex account/app-server method (chat/model routing; account login required)
-  - Codex CLI method (file-producing agent method; not chat routing)
 - **Local inference**
   - Ollama
   - Local OpenAI-compatible servers: LM Studio, vLLM, llama.cpp, LocalAI, custom localhost URL
@@ -102,10 +105,10 @@ Usage readouts show tokens consumed in the last 24 hours and last 7 days (from `
 
 ### CLI agent methods
 
-Claude Code and Codex CLI link controls are now embedded in their respective service areas rather than a detached section.
+Claude Code and Codex CLI remain available for **Develop with agent / Continue with agent** workflows, but linking is currently managed through the agents API surface rather than a dedicated Settings card.
 
-- They are **file-producing methods** used by Develop/Continue with agent workflows.
-- They are **not** used as normal chat/model routing methods in Feature Defaults.
+- Link/unlink endpoints: `POST /api/agents/link`, `DELETE /api/agents/link/:provider`.
+- They are **file-producing methods** and are **not** used as chat/model routes in Feature Defaults.
 - Authentication remains CLI-managed (`claude auth login`, `OPENAI_API_KEY`, or tool-specific config); Seedbank stores only binary path/link state.
 - Runs execute in per-idea scratch workspaces and are not OS-sandboxed.
 
@@ -132,7 +135,7 @@ Displays live server details at the top of the tab, with a refresh button (↻) 
 | Port | Settings store / `GET /api/server/info` |
 | Version | Server package version |
 | Uptime | Formatted d/h/m/s since server start |
-| Database | Absolute path to `seedbank.sqlite` |
+| Database | Absolute path to `seedbank.db` |
 | Last backup | Timestamp of most recent backup run |
 
 ### Personal access tokens
@@ -183,7 +186,7 @@ The human-readable full REST reference is in [`docs/API.md`](./API.md) in the pr
 
 ### MCP (Model Context Protocol) endpoints
 
-Read-only endpoints for external Claude or Codex sessions to pull seeds as context. All require a token with `mcp:read` scope.
+Read-only endpoints for external Claude or Codex sessions to pull seeds as context. External/bearer clients require a token with `mcp:read` scope. Local loopback requests can use implicit local auth without bearer token.
 
 | Endpoint | Description |
 |----------|-------------|
@@ -199,7 +202,7 @@ Read-only endpoints for external Claude or Codex sessions to pull seeds as conte
 
 All backup settings live here. Backups are written to `<seedbank-data-dir>/backups/` and can optionally be copied to offsite destinations after each run.
 
-- **Backup frequency** — off, daily, or weekly. A startup backup is always taken on server start.
+- **Backup frequency** — off, daily, or weekly. On startup, Seedbank runs scheduled backup checks and only runs a backup when due under the active schedule.
 - **Retention count** — how many database backup files to keep locally before pruning.
 - **JSON archive export** — toggle full JSON archive snapshots on each backup run (written to `<seedbank-data-dir>/exports/`).
 - **Offsite destinations** — copy backups to additional locations after each run. Two types:
@@ -259,7 +262,7 @@ A `configured` badge appears next to each adapter that has a valid project root.
 | API keys | Server `settings` table, encrypted at rest | Never visible in browser regardless of connectivity |
 | Agents config (linked, CLI paths) | Server `settings` table (`agents.config`) | Shown from cache; linking requires server |
 | Token budget | Server `settings` table (`ai.config`) | Shown from cache; changes require server |
-| Backups config | Server `settings` table (`backups.config`) | Shown from cache; changes require server |
+| Backups config | Server `settings` table (`backup.config`) | Shown from cache; changes require server |
 | Project Graduation config | Server `settings` table (`integration:<adapter-id>`; for example `integration:generic-project`) | Shown from cache; changes require server |
 | Personal access tokens | Server `api_tokens` table, hashed | Not visible offline |
 | Webhook URL + events | Server `settings` table (`api.webhooks`) | Not visible offline |

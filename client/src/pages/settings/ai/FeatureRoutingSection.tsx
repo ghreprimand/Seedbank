@@ -202,8 +202,8 @@ export function FeatureRoutingSection({
             <HelpButton
               helpId="feature-defaults"
               title="Feature Defaults"
-              summary="Route each AI feature to a specific provider and model, independently of the global default. 'Use global default' means a feature follows whatever provider you set as default."
-              details="The Effective readout below each row shows exactly which provider and model will run — accounting for inheritance. Useful when you want a fast/cheap model for field suggestions but a smarter one for Thinking Partner."
+              summary="Each row is a real runtime route for that feature. Provider/model/effort in this table directly controls what the backend uses."
+              details="Use global default means inherit the top row. Any non-default row is an explicit override. Check each row's Effective line before saving if privacy, cost, or latency matter."
               manualSection="settings-ai"
               alwaysShow
             />
@@ -229,7 +229,10 @@ export function FeatureRoutingSection({
         </button>
       </div>
 
-      <div className="grid gap-3 p-3 border border-ink-100 rounded-card bg-paper md:grid-cols-[1.2fr_1fr_1fr_auto] md:items-start">
+      <div
+        className="grid gap-3 p-3 border border-ink-100 rounded-card bg-paper md:grid-cols-[1.2fr_1fr_1fr_auto] md:items-start"
+        data-help="settings-ai-feature-defaults-global"
+      >
         <div className="min-w-0">
           <p className="text-sm font-semibold text-ink-800">Global default</p>
           <p className="text-xs text-ink-400">
@@ -237,7 +240,14 @@ export function FeatureRoutingSection({
           </p>
         </div>
 
-        <label className="block text-xs text-ink-500">
+        <label
+          className="block text-xs text-ink-500"
+          data-help="settings-ai-feature-provider"
+          data-help-title="Global Default Provider"
+          data-help-body="Select the provider instance inherited by rows set to Use global default."
+          data-help-details="This is the baseline runtime route for most features unless a row overrides it."
+          data-help-manual="settings-ai"
+        >
           Provider
           <select
             value={selectedDefaultInstanceId}
@@ -270,7 +280,14 @@ export function FeatureRoutingSection({
           </span>
         </label>
 
-        <label className="block text-xs text-ink-500">
+        <label
+          className="block text-xs text-ink-500"
+          data-help="settings-ai-feature-model"
+          data-help-title="Global Default Model"
+          data-help-body="Select the default model for the current global provider instance."
+          data-help-details="Rows set to Use global default inherit this model unless they are explicitly overridden."
+          data-help-manual="settings-ai"
+        >
           Model
           <ModelPicker
             discoveredModels={defaultInstanceModels}
@@ -283,7 +300,14 @@ export function FeatureRoutingSection({
           </span>
         </label>
 
-        <label className="block text-xs text-ink-500 min-w-[110px]">
+        <label
+          className="block text-xs text-ink-500 min-w-[110px]"
+          data-help="settings-ai-feature-effort"
+          data-help-title="Global Default Effort"
+          data-help-body="Reasoning effort defaults for rows inheriting the global route."
+          data-help-details="Effort appears only for provider/model combinations that support it."
+          data-help-manual="settings-ai"
+        >
           Effort
           <select
             value={defaultSupportsEffort ? defaultEffort : ''}
@@ -423,6 +447,13 @@ export function FeatureRoutingSection({
               className={`grid gap-3 p-3 md:grid-cols-[1.2fr_1fr_1fr_auto] md:items-start ${
                 feature.secondary ? 'opacity-60' : ''
               }`}
+              data-help="settings-ai-feature-defaults-row"
+              data-help-title={`${feature.label} Route`}
+              data-help-body={`Controls provider routing for ${feature.label}. "${feature.detail}"`}
+              data-help-details={feature.secondary
+                ? 'This is a fallback row used only when a feature has no dedicated route.'
+                : 'Set provider to Use global default to inherit, or choose a specific provider instance to override.'}
+              data-help-manual="settings-ai"
             >
               <div className="min-w-0">
                 <p
@@ -435,7 +466,14 @@ export function FeatureRoutingSection({
                 <p className="text-xs text-ink-400">{feature.detail}</p>
               </div>
 
-              <label className="block text-xs text-ink-500">
+              <label
+                className="block text-xs text-ink-500"
+                data-help="settings-ai-feature-provider"
+                data-help-title={`${feature.label} Provider`}
+                data-help-body={`Choose which provider instance runs ${feature.label}.`}
+                data-help-details={providerHint}
+                data-help-manual="settings-ai"
+              >
                 Provider
                 <select
                   value={
@@ -471,7 +509,14 @@ export function FeatureRoutingSection({
                 <span className="mt-1 block text-[11px] text-ink-400">{providerHint}</span>
               </label>
 
-              <label className="block text-xs text-ink-500">
+              <label
+                className="block text-xs text-ink-500"
+                data-help="settings-ai-feature-model"
+                data-help-title={`${feature.label} Model`}
+                data-help-body={`Select the model used by ${feature.label} for the current provider selection.`}
+                data-help-details={modelHint}
+                data-help-manual="settings-ai"
+              >
                 Model
                 <ModelPicker
                   discoveredModels={modelPickerModels}
@@ -488,7 +533,14 @@ export function FeatureRoutingSection({
               </label>
 
               <div className="space-y-2 min-w-[110px]">
-                <label className="block text-xs text-ink-500">
+                <label
+                  className="block text-xs text-ink-500"
+                  data-help="settings-ai-feature-effort"
+                  data-help-title={`${feature.label} Effort`}
+                  data-help-body="Controls reasoning depth when the selected provider/model supports effort."
+                  data-help-details={effortHint}
+                  data-help-manual="settings-ai"
+                >
                   Effort
                   <select
                     value={supportsEffort ? route.effort ?? '' : ''}
@@ -514,7 +566,14 @@ export function FeatureRoutingSection({
                   <span className="mt-1 block text-[11px] text-ink-400">{effortHint}</span>
                 </label>
                 {supportsVerbosity && (
-                  <label className="block text-xs text-ink-500">
+                  <label
+                    className="block text-xs text-ink-500"
+                    data-help="settings-ai-feature-verbosity"
+                    data-help-title={`${feature.label} Verbosity`}
+                    data-help-body="Controls response length/detail for supporting provider/model routes."
+                    data-help-details="Leave at Default unless this feature consistently needs shorter or more detailed responses."
+                    data-help-manual="settings-ai"
+                  >
                     Verbosity
                     <select
                       value={route.verbosity ?? ''}

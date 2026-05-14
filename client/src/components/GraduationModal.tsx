@@ -91,7 +91,7 @@ export default function GraduationModal({ idea, onClose, onGraduated }: Graduati
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-900/30 backdrop-blur-sm animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-900/30 backdrop-blur-sm animate-fade-in" data-help="graduation-modal">
       <div className="bg-paper w-full max-w-2xl rounded-card shadow-modal border border-ink-100 p-5 md:p-6 animate-scale-in max-h-[90vh] overflow-y-auto">
         <div className="flex items-start justify-between gap-4 mb-5">
           <div>
