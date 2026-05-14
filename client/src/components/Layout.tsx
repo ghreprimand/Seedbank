@@ -1,6 +1,6 @@
 /** App shell — sticky header with search, nav, and CTA. Hosts modals and global keyboard shortcuts. */
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Search, Compass, Trash2, X, Settings, BookOpen } from 'lucide-react';
 import QuickCapture from './QuickCapture';
 import ConnectionStatus from './ConnectionStatus';
@@ -11,32 +11,12 @@ import { HelpProvider } from '@/help/HelpContext';
 import HelpExperience from '@/help/HelpExperience';
 import { useFilterStore } from '@/stores/filters';
 import { useSettingsStore } from '@/stores/settings';
-import type { ShortcutBinding } from '@/lib/types';
+import { DEFAULT_SHORTCUTS, hasShortcutModifier, matchBinding } from '@/lib/shortcuts';
+import type { ShortcutConfig } from '@/lib/types';
 
-// ── Shortcut helpers (exported for use in GeneralTab) ─────────────────────────
+// ── Stable selector fallbacks ─────────────────────────────────────────────────
 
-/** Canonical defaults — used when the user has not overridden a binding. */
-export const DEFAULT_SHORTCUTS = {
-  focusSearch:      { key: '/' } as ShortcutBinding,
-  openQuickCapture: { key: 'n' } as ShortcutBinding,
-  openManual:       { key: '?' } as ShortcutBinding,
-} as const;
-
-/** Returns true when a KeyboardEvent matches the given binding. */
-export function matchBinding(e: KeyboardEvent, b: ShortcutBinding): boolean {
-  return (
-    e.key.toLowerCase() === b.key.toLowerCase() &&
-    !!e.ctrlKey  === !!b.ctrl  &&
-    !!e.altKey   === !!b.alt   &&
-    !!e.shiftKey === !!b.shift &&
-    !!e.metaKey  === !!b.meta
-  );
-}
-
-/** True when the binding needs a modifier key, i.e. it is safe to fire while isTyping. */
-function hasModifier(b: ShortcutBinding): boolean {
-  return !!(b.ctrl || b.alt || b.meta);
-}
+const EMPTY_SHORTCUTS: ShortcutConfig = {};
 
 export default function Layout() {
   const [isCaptureOpen, setIsCaptureOpen] = useState(false);
@@ -57,12 +37,16 @@ export default function Layout() {
   const searchRef = useRef<HTMLInputElement>(null);
 
   // Resolve effective bindings — stored overrides merged with defaults
-  const storedShortcuts = useSettingsStore((s) => s.data?.ui?.shortcuts ?? {});
-  const shortcuts = {
-    focusSearch:      storedShortcuts.focusSearch      ?? DEFAULT_SHORTCUTS.focusSearch,
+  const storedShortcuts = useSettingsStore((s) => s.data?.ui?.shortcuts ?? EMPTY_SHORTCUTS);
+  const shortcuts = useMemo(() => ({
+    focusSearch: storedShortcuts.focusSearch ?? DEFAULT_SHORTCUTS.focusSearch,
     openQuickCapture: storedShortcuts.openQuickCapture ?? DEFAULT_SHORTCUTS.openQuickCapture,
-    openManual:       storedShortcuts.openManual       ?? DEFAULT_SHORTCUTS.openManual,
-  };
+    openManual: storedShortcuts.openManual ?? DEFAULT_SHORTCUTS.openManual,
+  }), [
+    storedShortcuts.focusSearch,
+    storedShortcuts.openManual,
+    storedShortcuts.openQuickCapture,
+  ]);
 
   // When the user types in search and they're not on the board, navigate there
   const handleSearchChange = (value: string) => {
@@ -96,19 +80,19 @@ export default function Layout() {
       const openQuickCapture = shortcuts.openQuickCapture;
       const openManualB      = shortcuts.openManual;
 
-      if (matchBinding(e, focusSearch) && (!isTyping || hasModifier(focusSearch))) {
+      if (matchBinding(e, focusSearch) && (!isTyping || hasShortcutModifier(focusSearch))) {
         e.preventDefault();
         searchRef.current?.focus();
         return;
       }
 
-      if (matchBinding(e, openQuickCapture) && (!isTyping || hasModifier(openQuickCapture))) {
+      if (matchBinding(e, openQuickCapture) && (!isTyping || hasShortcutModifier(openQuickCapture))) {
         e.preventDefault();
         setIsCaptureOpen(true);
         return;
       }
 
-      if (matchBinding(e, openManualB) && (!isTyping || hasModifier(openManualB))) {
+      if (matchBinding(e, openManualB) && (!isTyping || hasShortcutModifier(openManualB))) {
         e.preventDefault();
         setManualOpen(true);
         return;

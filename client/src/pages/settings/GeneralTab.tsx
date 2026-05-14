@@ -2,17 +2,18 @@
 import { useState, useCallback } from 'react';
 import { ArrowUpDown, Keyboard } from 'lucide-react';
 import ImportExportModal from '@/components/ImportExportModal';
-import ShortcutRecorder, { bindingLabel } from '@/components/ShortcutRecorder';
+import ShortcutRecorder from '@/components/ShortcutRecorder';
 import { useNavigate } from 'react-router-dom';
 import { HelpButton } from '@/help/HelpPopover';
 import { useSettingsStore } from '@/stores/settings';
-import { DEFAULT_SHORTCUTS } from '@/components/Layout';
+import { bindingLabel, DEFAULT_SHORTCUTS } from '@/lib/shortcuts';
 import { patchSettings } from '@/api/client';
 import type { ShortcutBinding, ShortcutConfig } from '@/lib/types';
 
 // ── Action metadata ───────────────────────────────────────────────────────────
 
 type ActionId = keyof ShortcutConfig;
+const EMPTY_SHORTCUTS: ShortcutConfig = {};
 
 const ACTIONS: { id: ActionId; label: string; description: string }[] = [
   {
@@ -63,7 +64,7 @@ export default function GeneralTab() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  const storedShortcuts = useSettingsStore((s) => s.data?.ui?.shortcuts ?? {});
+  const storedShortcuts = useSettingsStore((s) => s.data?.ui?.shortcuts ?? EMPTY_SHORTCUTS);
   const refreshSettings = useSettingsStore((s) => s.refresh);
 
   // Effective bindings: stored overrides merged over defaults
