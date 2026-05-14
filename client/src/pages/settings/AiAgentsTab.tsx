@@ -2775,8 +2775,7 @@ export default function AiAgentsTab() {
                 ? claudeMethodOptions.filter((m) => m.channel !== 'file-agent')
                 : [
                     { id: 'anthropic-api-key', label: 'API key', channel: 'chat-model', availability: 'available' as const },
-                    // Fallback before capabilities load: mirror the gate state so the pill is correct.
-                    { id: 'claude-account-native', label: 'Account login', channel: 'chat-model', availability: (ai.claudeAccountAvailable ? 'auth-required' : 'unavailable') as AiMethodCapability['availability'] },
+                    { id: 'claude-account-native', label: 'Account login', channel: 'chat-model', availability: (ai.claudeAccountAuthenticated ? 'available' : 'auth-required') as AiMethodCapability['availability'] },
                   ] as AiMethodCapability[]
               ).map(optionFromMethodCapability)}
             />
@@ -2836,7 +2835,7 @@ export default function AiAgentsTab() {
                 ? openaiMethodOptions.filter((m) => m.channel !== 'file-agent')
                 : [
                     { id: 'openai-api-key', label: 'API key', channel: 'chat-model', availability: 'available' as const },
-                    { id: 'codex-account-app-server', label: 'Account login', channel: 'chat-model', availability: (ai.codexAccountAvailable ? (ai.codexAccountAuthenticated ? 'available' : 'auth-required') : 'unavailable') as AiMethodCapability['availability'] },
+                    { id: 'codex-account-app-server', label: 'Account login', channel: 'chat-model', availability: (ai.codexAccountAuthenticated ? 'available' : 'auth-required') as AiMethodCapability['availability'] },
                   ] as AiMethodCapability[]
               ).map(optionFromMethodCapability)}
             />
