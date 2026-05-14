@@ -1,36 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs/promises';
-import path from 'node:path';
-import { dataDir } from '../src/db.js';
-import { saveTokens, clearTokens } from '../src/ai/claude-account/auth.js';
+import { saveTokens } from '../src/ai/claude-account/auth.js';
 import { getCatalog, resetCatalogCacheForTests } from '../src/ai/claude-account/catalog.js';
 import { ClaudeAccountProvider } from '../src/ai/providers.js';
+import { withClaudeAuthSnapshot as withAuthSnapshot } from './helpers/claudeAuthSnapshot.js';
 import type { AiStoredConfig } from '../src/ai/types.js';
-
-const AUTH_PATH = path.join(dataDir, 'claude-auth.json');
-
-async function withAuthSnapshot(run: () => Promise<void>): Promise<void> {
-  let previous: Buffer | null = null;
-  try {
-    previous = await fs.readFile(AUTH_PATH);
-  } catch {
-    previous = null;
-  }
-
-  try {
-    await run();
-  } finally {
-    resetCatalogCacheForTests();
-    if (previous) {
-      await fs.mkdir(path.dirname(AUTH_PATH), { recursive: true });
-      await fs.writeFile(AUTH_PATH, previous);
-    } else {
-      await clearTokens().catch(() => {});
-      await fs.rm(AUTH_PATH, { force: true }).catch(() => {});
-    }
-  }
-}
 
 function claudeConfig(): AiStoredConfig {
   return {
