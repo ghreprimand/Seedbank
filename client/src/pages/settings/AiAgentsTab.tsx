@@ -1328,7 +1328,6 @@ const PROVIDER_LABELS: Record<AiProviderId, string> = {
 const REMOTE_PROVIDERS: AiProviderId[] = [
   'openai',
   'anthropic',
-  'openai-compatible',
   'claude-account',
   'codex-account',
 ];
@@ -1344,23 +1343,28 @@ const PROVIDER_IDS: AiProviderId[] = [
 
 interface AdvancedGuardrailsSectionProps {
   guardrails: AiGuardrailsConfig;
+  providerInstances: AiPublicConfig['providerInstances'];
   onSave: (patch: Partial<AiGuardrailsConfig>) => Promise<void>;
 }
 
-function AdvancedGuardrailsSection({ guardrails, onSave }: AdvancedGuardrailsSectionProps) {
+function AdvancedGuardrailsSection({ guardrails, providerInstances, onSave }: AdvancedGuardrailsSectionProps) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
   // Local drafts
   const [featureEnabled, setFeatureEnabled] = useState<Partial<Record<AiFeatureId, boolean>>>(guardrails.featureEnabled);
   const [providerEnabled, setProviderEnabled] = useState<Partial<Record<AiProviderId, boolean>>>(guardrails.providerEnabled);
+  const [providerInstanceEnabled, setProviderInstanceEnabled] = useState<Partial<Record<AiProviderInstanceId, boolean>>>(guardrails.providerInstanceEnabled);
   const [warnOnRemote, setWarnOnRemote] = useState(guardrails.warnOnRemoteProvider);
   const [requireConfirm, setRequireConfirm] = useState(guardrails.requireConfirmationForRemoteProvider);
   const [featureBudgets, setFeatureBudgets] = useState<Partial<Record<AiFeatureId, number>>>(guardrails.featureDailyTokenBudgets);
+  const [providerInstanceBudgets, setProviderInstanceBudgets] = useState<Partial<Record<AiProviderInstanceId, number>>>(guardrails.providerInstanceDailyTokenBudgets);
   const [allowedModelsText, setAllowedModelsText] = useState(guardrails.allowedModels.join(', '));
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  const privacyModeOn = warnOnRemote && requireConfirm && REMOTE_PROVIDERS.every(p => providerEnabled[p] === false);
+  const providerInstanceRows = Object.values(providerInstances);
+  const remoteProviderInstances = providerInstanceRows.filter((instance) => !instance.local);
+  const privacyModeOn = warnOnRemote && requireConfirm && remoteProviderInstances.every((instance) => providerInstanceEnabled[instance.id] === false);
 
   function togglePrivacyMode() {
     if (privacyModeOn) {
@@ -1368,6 +1372,12 @@ function AdvancedGuardrailsSection({ guardrails, onSave }: AdvancedGuardrailsSec
       setProviderEnabled(prev => {
         const next = { ...prev };
         REMOTE_PROVIDERS.forEach(p => { next[p] = true; });
+        next['openai-compatible'] = true;
+        return next;
+      });
+      setProviderInstanceEnabled(prev => {
+        const next = { ...prev };
+        providerInstanceRows.forEach((instance) => { next[instance.id] = true; });
         return next;
       });
       setWarnOnRemote(false);
@@ -1377,6 +1387,12 @@ function AdvancedGuardrailsSection({ guardrails, onSave }: AdvancedGuardrailsSec
       setProviderEnabled(prev => {
         const next = { ...prev };
         REMOTE_PROVIDERS.forEach(p => { next[p] = false; });
+        next['openai-compatible'] = true;
+        return next;
+      });
+      setProviderInstanceEnabled(prev => {
+        const next = { ...prev };
+        providerInstanceRows.forEach((instance) => { next[instance.id] = instance.local; });
         return next;
       });
       setWarnOnRemote(true);
@@ -1395,9 +1411,11 @@ function AdvancedGuardrailsSection({ guardrails, onSave }: AdvancedGuardrailsSec
       await onSave({
         featureEnabled,
         providerEnabled,
+        providerInstanceEnabled,
         warnOnRemoteProvider: warnOnRemote,
         requireConfirmationForRemoteProvider: requireConfirm,
         featureDailyTokenBudgets: featureBudgets,
+        providerInstanceDailyTokenBudgets: providerInstanceBudgets,
         allowedModels: models,
       });
     } catch (err) {
@@ -1430,7 +1448,7 @@ function AdvancedGuardrailsSection({ guardrails, onSave }: AdvancedGuardrailsSec
                 <div>
                   <p className="text-xs font-semibold text-ink-700">Local-only mode</p>
                   <p className="text-[11px] text-ink-500 leading-relaxed mt-0.5">
-                    Blocks all cloud and custom endpoint routes. Only Ollama can run. Re-enabling any other provider exits this mode.
+                    Blocks cloud API/account routes while leaving Ollama and local OpenAI-compatible endpoints available.
                   </p>
                 </div>
                 <button
@@ -1525,6 +1543,31 @@ function AdvancedGuardrailsSection({ guardrails, onSave }: AdvancedGuardrailsSec
             </div>
           </div>
 
+          {/* Provider instance enable/disable */}
+          <div className="space-y-2">
+            <p className="text-[11px] font-mono uppercase tracking-wider text-ink-400">Provider instance enable</p>
+            <div className="space-y-1.5">
+              {providerInstanceRows.map((instance) => {
+                const enabled = providerInstanceEnabled[instance.id] !== false;
+                return (
+                  <label key={instance.id} className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={enabled}
+                      onChange={e => setProviderInstanceEnabled(prev => ({ ...prev, [instance.id]: e.target.checked }))}
+                      className="w-3.5 h-3.5 accent-sage-600"
+                    />
+                    <span className="text-xs text-ink-700">{instance.label}</span>
+                    <span className="text-[10px] text-ink-400">{instance.local ? 'local' : 'cloud/account'}</span>
+                    {!enabled && (
+                      <span className="text-[10px] text-amber-600 font-medium">disabled</span>
+                    )}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Per-feature daily token budgets */}
           <div className="space-y-2">
             <div className="flex items-center gap-1.5">
@@ -1544,6 +1587,34 @@ function AdvancedGuardrailsSection({ guardrails, onSave }: AdvancedGuardrailsSec
                     onChange={e => {
                       const v = parseInt(e.target.value, 10);
                       setFeatureBudgets(prev => ({ ...prev, [fid]: isNaN(v) ? 0 : v }));
+                    }}
+                    className="w-28 px-2 py-1 text-[11px] font-mono border border-ink-100 rounded
+                               bg-white text-ink-700 focus:outline-none focus:border-sage-400"
+                  />
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Per-provider-instance daily token budgets */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-1.5">
+              <p className="text-[11px] font-mono uppercase tracking-wider text-ink-400">Per-provider-instance daily token caps</p>
+              <span title="0 = no instance-specific cap"><Info className="w-3 h-3 text-ink-300" /></span>
+            </div>
+            <div className="space-y-2">
+              {providerInstanceRows.map((instance) => (
+                <label key={instance.id} className="flex items-center gap-2">
+                  <span className="text-[11px] text-ink-600 w-44 shrink-0">{instance.label}</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1000}
+                    placeholder="0 = no cap"
+                    value={providerInstanceBudgets[instance.id] ?? 0}
+                    onChange={e => {
+                      const v = parseInt(e.target.value, 10);
+                      setProviderInstanceBudgets(prev => ({ ...prev, [instance.id]: isNaN(v) ? 0 : v }));
                     }}
                     className="w-28 px-2 py-1 text-[11px] font-mono border border-ink-100 rounded
                                bg-white text-ink-700 focus:outline-none focus:border-sage-400"
@@ -1659,6 +1730,7 @@ function GuardrailsSection({ ai, onSaveBudget, onSaveGuardrails }: GuardrailsSec
       {/* Live advanced guardrails controls */}
       <AdvancedGuardrailsSection
         guardrails={ai.guardrails}
+        providerInstances={ai.providerInstances}
         onSave={onSaveGuardrails}
       />
     </div>

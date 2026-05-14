@@ -7,19 +7,20 @@ import { AiService } from '../src/ai/service.js';
 import { SeedbankRepository } from '../src/repository.js';
 import { AiStore } from '../src/ai/store.js';
 
-function aiFixture(): { db: Database.Database; repository: SeedbankRepository; service: AiService } {
+function aiFixture(): { db: Database.Database; repository: SeedbankRepository; store: AiStore; service: AiService } {
   const db = new Database(':memory:');
   for (const migration of [
     '001_initial_schema.sql',
     '002_ai_assistance.sql',
     '005_ai_guardrail_audit.sql',
     '006_ai_execution_metadata.sql',
+    '007_ai_provider_instance_usage.sql',
   ]) {
     db.exec(fs.readFileSync(path.resolve('migrations', migration), 'utf8'));
   }
   const repository = new SeedbankRepository(db);
   const store = new AiStore(db);
-  return { db, repository, service: new AiService(repository, store) };
+  return { db, repository, store, service: new AiService(repository, store) };
 }
 
 test('save-time validation rejects explicit provider-instance routes missing required auth/config', () => {
@@ -96,6 +97,66 @@ test('run-time validation fails fast for stale provider-instance routes', () => 
         return err.statusCode === 400 && /API key is not configured/i.test(err.message ?? '');
       },
     );
+  } finally {
+    db.close();
+  }
+});
+
+test('provider-instance guardrails can block local OpenAI-compatible without disabling all OpenAI-compatible routes', () => {
+  const { db, service } = aiFixture();
+  try {
+    service.configure({
+      defaultProviderInstanceId: 'local-openai-compatible',
+      localOpenaiCompatibleModel: 'local-model',
+      featureRoutes: {
+        'thinking-partner': {
+          provider: 'openai-compatible',
+          providerInstanceId: 'local-openai-compatible',
+          model: 'local-model',
+        },
+      },
+      guardrails: {
+        providerEnabled: { 'openai-compatible': true },
+        providerInstanceEnabled: { 'local-openai-compatible': false },
+      },
+    });
+
+    const result = service.preflight('thinking-partner');
+    assert.equal(result.allowed, false);
+    assert.ok(result.blockers.some((blocker) => /Local OpenAI-compatible is disabled/i.test(blocker)));
+  } finally {
+    db.close();
+  }
+});
+
+test('provider-instance daily budgets use provider instance usage keys', () => {
+  const { db, store, service } = aiFixture();
+  try {
+    service.configure({
+      defaultProviderInstanceId: 'local-openai-compatible',
+      localOpenaiCompatibleModel: 'local-model',
+      featureRoutes: {
+        'thinking-partner': {
+          provider: 'openai-compatible',
+          providerInstanceId: 'local-openai-compatible',
+          model: 'local-model',
+        },
+      },
+      guardrails: {
+        providerInstanceDailyTokenBudgets: { 'local-openai-compatible': 5 },
+      },
+    });
+    store.recordUsage(
+      'openai-compatible',
+      'local-model',
+      'thinking-partner',
+      { inputTokens: 2, outputTokens: 3, totalTokens: 5 },
+      { providerInstanceId: 'local-openai-compatible' },
+    );
+
+    const result = service.preflight('thinking-partner');
+    assert.equal(result.allowed, false);
+    assert.ok(result.blockers.some((blocker) => /provider-instance budget local-openai-compatible reached/i.test(blocker)));
   } finally {
     db.close();
   }

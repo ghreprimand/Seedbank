@@ -12,6 +12,7 @@ function aiStoreFixture(): { db: Database.Database; store: AiStore } {
     '002_ai_assistance.sql',
     '005_ai_guardrail_audit.sql',
     '006_ai_execution_metadata.sql',
+    '007_ai_provider_instance_usage.sql',
   ]) {
     db.exec(fs.readFileSync(path.resolve('migrations', migration), 'utf8'));
   }
@@ -27,6 +28,7 @@ test('AI usage records execution metadata without changing configured-model budg
       'thinking-partner',
       { inputTokens: 2, outputTokens: 3, totalTokens: 5 },
       {
+        providerInstanceId: 'codex-account',
         providerFamily: 'account',
         transport: 'codex-account-app-server',
         requestedModel: 'codex-recommended',
@@ -36,10 +38,12 @@ test('AI usage records execution metadata without changing configured-model budg
     );
 
     assert.equal(store.tokensSince('1970-01-01T00:00:00.000Z', { model: 'codex-recommended' }), 5);
+    assert.equal(store.tokensSince('1970-01-01T00:00:00.000Z', { providerInstanceId: 'codex-account' }), 5);
     assert.equal(store.tokensSince('1970-01-01T00:00:00.000Z', { model: 'gpt-5.2-codex' }), 0);
 
     const [bucket] = store.routeUsageBuckets('1970-01-01T00:00:00.000Z');
     assert.equal(bucket?.provider, 'codex-account');
+    assert.equal(bucket?.providerInstanceId, 'codex-account');
     assert.equal(bucket?.model, 'codex-recommended');
     assert.equal(bucket?.providerFamily, 'account');
     assert.equal(bucket?.transport, 'codex-account-app-server');
@@ -61,6 +65,7 @@ test('AI audit events expose sanitized execution metadata', () => {
       'llama3.2',
       'Denied by guardrail',
       {
+        providerInstanceId: 'ollama',
         providerFamily: 'local',
         transport: 'ollama-chat',
         requestedModel: 'llama3.2',
@@ -72,6 +77,7 @@ test('AI audit events expose sanitized execution metadata', () => {
 
     const [event] = store.recentAuditEvents(1);
     assert.equal(event?.providerFamily, 'local');
+    assert.equal(event?.providerInstanceId, 'ollama');
     assert.equal(event?.transport, 'ollama-chat');
     assert.equal(event?.requestedModel, 'llama3.2');
     assert.equal(event?.resolvedModelId, 'llama3.2');

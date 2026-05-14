@@ -248,9 +248,19 @@ const DEFAULT_CONFIG: AiStoredConfig = {
       'claude-account': true,
       'codex-account': true,
     },
+    providerInstanceEnabled: {
+      'claude-api': true,
+      'claude-account': true,
+      'openai-api': true,
+      'codex-account': true,
+      ollama: true,
+      'local-openai-compatible': true,
+      'cloud-openai-compatible': true,
+    },
     allowedModels: [],
     featureDailyTokenBudgets: {},
     providerDailyTokenBudgets: {},
+    providerInstanceDailyTokenBudgets: {},
     modelDailyTokenBudgets: {},
     warnOnRemoteProvider: true,
     requireConfirmationForRemoteProvider: false,
@@ -438,9 +448,19 @@ function defaultGuardrails(): AiGuardrailsConfig {
       'claude-account': true,
       'codex-account': true,
     },
+    providerInstanceEnabled: {
+      'claude-api': true,
+      'claude-account': true,
+      'openai-api': true,
+      'codex-account': true,
+      ollama: true,
+      'local-openai-compatible': true,
+      'cloud-openai-compatible': true,
+    },
     allowedModels: [],
     featureDailyTokenBudgets: {},
     providerDailyTokenBudgets: {},
+    providerInstanceDailyTokenBudgets: {},
     modelDailyTokenBudgets: {},
     warnOnRemoteProvider: true,
     requireConfirmationForRemoteProvider: false,
@@ -490,6 +510,11 @@ function sanitizeGuardrails(input: unknown, current?: AiGuardrailsConfig): AiGua
       defaults.providerEnabled,
       ['openai', 'anthropic', 'ollama', 'openai-compatible', 'claude-account', 'codex-account'] as const,
     ),
+    providerInstanceEnabled: sanitizeBooleanMap(
+      source.providerInstanceEnabled,
+      defaults.providerInstanceEnabled,
+      AI_PROVIDER_INSTANCE_IDS,
+    ),
     allowedModels,
     featureDailyTokenBudgets: {
       ...defaults.featureDailyTokenBudgets,
@@ -501,6 +526,10 @@ function sanitizeGuardrails(input: unknown, current?: AiGuardrailsConfig): AiGua
         source.providerDailyTokenBudgets,
         ['openai', 'anthropic', 'ollama', 'openai-compatible', 'claude-account', 'codex-account'] as const,
       ),
+    },
+    providerInstanceDailyTokenBudgets: {
+      ...defaults.providerInstanceDailyTokenBudgets,
+      ...sanitizeBudgetMap(source.providerInstanceDailyTokenBudgets, AI_PROVIDER_INSTANCE_IDS),
     },
     modelDailyTokenBudgets: {
       ...defaults.modelDailyTokenBudgets,
@@ -575,20 +604,21 @@ function normalizeDefaultProviderInstance(value: unknown): AiProviderInstanceId 
 
 function applyProviderInstance(config: AiStoredConfig, providerInstanceId: AiProviderInstanceId): AiStoredConfig {
   if (providerInstanceId === 'claude-api') {
-    return { ...config, provider: 'anthropic', anthropicModel: config.providerInstances['claude-api'].configuredModel || config.anthropicModel };
+    return { ...config, defaultProviderInstanceId: providerInstanceId, provider: 'anthropic', anthropicModel: config.providerInstances['claude-api'].configuredModel || config.anthropicModel };
   }
   if (providerInstanceId === 'claude-account') {
-    return { ...config, provider: 'claude-account', claudeAccountModel: config.providerInstances['claude-account'].configuredModel || config.claudeAccountModel };
+    return { ...config, defaultProviderInstanceId: providerInstanceId, provider: 'claude-account', claudeAccountModel: config.providerInstances['claude-account'].configuredModel || config.claudeAccountModel };
   }
   if (providerInstanceId === 'openai-api') {
-    return { ...config, provider: 'openai', openaiModel: config.providerInstances['openai-api'].configuredModel || config.openaiModel };
+    return { ...config, defaultProviderInstanceId: providerInstanceId, provider: 'openai', openaiModel: config.providerInstances['openai-api'].configuredModel || config.openaiModel };
   }
   if (providerInstanceId === 'codex-account') {
-    return { ...config, provider: 'codex-account', codexAccountModel: config.providerInstances['codex-account'].configuredModel || config.codexAccountModel };
+    return { ...config, defaultProviderInstanceId: providerInstanceId, provider: 'codex-account', codexAccountModel: config.providerInstances['codex-account'].configuredModel || config.codexAccountModel };
   }
   if (providerInstanceId === 'ollama') {
     return {
       ...config,
+      defaultProviderInstanceId: providerInstanceId,
       provider: 'ollama',
       ollamaModel: config.providerInstances.ollama.configuredModel || config.ollamaModel,
       ollamaBaseUrl: config.providerInstances.ollama.baseUrl || config.ollamaBaseUrl,
@@ -597,6 +627,7 @@ function applyProviderInstance(config: AiStoredConfig, providerInstanceId: AiPro
   if (providerInstanceId === 'local-openai-compatible') {
     return {
       ...config,
+      defaultProviderInstanceId: providerInstanceId,
       provider: 'openai-compatible',
       openaiCompatiblePreset: config.localOpenaiCompatiblePreset,
       openaiCompatibleModel: config.localOpenaiCompatibleModel,
@@ -605,6 +636,7 @@ function applyProviderInstance(config: AiStoredConfig, providerInstanceId: AiPro
   }
   return {
     ...config,
+    defaultProviderInstanceId: providerInstanceId,
     provider: 'openai-compatible',
     openaiCompatiblePreset: config.cloudOpenaiCompatiblePreset,
     openaiCompatibleModel: config.cloudOpenaiCompatibleModel,
@@ -1276,6 +1308,7 @@ function metadataForConfig(config: AiStoredConfig, resolvedModelId?: string): Ai
   const requestedModel = modelFor(config);
   const contentLeavesDevice = !providerIsLocal(config);
   return {
+    providerInstanceId: normalizeDefaultProviderInstance(config.defaultProviderInstanceId),
     providerFamily: descriptor?.family,
     transport: descriptor?.transport,
     requestedModel,
@@ -1774,6 +1807,7 @@ export class AiService {
     const guardrails = sanitizeGuardrails(config.guardrails);
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const model = modelFor(config);
+    const providerInstanceId = normalizeDefaultProviderInstance(config.defaultProviderInstanceId);
     const budgetValues: AiBudgetState[] = [
       {
         scope: 'global',
@@ -1803,6 +1837,15 @@ export class AiService {
         enabled: (guardrails.providerDailyTokenBudgets[config.provider] ?? 0) > 0,
       },
       {
+        scope: 'provider-instance',
+        id: providerInstanceId,
+        limit: guardrails.providerInstanceDailyTokenBudgets[providerInstanceId] ?? 0,
+        used: this.store.tokensSince(since, { providerInstanceId }),
+        remaining: null,
+        window: 'day',
+        enabled: (guardrails.providerInstanceDailyTokenBudgets[providerInstanceId] ?? 0) > 0,
+      },
+      {
         scope: 'model',
         id: model,
         limit: guardrails.modelDailyTokenBudgets[model] ?? 0,
@@ -1826,6 +1869,8 @@ export class AiService {
     const guardrails = sanitizeGuardrails(config.guardrails);
     const model = modelFor(config);
     const metadata = metadataForConfig(config, preflightResolvedModelId(config, model));
+    const providerInstanceId = normalizeDefaultProviderInstance(config.defaultProviderInstanceId);
+    const providerInstanceLabel = config.providerInstances[providerInstanceId]?.label ?? providerInstanceId;
     const local = providerIsLocal(config);
     const providerLabel = providerLabelForConfig(config);
     const blockers: string[] = [];
@@ -1833,6 +1878,7 @@ export class AiService {
 
     if (guardrails.featureEnabled[feature] === false) blockers.push(`${feature} is disabled by AI guardrails.`);
     if (guardrails.providerEnabled[config.provider] === false) blockers.push(`${providerLabel} is disabled by AI guardrails.`);
+    if (guardrails.providerInstanceEnabled[providerInstanceId] === false) blockers.push(`${providerInstanceLabel} is disabled by AI guardrails.`);
     if (guardrails.allowedModels.length > 0 && !guardrails.allowedModels.includes(model)) {
       blockers.push(`${model} is not in the AI model allowlist.`);
     }
@@ -1873,6 +1919,8 @@ export class AiService {
     const model = modelFor(config);
     const metadata = metadataForConfig(config, model);
     const providerLabel = providerLabelForConfig(config);
+    const providerInstanceId = normalizeDefaultProviderInstance(config.defaultProviderInstanceId);
+    const providerInstanceLabel = config.providerInstances[providerInstanceId]?.label ?? providerInstanceId;
     const routeIssues = routeValidationIssues(config, feature);
     const deny = (message: string, statusCode: number) => {
       this.store.recordAuditEvent('guardrail_denied', feature, config.provider, model, message, metadata);
@@ -1892,6 +1940,9 @@ export class AiService {
       deny(first.message, first.statusCode);
     }
     if (guardrails.providerEnabled[config.provider] === false) deny(`AI provider "${providerLabel}" is disabled by guardrails. ${GUARDRAIL_SETTINGS_HINT}`, 403);
+    if (guardrails.providerInstanceEnabled[providerInstanceId] === false) {
+      deny(`AI provider instance "${providerInstanceLabel}" is disabled by guardrails. ${GUARDRAIL_SETTINGS_HINT}`, 403);
+    }
     if (guardrails.allowedModels.length > 0 && !guardrails.allowedModels.includes(model)) {
       deny(`AI model "${model}" is not allowed by guardrails. ${GUARDRAIL_SETTINGS_HINT}`, 403);
     }
