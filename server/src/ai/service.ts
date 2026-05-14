@@ -1,6 +1,7 @@
 import { extractSuggestion } from "./utils/suggestion-parser.js";
 import { aiProviderLabel, isAiProviderId } from '../../../shared/types.js';
 import type {
+  AiProviderDiagnosticCode,
   AiChatMessage,
   AiEffectiveFeatureRoute,
   AiFieldAssistMessage,
@@ -570,6 +571,108 @@ function resolveFeatureConfig(config: AiStoredConfig, feature: AiFeatureId): AiS
     return applyModelOverride(applyProviderInstance(config, route.providerInstanceId), providerInstanceToProvider(route.providerInstanceId), route.model ?? '');
   }
   return applyModelOverride({ ...config, provider: route.provider }, route.provider, route.model ?? '');
+}
+
+interface FeatureRouteValidationIssue {
+  feature: AiFeatureId;
+  providerInstanceId: AiProviderInstanceId;
+  code: AiProviderDiagnosticCode;
+  message: string;
+  statusCode: number;
+}
+
+function routeProviderInstanceId(config: AiStoredConfig, feature: AiFeatureId): AiProviderInstanceId {
+  const routes = sanitizeFeatureRoutes(config.featureRoutes);
+  const route = routes[feature] ?? routes.default;
+  const defaultInstanceId = normalizeDefaultProviderInstance(config.defaultProviderInstanceId);
+  return route.provider === 'default'
+    ? defaultInstanceId
+    : (route.providerInstanceId ?? defaultInstanceId);
+}
+
+function routeValidationIssues(config: AiStoredConfig, feature: AiFeatureId): FeatureRouteValidationIssue[] {
+  const providerInstanceId = routeProviderInstanceId(config, feature);
+  const instance = config.providerInstances[providerInstanceId];
+  const issues: FeatureRouteValidationIssue[] = [];
+  const label = instance?.label ?? providerInstanceId;
+
+  if (!instance) {
+    issues.push({
+      feature,
+      providerInstanceId,
+      code: 'runtime_unavailable',
+      message: `Feature route "${feature}" references unknown provider instance "${providerInstanceId}".`,
+      statusCode: 503,
+    });
+    return issues;
+  }
+
+  if (instance.baseUrl && !isValidAbsoluteUrl(instance.baseUrl)) {
+    issues.push({
+      feature,
+      providerInstanceId,
+      code: 'invalid_url',
+      message: `Feature route "${feature}" uses ${label} with invalid base URL "${instance.baseUrl}".`,
+      statusCode: 400,
+    });
+  }
+
+  if (instance.available === 'unavailable') {
+    issues.push({
+      feature,
+      providerInstanceId,
+      code: 'runtime_unavailable',
+      message: `Feature route "${feature}" uses ${label}, but runtime is unavailable${instance.availabilityReason ? `: ${instance.availabilityReason}` : '.'}`,
+      statusCode: 503,
+    });
+  } else if (instance.available === 'auth-required') {
+    issues.push({
+      feature,
+      providerInstanceId,
+      code: instance.requiresApiKey && !instance.hasApiKey ? 'missing_key' : 'auth_required',
+      message: instance.requiresApiKey && !instance.hasApiKey
+        ? `Feature route "${feature}" uses ${label}, but API key is not configured.`
+        : `Feature route "${feature}" uses ${label}, but account login/authentication is required.`,
+      statusCode: 400,
+    });
+  }
+
+  const resolved = resolveFeatureConfig(config, feature);
+  const model = modelFor(resolved).trim();
+  if (!model) {
+    issues.push({
+      feature,
+      providerInstanceId,
+      code: 'model_missing',
+      message: `Feature route "${feature}" uses ${label}, but no model is configured.`,
+      statusCode: 400,
+    });
+  }
+
+  return issues;
+}
+
+function saveTimeValidationFeatures(next: AiStoredConfig, input: AiConfigPatch): Set<AiFeatureId> {
+  const features = new Set<AiFeatureId>();
+  const source = input.featureRoutes;
+  if (source && typeof source === 'object') {
+    for (const feature of AI_FEATURE_IDS) {
+      const raw = (source as Partial<Record<AiFeatureId, unknown>>)[feature];
+      if (!raw || typeof raw !== 'object') continue;
+      const route = raw as { provider?: unknown; providerInstanceId?: unknown };
+      if (isProviderInstanceId(route.providerInstanceId) || route.provider === 'default') {
+        features.add(feature);
+      }
+    }
+  }
+  if (isProviderInstanceId(input.defaultProviderInstanceId)) {
+    const routes = sanitizeFeatureRoutes(next.featureRoutes);
+    for (const feature of AI_FEATURE_IDS) {
+      const route = routes[feature] ?? routes.default;
+      if (route.provider === 'default') features.add(feature);
+    }
+  }
+  return features;
 }
 
 function effectiveFeatureRoutes(config: AiStoredConfig): Record<AiFeatureId, AiEffectiveFeatureRoute> {
@@ -1529,6 +1632,13 @@ export class AiService {
   configure(input: AiConfigPatch): AiPublicConfig {
     const current = this.getConfig();
     const next = this.mergeConfig(input, current);
+    for (const feature of saveTimeValidationFeatures(next, input)) {
+      const issues = routeValidationIssues(next, feature);
+      if (issues.length > 0) {
+        const first = issues[0];
+        throw Object.assign(new Error(first.message), { statusCode: first.statusCode });
+      }
+    }
     this.repository.setSetting(AI_CONFIG_KEY, next);
     return publicConfig(next);
   }
@@ -1649,7 +1759,9 @@ export class AiService {
   }
 
   preflight(feature: AiFeatureId): AiPreflightResult {
-    const config = resolveFeatureConfig(this.getConfig(), feature);
+    const rawConfig = this.getConfig();
+    const config = resolveFeatureConfig(rawConfig, feature);
+    const routeIssues = routeValidationIssues(rawConfig, feature);
     const guardrails = sanitizeGuardrails(config.guardrails);
     const model = modelFor(config);
     const metadata = metadataForConfig(config, preflightResolvedModelId(config, model));
@@ -1663,6 +1775,7 @@ export class AiService {
     if (guardrails.allowedModels.length > 0 && !guardrails.allowedModels.includes(model)) {
       blockers.push(`${model} is not in the AI model allowlist.`);
     }
+    for (const issue of routeIssues) blockers.push(issue.message);
 
     for (const budget of this.budgetStates(config, feature)) {
       if (budget.enabled && budget.used >= budget.limit) blockers.push(`${budget.scope} budget ${budget.id} reached (${budget.used}/${budget.limit} tokens today).`);
@@ -1699,6 +1812,7 @@ export class AiService {
     const model = modelFor(config);
     const metadata = metadataForConfig(config, model);
     const providerLabel = providerLabelForConfig(config);
+    const routeIssues = routeValidationIssues(config, feature);
     const deny = (message: string, statusCode: number) => {
       this.store.recordAuditEvent('guardrail_denied', feature, config.provider, model, message, metadata);
       throw guardrailError(message, statusCode);
@@ -1712,6 +1826,10 @@ export class AiService {
     }
 
     if (guardrails.featureEnabled[feature] === false) deny(`AI feature "${feature}" is disabled by guardrails. ${GUARDRAIL_SETTINGS_HINT}`, 403);
+    if (routeIssues.length > 0) {
+      const first = routeIssues[0];
+      deny(first.message, first.statusCode);
+    }
     if (guardrails.providerEnabled[config.provider] === false) deny(`AI provider "${providerLabel}" is disabled by guardrails. ${GUARDRAIL_SETTINGS_HINT}`, 403);
     if (guardrails.allowedModels.length > 0 && !guardrails.allowedModels.includes(model)) {
       deny(`AI model "${model}" is not allowed by guardrails. ${GUARDRAIL_SETTINGS_HINT}`, 403);
