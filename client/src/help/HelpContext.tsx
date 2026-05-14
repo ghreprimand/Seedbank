@@ -33,6 +33,33 @@ export function HelpProvider({ children, onOpenManual }: HelpProviderProps) {
     setActiveHelp({ id, entry, anchorRect });
   }, []);
 
+  const inspectPoint = useCallback((x: number, y: number) => {
+    const target = document
+      .elementsFromPoint(x, y)
+      .find((element) =>
+        element instanceof HTMLElement
+        && !element.closest('[data-help-ignore]')
+        && !element.hasAttribute('data-help-overlay'),
+      );
+
+    if (!(target instanceof HTMLElement)) {
+      setActiveHelp({
+        id: 'fallback',
+        entry: FALLBACK_HELP_ENTRY,
+        anchorRect: pointRect(x, y),
+      });
+      return;
+    }
+
+    const resolved = resolveHelpTarget(target);
+    const anchorRect = resolved
+      ? resolved.element.getBoundingClientRect()
+      : pointRect(x, y);
+    const id = resolved?.id ?? 'fallback';
+    const entry = resolved?.entry ?? FALLBACK_HELP_ENTRY;
+    setActiveHelp({ id, entry, anchorRect });
+  }, []);
+
   const closeActiveHelp = useCallback(() => setActiveHelp(null), []);
 
   const setHelpMode = useCallback((next: boolean) => {
@@ -63,10 +90,6 @@ export function HelpProvider({ children, onOpenManual }: HelpProviderProps) {
 
   const setCollapsed = useCallback((next: boolean) => {
     setCollapsedState(next);
-  }, []);
-
-  const toggleCollapsed = useCallback(() => {
-    setCollapsedState((prev) => !prev);
   }, []);
 
   const openManual = useCallback(
@@ -109,34 +132,26 @@ export function HelpProvider({ children, onOpenManual }: HelpProviderProps) {
   useEffect(() => {
     if (!helpMode) return;
 
-    const onCaptureClick = (event: MouseEvent) => {
-      if (event.button !== 0) return;
-
+    const isIgnored = (target: EventTarget | null) =>
+      target instanceof HTMLElement && target.closest('[data-help-ignore]');
+    const onKeyDownCapture = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' || event.key === 'Tab') return;
       const target = event.target;
-      if (!(target instanceof HTMLElement)) return;
-
-      if (target.closest('[data-help-ignore]')) {
-        return;
-      }
-
-      const resolved = resolveHelpTarget(target);
-      const anchorRect = resolved
-        ? resolved.element.getBoundingClientRect()
-        : pointRect(event.clientX, event.clientY);
-      const id = resolved?.id ?? 'fallback';
-      const entry = resolved?.entry ?? FALLBACK_HELP_ENTRY;
-
+      if (!(target instanceof HTMLElement) || isIgnored(target)) return;
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation?.();
-      setActiveHelp({ id, entry, anchorRect });
+      if (event.key === 'Enter' || event.key === ' ') {
+        const rect = target.getBoundingClientRect();
+        inspectPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+      }
     };
 
-    document.addEventListener('click', onCaptureClick, true);
+    window.addEventListener('keydown', onKeyDownCapture, true);
     return () => {
-      document.removeEventListener('click', onCaptureClick, true);
+      window.removeEventListener('keydown', onKeyDownCapture, true);
     };
-  }, [helpMode]);
+  }, [helpMode, inspectPoint]);
 
   const value = useMemo(
     () => ({
@@ -147,11 +162,11 @@ export function HelpProvider({ children, onOpenManual }: HelpProviderProps) {
 
       collapsed,
       setCollapsed,
-      toggleCollapsed,
 
       activeHelp,
       closeActiveHelp,
       openHelpAtRect,
+      inspectPoint,
 
       openManual,
     }),
@@ -162,10 +177,10 @@ export function HelpProvider({ children, onOpenManual }: HelpProviderProps) {
       exitHelpMode,
       collapsed,
       setCollapsed,
-      toggleCollapsed,
       activeHelp,
       closeActiveHelp,
       openHelpAtRect,
+      inspectPoint,
       openManual,
     ],
   );

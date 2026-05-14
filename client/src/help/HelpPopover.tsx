@@ -35,7 +35,6 @@ export function HelpButton({
         data-help-body={summary}
         data-help-details={details}
         data-help-manual={manualSection}
-        data-help-trigger
         aria-label={`Help: ${title}`}
         onClick={(event) => {
           event.stopPropagation();

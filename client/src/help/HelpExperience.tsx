@@ -9,6 +9,36 @@ import {
 } from 'lucide-react';
 import { useHelp } from './useHelp';
 
+function HelpModeCaptureLayer() {
+  const { helpMode, inspectPoint } = useHelp();
+  if (!helpMode) return null;
+
+  const stop = (event: Event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation?.();
+  };
+
+  return (
+    <div
+      data-help-ignore
+      data-help-overlay
+      className="fixed inset-0 z-[35]"
+      onPointerDown={(event) => {
+        if (event.button !== 0) return;
+        stop(event.nativeEvent);
+        inspectPoint(event.clientX, event.clientY);
+      }}
+      onClick={(event) => {
+        stop(event.nativeEvent);
+      }}
+      onContextMenu={(event) => {
+        stop(event.nativeEvent);
+      }}
+    />
+  );
+}
+
 function HelpModeBanners() {
   const { helpMode, exitHelpMode } = useHelp();
   if (!helpMode) return null;
@@ -44,6 +74,28 @@ function HelpModeBanners() {
         Esc to exit help mode
       </div>
     </>
+  );
+}
+
+function HelpSelectionOutline() {
+  const { helpMode, activeHelp } = useHelp();
+  if (!helpMode || !activeHelp) return null;
+
+  const { left, top, width, height } = activeHelp.anchorRect;
+  if (width <= 0 || height <= 0) return null;
+
+  return (
+    <div
+      data-help-ignore
+      aria-hidden="true"
+      className="fixed z-[38] pointer-events-none rounded-md border-2 border-dashed border-sage-500 shadow-[0_0_0_9999px_rgba(0,0,0,0.02)]"
+      style={{
+        left: `${Math.max(0, left - 3)}px`,
+        top: `${Math.max(0, top - 3)}px`,
+        width: `${Math.max(6, width + 6)}px`,
+        height: `${Math.max(6, height + 6)}px`,
+      }}
+    />
   );
 }
 
@@ -194,6 +246,8 @@ function FloatingHelpControl() {
 export default function HelpExperience() {
   return (
     <>
+      <HelpModeCaptureLayer />
+      <HelpSelectionOutline />
       <HelpModeBanners />
       <ContextHelpPopover />
       <FloatingHelpControl />
