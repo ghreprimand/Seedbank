@@ -8,7 +8,7 @@
  *   4. Idea Weather — stats panel showing archive patterns
  */
 
-import { useState, useEffect } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { HelpButton } from '@/help/HelpPopover';
 import {
@@ -130,10 +130,10 @@ export default function Discover() {
 
   // Resolve a category ID to its configured label, falling back to the static
   // map and then the raw ID so custom categories appear readable in prose.
-  const categoryLabel = (id: string): string =>
+  const categoryLabel = useCallback((id: string): string =>
     categorySettings.items.find((c) => c.id === id)?.label ??
     CATEGORY_LABELS[id as keyof typeof CATEGORY_LABELS] ??
-    id;
+    id, [categorySettings.items]);
 
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [loading, setLoading] = useState(true);
@@ -336,7 +336,7 @@ export default function Discover() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [categoryLabel]);
 
   // ── Render ─────────────────────────────────────────────
 

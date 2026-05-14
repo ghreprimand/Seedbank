@@ -87,7 +87,7 @@ function claudeConfig(): AiStoredConfig {
   };
 }
 
-test('Claude catalog requests include account-beta identity headers', async () => {
+test('Claude catalog requests include account-beta identity headers', { concurrency: false }, async () => {
   await withAuthSnapshot(async () => {
     await saveTokens({
       accessToken: 'token-1',
@@ -123,7 +123,7 @@ test('Claude catalog requests include account-beta identity headers', async () =
   });
 });
 
-test('Claude account inference requests include account-beta identity headers', async () => {
+test('Claude account inference requests include account-beta identity headers', { concurrency: false }, async () => {
   await withAuthSnapshot(async () => {
     await saveTokens({
       accessToken: 'token-2',
@@ -185,7 +185,7 @@ test('Claude account inference requests include account-beta identity headers', 
   });
 });
 
-test('Claude account compact can be explicitly disabled while retaining prompt caching', async () => {
+test('Claude account compact can be explicitly disabled while retaining prompt caching', { concurrency: false }, async () => {
   await withAuthSnapshot(async () => {
     await saveTokens({
       accessToken: 'token-compact-off',
@@ -240,7 +240,7 @@ test('Claude account compact can be explicitly disabled while retaining prompt c
   });
 });
 
-test('Claude account listModels returns bundled models when unauthenticated', async () => {
+test('Claude account listModels returns bundled models when unauthenticated', { concurrency: false }, async () => {
   await withAuthSnapshot(async () => {
     await clearTokens();
     const provider = new ClaudeAccountProvider();
@@ -251,7 +251,7 @@ test('Claude account listModels returns bundled models when unauthenticated', as
   });
 });
 
-test('Claude account listModels surfaces refresh failures instead of false logout fallback', async () => {
+test('Claude account listModels surfaces refresh failures instead of false logout fallback', { concurrency: false }, async () => {
   await withAuthSnapshot(async () => {
     await saveTokens({
       accessToken: 'token-stale',
@@ -519,7 +519,7 @@ test('Codex status applies startup circuit-breaker after repeated app-server fai
   }
 });
 
-test('ensureLiveTokens refreshes expired Claude token with single-flight lock', async () => {
+test('ensureLiveTokens refreshes expired Claude token with single-flight lock', { concurrency: false }, async () => {
   await withAuthSnapshot(async () => {
     await saveTokens({
       accessToken: 'expired-access',
@@ -564,7 +564,7 @@ test('ensureLiveTokens refreshes expired Claude token with single-flight lock', 
   });
 });
 
-test('ensureLiveTokens surfaces refresh/network failures distinctly from signed-out state', async () => {
+test('ensureLiveTokens surfaces refresh/network failures distinctly from signed-out state', { concurrency: false }, async () => {
   await withAuthSnapshot(async () => {
     await saveTokens({
       accessToken: 'expired-access',

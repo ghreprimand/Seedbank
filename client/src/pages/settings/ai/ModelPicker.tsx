@@ -4,7 +4,7 @@
  * Renders a real select for discovered models and keeps a custom text field as
  * a fallback for model IDs that are not in the discovered list.
  */
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { AiModelInfo } from '@/lib/types';
 
 export interface ModelPickerProps {
@@ -27,15 +27,11 @@ export function ModelPicker({
   const discovered = discoveredModels.slice(0, 200);
   const hasDiscovered = discovered.length > 0;
   const knownValue = discovered.some((model) => model.id === value);
-  const [customMode, setCustomMode] = useState(false);
+  const [userCustomMode, setUserCustomMode] = useState(false);
+  const customMode = (hasDiscovered && value !== '' && !knownValue) || (userCustomMode && !knownValue);
   const inputClassName = hasDiscovered && !disabled
     ? className.replace('mt-1 ', '')
     : className;
-
-  useEffect(() => {
-    if (hasDiscovered && value && !knownValue) setCustomMode(true);
-    if (knownValue) setCustomMode(false);
-  }, [hasDiscovered, knownValue, value]);
 
   return (
     <div className="mt-1 space-y-1">
@@ -44,10 +40,10 @@ export function ModelPicker({
           value={customMode ? '__custom__' : knownValue ? value : ''}
           onChange={(event) => {
             if (event.target.value === '__custom__') {
-              setCustomMode(true);
+              setUserCustomMode(true);
               return;
             }
-            setCustomMode(false);
+            setUserCustomMode(false);
             onChange(event.target.value);
           }}
           className={className}

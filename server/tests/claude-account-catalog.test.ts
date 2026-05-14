@@ -84,7 +84,7 @@ function claudeConfig(): AiStoredConfig {
   };
 }
 
-test('Claude catalog parsing includes aliases and capability metadata', async () => {
+test('Claude catalog parsing includes aliases and capability metadata', { concurrency: false }, async () => {
   await withAuthSnapshot(async () => {
     await saveTokens({
       accessToken: 'token-cat-1',
@@ -140,7 +140,7 @@ test('Claude catalog parsing includes aliases and capability metadata', async ()
   });
 });
 
-test('Claude catalog serves stale cached data when live refresh fails', async () => {
+test('Claude catalog serves stale cached data when live refresh fails', { concurrency: false }, async () => {
   await withAuthSnapshot(async () => {
     await saveTokens({
       accessToken: 'token-cat-2',
@@ -176,7 +176,7 @@ test('Claude catalog serves stale cached data when live refresh fails', async ()
   });
 });
 
-test('Claude catalog surfaces refresh failures when no cache exists', async () => {
+test('Claude catalog surfaces refresh failures when no cache exists', { concurrency: false }, async () => {
   await withAuthSnapshot(async () => {
     await saveTokens({
       accessToken: 'token-expired',
@@ -202,7 +202,7 @@ test('Claude catalog surfaces refresh failures when no cache exists', async () =
   });
 });
 
-test('Claude provider listModels maps catalog capabilities into model metadata', async () => {
+test('Claude provider listModels maps catalog capabilities into model metadata', { concurrency: false }, async () => {
   await withAuthSnapshot(async () => {
     await saveTokens({
       accessToken: 'token-cat-3',
