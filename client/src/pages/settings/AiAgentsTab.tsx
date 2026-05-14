@@ -12,19 +12,14 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
-  ExternalLink,
   Info,
   Loader2,
   Lock,
   Radio,
-  RotateCcw,
   Shield,
-  Terminal,
-  Unlink,
 } from 'lucide-react';
 import { aiProviderLabel, isAiProviderId } from '@/lib/types';
 import type {
-  AgentProvider,
   AiAuditEvent,
   AiConfigInput,
   AiFeatureId,
@@ -39,6 +34,7 @@ import type {
   AiPreflightResult,
   AiProviderId,
   AiProviderHealth,
+  AiProviderInstanceId,
   AiPublicConfig,
   AiUsageBucket,
 } from '@/lib/types';
@@ -796,154 +792,6 @@ function OpenAICompatibleDetail({ preset, model, baseUrl, hasKey, mode, allowedP
         listLabel="List draft models"
       />
       {saveError && <p className="text-[11px] text-red-600 font-mono">{saveError}</p>}
-    </div>
-  );
-}
-
-// ── Linked agent card ─────────────────────────────────────────────────────────
-
-interface AgentCardProps {
-  provider: AgentProvider;
-  label: string;
-  description: string;
-  docsUrl: string;
-  isLinked: boolean;
-  version?: string;
-  onLink: (cliPath: string) => Promise<void>;
-  onDetect: () => Promise<void>;
-  onUnlink: () => Promise<void>;
-}
-
-function AgentCard({
-  provider, label, description, docsUrl,
-  isLinked, version,
-  onLink, onDetect, onUnlink,
-}: AgentCardProps) {
-  const [cliPath, setCliPath] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [detecting, setDetecting] = useState(false);
-
-  const handleLink = async () => {
-    if (!cliPath.trim()) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await onLink(cliPath.trim());
-      setCliPath('');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleDetect = async () => {
-    setDetecting(true);
-    setError(null);
-    try {
-      await onDetect();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setDetecting(false);
-    }
-  };
-
-  const handleUnlink = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      await onUnlink();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div className={`rounded-card border p-4 space-y-3 ${isLinked ? 'border-sage-300 bg-paper' : 'border-ink-100 bg-paper'}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <Terminal className="w-4 h-4 text-ink-400" />
-            <span className="text-sm font-semibold text-ink-800">{label}</span>
-            {isLinked && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-badge border
-                               bg-sage-50 text-sage-700 border-sage-200 text-[10px] font-mono font-semibold uppercase">
-                <Check className="w-2.5 h-2.5" /> linked
-              </span>
-            )}
-          </div>
-          <p className="text-xs text-ink-400 mt-0.5">{description}</p>
-          {version && (
-            <p className="text-[10px] font-mono text-ink-400 mt-1">version {version}</p>
-          )}
-        </div>
-        <a
-          href={docsUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="shrink-0 text-ink-400 hover:text-sage-700 transition-colors"
-          title="Documentation"
-        >
-          <ExternalLink className="w-3.5 h-3.5" />
-        </a>
-      </div>
-
-      {isLinked ? (
-        <button
-          type="button"
-          onClick={handleUnlink}
-          disabled={busy}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium
-                     border border-ink-200 text-ink-600 hover:border-red-200 hover:text-red-600
-                     hover:bg-red-50 rounded-card transition-colors disabled:opacity-50"
-        >
-          {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Unlink className="w-3 h-3" />}
-          Unlink
-        </button>
-      ) : (
-        <div className="space-y-2">
-          <div className="flex gap-2">
-            <input
-              value={cliPath}
-              onChange={(e) => setCliPath(e.target.value)}
-              placeholder={`Path to ${provider === 'claude' ? 'claude' : 'codex'} binary (or leave blank to detect)`}
-              className="flex-1 min-w-0 px-2 py-1.5 text-xs bg-paper-warm border border-ink-100
-                         rounded-card text-ink-800 placeholder:text-ink-300 outline-none
-                         focus:ring-2 focus:ring-sage-400 focus:border-sage-300"
-            />
-            <button
-              type="button"
-              onClick={handleDetect}
-              disabled={detecting || busy}
-              title="Detect on PATH"
-              className="px-2.5 py-1.5 text-xs border border-ink-200 text-ink-500
-                         hover:border-sage-300 hover:text-sage-700 hover:bg-sage-50
-                         rounded-card transition-colors disabled:opacity-50"
-            >
-              {detecting ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />}
-            </button>
-            <button
-              type="button"
-              onClick={handleLink}
-              disabled={busy || detecting}
-              className="px-3 py-1.5 text-xs font-semibold bg-sage-600 hover:bg-sage-700
-                         disabled:bg-ink-300 text-white rounded-card transition-colors"
-            >
-              {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Link'}
-            </button>
-          </div>
-          {error && (
-            <p className="text-[11px] text-red-600 font-mono">{error}</p>
-          )}
-          <p className="text-[11px] text-ink-400">
-            The binary path is stored server-side only — no credentials enter the browser.
-          </p>
-        </div>
-      )}
     </div>
   );
 }
@@ -1843,16 +1691,6 @@ const AI_FEATURE_ROWS: Array<{ id: AiFeatureId; label: string; detail: string; s
   { id: 'default', label: 'Other features (fallback)', detail: 'Applies only to unnamed or future AI features — does not affect the features above', secondary: true },
 ];
 
-// Ordered to match provider card grouping: direct API → local → external → account
-const AI_PROVIDER_OPTIONS: Array<{ id: AiProviderId; label: string }> = [
-  { id: 'openai', label: aiProviderLabel('openai') },
-  { id: 'anthropic', label: aiProviderLabel('anthropic') },
-  { id: 'ollama', label: aiProviderLabel('ollama') },
-  { id: 'openai-compatible', label: aiProviderLabel('openai-compatible') },
-  { id: 'claude-account', label: aiProviderLabel('claude-account') },
-  { id: 'codex-account', label: aiProviderLabel('codex-account') },
-];
-
 function providerModel(ai: AiPublicConfig, provider: AiProviderId): string {
   if (provider === 'openai') return ai.openaiModel;
   if (provider === 'anthropic') return ai.anthropicModel;
@@ -1874,13 +1712,22 @@ function providerModel(ai: AiPublicConfig, provider: AiProviderId): string {
  * known (OpenAI Responses API reasoning.effort, Codex app-server turn effort).
  * TODO(Phase 7): replace with a capability-map lookup from the model catalog.
  */
-function providerSupportsEffort(provider: AiProviderId | 'default'): boolean {
+function providerSupportsEffort(provider: AiProviderId | 'default', providerInstanceId?: AiProviderInstanceId): boolean {
   if (provider === 'default') return false;
-  return provider === 'openai' || provider === 'codex-account';
+  if (providerInstanceId === 'openai-api') return true;
+  return provider === 'codex-account';
 }
 
 function providerLabel(provider: AiProviderId): string {
   return aiProviderLabel(provider);
+}
+
+function providerInstanceBadge(ai: AiPublicConfig, providerInstanceId: AiProviderInstanceId, model?: string): string {
+  const instance = ai.providerInstances[providerInstanceId];
+  if (!instance) {
+    return `${providerLabel(ai.provider)} · ${model || 'choose a model'}`;
+  }
+  return `${instance.label} · ${model || instance.configuredModel || 'choose a model'}`;
 }
 
 interface FeatureRoutingSectionProps {
@@ -1903,6 +1750,15 @@ function FeatureRoutingSection({ ai, providerStatuses, providerAvailability, onS
   // Effort is local state only — not yet persisted. The backend contract for
   // per-feature effort in featureRoutes is pending (Phase 7). Wire here when ready.
   const [featureEfforts, setFeatureEfforts] = useState<Partial<Record<AiFeatureId, string>>>({});
+  const instanceRoutingOptions = Object.values(ai.providerInstances).filter((instance) => instance.featureRoutable);
+  const firstInstanceForProvider = (provider: AiProviderId): AiProviderInstanceId | null => (
+    instanceRoutingOptions.find((instance) => instance.provider === provider)?.id ?? null
+  );
+  const instanceForRoute = (route: AiFeatureRoute) => {
+    if (route.provider === 'default') return null;
+    const instanceId = route.providerInstanceId ?? firstInstanceForProvider(route.provider);
+    return instanceId ? ai.providerInstances[instanceId] : null;
+  };
 
   const updateRoute = (feature: AiFeatureId, route: AiFeatureRoute) => {
     setRoutes((current) => ({ ...current, [feature]: route }));
@@ -1913,14 +1769,15 @@ function FeatureRoutingSection({ ai, providerStatuses, providerAvailability, onS
     // by the backend method-capability contract.
     const unavailableProviders = Object.values(routes).filter((route) => {
       if (route.provider === 'default') return false;
-      const availability = providerAvailability[route.provider];
-      if (!availability) return false;
-      if (!availability.featureRoutable) return true;
-      return availability.availability === 'unavailable';
+      const instanceId = route.providerInstanceId ?? firstInstanceForProvider(route.provider);
+      if (!instanceId) return false;
+      const instance = ai.providerInstances[instanceId];
+      if (!instance) return false;
+      return instance.available === 'unavailable';
     });
     if (unavailableProviders.length > 0) {
       const reasons = unavailableProviders
-        .map((route) => (route.provider === 'default' ? null : providerAvailability[route.provider]?.reason))
+        .map((route) => instanceForRoute(route)?.availabilityReason ?? null)
         .filter(Boolean)
         .join(' ');
       setSaveError(
@@ -1977,10 +1834,16 @@ function FeatureRoutingSection({ ai, providerStatuses, providerAvailability, onS
         {AI_FEATURE_ROWS.map((feature) => {
           const route = routes[feature.id] ?? { provider: 'default' as const };
           const effective = ai.effectiveFeatureRoutes[feature.id];
+          const selectedInstanceId = route.provider === 'default'
+            ? null
+            : (route.providerInstanceId ?? firstInstanceForProvider(route.provider));
+          const selectedInstance = selectedInstanceId ? ai.providerInstances[selectedInstanceId] : null;
           const selectedProvider = route.provider === 'default' ? 'default' : route.provider;
           const selectedUnavailableReason =
             selectedProvider === 'default'
               ? null
+              : selectedInstance?.availabilityReason
+                ? selectedInstance.availabilityReason
               : selectedProvider === 'openai' && !ai.hasOpenAIKey
                 ? 'OpenAI API key missing in the OpenAI API card.'
               : selectedProvider === 'anthropic' && !ai.hasAnthropicKey
@@ -2012,14 +1875,16 @@ function FeatureRoutingSection({ ai, providerStatuses, providerAvailability, onS
                       : 'Provider is ready for this feature route.';
           const modelHint =
             selectedProvider === 'default'
-              ? `Effective: ${providerLabel(effective.provider)} · ${effective.model || 'choose a model'}`
+              ? `Effective: ${providerInstanceBadge(ai, effective.providerInstanceId, effective.model)}`
               : selectedProvider === 'claude-account'
                 ? 'Try aliases like claude-sonnet-latest. List models shows alias + resolved ID.'
-                : selectedProvider === 'codex-account'
+              : selectedProvider === 'codex-account'
                   ? 'Use codex-recommended/codex-fast or a resolved catalog ID from List models.'
                   : selectedProvider === 'openai-compatible'
                     ? 'Enter a model ID manually (e.g. from OpenRouter, Groq, or your local server catalog).'
-                    : `Effective: ${providerLabel(effective.provider)} · ${effective.model || 'choose a model'}`;
+                    : selectedInstance
+                      ? `Configured: ${selectedInstance.configuredModel || 'choose a model'}`
+                      : `Effective: ${providerLabel(effective.provider)} · ${effective.model || 'choose a model'}`;
           return (
             <div
               key={feature.id}
@@ -2036,25 +1901,29 @@ function FeatureRoutingSection({ ai, providerStatuses, providerAvailability, onS
               <label className="block text-xs text-ink-500">
                 Provider
                 <select
-                  value={selectedProvider}
+                  value={selectedProvider === 'default' ? 'default' : (selectedInstanceId ?? '')}
                   onChange={(event) => {
-                    const provider = event.target.value as AiProviderId | 'default';
-                    updateRoute(feature.id, provider === 'default' ? { provider } : { provider });
+                    const value = event.target.value;
+                    if (value === 'default') {
+                      updateRoute(feature.id, { provider: 'default' });
+                      return;
+                    }
+                    const instance = ai.providerInstances[value as AiProviderInstanceId];
+                    if (!instance) return;
+                    updateRoute(feature.id, {
+                      provider: instance.provider,
+                      providerInstanceId: instance.id,
+                      model: route.model,
+                    });
                   }}
                   className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800"
                 >
                   <option value="default">Use global default</option>
-                  {AI_PROVIDER_OPTIONS.map((provider) => (
-                    <option key={provider.id} value={provider.id}>
-                      {provider.label}
-                      {provider.id === 'openai' && !ai.hasOpenAIKey ? ' — setup required' : ''}
-                      {provider.id === 'anthropic' && !ai.hasAnthropicKey ? ' — setup required' : ''}
-                      {provider.id === 'claude-account' && !ai.claudeAccountAuthenticated
-                        ? (ai.claudeAccountAvailable ? ' — sign-in required' : ' — not yet available')
-                        : ''}
-                      {provider.id === 'codex-account' && !ai.codexAccountAuthenticated
-                        ? (ai.codexAccountAvailable ? ' — sign-in required' : ' — not yet available')
-                        : ''}
+                  {instanceRoutingOptions.map((instance) => (
+                    <option key={instance.id} value={instance.id}>
+                      {instance.label}
+                      {instance.available === 'auth-required' ? ' — auth required' : ''}
+                      {instance.available === 'unavailable' ? ' — unavailable' : ''}
                     </option>
                   ))}
                 </select>
@@ -2068,7 +1937,9 @@ function FeatureRoutingSection({ ai, providerStatuses, providerAvailability, onS
                   value={route.provider === 'default' ? '' : route.model ?? ''}
                   disabled={route.provider === 'default'}
                   onChange={(event) => updateRoute(feature.id, { ...route, model: event.target.value })}
-                  placeholder={route.provider === 'default' ? providerModel(ai, ai.provider) : providerModel(ai, route.provider)}
+                  placeholder={route.provider === 'default'
+                    ? providerModel(ai, ai.provider)
+                    : (selectedInstance?.configuredModel || providerModel(ai, route.provider))}
                   className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800 disabled:bg-ink-50 disabled:text-ink-400"
                 />
                 <span className="mt-1 block text-[11px] text-ink-400">
@@ -2077,7 +1948,7 @@ function FeatureRoutingSection({ ai, providerStatuses, providerAvailability, onS
               </label>
               {/* Effort column: visible only when the selected provider supports reasoning effort.
                   Local state only — not yet persisted (Phase 7 backend contract pending). */}
-              {providerSupportsEffort(route.provider) ? (
+              {providerSupportsEffort(route.provider, route.provider === 'default' ? undefined : selectedInstanceId ?? undefined) ? (
                 <label className="block text-xs text-ink-500 min-w-[100px]">
                   Effort
                   <select
@@ -2599,16 +2470,8 @@ export default function AiAgentsTab() {
   const ollamaStatus: ProviderCardProps['status'] = probeStatuses.ollama ?? 'not-tested';
   // ── Local OpenAI-compatible derived state (uses split localOpenaiCompatible* fields) ──
   const localCompatiblePreset = presetFor(ai.localOpenaiCompatiblePreset ?? ai.openaiCompatiblePreset);
-  const localCompatibleActive = openAICompatiblePresetMatchesMode(
-    ai.localOpenaiCompatiblePreset ?? ai.openaiCompatiblePreset,
-    ai.localOpenaiCompatibleBaseUrl ?? ai.openaiCompatibleBaseUrl,
-    'local',
-  );
   const localCompatibleStatus: ProviderCardProps['status'] = probeStatuses['openai-compatible']
     ?? (localCompatiblePreset.requiresKey && !ai.hasLocalOpenAICompatibleKey ? 'key-needed' : 'not-tested');
-  const localCompatibleLabel = localCompatibleActive
-    ? `${localCompatiblePreset.label} · ${ai.localOpenaiCompatibleModel || ai.openaiCompatibleModel || 'choose a model'}`
-    : `${presetFor(LOCAL_COMPATIBLE_DEFAULT_PRESET).label} · not configured`;
 
   // ── Cloud OpenAI-compatible derived state (uses split cloudOpenaiCompatible* fields) ──
   const cloudCompatiblePreset = presetFor(ai.cloudOpenaiCompatiblePreset ?? ai.openaiCompatiblePreset);
@@ -2625,6 +2488,9 @@ export default function AiAgentsTab() {
   const cloudCompatibleLabel = cloudCompatibleActive
     ? `${cloudCompatiblePreset.label} · ${ai.cloudOpenaiCompatibleModel || ai.openaiCompatibleModel || 'choose a model'}`
     : `${presetFor(CLOUD_COMPATIBLE_DEFAULT_PRESET).label} · not configured`;
+  const activeCompatibleStatus = ai.defaultProviderInstanceId === 'local-openai-compatible'
+    ? localCompatibleStatus
+    : cloudCompatibleStatus;
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -2645,13 +2511,7 @@ export default function AiAgentsTab() {
 
   const claudeMethodOptions = methodCapabilities.filter((method) => method.serviceFamily === 'claude');
   const openaiMethodOptions = methodCapabilities.filter((method) => method.serviceFamily === 'codex-openai');
-  const localMethods = methodCapabilities.filter((method) => method.serviceFamily === 'local-inference' && method.providerId === 'openai-compatible');
   const cloudMethods = methodCapabilities.filter((method) => method.serviceFamily === 'external-router' && method.providerId === 'openai-compatible');
-  const localPresetMethodIds: AiOpenAICompatiblePresetId[] = (
-    methodCapabilities.length > 0
-      ? [...new Set([...localMethods.map((method) => method.presetId).filter(Boolean), 'custom'])]
-      : ['lm-studio', 'vllm', 'llama-cpp', 'localai', 'custom']
-  ) as AiOpenAICompatiblePresetId[];
   const cloudPresetMethodIds: AiOpenAICompatiblePresetId[] = (
     methodCapabilities.length > 0
       ? [...new Set([...cloudMethods.map((method) => method.presetId).filter(Boolean), 'custom'])]
@@ -2762,6 +2622,18 @@ export default function AiAgentsTab() {
   const [localServerType, setLocalServerType] = useState<LocalServerType>(() => initialLocalServerType(ai));
   const localServerOpt = LOCAL_SERVER_OPTIONS.find((o) => o.id === localServerType)!;
   const localServerPresetId: AiOpenAICompatiblePresetId = localServerOpt.presetId ?? 'custom';
+  const providerDiagnostics = Object.values(ai.providerInstances).flatMap((instance) => {
+    const issues: string[] = [];
+    if (instance.available === 'auth-required') {
+      issues.push(instance.availabilityReason ?? `${instance.label}: authentication required.`);
+    } else if (instance.available === 'unavailable') {
+      issues.push(instance.availabilityReason ?? `${instance.label}: unavailable.`);
+    }
+    if (instance.requiresApiKey && !instance.hasApiKey) {
+      issues.push(`${instance.label}: API key missing.`);
+    }
+    return issues;
+  });
 
   return (
     <div className="space-y-8">
@@ -2793,6 +2665,14 @@ export default function AiAgentsTab() {
           <strong>Account login</strong> to use your subscription. Global default and Feature Defaults apply to
           chat/model-capable methods only.
         </p>
+        {providerDiagnostics.length > 0 && (
+          <div className="rounded-card border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900 font-mono space-y-1">
+            {providerDiagnostics.slice(0, 4).map((line) => (
+              <p key={line}>{line}</p>
+            ))}
+            {providerDiagnostics.length > 4 && <p>+{providerDiagnostics.length - 4} more diagnostics</p>}
+          </div>
+        )}
 
         <div className="space-y-4">
           <div className="rounded-card border border-ink-100 bg-paper p-3 space-y-3">
@@ -3068,7 +2948,7 @@ export default function AiAgentsTab() {
             'claude-account': claudeAccountStatus,
             'codex-account': codexAccountStatus,
             ollama: ollamaStatus,
-            'openai-compatible': compatibleStatus,
+            'openai-compatible': activeCompatibleStatus,
           }}
           providerAvailability={providerAvailability}
           onSave={saveFeatureRoutes}
