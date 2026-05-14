@@ -229,6 +229,7 @@ const DEFAULT_SETTINGS: AggregateSettings = {
       allowedModels: [],
       featureDailyTokenBudgets: {},
       providerDailyTokenBudgets: {},
+      providerFamilyDailyTokenBudgets: {},
       providerInstanceDailyTokenBudgets: {},
       modelDailyTokenBudgets: {},
       warnOnRemoteProvider: true,

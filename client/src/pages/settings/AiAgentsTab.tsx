@@ -33,6 +33,7 @@ import type {
   AiOpenAICompatiblePresetId,
   AiPreflightResult,
   AiProviderId,
+  AiProviderFamily,
   AiProviderHealth,
   AiProviderInstanceId,
   AiPublicConfig,
@@ -1340,6 +1341,12 @@ const PROVIDER_IDS: AiProviderId[] = [
   'ollama',
   'openai-compatible',
 ];
+const PROVIDER_FAMILY_IDS: AiProviderFamily[] = [
+  'api',
+  'account',
+  'custom-endpoint',
+  'local',
+];
 
 interface AdvancedGuardrailsSectionProps {
   guardrails: AiGuardrailsConfig;
@@ -1358,6 +1365,7 @@ function AdvancedGuardrailsSection({ guardrails, providerInstances, onSave }: Ad
   const [warnOnRemote, setWarnOnRemote] = useState(guardrails.warnOnRemoteProvider);
   const [requireConfirm, setRequireConfirm] = useState(guardrails.requireConfirmationForRemoteProvider);
   const [featureBudgets, setFeatureBudgets] = useState<Partial<Record<AiFeatureId, number>>>(guardrails.featureDailyTokenBudgets);
+  const [providerFamilyBudgets, setProviderFamilyBudgets] = useState<Partial<Record<AiProviderFamily, number>>>(guardrails.providerFamilyDailyTokenBudgets);
   const [providerInstanceBudgets, setProviderInstanceBudgets] = useState<Partial<Record<AiProviderInstanceId, number>>>(guardrails.providerInstanceDailyTokenBudgets);
   const [allowedModelsText, setAllowedModelsText] = useState(guardrails.allowedModels.join(', '));
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -1415,6 +1423,7 @@ function AdvancedGuardrailsSection({ guardrails, providerInstances, onSave }: Ad
         warnOnRemoteProvider: warnOnRemote,
         requireConfirmationForRemoteProvider: requireConfirm,
         featureDailyTokenBudgets: featureBudgets,
+        providerFamilyDailyTokenBudgets: providerFamilyBudgets,
         providerInstanceDailyTokenBudgets: providerInstanceBudgets,
         allowedModels: models,
       });
@@ -1587,6 +1596,34 @@ function AdvancedGuardrailsSection({ guardrails, providerInstances, onSave }: Ad
                     onChange={e => {
                       const v = parseInt(e.target.value, 10);
                       setFeatureBudgets(prev => ({ ...prev, [fid]: isNaN(v) ? 0 : v }));
+                    }}
+                    className="w-28 px-2 py-1 text-[11px] font-mono border border-ink-100 rounded
+                               bg-white text-ink-700 focus:outline-none focus:border-sage-400"
+                  />
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Per-provider-family daily token budgets */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-1.5">
+              <p className="text-[11px] font-mono uppercase tracking-wider text-ink-400">Per-provider-family daily token caps</p>
+              <span title="0 = no family-level cap"><Info className="w-3 h-3 text-ink-300" /></span>
+            </div>
+            <div className="space-y-2">
+              {PROVIDER_FAMILY_IDS.map((family) => (
+                <label key={family} className="flex items-center gap-2">
+                  <span className="text-[11px] text-ink-600 w-44 shrink-0">{providerFamilyLabel(family)}</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1000}
+                    placeholder="0 = no cap"
+                    value={providerFamilyBudgets[family] ?? 0}
+                    onChange={e => {
+                      const v = parseInt(e.target.value, 10);
+                      setProviderFamilyBudgets(prev => ({ ...prev, [family]: isNaN(v) ? 0 : v }));
                     }}
                     className="w-28 px-2 py-1 text-[11px] font-mono border border-ink-100 rounded
                                bg-white text-ink-700 focus:outline-none focus:border-sage-400"

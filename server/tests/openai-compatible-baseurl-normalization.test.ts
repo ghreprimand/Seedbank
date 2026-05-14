@@ -46,6 +46,7 @@ function baseConfig(): AiStoredConfig {
       allowedModels: [],
       featureDailyTokenBudgets: {},
       providerDailyTokenBudgets: {},
+      providerFamilyDailyTokenBudgets: {},
       providerInstanceDailyTokenBudgets: {},
       modelDailyTokenBudgets: {},
       warnOnRemoteProvider: true,
