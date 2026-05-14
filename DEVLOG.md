@@ -8,15 +8,21 @@ Newest entries at the top.
 
 Implemented a non-obtrusive account reauth notice for Claude and Codex account transports. The client now remembers, per browser, whether Claude account or Codex account auth has previously succeeded. If the aggregate settings/status later show that the same account transport is available but unauthenticated, the app shell shows a persistent bottom-right notice with a direct link to Settings → AI & Agents (`/settings/ai-agents`) and a refresh action. Intentional logout from the account cards clears the remembered flag so the notice does not nag after deliberate sign-out. The reminder stores only a local boolean marker, not provider credentials.
 
+Removed the old separate CLI runner surface and replaced it with provider-routed Project drafting. The server no longer registers the old file-runner routes, no longer exposes the old run scope, and no longer includes runner state in aggregate settings or OpenAPI. The client removed the old run panel and now exposes **Draft project files** on the idea detail page. That panel calls `POST /api/ai/project-draft`, which resolves the new `project-drafting` Feature Defaults route, runs the same preflight/guardrail checks as other AI features, validates safe relative file paths from model JSON output, and returns reviewable files. A separate apply endpoint writes selected files into a graduated project path only when that path is inside a configured project root and the destination files do not already exist.
+
+Settings → AI & Agents now includes a **Project drafting** row in Feature Defaults and Usage & Guardrails, so provider, model, effort, verbosity, account-auth route, token budgets, model allowlists, and remote-provider confirmation are configured the same way as Thinking Partner, field suggestions, health check, and Discover insights.
+
 Documentation/manual/help updates:
-- README, Settings docs, AI Guide, Agents docs, Architecture docs, API docs, changelog, in-app manual, and contextual help were audited against the current implementation.
-- Claude/Codex chat provider wording now consistently describes Claude native OAuth and Codex app-server account auth, with CLI wording limited to the optional file-producing agent runner/API.
+- README, Settings docs, AI Guide, Project Drafting docs, Architecture docs, API docs, changelog, in-app manual, and contextual help were audited against the current implementation.
+- Claude/Codex provider wording now consistently describes Claude native OAuth and Codex app-server account auth, and the old CLI runner documentation was removed.
 - Backup docs now distinguish startup safety snapshots from scheduled daily/weekly backup checks.
 - Contextual help includes the new reauth notice and links it to the AI & Agents manual section.
 
 Validation:
-- `npm run typecheck -w client`
+- `npm run typecheck`
 - `npm run lint -w client`
+- `npm test -w server`
+- `npm run build`
 
 Privacy/safety:
 - No secrets, keys, tokens, private paths, or machine-specific credentials were introduced in this change set.
@@ -91,11 +97,11 @@ This pass tightened contextual help and documentation to match the live code pat
 Contextual help improvements:
 - Reworked AI settings help from broad section buckets to control-level targeting (service cards, provider cards, feature-routing rows, provider/model/effort/verbosity selectors).
 - Added provider-specific help copy so Codex account, OpenAI API, Anthropic API, local inference, and external/cloud routes no longer inherit misleading generic text.
-- Added missing `data-help` wiring for high-complexity surfaces: Manual modal, Graduation modal, Agent run panel (prompt/transcript/proposed files/apply), and API Reference subsection.
+- Added missing `data-help` wiring for high-complexity surfaces: Manual modal, Graduation modal, Project draft panel, and API Reference subsection.
 - Updated stale help labels (`Settings` tab names, idea action wording, API/server descriptor).
 
 Documentation/manual corrections from code audit:
-- Updated README/docs/manual to reflect that CLI agent linking is currently API-driven (`POST /api/agents/link`) instead of a dedicated settings card.
+- Updated README/docs/manual to reflect the provider-routed Project drafting workflow.
 - Corrected API docs for current AI provider-instance routing shape and backup patch fields (`retentionCount`, `destinations`).
 - Corrected settings/docs/manual backup behavior (startup is schedule-check-driven, not unconditional backup every boot).
 - Corrected MCP auth wording to distinguish bearer external clients from implicit local loopback auth.
@@ -156,7 +162,7 @@ This session delivered three focused frontend-only commits on the AI settings su
 
 This session delivered three backend slices to support the RC AI & Agents truthfulness gate and the new service-family-first IA model. First, preflight metadata was corrected in `97eee68` so account aliases (`codex-recommended`, `codex-fast`, `claude-*-latest`) no longer appear as authoritative `resolvedModelId` values. Second, Codex account runtime was made explicit and truthful in `db37483`: the app-server path is now opt-in (`SEEDBANK_ENABLE_CODEX_ACCOUNT`) with deterministic unavailable/auth-required messaging when disabled or not signed in, plus focused gate tests.
 
-The main architecture slice landed in `b6801ae`: a new backend capability contract (`AiMethodCapability`) now exposes method-level metadata for Settings/UI via `GET /api/ai/method-capabilities`. It distinguishes service family (`claude`, `codex-openai`, `local-inference`, `external-router`), connection method (`api-key`, `account`, `local-server`, `openai-compatible`, `cli-agent`), channel (`chat-model` vs `file-agent`), feature-routability, and availability state with reasons. Chat/model providers (API keys, account transports, local inference, and openai-compatible presets) are now surfaced separately from file-producing CLI agent methods (`claude-code-cli-agent`, `codex-cli-agent`) which are explicitly non-routable.
+The main architecture slice landed in `b6801ae`: a new backend capability contract (`AiMethodCapability`) now exposes method-level metadata for Settings/UI via `GET /api/ai/method-capabilities`. It distinguishes service family (`claude`, `codex-openai`, `local-inference`, `external-router`), connection method (`api-key`, `account`, `local-server`, `openai-compatible`), chat/model channel support, feature-routability, and availability state with reasons.
 
 In parallel, two no-edit feasibility artifacts were produced for deferred backup follow-ups: `rclone-probe-cache-feasibility.md` and `backup-readiness-followup-plan.md`, covering a server-side TTL refresh option for rclone readiness cache and a remote restore-validation “download then validate locally” docs recipe. These remain deferred pending operator/coordinator pull-in.
 
@@ -168,7 +174,7 @@ The core work (`db37483` through `3a7be31`) established truthful framing for the
 
 The provider reorganisation (`80fab24`) replaced the flat provider list with four labelled groups — Direct API providers, Local inference, External & custom endpoints, and Account & subscription transports — and split the `custom` OpenAI-compatible preset handling throughout. Two separate sets were introduced (`LOCAL_OPTGROUP_PRESETS` for the dropdown, `LOCAL_RESIDENCY_PRESETS` for data-residency logic) to fix a regression where the `custom` preset was claiming local data residency even when the user could point it at a remote URL. The privacy notice fix required two layered commits (`12fa410` and `793165d`): the first excluded `'custom'` from the residency set, but the `PrivacyNotice` component was overriding it via a preflight result (the default localhost URL passes `isLikelyLocalUrl()` on the server, returning `preflight.local = true`). The second commit added an `isCustomPreset` short-circuit in `PrivacyNotice` itself, making `'mixed'` unconditional for the custom preset regardless of preflight state. A follow-up (`d32c3de`) split the `GuardrailsSection` `useEffect` into two, adding `[ai.provider, ai.openaiCompatibleBaseUrl, ai.openaiCompatiblePreset]` as dependencies to the preflight effect so the notice re-evaluates correctly after any in-session config change.
 
-Additional fixes: a synchronous Feature Defaults save gate blocks routes to unavailable providers (`claude-account` always, `codex-account` when runtime unavailable); all user-visible `'app-server'` copy replaced with `'Codex CLI component'` / `'Codex account component'`; the `codexAccountEnabledByEnv()` helper exported from `session.ts` and reused in `service.ts` to remove a duplicate inline IIFE. A read-only copy audit identified `docs/SETTINGS.md` AI & Agents section as stale (describes old four-card flat layout), backup step-by-step recipes as missing, and a restore procedure gap — all deferred pending Director assignment. The linked agents product decision resolved to keep as-is for RC (no structural change, no clarifying sentence added).
+Additional fixes: a synchronous Feature Defaults save gate blocks routes to unavailable providers (`claude-account` always, `codex-account` when runtime unavailable); account-provider copy was clarified; the `codexAccountEnabledByEnv()` helper exported from `session.ts` and reused in `service.ts` to remove a duplicate inline IIFE. A read-only copy audit identified `docs/SETTINGS.md` AI & Agents section as stale (describes old four-card flat layout), backup step-by-step recipes as missing, and a restore procedure gap — all deferred pending Director assignment.
 
 ---
 

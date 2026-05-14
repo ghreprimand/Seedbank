@@ -22,7 +22,7 @@ export type DataResidency = 'local' | 'cloud' | 'mixed';
 export interface ServiceMethodOption {
   id: string;
   label: string;
-  capability: 'chat' | 'agent' | 'chat+agent';
+  capability: 'chat';
   availability?: AiMethodCapability['availability'];
   availabilityReason?: string;
 }

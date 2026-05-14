@@ -12,14 +12,13 @@ interface TokenRow {
   last_used_at: string | null;
 }
 
-export type TokenScope = 'read:ideas' | 'write:ideas' | 'ai:suggest' | 'mcp:read' | 'agents:run';
+export type TokenScope = 'read:ideas' | 'write:ideas' | 'ai:suggest' | 'mcp:read';
 
 export const TOKEN_SCOPES: readonly TokenScope[] = [
   'read:ideas',
   'write:ideas',
   'ai:suggest',
   'mcp:read',
-  'agents:run',
 ];
 
 export interface TokenRecord extends PublicToken {

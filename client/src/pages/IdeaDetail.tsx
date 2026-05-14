@@ -10,6 +10,7 @@ import {
   ChevronDown,
   Download,
   ExternalLink,
+  Sparkles,
   Rocket,
 } from 'lucide-react';
 
@@ -36,12 +37,12 @@ import RelatedIdeasLinker from '@/components/RelatedIdeasLinker';
 import VersionHistory from '@/components/VersionHistory';
 import GraduationModal from '@/components/GraduationModal';
 import AiChatPanel from '@/components/AiChatPanel';
-import AgentRunPanel from '@/components/AgentRunPanel';
+import ProjectDraftPanel from '@/components/ProjectDraftPanel';
 import IdeaHealthCheck from '@/components/IdeaHealthCheck';
 import AiSuggestionButton from '@/components/AiSuggestionButton';
 import type { GraduationResponse } from '@/api/client';
 import { exportIdeaAsMarkdown, exportIdeaAsJSON } from '@/lib/export';
-import { useAgentsSettings, useCategoriesSettings } from '@/stores/settings';
+import { useCategoriesSettings } from '@/stores/settings';
 import { HelpButton } from '@/help/HelpPopover';
 
 /** Auto-save debounce delay in ms */
@@ -61,11 +62,8 @@ export default function IdeaDetail() {
   const [exportOpen, setExportOpen] = useState(false);
   const [graduationOpen, setGraduationOpen] = useState(false);
   const [graduationMessage, setGraduationMessage] = useState<string | null>(null);
-  const [agentPanelOpen, setAgentPanelOpen] = useState(false);
-  const [agentContinuePath, setAgentContinuePath] = useState<string | undefined>();
+  const [projectDraftOpen, setProjectDraftOpen] = useState(false);
 
-  const agents = useAgentsSettings();
-  const anyAgentLinked = agents.claudeLinked || agents.codexLinked;
   const categorySettings = useCategoriesSettings();
   const activeCategories = categorySettings.items
     .filter((c) => !c.archived)
@@ -380,20 +378,6 @@ export default function IdeaDetail() {
                 Graduated
                 <ExternalLink className="w-3 h-3" />
               </a>
-              {anyAgentLinked && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAgentContinuePath(idea.graduatedTo ?? undefined);
-                    setAgentPanelOpen(true);
-                  }}
-                  className="flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium font-mono
-                             text-ink-600 bg-paper-warm border border-ink-200 rounded-badge
-                             hover:border-sage-300 hover:text-sage-700 hover:bg-sage-50 transition-colors"
-                >
-                  Continue with agent
-                </button>
-              )}
             </div>
           )}
         </div>
@@ -552,30 +536,26 @@ export default function IdeaDetail() {
       </div>
 
       <div className="pt-5 border-t border-ink-100 space-y-3" data-help="idea-thinking-partner">
-        {anyAgentLinked && (
-          <div className="flex items-center justify-end gap-2">
-            <HelpButton
-              helpId="agent-run"
-              title="Develop with Agent"
-              summary="Launches a local CLI agent (Claude Code or Codex) against a scratch workspace seeded with this idea. Transcript streams live. Proposed files need your explicit approval before anything is saved."
-              details="Agents are sandboxed and time-capped. Link agents in Settings → AI & Agents."
-              manualSection="agents"
-              alwaysShow
-            />
-            <button
-              type="button"
-              onClick={() => {
-                setAgentContinuePath(undefined);
-                setAgentPanelOpen(true);
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium
-                         border border-ink-200 text-ink-600 hover:border-sage-300 hover:text-sage-700
-                         hover:bg-sage-50 rounded-card transition-colors"
-            >
-              Develop with agent
-            </button>
-          </div>
-        )}
+        <div className="flex items-center justify-end gap-2">
+          <HelpButton
+            helpId="project-draft"
+            title="Draft Project Files"
+            summary="Uses the Project drafting route from Settings → AI & Agents to propose reviewable project files from this idea."
+            details="The selected provider, model, effort, token budgets, and remote-provider guardrails are configured in Feature Defaults."
+            manualSection="project-drafting"
+            alwaysShow
+          />
+          <button
+            type="button"
+            onClick={() => setProjectDraftOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium
+                       border border-ink-200 text-ink-600 hover:border-sage-300 hover:text-sage-700
+                       hover:bg-sage-50 rounded-card transition-colors"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            Draft project files
+          </button>
+        </div>
         <AiChatPanel idea={idea} onApply={saveNow} />
       </div>
 
@@ -624,13 +604,11 @@ export default function IdeaDetail() {
         />
       )}
 
-      {agentPanelOpen && (
-        <AgentRunPanel
+      {projectDraftOpen && (
+        <ProjectDraftPanel
           idea={idea}
-          projectPath={agentContinuePath}
           onClose={() => {
-            setAgentPanelOpen(false);
-            setAgentContinuePath(undefined);
+            setProjectDraftOpen(false);
           }}
         />
       )}

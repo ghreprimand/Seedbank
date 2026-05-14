@@ -300,17 +300,14 @@ export function providerInstanceBadge(
 
 export function methodCapabilityLabel(capability: ServiceMethodOption['capability']): string {
   if (capability === 'chat')  return 'chat/model routing';
-  if (capability === 'agent') return 'file-producing agent';
-  return 'chat + file agent';
+  return 'chat/model routing';
 }
 
 export function optionFromMethodCapability(method: AiMethodCapability): ServiceMethodOption {
-  const capability: ServiceMethodOption['capability'] =
-    method.channel === 'file-agent' ? 'agent' : 'chat';
   return {
     id: method.id,
     label: method.label,
-    capability,
+    capability: 'chat',
     availability: method.availability,
     availabilityReason: method.availabilityReason,
   };

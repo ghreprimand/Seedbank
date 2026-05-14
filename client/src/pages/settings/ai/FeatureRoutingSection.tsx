@@ -221,8 +221,7 @@ export function FeatureRoutingSection({
           </div>
           <p className="text-xs text-ink-400 mt-1">
             Route each AI feature to the global provider or a specific chat/model-capable provider.
-            Account login and API key methods are both eligible; file-producing agent methods are
-            excluded from chat routing.
+            Account login, API key, local model, and OpenAI-compatible methods are all eligible.
           </p>
         </div>
         <button

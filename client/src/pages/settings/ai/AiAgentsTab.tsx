@@ -478,7 +478,7 @@ export default function AiAgentsTab() {
               value={claudeMethod}
               onChange={saveClaudeMethod}
               options={(visibleClaudeMethodOptions.length > 0
-                ? visibleClaudeMethodOptions.filter((m) => m.channel !== 'file-agent')
+                ? visibleClaudeMethodOptions
                 : [
                     ...(instanceEnabled('claude-api') ? [{ id: 'anthropic-api-key', label: 'API key', channel: 'chat-model', availability: 'available' as const }] : []),
                     ...(instanceEnabled('claude-account') ? [{ id: 'claude-account-native', label: 'Account login', channel: 'chat-model', availability: (ai.claudeAccountAuthenticated ? 'available' : 'auth-required') as AiMethodCapability['availability'] }] : []),
@@ -506,7 +506,7 @@ export default function AiAgentsTab() {
                 {...helpForProviderCard(
                   'Anthropic API Method',
                   'Direct API-key method for Claude models from Anthropic. Use this when you manage usage through Anthropic API billing.',
-                  'This is a chat/model provider method used by Feature Defaults and Ask AI. It is not the Claude Code CLI agent.',
+                  'This provider method is available to Feature Defaults and Ask AI.',
                 )}
               >
                 <ProviderDetailForm
@@ -559,7 +559,7 @@ export default function AiAgentsTab() {
               value={openaiMethod}
               onChange={saveOpenaiMethod}
               options={(visibleOpenaiMethodOptions.length > 0
-                ? visibleOpenaiMethodOptions.filter((m) => m.channel !== 'file-agent')
+                ? visibleOpenaiMethodOptions
                 : [
                     ...(instanceEnabled('openai-api') ? [{ id: 'openai-api-key', label: 'API key', channel: 'chat-model', availability: 'available' as const }] : []),
                     ...(instanceEnabled('codex-account') ? [{ id: 'codex-account-app-server', label: 'Account login', channel: 'chat-model', availability: (ai.codexAccountAuthenticated ? 'available' : 'auth-required') as AiMethodCapability['availability'] }] : []),
@@ -587,7 +587,7 @@ export default function AiAgentsTab() {
                 {...helpForProviderCard(
                   'OpenAI API Method',
                   'Direct API-key method for OpenAI models. Use this path when you want explicit model/API control through OpenAI API billing.',
-                  'This method participates in Feature Defaults and Ask AI model routing. It is separate from Codex account login and Codex CLI.',
+                  'This method participates in Feature Defaults and Ask AI model routing. It is separate from Codex account login.',
                 )}
               >
                 <ProviderDetailForm

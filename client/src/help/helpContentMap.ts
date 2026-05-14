@@ -141,10 +141,10 @@ export const HELP_CONTENT_MAP: Record<string, HelpEntry> = {
     body: 'Analyzes completeness and quality signals across critical idea fields.',
     manualSection: 'health-check',
   },
-  'agent-run': {
-    title: 'Develop with Agent',
-    body: 'Launches a linked coding agent against a generated workspace derived from this idea.',
-    manualSection: 'agents',
+  'project-draft': {
+    title: 'Draft Project Files',
+    body: 'Generates reviewable project files using the Project drafting AI route configured in Settings → AI & Agents.',
+    manualSection: 'project-drafting',
   },
   'idea-thinking-partner': {
     title: 'Thinking Partner',
@@ -201,13 +201,13 @@ export const HELP_CONTENT_MAP: Record<string, HelpEntry> = {
   'settings-ai-claude-service': {
     title: 'Claude Service',
     body: 'Methods for Claude-family routing: Anthropic API key or Claude account login.',
-    details: 'Both methods are chat/model routes available to Feature Defaults and Ask AI. Optional Claude Code CLI agent runs are separate and file-producing.',
+    details: 'Both methods are model routes available to Feature Defaults, Ask AI, Thinking Partner, and Project drafting.',
     manualSection: 'settings-ai',
   },
   'settings-ai-codex-service': {
     title: 'Codex / OpenAI Service',
     body: 'Methods for OpenAI-family routing: OpenAI API key or Codex account login.',
-    details: 'Codex account is an account-login provider route via local app-server auth. It is not Codex CLI and not the external cloud-router section.',
+    details: 'Codex account is an account-login provider route via local app-server auth, separate from direct OpenAI API keys and external cloud routers.',
     manualSection: 'settings-ai',
   },
   'settings-ai-local-models': {
@@ -392,35 +392,11 @@ export const HELP_CONTENT_MAP: Record<string, HelpEntry> = {
     body: 'Contextual AI assistant for a specific field. Choose intent, review output, and apply only what you want.',
     manualSection: 'ai-suggestions',
   },
-  'agent-run-modal': {
-    title: 'Agent Run Panel',
-    body: 'Run an optional Claude Code or Codex CLI agent against a scratch workspace (or continued project path).',
-    details: 'This is file-producing agent execution, separate from Thinking Partner chat and Ask AI field suggestions.',
-    manualSection: 'agents',
-  },
-  'agent-run-prompt': {
-    title: 'Agent Prompt',
-    body: 'Initial instruction sent to the selected CLI agent for this run.',
-    details: 'Be explicit about desired files, scope boundaries, and output format to get cleaner proposals.',
-    manualSection: 'agents',
-  },
-  'agent-run-transcript': {
-    title: 'Agent Transcript',
-    body: 'Live stream of stdout/stderr from the running agent process.',
-    details: 'Use this to monitor progress, catch errors early, and decide when to stop or rerun.',
-    manualSection: 'agents',
-  },
-  'agent-run-proposed-files': {
-    title: 'Proposed Files',
-    body: 'Files discovered from the run output for review and selection.',
-    details: 'In scratch mode, select exactly which outputs to copy into idea attachments.',
-    manualSection: 'agents',
-  },
-  'agent-run-apply': {
-    title: 'Apply Selected Files',
-    body: 'Copies selected scratch-run files into this idea’s attachments.',
-    details: 'This does not auto-overwrite canonical idea fields such as pitch, hook, or notes.',
-    manualSection: 'agents',
+  'project-draft-modal': {
+    title: 'Project Draft Panel',
+    body: 'Generates draft files from the current idea using your configured Project drafting provider, model, and effort.',
+    details: 'Review each file before downloading it. Canonical idea fields are not overwritten.',
+    manualSection: 'project-drafting',
   },
 };
 

@@ -70,14 +70,14 @@ On Linux/macOS (bash launcher), if port `5173` is occupied the launcher will pic
 - **Version history** — meaningful edits create snapshots that can be inspected and restored.
 - **AI thinking partner** — chat, field suggestions, organic prompt modes, health checks, and archive insights.
 - **Ten runtime themes** — Paper, Chalk, Meadow, Dusk (light), Hearth, Rainwash (mid-depth), and Woad, Moss, Peat, Canopy (dark); switchable live from Settings → Theme, with system dark/light auto-pairing (Paper ↔ Peat).
-- **Settings page** — a permanent `/settings` home for every configuration option: AI providers, agents, theme, API tokens, webhooks, backups, project graduation, and app info.
+- **Settings page** — a permanent `/settings` home for every configuration option: AI providers, feature routing, theme, API tokens, webhooks, backups, project graduation, and app info.
 - **Contextual help mode** — bottom-right help control toggles click-anywhere contextual guidance across pages, settings, and modals, with deep links into the in-app manual.
 - **Account reauth notice** — if Claude or Codex account auth was previously working in this browser and later requires sign-in again, a persistent notice links straight to Settings → AI & Agents.
-- **Personal access tokens** — generate scoped bearer tokens (`read:ideas`, `write:ideas`, `ai:suggest`, `mcp:read`, `agents:run`) for local scripting. Tokens are hashed at rest; creation is localhost-only.
+- **Personal access tokens** — generate scoped bearer tokens (`read:ideas`, `write:ideas`, `ai:suggest`, `mcp:read`) for local scripting. Tokens are hashed at rest; creation is localhost-only.
 - **Outbound webhooks** — fire a JSON payload to any URL on `idea.created`, `idea.graduated`, or `idea.shipped`. Useful for Zapier, n8n, or local automation.
 - **Read-only MCP endpoints** — `/api/mcp/ideas`, `/api/mcp/ideas/:id`, and `/api/mcp/search` expose seeds as context for external Claude or Codex sessions; token-gated.
 - **OpenAPI spec** — machine-readable at `/api/openapi.json`; browsable from Settings → API & Server.
-- **Optional local CLI agent runs** — link a Claude Code or Codex CLI binary through the agents API (`POST /api/agents/link`), then launch a "Develop with agent" run from any idea in a per-idea scratch workspace. This is separate from normal Claude/Codex account auth. Transcript streamed live; proposed files reviewed and accepted before anything is saved. Runtime capped; kill switch always present.
+- **Project drafting** — generate reviewable starter files such as specs, implementation notes, and TODOs from an idea using the same configurable AI provider/model/effort routes as the other assist features; save reviewed files into a graduated project path when configured.
 - **Project graduation** — turn a mature idea into an external project scaffold via project-graduation adapters.
 - **Import/export** — full archive export to JSON or Markdown, plus import from Seedbank archives and Markdown.
 - **Compost bin** — deleted ideas are soft-deleted, recoverable for 30 days, then purged.
@@ -240,9 +240,7 @@ Claude account and Codex account are account transports for chat/model routing: 
 
 Provider API keys (OpenAI, Anthropic, OpenRouter, Groq, Mistral, Together, Fireworks, or another compatible endpoint) are stored server-side, encrypted at rest; public config responses only expose whether a key exists. These are separate from **Seedbank personal access tokens** (Settings → API & Server), which are bearer tokens for the Seedbank REST API itself.
 
-The separate local CLI agent runner is optional and file-producing. If you use it, link Claude Code or Codex CLI through `POST /api/agents/link` with `provider` and `cliPath`. CLI agents authenticate through their own tooling and are not used for normal Claude/Codex chat provider auth.
-
-AI features include the Thinking Partner chat, contextual field suggestions, What If, Devil's Advocate, Scope Down, User Story, Idea Health Check, Smart Cross-Pollinate, and Pattern Insights. All AI features are opt-in. Feature Defaults choose the provider/model/effort for each feature, and the Ask AI modal lets you temporarily switch to another configured provider/model for a single run. See [docs/AI_GUIDE.md](docs/AI_GUIDE.md).
+AI features include the Thinking Partner chat, contextual field suggestions, Project drafting, What If, Devil's Advocate, Scope Down, User Story, Idea Health Check, Smart Cross-Pollinate, and Pattern Insights. All AI features are opt-in. Feature Defaults choose the provider/model/effort for each feature, and the Ask AI modal lets you temporarily switch to another configured provider/model for a single run. See [docs/AI_GUIDE.md](docs/AI_GUIDE.md).
 
 ### Project Graduation
 
@@ -256,7 +254,7 @@ Full REST reference with request/response shapes, token auth, and webhook payloa
 
 Machine-readable OpenAPI spec: `GET /api/openapi.json`. The same spec is browsable from **Settings → API & Server → View API reference** inside the running app.
 
-Quick endpoint groups: ideas, versions, integrations, AI (chat, suggest, usage), settings, tokens, webhooks, MCP, agents, backups, export/import, health. See `docs/API.md` for the full list.
+Quick endpoint groups: ideas, versions, integrations, AI (chat, suggest, project draft, usage), settings, tokens, webhooks, MCP, backups, export/import, health. See `docs/API.md` for the full list.
 
 ## Documentation
 
@@ -265,10 +263,10 @@ Quick endpoint groups: ideas, versions, integrations, AI (chat, suggest, usage),
 | [docs/SETTINGS.md](docs/SETTINGS.md) | Every Settings tab explained — what's stored where, offline behavior, server vs localStorage. |
 | [docs/THEMING.md](docs/THEMING.md) | Token model, the ten themes, dark-mode scale inversion, custom theme authoring. |
 | [docs/API.md](docs/API.md) | Full REST reference — endpoint list, token auth, webhook payloads, MCP surface. |
-| [docs/AGENTS.md](docs/AGENTS.md) | Optional Claude Code / Codex CLI linkage, "Develop with agent" and "Continue with agent" surfaces, safety rails, transcript storage. |
 | [docs/AI_GUIDE.md](docs/AI_GUIDE.md) | Thinking Partner posture, provider setup, prompt modes, field suggestions, usage readout. |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System diagram, data-flow, settings store, token middleware, theme tokens, agent runner. |
-| [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md) | Graduation adapter interface, built-in adapters, and "Continue with agent" handoff. |
+| [docs/PROJECT_DRAFTING.md](docs/PROJECT_DRAFTING.md) | Project drafting workflow, Feature Defaults routing, guardrails, and review-first file handling. |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System diagram, data-flow, settings store, token middleware, theme tokens, AI provider routing. |
+| [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md) | Graduation adapter interface and built-in adapters. |
 | [docs/RELEASING.md](docs/RELEASING.md) | Archive-based release flow, packaging commands, workflow notes, smoke checks. |
 
 ## Security and Hosting

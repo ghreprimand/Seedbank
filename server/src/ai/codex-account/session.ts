@@ -231,7 +231,7 @@ class CodexAppServerSession extends EventEmitter {
     }
     return {
       ok: true,
-      message: 'Codex account login is already managed by the Codex CLI.',
+      message: 'Codex account login is already managed by the local Codex account service.',
     };
   }
 

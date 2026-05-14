@@ -66,16 +66,6 @@ A custom adapter should:
 - write only inside configured roots
 - produce `filesCreated` output so the graduation response is informative
 
-## Continue With Agent Handoff
-
-After graduation, the UI can launch "Continue with agent" using the returned `path` from graduation.
-
-The backend enforces that continue-mode agent runs (`POST /api/agents/runs` with `projectPath`) are constrained to configured integration roots:
-- configured `projectRoot` values for enabled adapters
-- adapter-specific derived roots when applicable
-
-If `projectPath` is outside all configured roots, the run is rejected.
-
 ## Safety Expectations
 
 Adapters should:
@@ -83,8 +73,6 @@ Adapters should:
 - produce actionable starter scaffolds, not full products
 - preserve idea language in generated docs where possible
 - return clear `message` and `filesCreated` outputs
-
-Agent follow-on work remains opt-in and separately controlled through `agents:run` routes and safety rails.
 
 ## Adding a Custom Adapter
 

@@ -99,10 +99,10 @@ When Claude account, Codex account, API-key providers, local servers, or OpenAI-
 
 ### Feature Defaults
 
-**Feature Defaults** let you route individual features (Thinking Partner, field suggestions, health checks, Discover insights) to a specific provider/model instead of the global default.
+**Feature Defaults** let you route individual features (Thinking Partner, field suggestions, health checks, Discover insights, Project drafting) to a specific provider/model instead of the global default.
 
 - Routes can inherit the global default or pin a provider/model.
-- Only **chat/model-capable methods** are routable. CLI file agents are intentionally excluded.
+- API key, account login, local model, and OpenAI-compatible methods are routable.
 - Unavailable account routes may appear for visibility, but save is blocked when a route targets unavailable account transports.
 - Provider/model controls use discovered model dropdowns when available, while still accepting free-text model IDs for custom endpoints.
 - The global default row sets the default provider instance, model, and reasoning effort where the selected provider/model supports effort.
@@ -122,16 +122,13 @@ The **Usage & Guardrails** section includes a daily token limit plus advanced sa
 
 Usage readouts show tokens consumed in the last 24 hours and last 7 days (from `ai_usage`).
 
-### Optional CLI agent methods
+### Project drafting
 
-Claude Code and Codex CLI remain available for **Develop with agent / Continue with agent** workflows, but linking is currently managed through the agents API surface rather than a dedicated Settings card.
+The idea detail page includes **Draft project files**. It uses the **Project drafting** Feature Defaults route, so the selected provider, model, effort, token budgets, model allowlist, and remote-provider confirmation are configured here.
 
-- Link/unlink endpoints: `POST /api/agents/link`, `DELETE /api/agents/link/:provider`.
-- They are **file-producing methods** and are **not** used as Claude/Codex chat/model account auth or as Feature Defaults routes.
-- Authentication remains owned by the CLI tool itself; Seedbank stores only binary path/link state.
-- Runs execute in per-idea scratch workspaces and are not OS-sandboxed.
+Drafting returns reviewable text files such as `SPEC.md`, `IMPLEMENTATION_NOTES.md`, or `TODO.md`. It does not overwrite idea fields. The user reviews files in the panel, then downloads selected files or explicitly saves them into the graduated project path when that path is inside a configured project root.
 
-See [`docs/AGENTS.md`](./AGENTS.md) and [`docs/AI_GUIDE.md`](./AI_GUIDE.md) for full agent workflow and safety details.
+See [`docs/PROJECT_DRAFTING.md`](./PROJECT_DRAFTING.md) and [`docs/AI_GUIDE.md`](./AI_GUIDE.md).
 
 ---
 
@@ -170,7 +167,6 @@ Create scoped bearer tokens for scripting against the local API without a browse
   | `write:ideas` | Create and update ideas |
   | `ai:suggest` | Call AI suggestion endpoints |
   | `mcp:read` | Read-only MCP context endpoints |
-  | `agents:run` | Start, stop, and apply agent runs |
 
 - **Storage:** SHA-256 hashed at rest; raw value never persisted server-side.
 - **Table:** name, scope pills, created date, last used date, revoke (🗑) button.
@@ -260,7 +256,7 @@ Configure where Seedbank creates project folders when you graduate an idea. (Thi
 **What graduation does:** when you graduate a seed, Seedbank creates a project directory inside the root you set here. The directory is named after the idea title. It always contains:
 
 - `README.md` — idea title, brief, and key context.
-- `CLAUDE.md` — AI context pre-filled for use with Claude Code, Codex, or another AI coding session.
+- `CLAUDE.md` — AI context pre-filled for use with an AI coding session.
 - `package.json` + starter file — for all ideas except games.
 - `project.godot` stub — for game ideas.
 
@@ -291,7 +287,6 @@ A `configured` badge appears next to each adapter that has a valid project root.
 | Theme name + match-system | Server `settings` table (`ui.theme`) **and** `localStorage` (`seedbank.ui.theme`) | `localStorage` value applied pre-paint; server value applied on first hydration |
 | AI provider, models | Server `settings` table (`ai.config`) | Shows cached values; save buttons disabled while offline |
 | API keys | Server `settings` table, encrypted at rest | Never visible in browser regardless of connectivity |
-| Agents config (linked, CLI paths) | Server `settings` table (`agents.config`) | Shown from cache; linking requires server |
 | Token budget | Server `settings` table (`ai.config`) | Shown from cache; changes require server |
 | Backups config | Server `settings` table (`backup.config`) | Shown from cache; changes require server |
 | Project Graduation config | Server `settings` table (`integration:<adapter-id>`; for example `integration:generic-project`) | Shown from cache; changes require server |

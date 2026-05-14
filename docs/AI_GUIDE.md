@@ -29,9 +29,7 @@ Each provider method is stored as a provider instance. Built-in instances cover 
 
 **Claude account** — account-auth method with login/status controls shown in the Claude service area. Use this to route AI chat through a Claude.ai subscription with Seedbank's native OAuth flow rather than an Anthropic API key.
 
-**Codex account** — account-auth method that talks to the local Codex app-server over JSON-RPC. This requires a compatible Codex runtime installed locally. It is not OpenAI API billing and not the same as linked Codex CLI agent launching.
-
-**Claude Code CLI / Codex CLI** — optional file-producing agent methods managed through the agents API (`/api/agents/link`, `/api/agents/runs*`). They are review-first development tools, not Claude/Codex account auth and not Feature Defaults chat providers.
+**Codex account** — account-auth method that talks to the local Codex app-server over JSON-RPC. This requires a compatible Codex runtime installed locally. It is not OpenAI API billing.
 
 ### Account reauth notices
 
@@ -71,11 +69,10 @@ This lets you use providers such as OpenRouter, LM Studio, vLLM, LiteLLM gateway
 
 ### Feature Defaults
 
-Feature Defaults let you route each AI feature independently (Thinking Partner, field suggestions, health checks, Discover insights):
+Feature Defaults let you route each AI feature independently (Thinking Partner, field suggestions, health checks, Discover insights, Project drafting):
 
 - Inherit the global default provider/model, or
 - Pin a specific provider/model per feature.
-- Route only chat/model-capable methods. CLI agent methods are intentionally excluded from chat routing.
 - Pick from discovered models when available; free-text model IDs remain possible for custom endpoints.
 - Set reasoning effort when the selected provider/model supports it.
 
@@ -209,35 +206,17 @@ This preserves Seedbank's core promise: the archive remains useful even without 
 
 ---
 
-## Agents (separate surface)
+## Project Drafting
 
-The **Develop with agent** and **Continue with agent** buttons on the idea detail page launch a strictly opt-in, more powerful feature: a local Claude Code or Codex CLI agent that can produce multi-file outputs (specs, research docs, prototype scaffolds). Agents are distinct from the Thinking Partner — they write files, not chat messages.
+The **Draft project files** button on the idea detail page asks the configured **Project drafting** route to generate reviewable starter files from the current idea. It uses the same provider configuration, account auth, model selection, reasoning effort, token budgets, and guardrails as every other AI assist feature.
 
-### How agents authenticate
+Typical outputs include `SPEC.md`, `IMPLEMENTATION_NOTES.md`, `RESEARCH_NOTES.md`, and `TODO.md`. The server accepts only safe relative paths and returns the files to the browser for review. Canonical idea fields are not overwritten. For graduated ideas, the reviewed selection can be saved into the project path when that path is inside a configured project root; existing files are not overwritten.
 
-Agents use their **own** CLI-managed authentication — not Seedbank's provider API keys, Claude account OAuth, or Codex account app-server auth. Seedbank only stores the binary path and a linked flag. No agent credentials are stored in or passed through Seedbank.
+See [`docs/PROJECT_DRAFTING.md`](./PROJECT_DRAFTING.md) for the API shape and safety model.
 
-Agents inherit the environment variables of the Seedbank server process. If a linked CLI uses environment-based credentials, it can see the values available to that process. This is standard CLI behavior, not Seedbank's Claude/Codex account auth.
+### MCP context for external sessions
 
-### Workspace boundaries
-
-Seedbank sets the agent's working directory to a per-idea scratch workspace and validates all applied file paths for directory traversal. The agent process is **not OS-sandboxed** — it can access your filesystem with the same permissions as the Seedbank server process. Only link agent binaries you trust.
-
-### Transcript and output handling
-
-The agent transcript streams live in the panel. In scratch mode, the agent writes files inside the temporary workspace during execution, then you explicitly choose which outputs to copy into idea attachments. In continue mode, the agent may write directly in the target project path.
-
-Transcripts are stored per-run in the Seedbank database. Previous run transcripts are visible from the idea detail page via the **Continue with agent** button.
-
-### Runtime controls
-
-- **Runtime cap:** defaults to 5 minutes per run and is configurable up to a 30-minute maximum.
-- **Kill button:** always visible in the agent panel; terminates the process immediately.
-- No output auto-writes to canonical idea fields.
-
-### MCP context for agent sessions
-
-For external agent sessions (outside Seedbank's own agent runner), read-only MCP endpoints expose seeds as context:
+For external AI sessions, read-only MCP endpoints expose seeds as context:
 
 | Endpoint | Description |
 |---|---|

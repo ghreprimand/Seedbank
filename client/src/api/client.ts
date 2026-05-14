@@ -2,18 +2,17 @@ import { db } from '@/db';
 import * as localIdeas from '@/db/ideas';
 import type {
   AggregateSettings,
-  AgentLinkResult,
-  AgentProvider,
-  AgentRun,
-  AgentRunEvent,
-  AgentRunState,
   AiChatMessage,
   AiConfigInput,
   AiFieldAssistChatRequest,
   AiFieldAssistMessage,
   AiFieldSuggestionRequest,
   AiMethodCapability,
+  AiProjectDraftApplyRequest,
+  AiProjectDraftApplyResult,
   AiModelListResult,
+  AiProjectDraftRequest,
+  AiProjectDraftResult,
   AiProviderDescriptor,
   AiProviderHealth,
   AiPreflightRequest,
@@ -824,126 +823,18 @@ export async function preflightAiRequest(input: AiPreflightRequest): Promise<AiP
   });
 }
 
-// ── Agent linking + runs ──────────────────────────────────────────────────────
-
-export interface AgentLinkRequest {
-  provider: AgentProvider;
-  cliPath?: string;
-  detect?: boolean;
-}
-
-export interface AgentRunRequest {
-  ideaId: string;
-  provider: AgentProvider;
-  prompt: string;
-  /** Absolute path to project dir (for "Continue with agent" after graduation) */
-  projectPath?: string;
-}
-
-export interface AgentApplyRequest {
-  files: string[];
-}
-
-export async function linkAgent(req: AgentLinkRequest): Promise<AgentLinkResult> {
-  return request<AgentLinkResult>('/api/agents/link', {
+export async function draftProjectFiles(input: AiProjectDraftRequest): Promise<AiProjectDraftResult> {
+  return request<AiProjectDraftResult>('/api/ai/project-draft', {
     method: 'POST',
-    body: JSON.stringify(req),
+    body: JSON.stringify(input),
   });
 }
 
-export async function unlinkAgent(provider: AgentProvider): Promise<void> {
-  return request<void>(`/api/agents/link/${encodeURIComponent(provider)}`, { method: 'DELETE' });
-}
-
-// ── Server response shapes (not exported — normalized before leaving this module) ──
-
-interface ServerRunCreateResult {
-  runId: string;
-  state: AgentRunState;
-}
-
-interface ServerRunDetail {
-  id: string;
-  state: AgentRunState;
-  proposedFiles: string[];
-  // other fields exist but the panel only uses the above
-}
-
-/** Map server AgentRunState → client AgentRunStatus. */
-function mapAgentState(state: AgentRunState): AgentRun['status'] {
-  switch (state) {
-    case 'running':   return 'running';
-    case 'completed': return 'done';
-    case 'failed':    return 'error';
-    case 'stopped':   return 'stopped';
-    default:          return 'error';
-  }
-}
-
-export async function startAgentRun(req: AgentRunRequest): Promise<AgentRun> {
-  const raw = await request<ServerRunCreateResult>('/api/agents/runs', {
+export async function applyProjectDraftFiles(input: AiProjectDraftApplyRequest): Promise<AiProjectDraftApplyResult> {
+  return request<AiProjectDraftApplyResult>('/api/ai/project-draft/apply', {
     method: 'POST',
-    body: JSON.stringify(req),
+    body: JSON.stringify(input),
   });
-  return { id: raw.runId, status: mapAgentState(raw.state), proposedFiles: [] };
-}
-
-export async function getAgentRun(id: string): Promise<AgentRun> {
-  const raw = await request<ServerRunDetail>(`/api/agents/runs/${encodeURIComponent(id)}`);
-  return { id: raw.id, status: mapAgentState(raw.state), proposedFiles: raw.proposedFiles };
-}
-
-export async function stopAgentRun(id: string): Promise<{ ok: boolean }> {
-  return request<{ ok: boolean }>(`/api/agents/runs/${encodeURIComponent(id)}/stop`, { method: 'POST' });
-}
-
-export async function applyAgentRun(id: string, files: string[]): Promise<{ ok: boolean }> {
-  await request<unknown>(`/api/agents/runs/${encodeURIComponent(id)}/apply`, {
-    method: 'POST',
-    body: JSON.stringify({ paths: files }),
-  });
-  return { ok: true };
-}
-
-/**
- * Stream agent run events via SSE.
- * `onEvent` is called for each event. Returns when the stream closes.
- */
-export async function streamAgentRun(
-  id: string,
-  onEvent: (event: AgentRunEvent) => void,
-  signal?: AbortSignal,
-): Promise<void> {
-  const response = await fetch(apiUrl(`/api/agents/runs/${encodeURIComponent(id)}/stream`), {
-    headers: { Accept: 'text/event-stream' },
-    signal,
-  });
-  if (!response.ok || !response.body) {
-    throw new Error(`Agent stream ${response.status}: ${response.statusText}`);
-  }
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-
-  const handleChunk = (chunk: string) => {
-    const eventType = chunk.split('\n').find((l) => l.startsWith('event:'))?.slice(6).trim();
-    const dataLine = chunk.split('\n').filter((l) => l.startsWith('data:')).map((l) => l.slice(5).trim()).join('\n');
-    if (!eventType || !dataLine) return;
-    try {
-      const payload = JSON.parse(dataLine) as AgentRunEvent;
-      onEvent(payload);
-    } catch { /* ignore malformed */ }
-  };
-
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const chunks = buffer.split('\n\n');
-    buffer = chunks.pop() ?? '';
-    chunks.filter(Boolean).forEach(handleChunk);
-  }
-  if (buffer.trim()) handleChunk(buffer);
 }
 
 // ── Aggregate Settings ────────────────────────────────────────────────────────
@@ -952,7 +843,7 @@ export async function getAggregateSettings(): Promise<AggregateSettings> {
   return request<AggregateSettings>('/api/settings');
 }
 
-export type SettingsSection = 'ui' | 'ai' | 'api' | 'agents' | 'backups' | 'categories';
+export type SettingsSection = 'ui' | 'ai' | 'api' | 'backups' | 'categories';
 
 export async function patchSettings(
   section: SettingsSection,

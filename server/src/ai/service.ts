@@ -23,6 +23,7 @@ import type {
   AiProviderInstanceConfig,
   AiProviderInstanceId,
   AiProviderInstanceAvailability,
+  AiProjectDraftResult,
   AiPublicConfig,
   AiMethodCapability,
   AiSuggestion,
@@ -59,9 +60,11 @@ import {
   featureForMode,
   fieldAssistConversationMessages,
   messagesForChat,
+  parseProjectDraft,
   parseSuggestion,
   promptForFieldAssist,
   promptForMode,
+  promptForProjectDraft,
   promptForSuggestion,
 } from './prompts.js';
 import {
@@ -257,6 +260,7 @@ const DEFAULT_CONFIG: AiStoredConfig = {
     'field-suggestions': { provider: 'default', providerInstanceId: 'ollama' },
     'health-check': { provider: 'default', providerInstanceId: 'ollama' },
     'discover-insights': { provider: 'default', providerInstanceId: 'ollama' },
+    'project-drafting': { provider: 'default', providerInstanceId: 'ollama' },
     default: { provider: 'default', providerInstanceId: 'ollama' },
   },
   guardrails: {
@@ -265,6 +269,7 @@ const DEFAULT_CONFIG: AiStoredConfig = {
       'field-suggestions': true,
       'health-check': true,
       'discover-insights': true,
+      'project-drafting': true,
       default: true,
     },
     providerEnabled: {
@@ -319,6 +324,7 @@ const AI_FEATURE_IDS: AiFeatureId[] = [
   'field-suggestions',
   'health-check',
   'discover-insights',
+  'project-drafting',
   'default',
 ];
 
@@ -389,6 +395,7 @@ function defaultFeatureRoutes(): Record<AiFeatureId, AiFeatureRoute> {
     'field-suggestions': { provider: 'default' },
     'health-check': { provider: 'default' },
     'discover-insights': { provider: 'default' },
+    'project-drafting': { provider: 'default' },
     default: { provider: 'default' },
   };
 }
@@ -458,6 +465,7 @@ function defaultGuardrails(): AiGuardrailsConfig {
       'field-suggestions': true,
       'health-check': true,
       'discover-insights': true,
+      'project-drafting': true,
       default: true,
     },
     providerEnabled: {
@@ -2300,6 +2308,44 @@ export class AiService {
       return result.text;
     } catch (error) {
       this.recordProviderFailure(feature, config, error);
+      throw error;
+    }
+  }
+
+  async draftProject(
+    input: {
+      ideaId: string;
+      prompt?: string;
+      providerInstanceId?: AiProviderInstanceId;
+      model?: string;
+      effort?: AiReasoningEffort;
+      verbosity?: AiTextVerbosity;
+    },
+    key: string,
+    confirmationToken?: string,
+  ): Promise<AiProjectDraftResult> {
+    const idea = this.repository.getIdea(input.ideaId);
+    if (!idea) throw new Error('Idea not found.');
+    const config = resolveFeatureConfig(this.getConfig(), 'project-drafting', {
+      providerInstanceId: input.providerInstanceId,
+      model: input.model,
+      effort: input.effort,
+      verbosity: input.verbosity,
+    });
+    this.checkGuardrails(config, 'project-drafting', key, { confirmationToken });
+
+    try {
+      const result = await this.provider(config).complete(promptForProjectDraft(idea, input.prompt), config);
+      const resolvedModelId = await this.recordUsage(config, 'project-drafting', result);
+      const providerInstanceId = normalizeDefaultProviderInstance(config.defaultProviderInstanceId);
+      return {
+        ...parseProjectDraft(result.text),
+        provider: config.provider,
+        providerInstanceId,
+        model: resolvedModelId,
+      };
+    } catch (error) {
+      this.recordProviderFailure('project-drafting', config, error);
       throw error;
     }
   }

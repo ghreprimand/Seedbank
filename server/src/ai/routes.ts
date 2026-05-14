@@ -3,13 +3,13 @@ import { requireScope } from '../middleware/auth.js';
 import type { AiConfigPatch } from './types.js';
 import type { AiService } from './service.js';
 import type {
-  AgentsPublicConfig,
   AiFeatureId,
   AiFieldAssistChatRequest,
   AiFieldAssistMessage,
   AiFieldSuggestionRequest,
   AiMethodCapability,
   AiPreflightRequest,
+  AiProjectDraftRequest,
   AiProviderInstanceId,
   AiReasoningEffort,
   AiSuggestionField,
@@ -35,7 +35,7 @@ function clientKey(req: Request): string {
 
 const AI_SUGGESTION_FIELDS: readonly AiSuggestionField[] = ['pitch', 'fullNotes', 'risks', 'techStack', 'hook', 'whyItMightWork'];
 const AI_SUGGESTION_FIELD_ERROR = 'field must be one of pitch, fullNotes, risks, techStack, hook, or whyItMightWork.';
-const AI_FEATURE_IDS: readonly AiFeatureId[] = ['thinking-partner', 'field-suggestions', 'health-check', 'discover-insights', 'default'];
+const AI_FEATURE_IDS: readonly AiFeatureId[] = ['thinking-partner', 'field-suggestions', 'health-check', 'discover-insights', 'project-drafting', 'default'];
 const AI_REASONING_EFFORTS: readonly AiReasoningEffort[] = ['minimal', 'low', 'medium', 'high'];
 const AI_TEXT_VERBOSITIES: readonly AiTextVerbosity[] = ['low', 'medium', 'high'];
 
@@ -167,36 +167,13 @@ function fallbackAiSuggestion(mode: string, context: unknown): string {
   return `What if ${title} had to be tested with one screen, one interaction, and no setup? What would you keep?`;
 }
 
-function aiMethodCapabilities(aiService: AiService, agentConfig: AgentsPublicConfig): AiMethodCapability[] {
-  return [
-    ...aiService.getMethodCapabilities(),
-    {
-      id: 'claude-code-cli-agent',
-      label: 'Claude Code CLI',
-      serviceFamily: 'claude',
-      connectionMethod: 'cli-agent',
-      channel: 'file-agent',
-      featureRoutable: false,
-      availability: agentConfig.claudeLinked ? 'available' : 'unavailable',
-      ...(agentConfig.claudeLinked ? {} : { availabilityReason: 'Link Claude Code CLI via POST /api/agents/link to enable file-producing agent runs.' }),
-    },
-    {
-      id: 'codex-cli-agent',
-      label: 'Codex CLI',
-      serviceFamily: 'codex-openai',
-      connectionMethod: 'cli-agent',
-      channel: 'file-agent',
-      featureRoutable: false,
-      availability: agentConfig.codexLinked ? 'available' : 'unavailable',
-      ...(agentConfig.codexLinked ? {} : { availabilityReason: 'Link Codex CLI via POST /api/agents/link to enable file-producing agent runs.' }),
-    },
-  ];
+function aiMethodCapabilities(aiService: AiService): AiMethodCapability[] {
+  return aiService.getMethodCapabilities();
 }
 
 export function registerAiRoutes(
   app: Express,
   aiService: AiService,
-  agentsPublicConfig: () => AgentsPublicConfig,
 ): void {
   app.get('/api/ai/config', requireScope('read:ideas'), asyncRoute((_req, res) => {
     res.json(aiService.getPublicConfig());
@@ -213,7 +190,7 @@ export function registerAiRoutes(
   }));
 
   app.get('/api/ai/method-capabilities', requireScope('read:ideas'), asyncRoute((_req, res) => {
-    res.json({ methods: aiMethodCapabilities(aiService, agentsPublicConfig()) });
+    res.json({ methods: aiMethodCapabilities(aiService) });
   }));
 
   app.get('/api/ai/usage', requireScope('read:ideas'), asyncRoute((_req, res) => {
@@ -543,6 +520,43 @@ export function registerAiRoutes(
       res.end();
     }
   });
+
+  app.post('/api/ai/project-draft', requireScope('ai:suggest'), asyncRoute(async (req, res) => {
+    const body = (req.body ?? {}) as Partial<AiProjectDraftRequest>;
+    const ideaId = requiredString(body.ideaId, 'ideaId');
+    const prompt = optionalString(body.prompt, 'prompt');
+    const aiConfirmationToken = optionalString(body.aiConfirmationToken, 'aiConfirmationToken');
+    const model = optionalString(body.model, 'model');
+    if (!ideaId.ok) {
+      res.status(400).json({ error: ideaId.error });
+      return;
+    }
+    if (!prompt.ok) {
+      res.status(400).json({ error: prompt.error });
+      return;
+    }
+    if (!aiConfirmationToken.ok) {
+      res.status(400).json({ error: aiConfirmationToken.error });
+      return;
+    }
+    if (!model.ok) {
+      res.status(400).json({ error: model.error });
+      return;
+    }
+
+    res.json(await aiService.draftProject(
+      {
+        ideaId: ideaId.value,
+        ...(prompt.value?.trim() ? { prompt: prompt.value.trim() } : {}),
+        providerInstanceId: parseProviderInstanceId(body.providerInstanceId),
+        ...(model.value?.trim() ? { model: model.value.trim() } : {}),
+        effort: parseAiReasoningEffort(body.effort),
+        verbosity: parseAiTextVerbosity(body.verbosity),
+      },
+      clientKey(req),
+      aiConfirmationToken.value,
+    ));
+  }));
 
   app.post('/api/ai/chat', requireScope('ai:suggest'), async (req, res) => {
     const body = req.body as { ideaId?: string; message?: string; aiConfirmationToken?: unknown };
