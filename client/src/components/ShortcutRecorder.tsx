@@ -9,6 +9,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, RotateCcw } from 'lucide-react';
 import type { ShortcutBinding } from '@/lib/types';
+import { bindingLabel } from '@/lib/shortcuts';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -25,17 +26,6 @@ const BROWSER_RESERVED_WITH_CTRL = new Set([
 ]);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-/** Human-readable label for a binding, e.g. "Ctrl + Shift + K" */
-export function bindingLabel(b: ShortcutBinding): string {
-  const parts: string[] = [];
-  if (b.ctrl)  parts.push('Ctrl');
-  if (b.alt)   parts.push('Alt');
-  if (b.shift) parts.push('Shift');
-  if (b.meta)  parts.push('⌘');
-  parts.push(b.key === ' ' ? 'Space' : b.key.length === 1 ? b.key.toUpperCase() : b.key);
-  return parts.join(' + ');
-}
 
 function keyDisplay(key: string): string {
   if (key === ' ') return 'Space';
