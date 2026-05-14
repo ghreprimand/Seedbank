@@ -4,6 +4,25 @@ Newest entries at the top.
 
 ---
 
+## 2026-05-14 — Server Route Modularization and AI Service Helper Split
+
+This pass continued the codebase audit cleanup after the default quality gates were stabilized.
+
+Server startup is now slimmer: backup behavior moved into a dedicated `BackupService` plus backup route registration, and AI HTTP endpoints moved into `server/src/ai/routes.ts`. `server/src/index.ts` now stays closer to app wiring, shared settings, domain routes, and startup timers.
+
+AI service internals were split conservatively. Prompt construction and field-suggestion parsing moved to `server/src/ai/prompts.ts`; guardrail primitives such as confirmation tokens, guardrail errors, and rate limiting moved to `server/src/ai/guardrails.ts`; usage-summary/audit helpers moved to `server/src/ai/usage.ts`. Provider execution and config behavior were preserved.
+
+The Claude account tests also gained a shared cross-process auth snapshot lock so the default server test command remains stable even when Node runs test files in parallel.
+
+Validation:
+- `npm run typecheck`
+- `npm run test -w server`
+- `npm run lint`
+
+Follow-up candidates remain: a deeper `ai/service.ts` config-normalization split, provider-by-provider extraction from `providers.ts`, and the larger client component splits.
+
+---
+
 ## 2026-05-14 — Default Quality Gates Stabilized
 
 This pass closed the audit's first priority before larger server modularization work: make the default quality gates trustworthy and green.
