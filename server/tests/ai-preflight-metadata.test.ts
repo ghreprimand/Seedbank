@@ -25,7 +25,13 @@ function aiServiceFixture(): { db: Database.Database; service: AiService } {
 test('AI preflight omits unresolved codex alias from resolved model metadata', () => {
   const { db, service } = aiServiceFixture();
   try {
-    service.configure({ provider: 'codex-account', codexAccountModel: 'codex-recommended' });
+    service.configure({
+      provider: 'codex-account',
+      codexAccountModel: 'codex-recommended',
+      featureRoutes: {
+        'thinking-partner': { provider: 'codex-account' },
+      },
+    });
 
     const result = service.preflight('thinking-partner');
 
@@ -40,7 +46,13 @@ test('AI preflight omits unresolved codex alias from resolved model metadata', (
 test('AI preflight omits unresolved claude latest alias from resolved model metadata', () => {
   const { db, service } = aiServiceFixture();
   try {
-    service.configure({ provider: 'claude-account', claudeAccountModel: 'claude-sonnet-latest' });
+    service.configure({
+      provider: 'claude-account',
+      claudeAccountModel: 'claude-sonnet-latest',
+      featureRoutes: {
+        'thinking-partner': { provider: 'claude-account' },
+      },
+    });
 
     const result = service.preflight('thinking-partner');
 
@@ -55,7 +67,13 @@ test('AI preflight omits unresolved claude latest alias from resolved model meta
 test('AI preflight keeps resolved model metadata for non-alias model ids', () => {
   const { db, service } = aiServiceFixture();
   try {
-    service.configure({ provider: 'codex-account', codexAccountModel: 'gpt-5.2-codex' });
+    service.configure({
+      provider: 'codex-account',
+      codexAccountModel: 'gpt-5.2-codex',
+      featureRoutes: {
+        'thinking-partner': { provider: 'codex-account' },
+      },
+    });
 
     const result = service.preflight('thinking-partner');
 
