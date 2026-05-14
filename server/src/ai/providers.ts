@@ -1162,10 +1162,31 @@ export class CodexAccountProvider implements AiProvider {
       const visible = catalog.models.filter((model) => !model.hidden);
       const defaultModel = visible.find((model) => model.isDefault) ?? visible[0];
       const fastModel = visible.find((model) => /mini|fast/i.test(`${model.id} ${model.displayName}`));
+      const toCapabilities = (model: (typeof visible)[number] | undefined) => model
+        ? {
+            tools: false,
+            vision: model.supportsImage === true,
+            thinking: Boolean(model.defaultReasoningEffort || model.supportedReasoningEfforts?.length),
+            ...(typeof model.contextWindow === 'number' ? { contextWindow: model.contextWindow } : {}),
+          }
+        : undefined;
       const models = [
-        ...(defaultModel ? [{ id: 'codex-recommended', displayName: `Recommended (${defaultModel.displayName} · ${defaultModel.id})` }] : []),
-        ...(fastModel && fastModel.id !== defaultModel?.id ? [{ id: 'codex-fast', displayName: `Fast (${fastModel.displayName} · ${fastModel.id})` }] : []),
-        ...visible.map((model) => ({ id: model.id, displayName: model.displayName })),
+        ...(defaultModel ? [{
+          id: 'codex-recommended',
+          displayName: `Recommended (${defaultModel.displayName} · ${defaultModel.id})`,
+          capabilities: toCapabilities(defaultModel),
+        }] : []),
+        ...(fastModel && fastModel.id !== defaultModel?.id ? [{
+          id: 'codex-fast',
+          displayName: `Fast (${fastModel.displayName} · ${fastModel.id})`,
+          capabilities: toCapabilities(fastModel),
+        }] : []),
+        ...visible.map((model) => ({
+          id: model.id,
+          name: model.displayName,
+          displayName: model.displayName,
+          ...(toCapabilities(model) ? { capabilities: toCapabilities(model) } : {}),
+        })),
       ];
       return {
         provider: this.id,

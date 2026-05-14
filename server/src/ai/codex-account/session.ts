@@ -37,6 +37,10 @@ export interface CodexCatalogModel {
   hidden?: boolean;
   isDefault?: boolean;
   defaultReasoningEffort?: string;
+  supportedReasoningEfforts?: CodexReasoningEffort[];
+  supportsImage?: boolean;
+  contextWindow?: number;
+  aliases?: string[];
 }
 
 export interface CodexCatalogSnapshot {
@@ -66,10 +70,24 @@ interface ModelListResponse {
   data: Array<{
     id: string;
     displayName?: string;
+    name?: string;
     description?: string;
     hidden?: boolean;
+    isHidden?: boolean;
     isDefault?: boolean;
+    default?: boolean;
     defaultReasoningEffort?: string;
+    supportedReasoningEfforts?: unknown;
+    reasoningEfforts?: unknown;
+    aliases?: unknown;
+    image?: unknown;
+    vision?: unknown;
+    supportsImage?: unknown;
+    capabilities?: unknown;
+    contextWindow?: unknown;
+    contextLength?: unknown;
+    maxInputTokens?: unknown;
+    maxContextTokens?: unknown;
   }>;
   nextCursor: string | null;
 }
@@ -243,27 +261,28 @@ class CodexAppServerSession extends EventEmitter {
       return this.catalogCache;
     }
     await this.ensureStarted();
-    const all: CodexCatalogModel[] = [];
-    let cursor: string | null = null;
-    for (let page = 0; page < 20; page += 1) {
-      const response: ModelListResponse = await this.request<ModelListResponse>('model/list', {
-        cursor,
-        limit: null,
-        includeHidden: true,
-      }, REQUEST_TIMEOUT_MS);
-      all.push(...response.data.map((model: ModelListResponse['data'][number]) => ({
-        id: model.id,
-        displayName: model.displayName ?? model.id,
-        ...(model.description ? { description: model.description } : {}),
-        hidden: model.hidden,
-        isDefault: model.isDefault,
-        ...(model.defaultReasoningEffort ? { defaultReasoningEffort: model.defaultReasoningEffort } : {}),
-      })));
-      if (!response.nextCursor) break;
-      cursor = response.nextCursor;
+    try {
+      const all: CodexCatalogModel[] = [];
+      let cursor: string | null = null;
+      for (let page = 0; page < 20; page += 1) {
+        const response: ModelListResponse = await this.request<ModelListResponse>('model/list', {
+          cursor,
+          limit: null,
+          includeHidden: true,
+        }, REQUEST_TIMEOUT_MS);
+        all.push(...response.data.map(normalizeCatalogModel));
+        if (!response.nextCursor) break;
+        cursor = response.nextCursor;
+      }
+      this.catalogCache = { fetchedAt: Date.now(), fresh: true, models: dedupeCatalogModels(all) };
+      return this.catalogCache;
+    } catch (error) {
+      if (this.catalogCache) {
+        this.catalogCache = { ...this.catalogCache, fresh: false };
+        return this.catalogCache;
+      }
+      throw error;
     }
-    this.catalogCache = { fetchedAt: Date.now(), fresh: true, models: all };
-    return this.catalogCache;
   }
 
   async resolveModel(model: string): Promise<string> {
@@ -271,6 +290,8 @@ class CodexAppServerSession extends EventEmitter {
     if (!availability.available) return model.trim() || 'codex-recommended';
     const requested = model.trim() || 'codex-recommended';
     const catalog = await this.listModels().catch(() => null);
+    const aliasTarget = catalog?.models.find((item) => item.aliases?.some((alias) => alias === requested));
+    if (aliasTarget) return aliasTarget.id;
     if (requested !== 'codex-recommended' && requested !== 'codex-fast') return requested;
     const visible = catalog?.models.filter((item) => !item.hidden) ?? [];
     if (requested === 'codex-fast') {
@@ -288,7 +309,14 @@ class CodexAppServerSession extends EventEmitter {
     const normalizedModel = modelId.trim().toLowerCase();
     if (/\bmini\b|\bfast\b/.test(normalizedModel)) return 'low';
     const catalog = await this.listModels().catch(() => null);
-    const rawEffort = catalog?.models.find((model) => model.id === modelId)?.defaultReasoningEffort ?? '';
+    const modelMeta = catalog?.models.find((model) => model.id === modelId);
+    if (modelMeta?.supportedReasoningEfforts?.length) {
+      if (modelMeta.supportedReasoningEfforts.includes('medium')) return 'medium';
+      if (modelMeta.supportedReasoningEfforts.includes('high')) return 'high';
+      if (modelMeta.supportedReasoningEfforts.includes('low')) return 'low';
+      return modelMeta.supportedReasoningEfforts[0];
+    }
+    const rawEffort = modelMeta?.defaultReasoningEffort ?? '';
     const normalizedEffort = rawEffort.trim().toLowerCase();
     if (normalizedEffort === 'minimal' || normalizedEffort === 'low' || normalizedEffort === 'medium' || normalizedEffort === 'high') {
       return normalizedEffort;
@@ -672,6 +700,113 @@ function compactDetail(value: string, max = 180): string {
 function boundedMs(ms: number): number {
   if (!Number.isFinite(ms) || ms <= 0) return 0;
   return Math.max(0, Math.floor(ms));
+}
+
+function normalizeCatalogModel(model: ModelListResponse['data'][number]): CodexCatalogModel {
+  const defaultReasoningEffort = normalizeReasoningEffort(model.defaultReasoningEffort);
+  const supportedReasoningEfforts = normalizeReasoningEfforts(
+    model.supportedReasoningEfforts
+      ?? model.reasoningEfforts
+      ?? (isRecord(model.capabilities) ? model.capabilities.reasoningEfforts : undefined),
+  );
+  const supportsImage = supportsVisionOrImage(model);
+  const contextWindow = normalizePositiveInt(
+    model.contextWindow
+      ?? model.contextLength
+      ?? model.maxInputTokens
+      ?? model.maxContextTokens
+      ?? (isRecord(model.capabilities) ? model.capabilities.contextWindow : undefined),
+  );
+  const aliases = normalizeAliases(model.aliases);
+  return {
+    id: model.id,
+    displayName: model.displayName ?? model.name ?? model.id,
+    ...(model.description ? { description: model.description } : {}),
+    hidden: model.hidden ?? model.isHidden,
+    isDefault: model.isDefault ?? model.default,
+    ...(defaultReasoningEffort ? { defaultReasoningEffort } : {}),
+    ...(supportedReasoningEfforts.length ? { supportedReasoningEfforts } : {}),
+    ...(supportsImage !== undefined ? { supportsImage } : {}),
+    ...(contextWindow ? { contextWindow } : {}),
+    ...(aliases.length ? { aliases } : {}),
+  };
+}
+
+function dedupeCatalogModels(models: CodexCatalogModel[]): CodexCatalogModel[] {
+  const byId = new Map<string, CodexCatalogModel>();
+  for (const model of models) {
+    const previous = byId.get(model.id);
+    if (!previous) {
+      byId.set(model.id, model);
+      continue;
+    }
+    byId.set(model.id, {
+      ...previous,
+      ...model,
+      aliases: uniq([...(previous.aliases ?? []), ...(model.aliases ?? [])]),
+      supportedReasoningEfforts: uniq([
+        ...(previous.supportedReasoningEfforts ?? []),
+        ...(model.supportedReasoningEfforts ?? []),
+      ]) as CodexReasoningEffort[],
+    });
+  }
+  return Array.from(byId.values());
+}
+
+function normalizeReasoningEfforts(value: unknown): CodexReasoningEffort[] {
+  if (!Array.isArray(value)) return [];
+  const mapped = value
+    .map((item) => normalizeReasoningEffort(item))
+    .filter((item): item is CodexReasoningEffort => Boolean(item));
+  return uniq(mapped) as CodexReasoningEffort[];
+}
+
+function normalizeReasoningEffort(value: unknown): CodexReasoningEffort | undefined {
+  if (typeof value !== 'string') return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'minimal' || normalized === 'low' || normalized === 'medium' || normalized === 'high') return normalized;
+  return undefined;
+}
+
+function normalizeAliases(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return uniq(value.filter((item): item is string => typeof item === 'string').map((item) => item.trim()).filter(Boolean));
+}
+
+function supportsVisionOrImage(model: ModelListResponse['data'][number]): boolean | undefined {
+  const direct = firstBoolean([model.supportsImage, model.image, model.vision]);
+  if (direct !== undefined) return direct;
+  if (Array.isArray(model.capabilities)) {
+    return model.capabilities.some((item) => typeof item === 'string' && /vision|image/i.test(item));
+  }
+  if (isRecord(model.capabilities)) {
+    return firstBoolean([
+      model.capabilities.vision,
+      model.capabilities.image,
+      model.capabilities.supportsImage,
+    ]);
+  }
+  return undefined;
+}
+
+function firstBoolean(values: unknown[]): boolean | undefined {
+  for (const value of values) {
+    if (typeof value === 'boolean') return value;
+  }
+  return undefined;
+}
+
+function normalizePositiveInt(value: unknown): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return undefined;
+  return Math.floor(value);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function uniq(values: string[]): string[] {
+  return [...new Set(values)];
 }
 
 function killCodexProcess(proc: ChildProcess | null): void {
