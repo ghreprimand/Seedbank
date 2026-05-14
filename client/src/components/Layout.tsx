@@ -1,57 +1,15 @@
 /** App shell — sticky header with search, nav, and CTA. Hosts modals and global keyboard shortcuts. */
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
-import { Search, Compass, Trash2, X, Settings, BookOpen, HelpCircle } from 'lucide-react';
+import { Search, Compass, Trash2, X, Settings, BookOpen } from 'lucide-react';
 import QuickCapture from './QuickCapture';
 import ConnectionStatus from './ConnectionStatus';
 import DataMigrationDialog from './DataMigrationDialog';
 import BackupStatus from './BackupStatus';
 import ManualModal from '@/help/ManualModal';
 import { HelpProvider } from '@/help/HelpContext';
-import { HelpModeToggle } from '@/help/HelpPopover';
-import { useHelp } from '@/help/useHelp';
+import HelpExperience from '@/help/HelpExperience';
 import { useFilterStore } from '@/stores/filters';
-
-/** Persistent banner shown below the header when Help Mode is active. */
-function HelpModeBanner() {
-  const { helpMode, toggleHelpMode } = useHelp();
-  if (!helpMode) return null;
-  return (
-    <div
-      role="status"
-      aria-live="polite"
-      className="sticky top-14 z-20 flex items-center justify-between gap-3
-                 bg-sage-100 border-b border-sage-300 px-4 sm:px-6 py-2
-                 animate-slide-up"
-    >
-      <div className="flex items-center gap-2 min-w-0">
-        <HelpCircle className="w-4 h-4 text-sage-600 shrink-0" aria-hidden />
-        <p className="text-xs text-sage-800 font-medium leading-snug">
-          Help Mode is on.{' '}
-          <span className="font-normal">
-            Look for highlighted{' '}
-            <span className="inline-flex items-center gap-0.5 align-middle">
-              <HelpCircle className="w-3 h-3 text-sage-600" aria-hidden />
-            </span>{' '}
-            markers near settings and fields.
-          </span>
-        </p>
-      </div>
-      <button
-        type="button"
-        onClick={toggleHelpMode}
-        aria-label="Exit help mode"
-        className="shrink-0 flex items-center gap-1 px-2 py-1 rounded-pill text-xs
-                   font-medium text-sage-700 hover:bg-sage-200 border border-sage-300
-                   transition-colors focus-visible:outline-none focus-visible:ring-2
-                   focus-visible:ring-sage-400"
-      >
-        <X className="w-3 h-3" />
-        <span className="hidden sm:inline">Exit Help Mode</span>
-      </button>
-    </div>
-  );
-}
 
 export default function Layout() {
   const [isCaptureOpen, setIsCaptureOpen] = useState(false);
@@ -130,7 +88,10 @@ export default function Layout() {
     <HelpProvider onOpenManual={openManual}>
     <div className="min-h-screen bg-paper text-ink-800 font-sans antialiased">
       {/* ── Top bar ──────────────────────────────────────── */}
-      <header className="sticky top-0 z-30 bg-paper/85 backdrop-blur-lg border-b border-ink-100 px-4 sm:px-6 h-14 flex items-center justify-between">
+      <header
+        className="sticky top-0 z-30 bg-paper/85 backdrop-blur-lg border-b border-ink-100 px-4 sm:px-6 h-14 flex items-center justify-between"
+        data-help="layout-header"
+      >
         <div className="flex items-center gap-6">
           {/* Logo */}
           <Link
@@ -144,7 +105,7 @@ export default function Layout() {
           </Link>
 
           {/* Search Input */}
-          <div className="relative hidden md:block">
+          <div className="relative hidden md:block" data-help="layout-search">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-300 pointer-events-none">
               <Search className="w-4 h-4" />
             </span>
@@ -192,6 +153,7 @@ export default function Layout() {
           <Link
             to="/discover"
             title="Discover"
+            data-help="layout-discover-nav"
             className={`p-2 rounded-card transition-all duration-200 ${
               location.pathname === '/discover'
                 ? 'text-sage-600 bg-sage-50 shadow-sm'
@@ -204,6 +166,7 @@ export default function Layout() {
           <Link
             to="/compost"
             title="Compost"
+            data-help="layout-compost-nav"
             className={`p-2 rounded-card transition-all duration-200 ${
               location.pathname === '/compost'
                 ? 'text-sage-600 bg-sage-50 shadow-sm'
@@ -218,18 +181,17 @@ export default function Layout() {
             onClick={() => setManualOpen(true)}
             title="Manual (press ?)"
             aria-label="Open manual"
+            data-help="layout-manual"
             className="p-2 rounded-card transition-all duration-200 text-ink-400 hover:text-ink-600 hover:bg-ink-50"
           >
             <BookOpen className="w-[18px] h-[18px]" />
           </button>
 
-          {/* Help mode toggle — all screen sizes; icon-only below md, full pill on md+ */}
-          <HelpModeToggle className="flex" />
-
           {/* Settings gear */}
           <Link
             to="/settings"
             title="Settings"
+            data-help="layout-settings-nav"
             className={`p-2 rounded-card transition-all duration-200 ${
               location.pathname.startsWith('/settings')
                 ? 'text-sage-600 bg-sage-50 shadow-sm'
@@ -245,6 +207,7 @@ export default function Layout() {
           {/* Plant a Seed CTA */}
           <button
             onClick={() => setIsCaptureOpen(true)}
+            data-help="layout-quick-capture"
             className="bg-clay-500 hover:bg-clay-600 active:bg-clay-700 text-paper
                        px-3.5 py-1.5 rounded-pill text-sm font-medium
                        transition-all duration-200 flex items-center gap-1.5
@@ -255,9 +218,6 @@ export default function Layout() {
           </button>
         </div>
       </header>
-
-      {/* ── Help Mode banner ─────────────────────────────── */}
-      <HelpModeBanner />
 
       {/* ── Mobile search bar ─────────────────────────────── */}
       {mobileSearchOpen && (
@@ -306,6 +266,8 @@ export default function Layout() {
       )}
 
       <DataMigrationDialog />
+
+      <HelpExperience />
 
       {/* Manual modal */}
       {manualOpen && (

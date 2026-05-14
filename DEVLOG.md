@@ -4,6 +4,54 @@ Newest entries at the top.
 
 ---
 
+## 2026-05-14 — Granular Help Accuracy Pass + Docs/Manual Truth Sweep
+
+This pass tightened contextual help and documentation to match the live code paths exactly.
+
+Contextual help improvements:
+- Reworked AI settings help from broad section buckets to control-level targeting (service cards, provider cards, feature-routing rows, provider/model/effort/verbosity selectors).
+- Added provider-specific help copy so Codex account, OpenAI API, Anthropic API, local inference, and external/cloud routes no longer inherit misleading generic text.
+- Added missing `data-help` wiring for high-complexity surfaces: Manual modal, Graduation modal, Agent run panel (prompt/transcript/proposed files/apply), and API Reference subsection.
+- Updated stale help labels (`Settings` tab names, idea action wording, API/server descriptor).
+
+Documentation/manual corrections from code audit:
+- Updated README/docs/manual to reflect that CLI agent linking is currently API-driven (`POST /api/agents/link`) instead of a dedicated settings card.
+- Corrected API docs for current AI provider-instance routing shape and backup patch fields (`retentionCount`, `destinations`).
+- Corrected settings/docs/manual backup behavior (startup is schedule-check-driven, not unconditional backup every boot).
+- Corrected MCP auth wording to distinguish bearer external clients from implicit local loopback auth.
+- Corrected manual behavior text for board defaults, stage icons/tips, version history flow, health-check trigger, and contextual-help control wording.
+
+Validation and safety:
+- `npm run typecheck`
+- `npm run build`
+- `git diff --check`
+- Secret-pattern scan (keys/tokens/private-key signatures) on working tree
+- Runtime restart confirmed at `http://localhost:5174`
+
+## 2026-05-14 — Documentation Accuracy Sweep + Contextual Help Redesign
+
+This session did two coordinated upgrades: (1) a code-based documentation/manual correction pass, and (2) a full contextual-help interaction redesign modeled on the Archon click-target flow.
+
+The help system was rebuilt around a global mode instead of scattered inline popovers. A new floating bottom-right help control now toggles help mode, supports collapse-to-chevron state, and keeps clear exit affordances (banner + Esc). While help mode is active, capture-phase click interception resolves the nearest `data-help` target and opens a contextual popover anchored to that UI region. Help entries now come from a central map (`client/src/help/helpContentMap.ts`) with resolver support for dataset overrides and generic fallback entries for unlabeled controls. The app now applies hover/highlight affordances in help mode, and opening the manual exits help mode to avoid interaction conflicts.
+
+Coverage expanded from sparse marker buttons to broad surface tagging across layout navigation, Garden, Discover, Compost, Idea Detail major sections, Settings shell/tabs, and key modals (quick capture, import/export, ask-AI, version history). Legacy `HelpButton` calls were kept as a compatibility bridge into the new global popover path.
+
+Documentation/manual accuracy fixes were applied directly from implementation checks (server routes + client behavior), including:
+- manual score model corrected to the two live fields (Personal Excitement + Jam Suitability),
+- version-history snapshot behavior corrected (score edits are included),
+- compost purge behavior corrected (purge on Compost load path),
+- MCP docs/manual corrected to paginated `GET /api/mcp/ideas` response shape,
+- graduation manual text corrected to adapter-defined stage updates (not hard-coded Shipped),
+- API docs expanded for current AI/account/testing/settings integration routes and settings sections,
+- settings docs corrected to runtime database filename/path conventions,
+- agents docs corrected for current AI settings navigation and removed stale Detect-only wording.
+
+Validation:
+- `npm run typecheck`
+- `npm run build`
+
+---
+
 ## 2026-05-14 — AI Settings Persistence, Model Discovery, and Ask AI Route Selection
 
 This session completed the AI & Agents settings refactor that moved the former monolithic settings tab into focused components under `client/src/pages/settings/ai/`. The tab now treats provider methods as persistent provider instances: account-login methods, API-key methods, local servers, and OpenAI-compatible cloud routers can each carry their own label, configured model, discovered models, enabled-model subset, probe status, guardrail state, and routing identity.

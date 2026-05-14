@@ -217,7 +217,7 @@ export default function AgentRunPanel({ idea, projectPath, onClose }: AgentRunPa
     : `Idea: ${idea.title || 'Untitled'}`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-ink-900/30 backdrop-blur-sm animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-ink-900/30 backdrop-blur-sm animate-fade-in" data-help="agent-run-modal">
       <div className="bg-paper w-full max-w-2xl rounded-card shadow-modal border border-ink-100 flex flex-col max-h-[90vh] animate-scale-in">
         {/* Header */}
         <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-ink-100">
@@ -278,7 +278,10 @@ export default function AgentRunPanel({ idea, projectPath, onClose }: AgentRunPa
                   </select>
                 </label>
               )}
-              <label className="block text-xs text-ink-500">
+              <label
+                className="block text-xs text-ink-500"
+                data-help="agent-run-prompt"
+              >
                 Initial prompt
                 <textarea
                   value={prompt}
@@ -293,7 +296,7 @@ export default function AgentRunPanel({ idea, projectPath, onClose }: AgentRunPa
 
           {/* Transcript */}
           {transcript.length > 0 && (
-            <div>
+            <div data-help="agent-run-transcript">
               <p className="text-[10px] font-mono uppercase tracking-wider text-ink-400 mb-1">Transcript</p>
               <div
                 ref={transcriptRef}
@@ -314,7 +317,7 @@ export default function AgentRunPanel({ idea, projectPath, onClose }: AgentRunPa
 
           {/* Proposed files checklist */}
           {proposedFiles.length > 0 && (
-            <div className="space-y-2">
+            <div className="space-y-2" data-help="agent-run-proposed-files">
               <div className="flex items-center justify-between">
                 <p className="text-[10px] font-mono uppercase tracking-wider text-ink-400">
                   Proposed files ({proposedFiles.length})
@@ -407,6 +410,7 @@ export default function AgentRunPanel({ idea, projectPath, onClose }: AgentRunPa
                 type="button"
                 onClick={() => void handleApply()}
                 disabled={applying || selectedFiles.size === 0}
+                data-help="agent-run-apply"
                 className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold
                            bg-sage-600 hover:bg-sage-700 disabled:bg-ink-300 text-white rounded-card transition-colors"
               >

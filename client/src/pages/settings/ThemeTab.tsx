@@ -367,9 +367,9 @@ export default function ThemeTab() {
   const activeIdx = THEMES.findIndex((t) => t.id === prefs.name);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-help="settings-theme-picker">
       {/* Match system toggle */}
-      <section className="flex items-start gap-4 p-4 bg-paper-warm border border-ink-100 rounded-card max-w-xl">
+      <section className="flex items-start gap-4 p-4 bg-paper-warm border border-ink-100 rounded-card max-w-xl" data-help="settings-theme-picker">
         <Monitor className="w-4 h-4 text-ink-400 mt-0.5 shrink-0" />
         <div className="flex-1">
           <div className="flex items-center justify-between gap-4">
@@ -401,7 +401,7 @@ export default function ThemeTab() {
       </section>
 
       {/* Theme grid */}
-      <section role="radiogroup" aria-label="Theme">
+      <section role="radiogroup" aria-label="Theme" data-help="settings-theme-picker">
         <div className="flex items-center gap-2 mb-3">
           <h3 className="text-sm font-mono uppercase tracking-wider text-ink-400">
             Choose a theme

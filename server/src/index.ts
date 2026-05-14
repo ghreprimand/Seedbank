@@ -985,7 +985,7 @@ function aiMethodCapabilities(): AiMethodCapability[] {
       channel: 'file-agent',
       featureRoutable: false,
       availability: agentConfig.claudeLinked ? 'available' : 'unavailable',
-      ...(agentConfig.claudeLinked ? {} : { availabilityReason: 'Link Claude Code CLI in Project Graduation → Agents to enable file-producing agent runs.' }),
+      ...(agentConfig.claudeLinked ? {} : { availabilityReason: 'Link Claude Code CLI via POST /api/agents/link to enable file-producing agent runs.' }),
     },
     {
       id: 'codex-cli-agent',
@@ -995,7 +995,7 @@ function aiMethodCapabilities(): AiMethodCapability[] {
       channel: 'file-agent',
       featureRoutable: false,
       availability: agentConfig.codexLinked ? 'available' : 'unavailable',
-      ...(agentConfig.codexLinked ? {} : { availabilityReason: 'Link Codex CLI in Project Graduation → Agents to enable file-producing agent runs.' }),
+      ...(agentConfig.codexLinked ? {} : { availabilityReason: 'Link Codex CLI via POST /api/agents/link to enable file-producing agent runs.' }),
     },
   ];
 }

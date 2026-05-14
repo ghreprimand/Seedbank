@@ -113,7 +113,7 @@ export default function Settings() {
   const ActiveComponent = active.component;
 
   return (
-    <div className="animate-fade-in">
+    <div className="animate-fade-in" data-help="settings-page">
       {/* Page heading */}
       <div className="mb-6">
         <h1 className="text-2xl font-serif font-semibold text-ink-900">Settings</h1>
@@ -135,6 +135,7 @@ export default function Settings() {
             md:hidden flex items-center gap-1 overflow-x-auto pb-2 mb-5
             scrollbar-none -mx-4 px-4
           "
+          data-help="settings-tab-nav"
         >
           {TABS.map((t) => {
             const Icon = t.icon;
@@ -164,6 +165,7 @@ export default function Settings() {
         <nav
           aria-label="Settings sections"
           className="hidden md:block shrink-0 w-44 space-y-0.5"
+          data-help="settings-tab-nav"
         >
           {TABS.map((t) => {
             const Icon = t.icon;
@@ -188,7 +190,7 @@ export default function Settings() {
         </nav>
 
         {/* ── Content pane ──────────────────────────────────────────── */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0" data-help="settings-tab-content">
           <div className="mb-5 pb-4 border-b border-ink-100">
             <h2 className="text-xl font-serif font-semibold text-ink-900">{active.label}</h2>
             <p className="text-[11px] font-mono uppercase tracking-widest text-ink-400 mt-0.5">

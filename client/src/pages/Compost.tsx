@@ -83,19 +83,19 @@ export default function Compost() {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in" data-help="compost-page">
       <div>
         <div className="flex items-center gap-2">
           <h1 className="text-3xl font-serif font-semibold text-ink-900 tracking-tight">
             Compost
           </h1>
-          <HelpButton
-            helpId="compost-header"
-            title="Compost Bin"
-            summary="Deleted ideas stay here for a recovery window before being purged permanently. Restore any idea or delete it immediately."
-            details="Compost is purged automatically when Seedbank starts and periodically while it is running."
-            manualSection="compost"
-          />
+            <HelpButton
+              helpId="compost-header"
+              title="Compost Bin"
+              summary="Deleted ideas stay here for a recovery window before being purged permanently. Restore any idea or delete it immediately."
+              details="Expired entries are purged when Compost is loaded."
+              manualSection="compost"
+            />
         </div>
         <p className="text-ink-400 text-sm mt-1">
           Deleted ideas stay recoverable for {retentionDays} days.
@@ -111,7 +111,7 @@ export default function Compost() {
           <p className="text-sm text-ink-400">Deleted ideas will appear here before they are purged.</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3" data-help="compost-list">
           {ideas.map((idea) => (
             <article
               key={idea.id}

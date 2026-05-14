@@ -17,7 +17,13 @@ The Thinking Partner (inline AI chat) stays in the question-and-reflection postu
 
 ## Linking an agent
 
-Go to **Settings → AI & Agents → Agents**.
+Agent linking is currently done via API endpoints (there is no dedicated Settings card for CLI linking).
+
+Link endpoint:
+- `POST /api/agents/link` with `{ "provider": "claude" | "codex", "cliPath": "<absolute-path>" }`
+
+Unlink endpoint:
+- `DELETE /api/agents/link/:provider`
 
 ### Claude Code
 
@@ -25,8 +31,8 @@ Claude Code is Anthropic's official CLI (`claude`). To link it:
 
 1. Install Claude Code: `npm install -g @anthropic-ai/claude-code` (or follow the official install instructions).
 2. Authenticate Claude Code with your Anthropic account outside Seedbank (run `claude` once; it will prompt for auth).
-3. In Seedbank, enter the path to the binary (e.g. `/usr/local/bin/claude`) **or** leave the path blank and click **Detect** to find it on `$PATH`.
-4. Click **Link**. The server runs `claude --version` to validate and stores the resolved path.
+3. Call `POST /api/agents/link` with provider `claude` and the binary path (for example `/usr/local/bin/claude`).
+4. The server runs `claude --version` to validate and stores the resolved path.
 
 ### Codex CLI
 
@@ -34,8 +40,8 @@ Codex CLI is OpenAI's open-source CLI (`codex`). To link it:
 
 1. Install: `npm install -g @openai/codex` (or follow the official install instructions).
 2. Set up your OpenAI credentials via the CLI or `OPENAI_API_KEY` environment variable.
-3. In Seedbank, enter the binary path or use **Detect**.
-4. Click **Link**.
+3. Call `POST /api/agents/link` with provider `codex` and the binary path.
+4. The server validates with `codex --version`.
 
 ### What Seedbank stores
 
@@ -147,7 +153,8 @@ See [docs/SETTINGS.md — API & Server — MCP](./SETTINGS.md#mcp-model-context-
 ## What agents cannot do
 
 - Modify or delete ideas in the database.
-- Access any file outside the scratch workspace directory (scratch run) or integration project root (continue run).
+- Bypass Seedbank's start-path validation for scratch/project-root run setup.
+  Note: the spawned CLI process is not OS-sandboxed; it runs with the same filesystem permissions as the Seedbank server process.
 - Run multiple concurrent runs for the same idea (the daily budget and runtime cap apply globally).
 - Auto-apply files — every file must go through the user's explicit accept step.
 - Access other ideas in the archive (the workspace only contains `IDEA.md` for the specific idea).

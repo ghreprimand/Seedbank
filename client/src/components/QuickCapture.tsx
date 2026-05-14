@@ -47,7 +47,7 @@ export default function QuickCapture({ onClose, onSuccess }: QuickCaptureProps) 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-900/30 backdrop-blur-sm animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-900/30 backdrop-blur-sm animate-fade-in" data-help="quick-capture-modal">
       <div
         className="bg-paper w-full max-w-md rounded-card shadow-modal border border-ink-100 p-6 animate-scale-in"
         onClick={(e) => e.stopPropagation()}

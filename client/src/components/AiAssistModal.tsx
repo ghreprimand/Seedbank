@@ -1025,7 +1025,7 @@ export default function AiAssistModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-900/30
-                    backdrop-blur-sm animate-fade-in">
+                    backdrop-blur-sm animate-fade-in" data-help="ai-assist-modal">
       <div
         className="bg-paper w-full max-w-2xl rounded-card shadow-modal border border-ink-100
                    p-5 animate-scale-in max-h-[90vh] overflow-y-auto"

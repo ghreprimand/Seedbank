@@ -86,7 +86,7 @@ function ServerInfoCard() {
   };
 
   return (
-    <section className="space-y-3">
+    <section className="space-y-3" data-help="settings-api-server">
       <div className="flex items-center justify-between">
         <h3 className="text-xs font-mono uppercase tracking-wider text-ink-500">Server</h3>
         <button
@@ -199,7 +199,7 @@ function TokensSection() {
   };
 
   return (
-    <section className="space-y-3">
+    <section className="space-y-3" data-help="settings-api-tokens">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <h3 className="text-xs font-mono uppercase tracking-wider text-ink-500">Personal Access Tokens</h3>
@@ -420,7 +420,7 @@ function WebhooksSection() {
   };
 
   return (
-    <section className="space-y-3">
+    <section className="space-y-3" data-help="settings-api-webhooks">
       <div className="flex items-center gap-1.5">
         <h3 className="text-xs font-mono uppercase tracking-wider text-ink-500">Webhooks</h3>
         <HelpButton
@@ -485,7 +485,7 @@ function WebhooksSection() {
 function OpenApiSection() {
   const specUrl = apiUrl('/api/openapi.json');
   return (
-    <section className="space-y-2">
+    <section className="space-y-2" data-help="settings-api-reference">
       <h3 className="text-xs font-mono uppercase tracking-wider text-ink-500">API Reference</h3>
       <p className="text-xs text-ink-400">
         Seedbank exposes a machine-readable OpenAPI spec. Open it directly or paste the URL into any OpenAPI viewer.
@@ -517,7 +517,7 @@ export default function ApiServerTab() {
   const offline = useSettingsOffline();
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8" data-help="settings-api-server">
       {offline && (
         <div className="px-3 py-2 bg-amber-50 border border-amber-200 rounded-card text-xs text-amber-800">
           Offline — server data may be stale. Token and webhook changes require the server to be reachable.

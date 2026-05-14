@@ -420,6 +420,18 @@ export default function AiAgentsTab() {
     setNewCloudKey('');
   };
 
+  const helpForProviderCard = (
+    title: string,
+    summary: string,
+    details: string,
+  ) => ({
+    helpId: 'settings-ai-provider-card',
+    helpTitle: title,
+    helpBody: summary,
+    helpDetails: details,
+    helpManualSection: 'settings-ai',
+  });
+
   // ── Diagnostics — only active providers ────────────────────────────────────
   const activeInstanceIds: Set<string> = new Set([
     ai.defaultProviderInstanceId,
@@ -450,7 +462,7 @@ export default function AiAgentsTab() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-8">
+    <div className="space-y-8" data-help="settings-ai-services">
       {offline && (
         <div className="px-3 py-2 bg-amber-50 border border-amber-200 rounded-card text-xs text-amber-800">
           Offline — AI settings shown from local cache. Changes will sync when the server reconnects.
@@ -458,7 +470,7 @@ export default function AiAgentsTab() {
       )}
 
       {/* ── AI Services ─────────────────────────────────────────────────────── */}
-      <section className="space-y-3">
+      <section className="space-y-3" data-help="settings-ai-services">
         <div className="flex items-center gap-1.5">
           <h3 className="text-xs font-mono uppercase tracking-wider text-ink-500">AI Services</h3>
           <HelpButton
@@ -485,7 +497,7 @@ export default function AiAgentsTab() {
 
         <div className="space-y-4">
           {/* ── Claude Service ─────────────────────────────────────────────── */}
-          <div className="rounded-card border border-ink-100 bg-paper p-3 space-y-3">
+          <div className="rounded-card border border-ink-100 bg-paper p-3 space-y-3" data-help="settings-ai-claude-service">
             <p className="text-[10px] font-mono uppercase tracking-wider text-ink-400">Claude Service</p>
             <ServiceMethodSwitch
               title="Method"
@@ -517,6 +529,11 @@ export default function AiAgentsTab() {
                     listLabel="List saved models"
                   />
                 }
+                {...helpForProviderCard(
+                  'Anthropic API Method',
+                  'Direct API-key method for Claude models from Anthropic. Use this when you manage usage through Anthropic API billing.',
+                  'This is a chat/model provider method used by Feature Defaults and Ask AI. It is not the Claude Code CLI agent.',
+                )}
               >
                 <ProviderDetailForm
                   fields={[
@@ -541,6 +558,11 @@ export default function AiAgentsTab() {
                 onSetDefault={() => void setDefaultProvider('claude-account')}
                 canSetDefault={claudeAccountStatus === 'connected'}
                 defaultExpanded={!ai.claudeAccountAuthenticated}
+                {...helpForProviderCard(
+                  'Claude Account Login Method',
+                  'Account-login method that routes AI features through your Claude account session instead of an Anthropic API key.',
+                  'Use login/logout in this card to manage account auth. This method is routable in Feature Defaults and Ask AI.',
+                )}
               >
                 <ClaudeAccountDetail
                   model={ai.claudeAccountModel || 'claude-sonnet-latest'}
@@ -556,7 +578,7 @@ export default function AiAgentsTab() {
           </div>
 
           {/* ── Codex / OpenAI Service ─────────────────────────────────────── */}
-          <div className="rounded-card border border-ink-100 bg-paper p-3 space-y-3">
+          <div className="rounded-card border border-ink-100 bg-paper p-3 space-y-3" data-help="settings-ai-codex-service">
             <p className="text-[10px] font-mono uppercase tracking-wider text-ink-400">Codex / OpenAI Service</p>
             <ServiceMethodSwitch
               title="Method"
@@ -588,6 +610,11 @@ export default function AiAgentsTab() {
                     listLabel="List saved models"
                   />
                 }
+                {...helpForProviderCard(
+                  'OpenAI API Method',
+                  'Direct API-key method for OpenAI models. Use this path when you want explicit model/API control through OpenAI API billing.',
+                  'This method participates in Feature Defaults and Ask AI model routing. It is separate from Codex account login and Codex CLI.',
+                )}
               >
                 <ProviderDetailForm
                   fields={[
@@ -611,6 +638,11 @@ export default function AiAgentsTab() {
                 onSetDefault={() => void setDefaultProvider('codex-account')}
                 canSetDefault={ai.codexAccountAvailable === true && ai.codexAccountAuthenticated === true && codexAccountStatus === 'connected'}
                 defaultExpanded={!ai.codexAccountAuthenticated}
+                {...helpForProviderCard(
+                  'Codex Account Login Method',
+                  'Account-login method via local Codex app-server. This is a chat/model provider route, not an external cloud-router card.',
+                  'Feature Defaults and Ask AI can route to this method when account auth is available. Model options come from the discovered Codex account catalog.',
+                )}
               >
                 <CodexAccountDetail
                   model={ai.codexAccountModel || 'codex-recommended'}
@@ -625,7 +657,7 @@ export default function AiAgentsTab() {
           </div>
 
           {/* ── Local Models ───────────────────────────────────────────────── */}
-          <div className="rounded-card border border-ink-100 bg-paper p-3 space-y-3">
+          <div className="rounded-card border border-ink-100 bg-paper p-3 space-y-3" data-help="settings-ai-local-models">
             <p className="text-[10px] font-mono uppercase tracking-wider text-ink-400">Local Models</p>
             <label className="block text-xs text-ink-500">
               Server type
@@ -660,6 +692,11 @@ export default function AiAgentsTab() {
                     listLabel="List saved models"
                   />
                 }
+                {...helpForProviderCard(
+                  'Ollama Local Method',
+                  'Local inference method using the configured Ollama host and model. No cloud provider is required.',
+                  'If your base URL points to localhost or a trusted LAN host you control, idea content stays on that configured host.',
+                )}
               >
                 <ProviderDetailForm
                   fields={[
@@ -708,6 +745,11 @@ export default function AiAgentsTab() {
                     listLabel="List saved models"
                   />
                 }
+                {...helpForProviderCard(
+                  `${localServerOpt.label} Local Endpoint`,
+                  'Local OpenAI-compatible inference method for the selected local server type.',
+                  'Use this for local runtimes like LM Studio, vLLM, llama.cpp, LocalAI, or another localhost-compatible endpoint.',
+                )}
               >
                 <OpenAICompatibleDetail
                   preset={ai.localOpenaiCompatiblePreset ?? ai.openaiCompatiblePreset}
@@ -745,6 +787,11 @@ export default function AiAgentsTab() {
                     listLabel="List saved models"
                   />
                 }
+                {...helpForProviderCard(
+                  `${instance.label} Local Instance`,
+                  'Saved local provider instance with its own base URL, model selection, and probe status.',
+                  'Use this when you run multiple local endpoints and want each one to be independently routable in Feature Defaults and Ask AI.',
+                )}
               >
                 {instance.provider === 'ollama' ? (
                   <ProviderDetailForm
@@ -786,7 +833,7 @@ export default function AiAgentsTab() {
                 </button>
               </ProviderCard>
             ))}
-            <div className="rounded-card border border-dashed border-ink-200 bg-paper-warm p-3 space-y-2">
+            <div className="rounded-card border border-dashed border-ink-200 bg-paper-warm p-3 space-y-2" data-help="settings-ai-add-local-instance">
               <p className="text-[11px] font-mono uppercase tracking-wider text-ink-400">Add local instance</p>
               <div className="grid gap-2 md:grid-cols-[1fr_1fr_1.4fr_1fr_auto] md:items-end">
                 <label className="block text-xs text-ink-500">
@@ -815,7 +862,7 @@ export default function AiAgentsTab() {
           </div>
 
           {/* ── External / Cloud ───────────────────────────────────────────── */}
-          <div className="rounded-card border border-ink-100 bg-paper p-3 space-y-3">
+          <div className="rounded-card border border-ink-100 bg-paper p-3 space-y-3" data-help="settings-ai-external-cloud">
             <p className="text-[10px] font-mono uppercase tracking-wider text-ink-400">External / Cloud</p>
             <p className="text-[11px] text-ink-400">
               Connect to hosted services: OpenRouter, Groq, Mistral, Together, Fireworks, or a custom cloud endpoint.
@@ -849,6 +896,11 @@ export default function AiAgentsTab() {
                     listLabel="List saved models"
                   />
                 }
+                {...helpForProviderCard(
+                  'Cloud OpenAI-Compatible Method',
+                  'Hosted OpenAI-compatible provider route for external services such as OpenRouter, Groq, Mistral, Together, Fireworks, or custom HTTPS endpoints.',
+                  'Requests on this method leave your machine and are processed by the selected cloud provider. Use enabled-model lists to limit routable models.',
+                )}
               >
                 <OpenAICompatibleDetail
                   preset={ai.cloudOpenaiCompatiblePreset ?? ai.openaiCompatiblePreset}
@@ -882,6 +934,11 @@ export default function AiAgentsTab() {
                     listLabel="List saved models"
                   />
                 }
+                {...helpForProviderCard(
+                  `${instance.label} External Instance`,
+                  'Saved external/cloud provider instance with its own API key presence, model catalog, and routing identity.',
+                  'Use this when you need separate cloud accounts, billing contexts, or model allowlists across providers.',
+                )}
               >
                 <OpenAICompatibleDetail
                   preset={instance.presetId ?? 'custom'}
@@ -942,7 +999,7 @@ export default function AiAgentsTab() {
                 </button>
               </ProviderCard>
             ))}
-            <div className="rounded-card border border-dashed border-ink-200 bg-paper-warm p-3 space-y-2">
+            <div className="rounded-card border border-dashed border-ink-200 bg-paper-warm p-3 space-y-2" data-help="settings-ai-add-external-instance">
               <p className="text-[11px] font-mono uppercase tracking-wider text-ink-400">Add external instance</p>
               <div className="grid gap-2 md:grid-cols-[1fr_1fr_1.4fr_1fr_1fr_auto] md:items-end">
                 <label className="block text-xs text-ink-500">
@@ -977,7 +1034,7 @@ export default function AiAgentsTab() {
       </section>
 
       {/* ── Feature Defaults ─────────────────────────────────────────────────── */}
-      <section className="p-4 bg-paper-warm border border-ink-100 rounded-card">
+      <section className="p-4 bg-paper-warm border border-ink-100 rounded-card" data-help="settings-ai-feature-defaults">
         <FeatureRoutingSection
           ai={ai}
           providerStatuses={{
@@ -997,7 +1054,7 @@ export default function AiAgentsTab() {
       </section>
 
       {/* ── Usage & Guardrails ───────────────────────────────────────────────── */}
-      <section className="p-4 bg-paper-warm border border-ink-100 rounded-card">
+      <section className="p-4 bg-paper-warm border border-ink-100 rounded-card" data-help="settings-ai-guardrails">
         <GuardrailsSection
           ai={ai}
           onSaveBudget={saveBudget}

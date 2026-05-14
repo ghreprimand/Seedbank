@@ -46,6 +46,11 @@ export interface ProviderCardProps {
   children?: React.ReactNode;
   /** Expand on first render. Use when the primary action lives in children and is needed immediately. */
   defaultExpanded?: boolean;
+  helpId?: string;
+  helpTitle?: string;
+  helpBody?: string;
+  helpDetails?: string;
+  helpManualSection?: string;
 }
 
 export function ProviderCard({
@@ -61,6 +66,11 @@ export function ProviderCard({
   actions,
   children,
   defaultExpanded = false,
+  helpId,
+  helpTitle,
+  helpBody,
+  helpDetails,
+  helpManualSection,
 }: ProviderCardProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
 
@@ -76,6 +86,11 @@ export function ProviderCard({
       className={`rounded-card border transition-colors ${
         isDefault ? 'border-sage-300 bg-paper' : 'border-ink-100 bg-paper'
       }`}
+      data-help={helpId}
+      data-help-title={helpTitle}
+      data-help-body={helpBody}
+      data-help-details={helpDetails}
+      data-help-manual={helpManualSection}
     >
       {/* Header row */}
       <div className="flex items-center gap-3 px-4 py-3">

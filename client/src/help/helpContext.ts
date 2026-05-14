@@ -1,19 +1,36 @@
-/**
- * HelpContext instance and value type.
- * Plain .ts (no JSX) so react-refresh rules don't complain.
- */
 import { createContext } from 'react';
+import type { ActiveHelpState, HelpEntry } from './helpTypes';
 
 export interface HelpContextValue {
-  /** True when the user has activated Help Mode. */
   helpMode: boolean;
+  setHelpMode: (next: boolean) => void;
   toggleHelpMode: () => void;
-  /** Open the manual modal, optionally jumping to a section. */
+  exitHelpMode: () => void;
+
+  collapsed: boolean;
+  setCollapsed: (next: boolean) => void;
+  toggleCollapsed: () => void;
+
+  activeHelp: ActiveHelpState | null;
+  closeActiveHelp: () => void;
+  openHelpAtRect: (id: string, entry: HelpEntry, anchorRect: DOMRect) => void;
+
   openManual: (sectionId?: string) => void;
 }
 
 export const HelpContext = createContext<HelpContextValue>({
   helpMode: false,
+  setHelpMode: () => {},
   toggleHelpMode: () => {},
+  exitHelpMode: () => {},
+
+  collapsed: false,
+  setCollapsed: () => {},
+  toggleCollapsed: () => {},
+
+  activeHelp: null,
+  closeActiveHelp: () => {},
+  openHelpAtRect: () => {},
+
   openManual: () => {},
 });

@@ -12,8 +12,8 @@ Provider configuration lives in **Settings → AI & Agents**. Navigate there via
 
 Settings → AI & Agents is organized by service family first, then connection method:
 
-- **Claude service**: Anthropic API key, Claude account/native OAuth, Claude Code CLI
-- **Codex/OpenAI service**: OpenAI API key, Codex account/app-server, Codex CLI
+- **Claude service**: Anthropic API key, Claude account/native OAuth
+- **Codex/OpenAI service**: OpenAI API key, Codex account/app-server
 - **Local inference**: Ollama plus as many local OpenAI-compatible servers as you configure (LM Studio, vLLM, llama.cpp, LocalAI, custom localhost URL)
 - **External/cloud routers**: OpenRouter, Groq, Mistral, Together, Fireworks, or other custom cloud endpoints
 
@@ -31,7 +31,7 @@ Each provider method is stored as a provider instance. Built-in instances cover 
 
 **Codex account** — account-auth method that talks to the local Codex app-server over JSON-RPC. This requires a compatible Codex runtime installed locally. It is not OpenAI API billing and not the same as linked Codex CLI agent launching.
 
-**Claude Code CLI / Codex CLI** — file-producing agent methods inside their respective service areas. These are review-first development tools, not Feature Defaults chat providers.
+**Claude Code CLI / Codex CLI** — file-producing agent methods managed through the agents API (`/api/agents/link`, `/api/agents/runs*`). They are review-first development tools, not Feature Defaults chat providers.
 
 ### Model discovery and saved instances
 
@@ -219,13 +219,13 @@ Seedbank sets the agent's working directory to a per-idea scratch workspace and 
 
 ### Transcript and output handling
 
-The agent transcript streams live in the panel. When the agent proposes file changes, a checklist appears — you select which files to accept before anything is saved. No file is written without explicit approval.
+The agent transcript streams live in the panel. In scratch mode, the agent writes files inside the temporary workspace during execution, then you explicitly choose which outputs to copy into idea attachments. In continue mode, the agent may write directly in the target project path.
 
 Transcripts are stored per-run in the Seedbank database. Previous run transcripts are visible from the idea detail page via the **Continue with agent** button.
 
 ### Runtime controls
 
-- **Runtime cap:** 5 minutes per run, 30-minute absolute maximum.
+- **Runtime cap:** defaults to 5 minutes per run and is configurable up to a 30-minute maximum.
 - **Kill button:** always visible in the agent panel; terminates the process immediately.
 - No output auto-writes to canonical idea fields.
 
@@ -239,4 +239,4 @@ For external agent sessions (outside Seedbank's own agent runner), read-only MCP
 | `GET /api/mcp/ideas/:id` | Full idea detail with rendered Markdown |
 | `GET /api/mcp/search` | Full-text search over ideas |
 
-All MCP endpoints require a bearer token with `mcp:read` scope, created in Settings → API & Server. See [`docs/API.md`](./API.md) for the full MCP surface.
+External/bearer clients should use a token with `mcp:read` scope, created in Settings → API & Server. Local loopback requests can use implicit local auth without bearer token. See [`docs/API.md`](./API.md) for the full MCP surface.

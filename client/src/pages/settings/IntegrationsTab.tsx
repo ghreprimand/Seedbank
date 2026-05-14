@@ -165,7 +165,7 @@ function IntegrationCard({ integration, state, offline, onSave, onTest, onFieldC
   );
 
   return (
-    <div className="p-5 bg-paper border border-ink-100 rounded-card shadow-card space-y-4">
+    <div className="p-5 bg-paper border border-ink-100 rounded-card shadow-card space-y-4" data-help="settings-integrations-card">
       {/* Card header */}
       <div className="flex items-start gap-3">
         <span className="mt-0.5 text-sage-600">
@@ -376,7 +376,7 @@ export default function IntegrationsTab() {
   const advancedIntegrations = integrations.filter((i) => i.id !== 'generic-project');
 
   return (
-    <div className="space-y-6 max-w-xl">
+    <div className="space-y-6 max-w-xl" data-help="settings-integrations-page">
       {/* Tab header */}
       <div className="flex items-start gap-2">
         <div className="flex-1 space-y-1.5">

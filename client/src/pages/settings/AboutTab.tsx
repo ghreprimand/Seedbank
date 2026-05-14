@@ -6,7 +6,7 @@ export default function AboutTab() {
   const version = server.version && server.version !== '0.0.0' ? server.version : 'unknown';
 
   return (
-    <div className="space-y-6 max-w-lg">
+    <div className="space-y-6 max-w-lg" data-help="settings-about">
       <div className="flex items-center gap-3">
         <span className="text-4xl">🌱</span>
         <div>
