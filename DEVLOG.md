@@ -4,6 +4,44 @@ Newest entries at the top.
 
 ---
 
+## 2026-05-13 — Backend Capability Contract And Account Runtime Truthfulness
+
+This session delivered three backend slices to support the RC AI & Agents truthfulness gate and the new service-family-first IA model. First, preflight metadata was corrected in `97eee68` so account aliases (`codex-recommended`, `codex-fast`, `claude-*-latest`) no longer appear as authoritative `resolvedModelId` values. Second, Codex account runtime was made explicit and truthful in `db37483`: the app-server path is now opt-in (`SEEDBANK_ENABLE_CODEX_ACCOUNT`) with deterministic unavailable/auth-required messaging when disabled or not signed in, plus focused gate tests.
+
+The main architecture slice landed in `b6801ae`: a new backend capability contract (`AiMethodCapability`) now exposes method-level metadata for Settings/UI via `GET /api/ai/method-capabilities`. It distinguishes service family (`claude`, `codex-openai`, `local-inference`, `external-router`), connection method (`api-key`, `account`, `local-server`, `openai-compatible`, `cli-agent`), channel (`chat-model` vs `file-agent`), feature-routability, and availability state with reasons. Chat/model providers (API keys, account transports, local inference, and openai-compatible presets) are now surfaced separately from file-producing CLI agent methods (`claude-code-cli-agent`, `codex-cli-agent`) which are explicitly non-routable.
+
+In parallel, two no-edit feasibility artifacts were produced for deferred backup follow-ups: `rclone-probe-cache-feasibility.md` and `backup-readiness-followup-plan.md`, covering a server-side TTL refresh option for rclone readiness cache and a remote restore-validation “download then validate locally” docs recipe. These remain deferred pending operator/coordinator pull-in.
+
+## 2026-05-13 — AI Provider Grouping, Account Truthfulness & Privacy Notice Hardening
+
+This session resolved the last blocking RC gate: AI provider card truthfulness and grouping. Nine commits across five files closed all Reviewer and Tester findings through five gate cycles.
+
+The core work (`db37483` through `3a7be31`) established truthful framing for the account-transport providers: the Claude account card now shows a "coming soon" violet pill and has no login flow (login is not yet available), and the Codex account runtime is gated behind a `SEEDBANK_ENABLE_CODEX_ACCOUNT` env-var opt-in defaulting to off. Both cards have their "Set default" button unconditionally hidden — the Claude card via `claudeAccountStatus === 'connected'` (never true), and the Codex card via `ai.codexAccountAvailable === true && ai.codexAccountAuthenticated === true && codexAccountStatus === 'connected'` (all false by default). A key hardening detail (`d0aaa9c`): the `ProviderCard` render guard was changed from `canSetDefault &&` to `canSetDefault === true` because JS evaluates `undefined && x` as `undefined`, which was triggering the prop's `= true` default and showing the button when `codexAccountAvailable` was absent from a stale server payload.
+
+The provider reorganisation (`80fab24`) replaced the flat provider list with four labelled groups — Direct API providers, Local inference, External & custom endpoints, and Account & subscription transports — and split the `custom` OpenAI-compatible preset handling throughout. Two separate sets were introduced (`LOCAL_OPTGROUP_PRESETS` for the dropdown, `LOCAL_RESIDENCY_PRESETS` for data-residency logic) to fix a regression where the `custom` preset was claiming local data residency even when the user could point it at a remote URL. The privacy notice fix required two layered commits (`12fa410` and `793165d`): the first excluded `'custom'` from the residency set, but the `PrivacyNotice` component was overriding it via a preflight result (the default localhost URL passes `isLikelyLocalUrl()` on the server, returning `preflight.local = true`). The second commit added an `isCustomPreset` short-circuit in `PrivacyNotice` itself, making `'mixed'` unconditional for the custom preset regardless of preflight state. A follow-up (`d32c3de`) split the `GuardrailsSection` `useEffect` into two, adding `[ai.provider, ai.openaiCompatibleBaseUrl, ai.openaiCompatiblePreset]` as dependencies to the preflight effect so the notice re-evaluates correctly after any in-session config change.
+
+Additional fixes: a synchronous Feature Defaults save gate blocks routes to unavailable providers (`claude-account` always, `codex-account` when runtime unavailable); all user-visible `'app-server'` copy replaced with `'Codex CLI component'` / `'Codex account component'`; the `codexAccountEnabledByEnv()` helper exported from `session.ts` and reused in `service.ts` to remove a duplicate inline IIFE. A read-only copy audit identified `docs/SETTINGS.md` AI & Agents section as stale (describes old four-card flat layout), backup step-by-step recipes as missing, and a restore procedure gap — all deferred pending Director assignment. The linked agents product decision resolved to keep as-is for RC (no structural change, no clarifying sentence added).
+
+---
+
+## 2026-05-13 — Configurable Categories Gate + Help Mode Coverage
+
+This session resolved all review findings on the configurable categories UI slice (`576632c`) through a sequence of five follow-up commits, then expanded Help Mode contextual marker coverage to five previously uncovered surfaces.
+
+The categories gate work (`b8c2f16` through `8286e75`) fixed: markdown export writing `undefined` for custom category IDs; Discover Pattern Insight prose using raw IDs instead of labels; the server `builtIn` spoof vulnerability (client-supplied `builtIn: true` for unknown IDs is now silently dropped); an empty-slug bypass where symbols-only names (e.g. `!!!`) could submit an empty-ID category; the Reviewer-flagged safe-delete guard running on every request path including empty-body PATCH calls. The most significant fix (`8286e75`) restructured the `PATCH /api/settings/categories` handler so that any body without an explicit `items` array is a strict no-op — the guard and the `setSetting` call are now both inside the `Array.isArray(rawConfig.items)` branch, preventing any body shape from accidentally wiping custom categories. The gate was confirmed closed by both Tester (PASS) and Reviewer Codex (ACCEPT) on the full chain.
+
+Help Mode coverage (`e96f6d3`) added `HelpButton` markers to Board, Compost, Discover (page header + Pattern Insight card), Settings → General (Data section), and Settings → Theme (theme picker heading). This commit also fixed two pre-existing typecheck errors introduced by the in-progress Claude account provider WIP: missing `claudeAccountAuthenticated: false` in the default config objects in `client/src/stores/settings.ts` and `server/src/ai/service.ts`, and an unused `_config` parameter in the Claude account provider's `listModels()` method.
+
+---
+
+## 2026-05-13 — Release Candidate UX Foundation
+
+This release-candidate wave split the next usability work into smaller reviewable commits after the stabilization pass. It added the first Help Mode discoverability slice, introduced shared AI provider metadata and clearer provider labels, cleaned public release workflow notes, clarified local-only/provider copy, and hardened Ollama runtime diagnostics with a real generation smoke test.
+
+The branch is currently five commits ahead of `origin/main`: `34f1769` for the Help Mode banner/highlight behavior, `0bb9d61` for provider metadata and OpenRouter/custom endpoint naming, `d5b2039` for release workflow cleanup, `3897c62` for provider guardrail copy, and `6328924` for Ollama runtime checks. Typecheck/build passed after the stack, with only the existing Vite chunk-size warning.
+
+---
+
 ## 2026-05-13 — Release Candidate Stabilization
 
 This release-candidate wave focused on making Seedbank safer and easier to operate as a local-first app before public packaging.
@@ -51,4 +89,3 @@ This wave established the application settings foundation.
 - Added the runtime theming system using CSS custom properties and persisted theme preferences.
 - Added a shared settings store that hydrates from the server, patches section-level settings, and falls back safely when offline.
 - Migrated backup, integration, and theme settings to the shared store.
-
