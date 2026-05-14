@@ -59,10 +59,10 @@ AI & Agents is now organized by **service family first**, then **connection meth
 
 - **Claude service**
   - Anthropic API key method (chat/model routing)
-  - Claude account/native OAuth method (chat/model routing; account login required)
+  - Claude account native OAuth method (chat/model routing; account login required)
 - **Codex/OpenAI service**
   - OpenAI API key method (chat/model routing)
-  - Codex account/app-server method (chat/model routing; account login required)
+  - Codex account app-server auth method (chat/model routing; account login required)
 - **Local inference**
   - Ollama
   - Local OpenAI-compatible servers: LM Studio, vLLM, llama.cpp, LocalAI, custom localhost URL
@@ -90,8 +90,10 @@ For large cloud catalogs such as OpenRouter, the expanded instance card includes
 
 ### Account providers
 
-- **Claude account** is an account-login transport for Claude.ai subscriptions. Login and logout from the Claude account card; token refresh is automatic.
-- **Codex account** is an account-login transport through the local Codex app-server. If Codex is missing or cannot start, the card reports that runtime failure directly.
+- **Claude account** is an account-login transport for Claude.ai subscriptions. Login and logout from the Claude account card using Seedbank's native OAuth flow; token refresh is automatic.
+- **Codex account** is an account-login transport through the local Codex app-server auth flow. If Codex is missing or cannot start, the card reports that runtime failure directly.
+
+If this browser has previously seen Claude or Codex account auth succeed and the current server status later reports that auth is missing, Seedbank shows a persistent reauth notice in the app shell. The notice stays visible until the account is authenticated again and includes a direct **Open AI settings** link to `/settings/ai-agents`. Choosing **Log out** from the account card clears the browser-side reminder, so intentional sign-out does not keep nagging. The reminder stores only a local "this account was seen signed in before" flag; it does not store credentials.
 
 When Claude account, Codex account, API-key providers, local servers, or OpenAI-compatible endpoints become usable, Seedbank discovers available models and persists them to the provider instance. Discovery runs after successful auth/key saves, account status checks, manual list-model actions, server startup, and a background refresh cycle. Provider cards show the model count and retain the last probe status after navigating away.
 
@@ -120,13 +122,13 @@ The **Usage & Guardrails** section includes a daily token limit plus advanced sa
 
 Usage readouts show tokens consumed in the last 24 hours and last 7 days (from `ai_usage`).
 
-### CLI agent methods
+### Optional CLI agent methods
 
 Claude Code and Codex CLI remain available for **Develop with agent / Continue with agent** workflows, but linking is currently managed through the agents API surface rather than a dedicated Settings card.
 
 - Link/unlink endpoints: `POST /api/agents/link`, `DELETE /api/agents/link/:provider`.
-- They are **file-producing methods** and are **not** used as chat/model routes in Feature Defaults.
-- Authentication remains CLI-managed (`claude auth login`, `OPENAI_API_KEY`, or tool-specific config); Seedbank stores only binary path/link state.
+- They are **file-producing methods** and are **not** used as Claude/Codex chat/model account auth or as Feature Defaults routes.
+- Authentication remains owned by the CLI tool itself; Seedbank stores only binary path/link state.
 - Runs execute in per-idea scratch workspaces and are not OS-sandboxed.
 
 See [`docs/AGENTS.md`](./AGENTS.md) and [`docs/AI_GUIDE.md`](./AI_GUIDE.md) for full agent workflow and safety details.
@@ -219,7 +221,8 @@ Read-only endpoints for external Claude or Codex sessions to pull seeds as conte
 
 All backup settings live here. Backups are written to `<seedbank-data-dir>/backups/` and can optionally be copied to offsite destinations after each run.
 
-- **Backup frequency** — off, daily, or weekly. On startup, Seedbank runs scheduled backup checks and only runs a backup when due under the active schedule.
+- **Startup safety snapshot** — each server startup creates a database snapshot after migrations complete, so the latest schema is represented in restore validation.
+- **Backup frequency** — off, daily, or weekly. After startup, Seedbank runs scheduled backup checks every few minutes and only runs an additional scheduled backup when due under the active schedule.
 - **Retention count** — how many database backup files to keep locally before pruning.
 - **JSON archive export** — toggle full JSON archive snapshots on each backup run (written to `<seedbank-data-dir>/exports/`).
 - **Offsite destinations** — copy backups to additional locations after each run. Two types:

@@ -4,6 +4,25 @@ Newest entries at the top.
 
 ---
 
+## 2026-05-14 — Account Reauth Notice and Documentation Audit
+
+Implemented a non-obtrusive account reauth notice for Claude and Codex account transports. The client now remembers, per browser, whether Claude account or Codex account auth has previously succeeded. If the aggregate settings/status later show that the same account transport is available but unauthenticated, the app shell shows a persistent bottom-right notice with a direct link to Settings → AI & Agents (`/settings/ai-agents`) and a refresh action. Intentional logout from the account cards clears the remembered flag so the notice does not nag after deliberate sign-out. The reminder stores only a local boolean marker, not provider credentials.
+
+Documentation/manual/help updates:
+- README, Settings docs, AI Guide, Agents docs, Architecture docs, API docs, changelog, in-app manual, and contextual help were audited against the current implementation.
+- Claude/Codex chat provider wording now consistently describes Claude native OAuth and Codex app-server account auth, with CLI wording limited to the optional file-producing agent runner/API.
+- Backup docs now distinguish startup safety snapshots from scheduled daily/weekly backup checks.
+- Contextual help includes the new reauth notice and links it to the AI & Agents manual section.
+
+Validation:
+- `npm run typecheck -w client`
+- `npm run lint -w client`
+
+Privacy/safety:
+- No secrets, keys, tokens, private paths, or machine-specific credentials were introduced in this change set.
+
+---
+
 ## 2026-05-14 — Manual Contrast Fixes, Repo Doc Linking, and Conditional Privacy Copy
 
 This pass addressed readability and wording issues reported in live theme testing of the in-app manual.

@@ -133,7 +133,7 @@ Read-only MCP-style endpoints:
 
 These routes require `mcp:read` for bearer auth and are designed for external agent/tool context pulls, not mutation.
 
-## Agent Runner Architecture
+## Optional CLI Agent Runner Architecture
 
 Core modules:
 - `server/src/agents/link.ts` — CLI binary resolution and `--version` validation for `claude`/`codex`
@@ -144,7 +144,7 @@ Execution model:
 - Seedbank spawns local CLI processes (`spawn`) in either:
   - scratch workspace for idea development mode
   - graduated project path for continue mode
-- environment is intentionally inherited so CLIs can discover local credentials/session.
+- environment is intentionally inherited because linked CLI tools run as child processes of the Seedbank server. This is separate from Claude account native OAuth and Codex account app-server auth used for chat/model routing.
 
 Transcript model:
 - transcript written to disk under `<seedbank-data-dir>/agent-runs/<runId>.log`
@@ -193,9 +193,11 @@ Data directory:
 ```
 
 Backup flow supports:
+- startup safety snapshots after migrations
 - scheduled daily/weekly DB copies
 - manual backup runs
 - optional JSON archive export
+- optional copy to local-path or rclone destinations after each backup run
 
 ## Operational Notes
 

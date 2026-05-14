@@ -12,8 +12,8 @@ Provider configuration lives in **Settings → AI & Agents**. Navigate there via
 
 Settings → AI & Agents is organized by service family first, then connection method:
 
-- **Claude service**: Anthropic API key, Claude account/native OAuth
-- **Codex/OpenAI service**: OpenAI API key, Codex account/app-server
+- **Claude service**: Anthropic API key, Claude account native OAuth
+- **Codex/OpenAI service**: OpenAI API key, Codex account app-server auth
 - **Local inference**: Ollama plus as many local OpenAI-compatible servers as you configure (LM Studio, vLLM, llama.cpp, LocalAI, custom localhost URL)
 - **External/cloud routers**: OpenRouter, Groq, Mistral, Together, Fireworks, or other custom cloud endpoints
 
@@ -27,11 +27,17 @@ Each provider method is stored as a provider instance. Built-in instances cover 
 
 **Custom / OpenAI-compatible endpoint** — choose a preset or enter a compatible endpoint URL, API key when required, and model name. Use this for OpenRouter, Groq, Mistral, Together, Fireworks, LM Studio, vLLM, llama.cpp, LocalAI, or another service that accepts OpenAI Chat Completions requests. Local and cloud instances are stored separately so a local LM Studio server does not overwrite an OpenRouter setup.
 
-**Claude account** — account-auth method with login/status controls shown in the Claude service area. Use this to route AI chat through a Claude.ai subscription with OAuth tokens rather than an Anthropic API key.
+**Claude account** — account-auth method with login/status controls shown in the Claude service area. Use this to route AI chat through a Claude.ai subscription with Seedbank's native OAuth flow rather than an Anthropic API key.
 
 **Codex account** — account-auth method that talks to the local Codex app-server over JSON-RPC. This requires a compatible Codex runtime installed locally. It is not OpenAI API billing and not the same as linked Codex CLI agent launching.
 
-**Claude Code CLI / Codex CLI** — file-producing agent methods managed through the agents API (`/api/agents/link`, `/api/agents/runs*`). They are review-first development tools, not Feature Defaults chat providers.
+**Claude Code CLI / Codex CLI** — optional file-producing agent methods managed through the agents API (`/api/agents/link`, `/api/agents/runs*`). They are review-first development tools, not Claude/Codex account auth and not Feature Defaults chat providers.
+
+### Account reauth notices
+
+Claude account and Codex account can require reauth if their underlying account session expires or becomes unavailable. When this browser previously saw one of those account transports authenticated, but the current server status says auth is missing, Seedbank shows a persistent reauth notice in the app shell. The notice links directly to **Settings → AI & Agents** (`/settings/ai-agents`) so you can sign in again from the right account card.
+
+The reminder is intentionally local and minimal: it stores only a browser-side flag that the account was seen authenticated before. It does not store provider credentials. Logging out from the Claude or Codex account card clears the reminder for that account.
 
 ### Model discovery and saved instances
 
@@ -209,9 +215,9 @@ The **Develop with agent** and **Continue with agent** buttons on the idea detai
 
 ### How agents authenticate
 
-Agents use their **own** CLI-managed authentication — not Seedbank's provider API keys. Claude Code authenticates via `claude auth login` (or `ANTHROPIC_API_KEY` in the environment); Codex CLI uses `OPENAI_API_KEY` or its own config. Seedbank only stores the binary path and a linked flag. No agent credentials are stored in or passed through Seedbank.
+Agents use their **own** CLI-managed authentication — not Seedbank's provider API keys, Claude account OAuth, or Codex account app-server auth. Seedbank only stores the binary path and a linked flag. No agent credentials are stored in or passed through Seedbank.
 
-Agents inherit the environment variables of the Seedbank server process. If `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` is set in that environment, the agent will pick it up. This is the standard CLI auth mechanism — it is not a Seedbank feature.
+Agents inherit the environment variables of the Seedbank server process. If a linked CLI uses environment-based credentials, it can see the values available to that process. This is standard CLI behavior, not Seedbank's Claude/Codex account auth.
 
 ### Workspace boundaries
 

@@ -12,6 +12,7 @@ import {
   type ClaudeAccountLoginResult,
 } from '@/api/client';
 import { useSettingsStore } from '@/stores/settings';
+import { forgetAccountAuth, rememberAccountAuth } from '@/lib/accountAuthMemory';
 import { ModelPicker } from './ModelPicker';
 import { ProviderProbe } from './ProviderProbe';
 import type { ProviderCardStatus } from './types';
@@ -72,6 +73,7 @@ export function ClaudeAccountDetail({
     try {
       const status = await getClaudeAccountStatus();
       setExpiresAt(status.expiresAt ?? null);
+      if (status.authenticated) rememberAccountAuth('claude-account');
       onStatusChange?.(status.authenticated ? 'connected' : 'key-needed');
       await refreshSettings();
       if (status.authenticated) scheduleSettingsRefresh();
@@ -137,6 +139,7 @@ export function ClaudeAccountDetail({
     setError('');
     try {
       await logoutClaudeAccount();
+      forgetAccountAuth('claude-account');
       await refreshSettings();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));

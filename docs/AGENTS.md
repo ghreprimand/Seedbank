@@ -1,6 +1,6 @@
 # Agents
 
-Seedbank can link a local **Claude Code** or **Codex CLI** agent to help develop an idea further. Agents are a *tool*, not an autonomous co-creator: they run in a per-idea scratch workspace, produce proposed files, and stop. Every file they produce must be explicitly accepted by you before it touches your idea record.
+Seedbank can optionally link a local **Claude Code** or **Codex CLI** agent to help develop an idea further. This is separate from the Claude account and Codex account chat/model providers in Settings → AI & Agents, which use native/account transports rather than CLI auth. Agents are a *tool*, not an autonomous co-creator: they run in a per-idea scratch workspace, produce proposed files, and stop. Every file they produce must be explicitly accepted by you before it touches your idea record.
 
 ---
 
@@ -30,7 +30,7 @@ Unlink endpoint:
 Claude Code is Anthropic's official CLI (`claude`). To link it:
 
 1. Install Claude Code: `npm install -g @anthropic-ai/claude-code` (or follow the official install instructions).
-2. Authenticate Claude Code with your Anthropic account outside Seedbank (run `claude` once; it will prompt for auth).
+2. Set up Claude Code outside Seedbank according to its own CLI instructions.
 3. Call `POST /api/agents/link` with provider `claude` and the binary path (for example `/usr/local/bin/claude`).
 4. The server runs `claude --version` to validate and stores the resolved path.
 
@@ -39,7 +39,7 @@ Claude Code is Anthropic's official CLI (`claude`). To link it:
 Codex CLI is OpenAI's open-source CLI (`codex`). To link it:
 
 1. Install: `npm install -g @openai/codex` (or follow the official install instructions).
-2. Set up your OpenAI credentials via the CLI or `OPENAI_API_KEY` environment variable.
+2. Set up Codex CLI outside Seedbank according to its own CLI instructions.
 3. Call `POST /api/agents/link` with provider `codex` and the binary path.
 4. The server validates with `codex --version`.
 
@@ -50,7 +50,7 @@ Codex CLI is OpenAI's open-source CLI (`codex`). To link it:
 - A `linkedAt` timestamp.
 - A boolean `claudeLinked` / `codexLinked` flag (visible to the UI as a `hasX` status).
 
-**No API keys or session tokens are stored by Seedbank.** The linked CLI manages its own credentials (keychain, config files, environment variables) outside the Seedbank process. When Seedbank spawns the agent, it inherits the server process's environment — the CLI finds its own credentials through normal means.
+**No API keys or session tokens are stored by Seedbank.** The linked CLI manages its own credentials outside the Seedbank process. Those credentials are not the same thing as Claude account native OAuth or Codex account app-server auth used by normal chat/model routing. When Seedbank spawns the agent, it inherits the server process's environment and the CLI finds its own credentials through its normal means.
 
 ---
 
@@ -168,7 +168,7 @@ See [docs/SETTINGS.md — API & Server — MCP](./SETTINGS.md#mcp-model-context-
 The server logs the exact error. Common causes: the CLI binary is not executable, the CLI's credentials are expired, or the daily run budget has been reached.
 
 **`claude --version` fails during linking.**
-Ensure `claude` is installed and that its setup has been completed (the first-run authentication). On some systems the binary is in `~/.npm-global/bin/` or a similar location not on the default server `$PATH` — in that case enter the full absolute path manually.
+Ensure `claude` is installed and executable. On some systems the binary is in `~/.npm-global/bin/` or a similar location not on the default server `$PATH` — in that case enter the full absolute path manually.
 
 **Transcript appears empty.**
 Some CLI versions buffer stdout heavily. The transcript is assembled from the persisted log file after the run ends; a zero-byte transcript may indicate the CLI exited immediately without writing to stdout (check for a `[stderr]` prefix in the transcript for error details).

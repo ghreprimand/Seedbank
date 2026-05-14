@@ -6,6 +6,7 @@ import QuickCapture from './QuickCapture';
 import ConnectionStatus from './ConnectionStatus';
 import DataMigrationDialog from './DataMigrationDialog';
 import BackupStatus from './BackupStatus';
+import AccountReauthNotice from './AccountReauthNotice';
 import ManualModal from '@/help/ManualModal';
 import { HelpProvider } from '@/help/HelpContext';
 import HelpExperience from '@/help/HelpExperience';
@@ -284,6 +285,7 @@ export default function Layout() {
       )}
 
       <DataMigrationDialog />
+      <AccountReauthNotice />
 
       <HelpExperience />
 
