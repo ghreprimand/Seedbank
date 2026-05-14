@@ -1,3 +1,4 @@
+import { extractSuggestion } from "./utils/suggestion-parser.js";
 import { aiProviderLabel, isAiProviderId } from '../../../shared/types.js';
 import type {
   AiChatMessage,
@@ -933,22 +934,13 @@ function featureForMode(mode: string): AiFeatureId {
 }
 
 function parseSuggestion(field: AiSuggestionField, text: string): AiSuggestion {
-  try {
-    const parsed = JSON.parse(text) as { suggestion?: string; rationale?: string };
-    return {
-      field,
-      suggestion: parsed.suggestion ?? text,
-      rationale: parsed.rationale ?? '',
-    };
-  } catch {
-    return {
-      field,
-      suggestion: text,
-      rationale: '',
-    };
-  }
+  const { suggestion, rationale } = extractSuggestion(text);
+  return {
+    field,
+    suggestion,
+    rationale,
+  };
 }
-
 function isProvider(value: unknown): value is AiProviderId {
   return isAiProviderId(value);
 }
