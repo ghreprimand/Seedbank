@@ -259,6 +259,7 @@ export const MANUAL_GROUPS: ManualGroup[] = [
             'Refine… — adds a follow-up instruction ("Make it shorter", "More technical") and re-runs.',
             'Reject — discards the suggestion and returns to intent selection.',
           ]},
+          { type: 'p', text: 'Applied suggestions are saved as plain field text. Line breaks are preserved in the editor; markdown is not specially rendered inside editable idea fields.' },
           { type: 'h3', text: 'Conversation mode' },
           { type: 'p', text: 'When you choose Ask a question, a short chat panel opens for this field only. This conversation is not saved to the idea\'s Thinking Partner history. Type your question and use "Apply to field" on any assistant reply to use it.' },
           { type: 'h3', text: 'Which provider is used' },
