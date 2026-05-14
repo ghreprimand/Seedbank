@@ -34,6 +34,7 @@ let authLock: Promise<void> = Promise.resolve();
 async function readRaw(): Promise<AuthFileShape> {
   try {
     const buf = await fs.readFile(AUTH_PATH, 'utf8');
+    if (!buf.trim()) return {};
     const parsed = JSON.parse(buf) as AuthFileShape;
     return parsed && typeof parsed === 'object' ? parsed : {};
   } catch (err) {

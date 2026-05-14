@@ -45,6 +45,7 @@ export const CLAUDE_ACCOUNT_OAUTH_SCOPES = [
   'user:profile',
   'user:inference',
 ] as const;
+export const CLAUDE_ACCOUNT_REQUIRED_SCOPES = ['user:inference'] as const;
 const SCOPES = CLAUDE_ACCOUNT_OAUTH_SCOPES.join(' ');
 
 const REFRESH_LEAD_MS = 30_000;
@@ -72,6 +73,16 @@ export class ClaudeAccountRefreshError extends Error {
   }
 }
 
+export class ClaudeAccountScopeError extends Error {
+  constructor(
+    readonly missingScopes: string[],
+    readonly grantedScope: string,
+  ) {
+    super(`Claude account OAuth grant is missing required scope(s): ${missingScopes.join(', ') || 'unknown'}.`);
+    this.name = 'ClaudeAccountScopeError';
+  }
+}
+
 interface PendingFlow {
   state: string;
   codeVerifier: string;
@@ -93,6 +104,18 @@ function genVerifier(): string {
 
 function challengeOf(verifier: string): string {
   return base64UrlEncode(createHash('sha256').update(verifier).digest());
+}
+
+function parseScope(scope: string): Set<string> {
+  return new Set(scope.split(/\s+/).map((item) => item.trim()).filter(Boolean));
+}
+
+export function validateClaudeAccountScopes(scope: string): void {
+  const granted = parseScope(scope);
+  const missing = CLAUDE_ACCOUNT_REQUIRED_SCOPES.filter((required) => !granted.has(required));
+  if (missing.length > 0) {
+    throw new ClaudeAccountScopeError(missing, scope);
+  }
 }
 
 export interface BootstrapResult {
@@ -275,12 +298,14 @@ async function exchangeCode(code: string, codeVerifier: string): Promise<ClaudeA
     scope?: string;
   };
   const now = Date.now();
+  const scope = data.scope ?? SCOPES;
+  validateClaudeAccountScopes(scope);
   return {
     accessToken: data.access_token,
     refreshToken: data.refresh_token,
     expiresAt: now + (data.expires_in * 1000),
     tokenType: data.token_type ?? 'Bearer',
-    scope: data.scope ?? SCOPES,
+    scope,
     obtainedAt: now,
   };
 }
@@ -294,6 +319,7 @@ export async function refreshTokens(): Promise<ClaudeAccountTokens> {
     if (!latest) {
       throw new ClaudeAccountNoAuthError();
     }
+    validateClaudeAccountScopes(latest.scope);
     if (latest.expiresAt > Date.now() + REFRESH_LEAD_MS) {
       return latest;
     }
@@ -341,6 +367,7 @@ export async function refreshTokens(): Promise<ClaudeAccountTokens> {
       scope: data.scope ?? latest.scope,
       obtainedAt: now,
     };
+    validateClaudeAccountScopes(next.scope);
     await writeTokensUnlocked(next);
     return next;
   });
@@ -354,6 +381,7 @@ export async function refreshTokens(): Promise<ClaudeAccountTokens> {
 export async function ensureLiveTokens(): Promise<ClaudeAccountTokens> {
   const tokens = await loadTokens();
   if (!tokens) throw new ClaudeAccountNoAuthError();
+  validateClaudeAccountScopes(tokens.scope);
   if (tokens.expiresAt > Date.now() + REFRESH_LEAD_MS) return tokens;
   return await refreshTokens();
 }
