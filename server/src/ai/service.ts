@@ -324,11 +324,11 @@ function isFeatureRoutableProvider(provider: AiProviderId): boolean {
 
 function defaultFeatureRoutes(): Record<AiFeatureId, AiFeatureRoute> {
   return {
-    'thinking-partner': { provider: 'default', providerInstanceId: 'ollama' },
-    'field-suggestions': { provider: 'default', providerInstanceId: 'ollama' },
-    'health-check': { provider: 'default', providerInstanceId: 'ollama' },
-    'discover-insights': { provider: 'default', providerInstanceId: 'ollama' },
-    default: { provider: 'default', providerInstanceId: 'ollama' },
+    'thinking-partner': { provider: 'default' },
+    'field-suggestions': { provider: 'default' },
+    'health-check': { provider: 'default' },
+    'discover-insights': { provider: 'default' },
+    default: { provider: 'default' },
   };
 }
 
@@ -336,8 +336,7 @@ function sanitizeFeatureRoute(value: unknown): AiFeatureRoute | undefined {
   const route = value as { provider?: unknown; providerInstanceId?: unknown; model?: unknown } | undefined;
   if (!route) return undefined;
   if (route.provider === 'default') {
-    const providerInstanceId = isProviderInstanceId(route.providerInstanceId) ? route.providerInstanceId : 'ollama';
-    return { provider: 'default', providerInstanceId };
+    return { provider: 'default' };
   }
   if (isProviderInstanceId(route.providerInstanceId)) {
     const provider = providerInstanceToProvider(route.providerInstanceId);
@@ -561,8 +560,7 @@ function resolveFeatureConfig(config: AiStoredConfig, feature: AiFeatureId): AiS
   const route = routes[feature] ?? routes.default;
   const defaultInstanceId = normalizeDefaultProviderInstance(config.defaultProviderInstanceId);
   if (route.provider === 'default') {
-    const instanceId = route.providerInstanceId ?? defaultInstanceId;
-    return applyProviderInstance(config, instanceId);
+    return applyProviderInstance(config, defaultInstanceId);
   }
   if (route.providerInstanceId) {
     return applyModelOverride(applyProviderInstance(config, route.providerInstanceId), providerInstanceToProvider(route.providerInstanceId), route.model ?? '');
@@ -577,7 +575,7 @@ function effectiveFeatureRoutes(config: AiStoredConfig): Record<AiFeatureId, AiE
     const resolved = resolveFeatureConfig(config, feature);
     const route = routes[feature];
     const providerInstanceId = route?.provider === 'default'
-      ? (route.providerInstanceId ?? defaultInstanceId)
+      ? defaultInstanceId
       : (route?.providerInstanceId ?? defaultInstanceId);
     acc[feature] = {
       provider: resolved.provider,
@@ -981,6 +979,20 @@ function isLikelyLocalUrl(value: string | undefined): boolean {
   }
 }
 
+function normalizeEndpointIdentity(value: string | undefined): string {
+  const raw = value?.trim();
+  if (!raw) return '';
+  try {
+    const url = new URL(raw);
+    url.hash = '';
+    url.search = '';
+    url.pathname = url.pathname.replace(/\/+$/, '');
+    return url.toString().toLowerCase().replace(/\/$/, '');
+  } catch {
+    return raw.toLowerCase();
+  }
+}
+
 function descriptorForConfig(config: AiStoredConfig): AiProviderDescriptor | undefined {
   if (config.provider === 'openai-compatible') return openAICompatiblePreset(config.openaiCompatiblePreset);
   return AI_PROVIDER_DESCRIPTORS.find((descriptor) => descriptor.id === config.provider && !descriptor.presetId);
@@ -1317,15 +1329,20 @@ export class AiService {
     const nextCloudModel = input.cloudOpenaiCompatibleModel?.trim()
       || (!legacyTargetsLocal ? legacyModel : undefined)
       || current.cloudOpenaiCompatibleModel;
+    const currentCloudIdentity = `${current.cloudOpenaiCompatiblePreset}|${normalizeEndpointIdentity(current.cloudOpenaiCompatibleBaseUrl)}`;
+    const nextCloudIdentity = `${nextCloudPreset}|${normalizeEndpointIdentity(nextCloudBaseUrl)}`;
+    const cloudIdentityChanged = currentCloudIdentity !== nextCloudIdentity;
     const nextLocalKey = input.localOpenaiCompatibleApiKey?.trim()
       ? encryptSecret(input.localOpenaiCompatibleApiKey.trim())
       : legacyTargetsLocal && input.openaiCompatibleApiKey?.trim()
         ? encryptSecret(input.openaiCompatibleApiKey.trim())
         : current.localOpenaiCompatibleApiKeyEncrypted;
-    const nextCloudKey = input.cloudOpenaiCompatibleApiKey?.trim()
-      ? encryptSecret(input.cloudOpenaiCompatibleApiKey.trim())
-      : !legacyTargetsLocal && input.openaiCompatibleApiKey?.trim()
-        ? encryptSecret(input.openaiCompatibleApiKey.trim())
+    const explicitCloudKey = input.cloudOpenaiCompatibleApiKey?.trim()
+      || (!legacyTargetsLocal ? input.openaiCompatibleApiKey?.trim() : undefined);
+    const nextCloudKey = explicitCloudKey
+      ? encryptSecret(explicitCloudKey)
+      : cloudIdentityChanged
+        ? undefined
         : current.cloudOpenaiCompatibleApiKeyEncrypted ?? current.openaiCompatibleApiKeyEncrypted;
 
     const nextDefaultInstanceId = requestedDefaultInstanceId;
