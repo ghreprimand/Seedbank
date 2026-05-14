@@ -609,6 +609,18 @@ function openAICompatiblePresetMatchesMode(
   return CLOUD_COMPATIBLE_PRESETS.has(presetId);
 }
 
+function isUnsafeCloudEndpoint(url: string): boolean {
+  const trimmed = url.trim();
+  if (!trimmed) return true;
+  if (isLikelyLocalUrl(trimmed)) return true;
+  try {
+    const parsed = new URL(trimmed);
+    return parsed.protocol !== 'https:';
+  } catch {
+    return true;
+  }
+}
+
 function preferredOpenAICompatiblePreset(
   presetList: Array<{ id: AiOpenAICompatiblePresetId }>,
   mode: OpenAICompatibleMode,
@@ -672,6 +684,8 @@ function OpenAICompatibleDetail({ preset, model, baseUrl, hasKey, mode, allowedP
       : mode === 'local'
         ? 'optional for most local servers'
         : 'usually required for cloud endpoints';
+  const cloudCustomUnsafe = mode === 'cloud' && selectedPreset === 'custom' && isUnsafeCloudEndpoint(url);
+  const saveDisabled = saving || cloudCustomUnsafe;
 
   const updateDraft = (patch: Partial<Omit<OpenAICompatibleDraftState, 'signature'>>) => {
     setDraft({ ...currentDraft, ...patch });
@@ -703,6 +717,11 @@ function OpenAICompatibleDetail({ preset, model, baseUrl, hasKey, mode, allowedP
       <p className="text-[11px] text-ink-500 leading-relaxed">
         {intro}
       </p>
+      {mode === 'cloud' && (
+        <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
+          Cloud endpoint selected: idea content leaves this machine and is sent to the configured provider.
+        </div>
+      )}
       {guidance && (
         <p className="text-[11px] text-ink-500 leading-relaxed">{guidance}</p>
       )}
@@ -746,6 +765,11 @@ function OpenAICompatibleDetail({ preset, model, baseUrl, hasKey, mode, allowedP
           className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800"
         />
       </label>
+      {cloudCustomUnsafe && (
+        <div className="text-[11px] text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1.5">
+          Custom cloud endpoints must use a remote HTTPS URL (not localhost or local-network addresses).
+        </div>
+      )}
       <label className="block text-xs text-ink-500">
         Model
         <input
@@ -773,7 +797,7 @@ function OpenAICompatibleDetail({ preset, model, baseUrl, hasKey, mode, allowedP
       <button
         type="button"
         onClick={save}
-        disabled={saving}
+        disabled={saveDisabled}
         className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-sage-600 hover:bg-sage-700 disabled:bg-ink-300 text-white rounded-card transition-colors"
       >
         {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : saved ? <Check className="w-3 h-3" /> : null}
@@ -2606,11 +2630,15 @@ export default function AiAgentsTab() {
     baseUrl: string,
     key?: string,
   ) => {
+    const previousPreset = ai.cloudOpenaiCompatiblePreset ?? ai.openaiCompatiblePreset;
+    const previousBaseUrl = ai.cloudOpenaiCompatibleBaseUrl ?? ai.openaiCompatibleBaseUrl;
+    const endpointChanged = previousPreset !== preset || previousBaseUrl !== baseUrl;
     await patch('ai', {
       cloudOpenaiCompatiblePreset: preset,
       cloudOpenaiCompatibleModel: model,
       cloudOpenaiCompatibleBaseUrl: baseUrl,
       ...(key ? { cloudOpenaiCompatibleApiKey: key } : {}),
+      ...(!key && endpointChanged ? { cloudOpenaiCompatibleApiKey: '' } : {}),
     });
   };
 
@@ -2899,6 +2927,7 @@ export default function AiAgentsTab() {
             <p className="text-[10px] font-mono uppercase tracking-wider text-ink-400">External / Cloud</p>
             <p className="text-[11px] text-ink-400">
               Connect to hosted services: OpenRouter, Groq, Mistral, Together, Fireworks, or a custom cloud endpoint.
+              Requests from this card leave your machine and are processed by the selected cloud provider.
             </p>
             <ProviderCard
               label={cloudCompatibleActive ? cloudCompatiblePreset.label : 'Cloud provider'}
