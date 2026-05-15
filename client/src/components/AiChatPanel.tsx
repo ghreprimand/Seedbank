@@ -92,8 +92,20 @@ export default function AiThinkingPanel({ idea, onApply }: AiThinkingPanelProps)
   const aiConfig = useAiSettings();
 
   const providerStatus = (() => {
+    if (preflight) {
+      return `${aiProviderLabel(preflight.provider, 'short')} / ${preflight.resolvedModelId ?? preflight.model}`;
+    }
+
+    const route = aiConfig.effectiveFeatureRoutes?.['thinking-partner'];
+    if (route) {
+      const instance = aiConfig.providerInstances?.[route.providerInstanceId];
+      return `${instance?.label ?? aiProviderLabel(route.provider, 'short')} / ${route.model}`;
+    }
+
     if (aiConfig.provider === 'openai') return aiConfig.hasOpenAIKey ? aiConfig.openaiModel : 'OpenAI API key needed';
     if (aiConfig.provider === 'anthropic') return aiConfig.hasAnthropicKey ? aiConfig.anthropicModel : 'Anthropic API key needed';
+    if (aiConfig.provider === 'claude-account') return aiConfig.claudeAccountModel || 'Claude account model needed';
+    if (aiConfig.provider === 'codex-account') return aiConfig.codexAccountModel || 'Codex account model needed';
     if (aiConfig.provider === 'openai-compatible') return aiConfig.openaiCompatibleModel || `${aiProviderLabel('openai-compatible')} model needed`;
     return aiConfig.ollamaModel;
   })();

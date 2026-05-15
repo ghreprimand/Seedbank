@@ -12,6 +12,7 @@ What changed:
 - Thinking Partner's base system prompt now explicitly grounds questions in the current idea context: title, pitch, stage, notes, risks, build notes, tags, and scores.
 - Organic prompt buttons now ask for project-specific questions instead of broad generic prompts.
 - Devil's Advocate now challenges an assumption that is actually present in the idea context; when the context is too sparse, it asks for the missing detail needed to critique accurately.
+- Thinking Partner's header now reads the effective Thinking Partner feature route and then the preflight result after opening, so it matches the provider/model that will actually receive the request.
 - Image gallery rendering now resolves Seedbank API image paths through the configured API base URL, so uploads display correctly when the frontend and API run on different ports.
 - Image fetch/delete routes now handle dotted filenames such as `.png` through explicit route parsing, and image reads stream files with a known content type instead of relying on `sendFile`.
 
