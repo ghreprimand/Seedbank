@@ -45,10 +45,12 @@ function assessIdea(idea: Idea): FieldAssessment[] {
       note: idea.techStack.trim() ? 'Implementation direction exists.' : 'Needs likely tools or constraints.',
     },
     {
-      label: 'Tags',
+      label: 'Tags (optional)',
       value: idea.tags.join(', '),
-      status: idea.tags.length >= 2 ? 'strong' : 'needs-attention',
-      note: idea.tags.length ? 'Partly categorized for discovery.' : 'Needs tags to connect with related ideas.',
+      status: 'strong',
+      note: idea.tags.length
+        ? 'Useful for discovery, but never required for stage progress.'
+        : 'Optional. Add tags only if they help you find or group this later.',
     },
   ];
 }
@@ -127,13 +129,22 @@ export default function IdeaHealthCheck({ idea, onPromote }: { idea: Idea; onPro
         ) : (
           <div className="mb-4 px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-card">
             <p className="text-xs text-amber-900 mb-1.5">
-              Not ready for <strong>{STAGE_LABELS[readiness.nextStage]}</strong> yet.
+              Suggested checks before <strong>{STAGE_LABELS[readiness.nextStage]}</strong>.
             </p>
             <ul className="space-y-1">
               {readiness.missing.map((item) => (
                 <li key={item} className="text-xs text-amber-800">• {item}</li>
               ))}
             </ul>
+            {onPromote && (
+              <button
+                type="button"
+                onClick={() => onPromote(readiness.nextStage)}
+                className="mt-2 px-2.5 py-1 text-[11px] font-medium bg-paper hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-badge transition-colors"
+              >
+                Move anyway
+              </button>
+            )}
           </div>
         )
       )}

@@ -21,7 +21,7 @@ START_LOCK_DIR="${CACHE_DIR}/start.lock.d"
 TRACE_FILE="${CACHE_DIR}/launcher-trace.log"
 BROWSER_OPEN_STAMP_FILE="${CACHE_DIR}/last-browser-open"
 BROWSER_OPEN_LOCK_DIR="${CACHE_DIR}/browser-open.lock.d"
-BROWSER_OPEN_DEBOUNCE_SECONDS="${SEEDBANK_BROWSER_OPEN_DEBOUNCE_SECONDS:-45}"
+BROWSER_OPEN_DEBOUNCE_SECONDS="${SEEDBANK_BROWSER_OPEN_DEBOUNCE_SECONDS:-3}"
 
 mkdir -p "$CACHE_DIR"
 
@@ -493,6 +493,8 @@ stop() {
   kill_pid_file "$SERVER_PID_FILE"
   reap_seedbank_ports
   rm -f "$CLIENT_PID_FILE" "$SERVER_PID_FILE" "$CLIENT_PORT_FILE" "$SERVER_PORT_FILE"
+  rm -f "$BROWSER_OPEN_STAMP_FILE"
+  rmdir "$BROWSER_OPEN_LOCK_DIR" 2>/dev/null || true
   notify "Seedbank stopped"
 }
 

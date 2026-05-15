@@ -4,6 +4,29 @@ Newest entries at the top.
 
 ---
 
+## 2026-05-15 — v1.0.2 Release Hardening: Account Auth, Launchers, and Stage Progress
+
+Closed the last public-release hardening pass around account-auth reliability, app-launcher update behavior, and idea-stage progression clarity. This entry intentionally avoids local machine paths, user names, account identifiers, credentials, and environment-specific private values.
+
+What changed:
+- Hardened Claude account routing to match the working native Claude Code-compatible account path, including broader account scopes, concrete Sonnet 4.6 model IDs, block-form system prompts, adaptive thinking, account-scope status checks, transient retry handling, and longer account request timeouts.
+- Hardened Codex account startup on Windows by resolving npm-installed Codex CLI entrypoints through Node.js when `.cmd` launch quoting fails, increasing request timeouts, treating existing authenticated sessions as success, and surfacing manual `codex login` guidance when interactive login cannot be started from the local app server.
+- Clarified AI settings copy so users can distinguish provider API keys from account-login methods, and so Claude/Codex account routes call out their local CLI/runtime requirement.
+- Updated Linux, macOS, and Windows launchers so application-menu launches restart the local Seedbank runtime before opening the browser. This makes an installed update take effect without requiring users to find and kill background Node processes.
+- Fixed macOS app-wrapper launch behavior by installing the runtime under application support, invoking the launcher through `/bin/bash`, clearing download quarantine metadata, and logging wrapper output to a standard Seedbank log folder.
+- Changed the GitHub Release workflow to manual dispatch only. Tags can now be pushed without automatically starting release package jobs or self-hosted runner work.
+- Reworked idea stage progression so tags are optional, the next-stage checklist is visible in a Stage Progress panel, users can move stages manually at any time, and ideas auto-advance when an edit completes the current stage checklist.
+
+Validation:
+- `node --import tsx --test server/tests/claude-account-oauth-scopes.test.ts server/tests/claude-codex-regressions.test.ts server/tests/claude-account-catalog.test.ts`
+- `node --import tsx --test tests/ai-config-compat.test.ts tests/ai-preflight-metadata.test.ts` from `server/`
+- `node --import tsx --test server/tests/stage-readiness.test.ts`
+- `npm run typecheck`
+- `npm run build`
+- Release package smoke checks were run against local v1.0.2 test archives before this documentation pass.
+
+---
+
 ## 2026-05-15 — Claude Account Native Parity Fix
 
 Fixed the Claude account transport after release testing exposed a chain of misleading Anthropic account-beta failures: stale `claude-sonnet-latest` IDs returned 404s, partial account-login scopes looked connected but failed at inference time, and non-Claude-Code-shaped requests returned confusing 429/400 errors even though a Claude Code-compatible native request shape worked.

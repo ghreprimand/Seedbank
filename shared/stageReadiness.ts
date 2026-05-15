@@ -16,8 +16,7 @@ const STAGE_CRITERIA: Partial<Record<Stage, StageCriteria>> = {
   seed: {
     nextStage: 'sprout',
     checks: [
-      { label: 'The Spark is at least 40 characters', pass: (idea) => idea.fullNotes.trim().length >= 40 },
-      { label: 'At least 1 tag is added', pass: (idea) => idea.tags.length >= 1 },
+      { label: 'The Spark has enough detail', pass: (idea) => idea.fullNotes.trim().length >= 40 },
     ],
   },
   sprout: {
@@ -36,7 +35,7 @@ const STAGE_CRITERIA: Partial<Record<Stage, StageCriteria>> = {
   prototype: {
     nextStage: 'plot',
     checks: [
-      { label: 'Risks are filled', pass: (idea) => idea.risks.trim().length > 0 },
+      { label: 'Risks & Blockers are filled', pass: (idea) => idea.risks.trim().length > 0 },
       { label: 'Build Notes are filled', pass: (idea) => idea.techStack.trim().length > 0 },
     ],
   },

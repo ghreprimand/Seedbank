@@ -1,11 +1,13 @@
-import { spawn, type ChildProcess } from 'node:child_process';
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { EventEmitter } from 'node:events';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
 import { JsonRpcClient, JsonRpcRequestError, type JsonRpcNotification } from './jsonRpc.js';
 import type { AiProviderMessage, AiProviderResult, AiUsage } from '../types.js';
 
 const CLIENT_NAME = 'seedbank';
 const CLIENT_VERSION = '1.0.0';
-const REQUEST_TIMEOUT_MS = 20_000;
+const REQUEST_TIMEOUT_MS = 90_000;
 const TURN_TIMEOUT_MS = 120_000;
 const FALLBACK_CODEX_MODEL = 'gpt-5.3-codex';
 const START_FAILURE_THRESHOLD = 3;
@@ -158,6 +160,99 @@ export function codexAccountRuntimeAvailability(): CodexAccountRuntimeAvailabili
   return { available: true };
 }
 
+interface ResolvedCodexCli {
+  command: string;
+  argsPrefix: string[];
+  displayPath: string;
+}
+
+function windowsPathEntries(): string[] {
+  const values = [
+    process.env.Path,
+    process.env.PATH,
+    process.env.APPDATA ? path.join(process.env.APPDATA, 'npm') : '',
+    process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, 'Programs', 'nodejs') : '',
+    process.env.ProgramFiles ? path.join(process.env.ProgramFiles, 'nodejs') : '',
+    process.env['ProgramFiles(x86)'] ? path.join(process.env['ProgramFiles(x86)'] as string, 'nodejs') : '',
+  ];
+  return [...new Set(values
+    .flatMap((value) => (value ?? '').split(path.delimiter))
+    .map((value) => value.trim())
+    .filter(Boolean))];
+}
+
+function resolveCodexCli(): ResolvedCodexCli {
+  const override = process.env.SEEDBANK_CODEX_CLI?.trim();
+  if (override) return resolvedCodexCommand(override);
+
+  if (process.platform !== 'win32') {
+    return { command: 'codex', argsPrefix: [], displayPath: 'codex' };
+  }
+
+  const names = ['codex.cmd', 'codex.exe', 'codex.bat'];
+  for (const dir of windowsPathEntries()) {
+    const npmPackageEntrypoint = path.join(dir, 'node_modules', '@openai', 'codex', 'bin', 'codex.js');
+    if (existsSync(npmPackageEntrypoint)) return resolvedNodeEntrypoint(npmPackageEntrypoint);
+
+    for (const name of names) {
+      const candidate = path.join(dir, name);
+      if (existsSync(candidate)) return resolvedCodexCommand(candidate);
+    }
+  }
+
+  return resolvedCodexCommand('codex');
+}
+
+function resolvedNodeEntrypoint(entrypoint: string): ResolvedCodexCli {
+  return {
+    command: process.execPath,
+    argsPrefix: [entrypoint],
+    displayPath: entrypoint,
+  };
+}
+
+function resolvedCodexCommand(commandPath: string): ResolvedCodexCli {
+  if (process.platform === 'win32' && /\.(cmd|bat)$/i.test(commandPath)) {
+    const npmPackageEntrypoint = path.join(path.dirname(commandPath), 'node_modules', '@openai', 'codex', 'bin', 'codex.js');
+    if (existsSync(npmPackageEntrypoint)) return resolvedNodeEntrypoint(npmPackageEntrypoint);
+  }
+  if (process.platform === 'win32' && /\.(cmd|bat)$/i.test(commandPath)) {
+    return {
+      command: 'cmd.exe',
+      argsPrefix: ['/d', '/c', 'call', commandPath],
+      displayPath: commandPath,
+    };
+  }
+  return { command: commandPath, argsPrefix: [], displayPath: commandPath };
+}
+
+function runCodexProbe(cli: ResolvedCodexCli) {
+  return spawnSync(cli.command, [...cli.argsPrefix, '--version'], {
+    encoding: 'utf8',
+    stdio: 'pipe',
+  });
+}
+
+function resolveAvailableCodexCli(): ResolvedCodexCli {
+  const cli = resolveCodexCli();
+  const probe = runCodexProbe(cli);
+  if (probe.error) {
+    throw new Error(
+      `Codex CLI was not found on the PATH visible to Seedbank. Tried: ${cli.displayPath}. ` +
+      'Install Codex CLI, then restart Seedbank. On Windows, if Codex works in a new terminal but not Seedbank, ' +
+      'restart Seedbank from the Start Menu so the server picks up the updated PATH.',
+    );
+  }
+  if (probe.status !== 0) {
+    const detail = compactDetail(probe.stderr || probe.stdout || `exit code ${probe.status}`, 220);
+    throw new Error(
+      `Codex CLI was found at ${cli.displayPath}, but it could not be started. ` +
+      `Update or reinstall Codex CLI, then restart Seedbank.${detail ? ` Details: ${detail}` : ''}`,
+    );
+  }
+  return cli;
+}
+
 class CodexAppServerSession extends EventEmitter {
   private proc: ChildProcess | null = null;
   private rpc: JsonRpcClient | null = null;
@@ -190,7 +285,7 @@ class CodexAppServerSession extends EventEmitter {
         requiresOpenaiAuth: false,
       };
     }
-    const response = await this.request<AccountResponse>('account/read', { refreshToken: true }, REQUEST_TIMEOUT_MS);
+    const response = await this.request<AccountResponse>('account/read', {}, REQUEST_TIMEOUT_MS);
     const account = response.account;
     return {
       authenticated: Boolean(account),
@@ -211,7 +306,31 @@ class CodexAppServerSession extends EventEmitter {
       };
     }
     await this.ensureStarted();
-    const response = await this.request<LoginResponse>('account/login/start', { type: 'chatgpt', codexStreamlinedLogin: true }, REQUEST_TIMEOUT_MS);
+    try {
+      const current = await this.request<AccountResponse>('account/read', {}, REQUEST_TIMEOUT_MS);
+      if (current.account) {
+        return {
+          ok: true,
+          message: `Codex is already logged in${current.account.email ? ` as ${current.account.email}` : ''}. Refresh status or set Codex account as the default provider.`,
+        };
+      }
+    } catch {
+      // Continue to login start; if that also fails, return a user-actionable message below.
+    }
+
+    let response: LoginResponse;
+    try {
+      response = await this.request<LoginResponse>('account/login/start', { type: 'chatgpt' }, REQUEST_TIMEOUT_MS);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (/timed out/i.test(message)) {
+        return {
+          ok: false,
+          message: 'Codex app-server did not return a login URL in time. Open a terminal, run "codex login", finish the Codex browser login, then return to Seedbank and click Refresh status.',
+        };
+      }
+      throw error;
+    }
     if (response.type === 'chatgpt') {
       return {
         ok: true,
@@ -296,23 +415,22 @@ class CodexAppServerSession extends EventEmitter {
 
   private async resolveEffort(modelId: string, requestedEffort?: CodexReasoningEffort): Promise<CodexReasoningEffort> {
     const normalizedModel = modelId.trim().toLowerCase();
+    if (requestedEffort) return requestedEffort;
     if (/\bmini\b|\bfast\b/.test(normalizedModel)) return 'low';
     const catalog = await this.listModels().catch(() => null);
     const modelMeta = catalog?.models.find((model) => model.id === modelId);
     if (modelMeta?.supportedReasoningEfforts?.length) {
-      if (requestedEffort && modelMeta.supportedReasoningEfforts.includes(requestedEffort)) return requestedEffort;
-      if (modelMeta.supportedReasoningEfforts.includes('medium')) return 'medium';
       if (modelMeta.supportedReasoningEfforts.includes('high')) return 'high';
+      if (modelMeta.supportedReasoningEfforts.includes('medium')) return 'medium';
       if (modelMeta.supportedReasoningEfforts.includes('low')) return 'low';
       return modelMeta.supportedReasoningEfforts[0];
     }
-    if (requestedEffort) return requestedEffort;
     const rawEffort = modelMeta?.defaultReasoningEffort ?? '';
     const normalizedEffort = rawEffort.trim().toLowerCase();
     if (normalizedEffort === 'minimal' || normalizedEffort === 'low' || normalizedEffort === 'medium' || normalizedEffort === 'high') {
       return normalizedEffort;
     }
-    return 'medium';
+    return 'high';
   }
 
   async complete(
@@ -327,6 +445,15 @@ class CodexAppServerSession extends EventEmitter {
     if (this.activeTurn) throw new Error('Codex account app-server already has a request in flight.');
     const resolvedModel = await this.resolveModel(model);
     const effort = await this.resolveEffort(resolvedModel, requestedEffort);
+    const seedbankInstructions = systemPrompt(messages);
+    const developerInstructions = [
+      seedbankInstructions,
+      'You are Seedbank AI assistance inside a local idea-development app.',
+      'Follow the Seedbank feature instructions and output contract exactly.',
+      'Do not flatten the user input into a generic summary when the prompt asks for a field draft, critique, plan, or next step.',
+      'Use the supplied idea context concretely, and return directly usable text for the requested Seedbank surface.',
+      'Do not edit files or run shell commands unless explicitly asked by Seedbank.',
+    ].filter(Boolean).join('\n\n');
     const thread = await this.request<ThreadStartResponse>('thread/start', {
       model: resolvedModel,
       modelProvider: null,
@@ -338,8 +465,8 @@ class CodexAppServerSession extends EventEmitter {
       permissions: null,
       config: null,
       serviceName: null,
-      baseInstructions: systemPrompt(messages),
-      developerInstructions: 'Reply as Seedbank AI assistance. Do not edit files or run shell commands unless explicitly asked by Seedbank.',
+      baseInstructions: seedbankInstructions,
+      developerInstructions,
       personality: null,
       ephemeral: true,
       sessionStartSource: null,
@@ -459,7 +586,8 @@ class CodexAppServerSession extends EventEmitter {
   }
 
   private async start(): Promise<void> {
-    this.proc = spawn('codex', ['app-server'], {
+    const cli = resolveAvailableCodexCli();
+    this.proc = spawn(cli.command, [...cli.argsPrefix, 'app-server'], {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env },
       cwd: process.cwd(),

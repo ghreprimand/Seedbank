@@ -43,11 +43,27 @@ function Update-ProcessPath {
   if (Test-Path $LocalNodeDir) {
     $paths += $LocalNodeDir
   }
+  if ($env:APPDATA) {
+    $npmGlobalDir = Join-Path $env:APPDATA 'npm'
+    if (Test-Path $npmGlobalDir) { $paths += $npmGlobalDir }
+  }
+  if ($env:LOCALAPPDATA) {
+    $userNodeDir = Join-Path $env:LOCALAPPDATA 'Programs\nodejs'
+    if (Test-Path $userNodeDir) { $paths += $userNodeDir }
+  }
+  if ($env:ProgramFiles) {
+    $machineNodeDir = Join-Path $env:ProgramFiles 'nodejs'
+    if (Test-Path $machineNodeDir) { $paths += $machineNodeDir }
+  }
+  if (${env:ProgramFiles(x86)}) {
+    $machineNodeX86Dir = Join-Path ${env:ProgramFiles(x86)} 'nodejs'
+    if (Test-Path $machineNodeX86Dir) { $paths += $machineNodeX86Dir }
+  }
   $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
   $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
   if ($machinePath) { $paths += $machinePath }
   if ($userPath) { $paths += $userPath }
-  $env:Path = $paths -join ';'
+  $env:Path = ($paths | Select-Object -Unique) -join ';'
 }
 
 function Get-NodeWindowsArch {
@@ -241,7 +257,7 @@ function Install-Shortcut {
   $shell = New-Object -ComObject WScript.Shell
   $shortcut = $shell.CreateShortcut($shortcutPath)
   $shortcut.TargetPath = 'powershell.exe'
-  $shortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$Launcher`" start"
+  $shortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$Launcher`" restart"
   $shortcut.WorkingDirectory = $SeedbankDir
   $shortcut.WindowStyle = 7
   $shortcut.Description = 'Start Seedbank'
@@ -291,5 +307,5 @@ if (-not $NoStart) {
   Write-Step 'Starting Seedbank...'
   powershell -NoProfile -ExecutionPolicy Bypass -File $Launcher restart
 } else {
-  Write-Host 'Start it later from the Start Menu or with scripts\seedbank.ps1 start.'
+  Write-Host 'Start it later from the Start Menu or with scripts\seedbank.ps1 restart.'
 }

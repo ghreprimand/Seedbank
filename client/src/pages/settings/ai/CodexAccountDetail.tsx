@@ -117,20 +117,29 @@ export function CodexAccountDetail({
         <span>
           — Codex account login uses a local Codex runtime installed on this machine and your
           ChatGPT/Codex subscription. This is a different billing surface from OpenAI API keys. This
-          feature is in development and may not be fully operational.
+          feature requires the <span className="font-mono">codex</span> CLI to be installed and visible
+          on the PATH used by Seedbank.
         </span>
       </div>
 
       {!available && (
-        <div className="text-[11px] text-ink-600 bg-ink-50 border border-ink-200 rounded px-2 py-1.5">
-          Runtime unavailable: install or update the Codex runtime, then refresh status.
+        <div className="space-y-1 text-[11px] text-ink-600 bg-ink-50 border border-ink-200 rounded px-2 py-1.5">
+          <p>
+            <span className="font-semibold text-ink-800">Runtime unavailable:</span> install or update
+            the Codex CLI, restart Seedbank, then refresh status.
+          </p>
+          <p>
+            On Windows, if Codex works in a new terminal but Seedbank still cannot find it, restart
+            Seedbank from the Start Menu so the server picks up the updated PATH.
+          </p>
         </div>
       )}
 
       {!authenticated ? (
         <div className="space-y-2">
           <p className="text-[12px] text-neutral-600">
-            Log in with Codex to use your ChatGPT/Codex account for Seedbank AI features.
+            Log in with Codex to use your ChatGPT/Codex account for Seedbank AI features. This is
+            separate from the OpenAI API key method above.
           </p>
           <div className="flex flex-wrap gap-2">
             <button

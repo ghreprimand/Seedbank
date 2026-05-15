@@ -87,8 +87,9 @@ Smoke checks now validate:
 Workflow file: `.github/workflows/release.yml`
 
 Trigger modes:
-- `push` tag `v*`
 - manual `workflow_dispatch` with required `release_tag` input (existing tag)
+
+Tag pushes do not start the release workflow automatically. Create and push the tag first, then start the workflow manually from the same tagged commit.
 
 Pipeline behavior:
 1. Validate release tag format and ensure workflow ref matches the tag commit.
@@ -102,11 +103,12 @@ Permissions model:
 - Workflow default token permission is `contents:read`.
 - Only the `publish` job elevates to `contents:write` to create/update the GitHub Release.
 
-Tag example:
+Tag + workflow example:
 
 ```bash
 git tag v1.2.3
 git push origin v1.2.3
+# In GitHub Actions, run "Release" manually with release_tag=v1.2.3.
 ```
 
 ## macOS Runner Notes
@@ -129,7 +131,7 @@ Recommended setup pattern:
 
 Public-repo safety constraints:
 - Seedbank is a public repository. Self-hosted runners execute workflow code and must only be used for trusted release flows.
-- The release workflow is intentionally limited to trusted triggers (`push` tags `v*` and manual `workflow_dispatch`) and does not run on `pull_request`/`pull_request_target`.
+- The release workflow is intentionally limited to manual `workflow_dispatch` for existing tags and does not run on tag pushes, `pull_request`, or `pull_request_target`.
 - Do not store Apple credentials, SSH keys, API keys, or other long-lived secrets on the release runner for this archive flow.
 - Any future signing/notarization secret use should be implemented as a separate protected design (manual approvals/protected environments/isolated runner), not in this archive workflow.
 
