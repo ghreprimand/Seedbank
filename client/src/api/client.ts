@@ -862,7 +862,7 @@ export async function streamAiChat(
   ideaId: string,
   message: string,
   onDelta: (delta: string) => void,
-  options: { aiConfirmationToken?: string; freshContext?: boolean } = {},
+  options: { aiConfirmationToken?: string; freshContext?: boolean; displayMessage?: string } = {},
 ): Promise<AiChatMessage> {
   return streamAiMessage('/api/ai/chat', { ideaId, message, ...options }, onDelta);
 }
@@ -875,6 +875,7 @@ async function streamAiMessage(
     history?: AiFieldAssistMessage[];
     field?: AiSuggestionField;
     currentValue?: string;
+    displayMessage?: string;
     aiConfirmationToken?: string;
     providerInstanceId?: string;
     model?: string;

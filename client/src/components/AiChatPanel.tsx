@@ -53,19 +53,19 @@ const FIELD_ACTIONS: Array<{ label: string; field: keyof Idea }> = [
 const ORGANIC_MODES: Array<{ label: string; prompt: string }> = [
   {
     label: 'What if?',
-    prompt: 'Ask one provocative "what if" question grounded in at least two concrete details from this idea\'s raw notes, concept, build notes, or validation criteria. If this is a personal daily-driver or learning project, frame the question around my own workflow rather than external users. Wait for my answer before suggesting anything. Use plain text, no markdown headings.',
+    prompt: 'Ask exactly one provocative "what if" question grounded in at least two concrete details from this idea\'s raw notes, concept, build notes, or validation criteria. If this is a personal daily-driver or learning project, frame the question around my own workflow rather than external users. Return only the question itself. Do not include preamble, labels, headings, analysis, or suggestions.',
   },
   {
     label: "Devil's Advocate",
-    prompt: 'Constructively challenge the weakest assumption that is actually present in this idea context. Name the specific assumption and the note that implies it, then ask one testable question that would expose whether that assumption is true. If this is a personal daily-driver or learning project, test it against my own workflow rather than launch or external-user metrics unless external users are explicitly mentioned. If the context is too sparse to identify one, ask for the missing detail instead of inventing a critique. Use plain text, no markdown headings.',
+    prompt: 'Constructively challenge the weakest assumption that is actually present in this idea context. Ask exactly one testable question that exposes whether that assumption is true. Work the assumption and evidence into a natural sentence instead of using labels. If this is a personal daily-driver or learning project, test it against my own workflow rather than launch or external-user metrics unless external users are explicitly mentioned. If the context is too sparse to identify one, ask for the missing detail instead of inventing a critique. Return only the challenge question. Do not include headings, labels, bullets, analysis, or suggestions.',
   },
   {
     label: 'Scope Down',
-    prompt: 'Help me find the smallest viable version of this specific idea. Anchor on the stated personal value, differentiators, or phase plan, then ask one question that removes scope without removing the core value described here. Use plain text, no markdown headings.',
+    prompt: 'Help me find the smallest viable version of this specific idea. Anchor on the stated personal value, differentiators, or phase plan, then ask exactly one question that removes scope without removing the core value described here. Return one short sentence of context followed by one question. Do not include headings, labels, bullets, analysis, or feature suggestions.',
   },
   {
     label: 'User Story',
-    prompt: 'Help me imagine one specific use case based on the actual context. If the notes frame this as a personal daily-driver, make the use case about my own repeated workflow; only invent an external user when the notes imply one. Anchor on the stated workflow pain or validation criteria, then ask one question before suggesting features. Use plain text, no markdown headings.',
+    prompt: 'Help me imagine one specific use case based on the actual context. If the notes frame this as a personal daily-driver, make the use case about my own repeated workflow; only invent an external user when the notes imply one. Return one concise use-case sentence and one follow-up question. Do not include headings, labels, bullets, analysis, or feature suggestions.',
   },
 ];
 
@@ -86,7 +86,7 @@ export default function AiThinkingPanel({ idea, onApply }: AiThinkingPanelProps)
   const [preflight, setPreflight] = useState<AiPreflightResult | null>(null);
   const [preflightToken, setPreflightToken] = useState<string | undefined>();
   const [showConfirmBanner, setShowConfirmBanner] = useState(false);
-  const [pendingMessage, setPendingMessage] = useState<{ content: string; freshContext: boolean } | null>(null);
+  const [pendingMessage, setPendingMessage] = useState<{ content: string; freshContext: boolean; displayContent?: string } | null>(null);
 
   // Read provider config from the settings store (A2 — single source of truth).
   const aiConfig = useAiSettings();
@@ -140,7 +140,7 @@ export default function AiThinkingPanel({ idea, onApply }: AiThinkingPanelProps)
     return () => { cancelled = true; };
   }, [open, idea.id]);
 
-  const doSubmit = async (content: string, token?: string, freshContext = false) => {
+  const doSubmit = async (content: string, token?: string, freshContext = false, displayContent?: string) => {
     setBusy(true);
     setError(null);
     setStreamingText('');
@@ -149,7 +149,7 @@ export default function AiThinkingPanel({ idea, onApply }: AiThinkingPanelProps)
       id: msgId,
       ideaId: idea.id,
       role: 'user',
-      content,
+      content: displayContent || content,
       createdAt: new Date(),
     };
     setMessages((current) => [...current, optimistic]);
@@ -158,7 +158,7 @@ export default function AiThinkingPanel({ idea, onApply }: AiThinkingPanelProps)
         idea.id,
         content,
         (delta) => { setStreamingText((current) => current + delta); },
-        { aiConfirmationToken: token, freshContext },
+        { aiConfirmationToken: token, freshContext, displayMessage: displayContent },
       );
       setMessages((current) => [...current, assistant]);
     } catch (err) {
@@ -168,7 +168,7 @@ export default function AiThinkingPanel({ idea, onApply }: AiThinkingPanelProps)
         // Token expired or missing — remove the optimistic message, re-fire
         // preflight, and re-show the confirmation banner with the message queued.
         setMessages((current) => current.filter((m) => m.id !== msgId));
-        setPendingMessage({ content, freshContext });
+        setPendingMessage({ content, freshContext, displayContent });
         // Re-fire preflight to get a fresh token.
         try {
           const pf = await preflightAiRequest({ feature: 'thinking-partner' as AiFeatureId });
@@ -185,7 +185,7 @@ export default function AiThinkingPanel({ idea, onApply }: AiThinkingPanelProps)
     }
   };
 
-  const submit = (override?: string, freshContext = false) => {
+  const submit = (override?: string, freshContext = false, displayContent?: string) => {
     const content = (override ?? input).trim();
     if (!content || busy) return;
     setInput('');
@@ -193,11 +193,11 @@ export default function AiThinkingPanel({ idea, onApply }: AiThinkingPanelProps)
     // If a confirmation banner is showing and the user hasn't acknowledged it,
     // hold the message until they click "Got it / Proceed".
     if (showConfirmBanner && preflight?.requiresConfirmation) {
-      setPendingMessage({ content, freshContext });
+      setPendingMessage({ content, freshContext, displayContent });
       return;
     }
 
-    void doSubmit(content, preflightToken, freshContext);
+    void doSubmit(content, preflightToken, freshContext, displayContent);
   };
 
   const applyMessage = (field: keyof Idea, content: string) => {
@@ -286,9 +286,9 @@ export default function AiThinkingPanel({ idea, onApply }: AiThinkingPanelProps)
                   onClick={() => {
                     setShowConfirmBanner(false);
                     if (pendingMessage) {
-                      const { content: msg, freshContext } = pendingMessage;
+                      const { content: msg, freshContext, displayContent } = pendingMessage;
                       setPendingMessage(null);
-                      void doSubmit(msg, preflightToken, freshContext);
+                      void doSubmit(msg, preflightToken, freshContext, displayContent);
                     }
                   }}
                   className="px-3 py-1.5 text-xs font-semibold bg-amber-600 hover:bg-amber-700
@@ -310,7 +310,7 @@ export default function AiThinkingPanel({ idea, onApply }: AiThinkingPanelProps)
                 <button
                   key={mode.label}
                   type="button"
-                  onClick={() => submit(mode.prompt, true)}
+                  onClick={() => submit(mode.prompt, true, mode.label)}
                   disabled={busy}
                   className="px-2.5 py-1 text-[11px] font-medium rounded-badge border bg-paper-warm border-ink-100 text-ink-500 hover:bg-sage-50 hover:text-sage-700 hover:border-sage-100 transition-colors disabled:opacity-50"
                 >

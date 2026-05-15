@@ -2186,6 +2186,7 @@ export class AiService {
     onDelta: (delta: string) => void,
     confirmationToken?: string,
     freshContext = false,
+    displayMessage?: string,
   ): Promise<AiChatMessage> {
     const idea = this.repository.getIdea(ideaId);
     if (!idea) throw new Error('Idea not found.');
@@ -2193,7 +2194,7 @@ export class AiService {
     this.checkGuardrails(config, 'thinking-partner', key, { confirmationToken, skipRateLimit: true });
 
     const history = freshContext ? [] : this.store.getMessages(ideaId);
-    this.store.addMessage(ideaId, 'user', userMessage);
+    this.store.addMessage(ideaId, 'user', displayMessage?.trim() || userMessage);
     try {
       const result = await this.provider(config).stream(messagesForChat(idea, history, userMessage), config, onDelta);
       const resolvedModelId = await this.recordUsage(config, 'thinking-partner', result);

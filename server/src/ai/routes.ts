@@ -636,9 +636,14 @@ export function registerAiRoutes(
   }));
 
   app.post('/api/ai/chat', requireScope('ai:suggest'), async (req, res) => {
-    const body = req.body as { ideaId?: string; message?: string; aiConfirmationToken?: unknown; freshContext?: unknown };
+    const body = req.body as { ideaId?: string; message?: string; displayMessage?: unknown; aiConfirmationToken?: unknown; freshContext?: unknown };
     if (!body.ideaId || !body.message?.trim()) {
       res.status(400).json({ error: 'ideaId and message are required.' });
+      return;
+    }
+    const displayMessage = optionalString(body.displayMessage, 'displayMessage');
+    if (!displayMessage.ok) {
+      res.status(400).json({ error: displayMessage.error });
       return;
     }
     const aiConfirmationToken = optionalString(body.aiConfirmationToken, 'aiConfirmationToken');
@@ -674,6 +679,7 @@ export function registerAiRoutes(
         },
         aiConfirmationToken.value,
         body.freshContext === true,
+        displayMessage.value,
       );
       res.write(`event: message\ndata: ${JSON.stringify({ message })}\n\n`);
       res.write('event: done\ndata: {}\n\n');
