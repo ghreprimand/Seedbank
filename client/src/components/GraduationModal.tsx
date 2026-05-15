@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ExternalLink, FolderPlus, Network, Rocket, Settings, X } from 'lucide-react';
+import { FolderOpen, FolderPlus, Network, Rocket, Settings, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { GraduationReadiness, Idea, IntegrationSummary } from '@/lib/types';
 import {
   getIntegrations,
   graduateIdea,
+  openIdeaProjectFolder,
   type GraduationResponse,
   type IntegrationWithReadiness,
 } from '@/api/client';
@@ -51,6 +52,7 @@ export default function GraduationModal({ idea, onClose, onGraduated }: Graduati
   const [selectedId, setSelectedId] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
+  const [openingProject, setOpeningProject] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -87,6 +89,19 @@ export default function GraduationModal({ idea, onClose, onGraduated }: Graduati
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setWorking(false);
+    }
+  };
+
+  const openCurrentProject = async () => {
+    if (!idea.graduatedTo || openingProject) return;
+    setOpeningProject(true);
+    setError(null);
+    try {
+      await openIdeaProjectFolder(idea.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setOpeningProject(false);
     }
   };
 
@@ -188,12 +203,14 @@ export default function GraduationModal({ idea, onClose, onGraduated }: Graduati
 
         <div className="flex items-center justify-between gap-3">
           {idea.graduatedTo ? (
-            <a
-              href={`file://${idea.graduatedTo}`}
+            <button
+              type="button"
+              onClick={() => { void openCurrentProject(); }}
+              disabled={openingProject}
               className="text-xs text-sage-700 hover:text-sage-900 flex items-center gap-1"
             >
-              <ExternalLink className="w-3 h-3" /> Current project
-            </a>
+              <FolderOpen className="w-3 h-3" /> {openingProject ? 'Opening...' : 'Current project'}
+            </button>
           ) : <span />}
           <div className="flex gap-2">
             <button

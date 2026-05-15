@@ -9,9 +9,9 @@ import {
   Check,
   ChevronDown,
   Download,
-  ExternalLink,
   Rocket,
   GitBranch,
+  FolderOpen,
 } from 'lucide-react';
 
 import type { Idea, Stage } from '@/lib/types';
@@ -28,6 +28,7 @@ import {
   updateIdea,
   deleteIdea,
   duplicateIdea,
+  openIdeaProjectFolder,
 } from '@/api/client';
 import { useDebouncedCallback } from '@/hooks/useDebounce';
 
@@ -95,6 +96,7 @@ export default function IdeaDetail() {
   const [exportOpen, setExportOpen] = useState(false);
   const [graduationOpen, setGraduationOpen] = useState(false);
   const [graduationMessage, setGraduationMessage] = useState<string | null>(null);
+  const [openingProjectFolder, setOpeningProjectFolder] = useState(false);
   const [gitHubPublishOpen, setGitHubPublishOpen] = useState(false);
   const [gitHubPublishMessage, setGitHubPublishMessage] = useState<string | null>(null);
 
@@ -221,6 +223,20 @@ export default function IdeaDetail() {
     setIdea(response.idea);
     setGraduationMessage(response.result.message);
     setGraduationOpen(false);
+  };
+
+  const openProjectFolder = async () => {
+    if (!idea || openingProjectFolder) return;
+    setOpeningProjectFolder(true);
+    setGraduationMessage(null);
+    try {
+      const response = await openIdeaProjectFolder(idea.id);
+      setGraduationMessage(response.message);
+    } catch (err) {
+      setGraduationMessage(err instanceof Error ? err.message : String(err));
+    } finally {
+      setOpeningProjectFolder(false);
+    }
   };
 
   const handleGitHubPublished = (result: GitHubPublishResponse) => {
@@ -458,16 +474,19 @@ export default function IdeaDetail() {
 
           {idea.graduatedTo && (
             <div className="flex items-center gap-2 flex-wrap">
-              <a
-                href={`file://${idea.graduatedTo}`}
+              <button
+                type="button"
+                onClick={() => { void openProjectFolder(); }}
+                disabled={openingProjectFolder}
                 className="flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium font-mono
                            text-sage-700 bg-sage-50 border border-sage-200 rounded-badge
-                           hover:border-sage-300 transition-colors"
+                           hover:border-sage-300 disabled:opacity-50 transition-colors"
+                title="Open graduated project folder"
               >
-                <Rocket className="w-3 h-3" />
+                {openingProjectFolder ? <FolderOpen className="w-3 h-3" /> : <Rocket className="w-3 h-3" />}
                 Graduated
-                <ExternalLink className="w-3 h-3" />
-              </a>
+                <FolderOpen className="w-3 h-3" />
+              </button>
             </div>
           )}
           {!idea.graduatedTo && (

@@ -236,6 +236,12 @@ export interface GitHubPublishResponse {
   idea?: Idea;
 }
 
+export interface ProjectFolderOpenResponse {
+  ok: boolean;
+  path: string;
+  message: string;
+}
+
 export interface GitHubRepoStatus {
   available: boolean;
   authenticated: boolean;
@@ -1174,6 +1180,13 @@ export async function updateIdeaGitHubRepo(ideaId: string): Promise<GitHubRepoUp
   );
   if (response.idea) response.idea = hydrateIdea(response.idea);
   return response;
+}
+
+export async function openIdeaProjectFolder(ideaId: string): Promise<ProjectFolderOpenResponse> {
+  return request<ProjectFolderOpenResponse>(
+    `/api/ideas/${encodeURIComponent(ideaId)}/open-project-folder`,
+    { method: 'POST' },
+  );
 }
 
 export async function exportArchive(format: 'json' | 'markdown'): Promise<string | SeedbankArchive> {

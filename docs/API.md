@@ -373,6 +373,7 @@ Idea JSON uses stable API keys while the UI/manual may show friendlier labels:
 - `POST /api/ai/project-draft` (`ai:suggest`) - generates reviewable project files using the `project-drafting` Feature Defaults route; accepts `ideaId`, optional `prompt`, `aiConfirmationToken`, `providerInstanceId`, `model`, `effort`, and `verbosity`
 - `POST /api/ai/project-generate` (`ai:suggest`, `write:ideas`) - creates or uses the idea's local project folder, generates repo-ready starter docs (`README.md`, `SPEC.md`, `IMPLEMENTATION_NOTES.md`, `TODO.md`), writes them to disk without overwriting existing files, and returns the updated idea plus `targetPath` and `filesWritten`; accepts the same request fields as project drafting
 - `POST /api/ai/project-draft/apply` (`ai:suggest`) - writes selected reviewed draft files into the idea's graduated project path when it is inside a configured project root; rejects unsafe paths and existing files
+- `POST /api/ideas/:id/open-project-folder` (`read:ideas`, local implicit session only) - opens the idea's `graduatedTo` folder with the local system file explorer; Seedbank reads the stored idea path and does not accept an arbitrary path in the request
 - `POST /api/ai/chat` (`ai:suggest`, SSE) - Thinking Partner chat; accepts `aiConfirmationToken`
 
 The provider/model override fields are request-scoped. They let a single AI request run against another configured provider instance without changing Settings → AI & Agents → Feature Defaults.
