@@ -1947,6 +1947,10 @@ export class AiService {
     return this.store.getMessages(ideaId);
   }
 
+  clearConversation(ideaId: string): void {
+    this.store.clearMessages(ideaId);
+  }
+
   getUsageSummary(): { last24h: number; last7d: number } {
     return usageSummary(this.store);
   }
@@ -2180,13 +2184,14 @@ export class AiService {
     key: string,
     onDelta: (delta: string) => void,
     confirmationToken?: string,
+    freshContext = false,
   ): Promise<AiChatMessage> {
     const idea = this.repository.getIdea(ideaId);
     if (!idea) throw new Error('Idea not found.');
     const config = resolveFeatureConfig(this.getConfig(), 'thinking-partner');
     this.checkGuardrails(config, 'thinking-partner', key, { confirmationToken, skipRateLimit: true });
 
-    const history = this.store.getMessages(ideaId);
+    const history = freshContext ? [] : this.store.getMessages(ideaId);
     this.store.addMessage(ideaId, 'user', userMessage);
     try {
       const result = await this.provider(config).stream(messagesForChat(idea, history, userMessage), config, onDelta);

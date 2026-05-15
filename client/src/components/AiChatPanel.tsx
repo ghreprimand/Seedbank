@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, Bot, ChevronDown, ExternalLink, Send, Settings, Shield, X } from 'lucide-react';
+import { AlertTriangle, Bot, ChevronDown, ExternalLink, Send, Settings, Shield, Trash2, X } from 'lucide-react';
 import { aiProviderLabel, type AiChatMessage, type AiFeatureId, type AiPreflightResult, type Idea } from '@/lib/types';
-import { getAiConversation, preflightAiRequest, streamAiChat } from '@/api/client';
+import { clearAiConversation, getAiConversation, preflightAiRequest, streamAiChat } from '@/api/client';
 import { useAiSettings } from '@/stores/settings';
 
 function isGuardrailError(msg: string): boolean {
@@ -53,19 +53,19 @@ const FIELD_ACTIONS: Array<{ label: string; field: keyof Idea }> = [
 const ORGANIC_MODES: Array<{ label: string; prompt: string }> = [
   {
     label: 'What if?',
-    prompt: 'Ask one provocative "what if" question grounded in at least two concrete details from this idea\'s raw notes, concept, build notes, or validation criteria. First name the context details you are anchoring on. Wait for my answer before suggesting anything.',
+    prompt: 'Ask one provocative "what if" question grounded in at least two concrete details from this idea\'s raw notes, concept, build notes, or validation criteria. If this is a personal daily-driver or learning project, frame the question around my own workflow rather than external users. Wait for my answer before suggesting anything. Use plain text, no markdown headings.',
   },
   {
     label: "Devil's Advocate",
-    prompt: 'Constructively challenge the weakest assumption that is actually present in this idea context. First name the specific assumption and the note that implies it, then ask one testable question that would expose whether that assumption is true. If the context is too sparse to identify one, ask for the missing detail instead of inventing a critique.',
+    prompt: 'Constructively challenge the weakest assumption that is actually present in this idea context. Name the specific assumption and the note that implies it, then ask one testable question that would expose whether that assumption is true. If this is a personal daily-driver or learning project, test it against my own workflow rather than launch or external-user metrics unless external users are explicitly mentioned. If the context is too sparse to identify one, ask for the missing detail instead of inventing a critique. Use plain text, no markdown headings.',
   },
   {
     label: 'Scope Down',
-    prompt: 'Help me find the smallest viable version of this specific idea. Anchor on the stated personal value, differentiators, or phase plan, then ask one question that removes scope without removing the core value described here.',
+    prompt: 'Help me find the smallest viable version of this specific idea. Anchor on the stated personal value, differentiators, or phase plan, then ask one question that removes scope without removing the core value described here. Use plain text, no markdown headings.',
   },
   {
     label: 'User Story',
-    prompt: 'Help me imagine one specific person using this idea based on the actual context. Anchor on the stated workflow pain or validation criteria, then ask one question about their situation before suggesting features.',
+    prompt: 'Help me imagine one specific use case based on the actual context. If the notes frame this as a personal daily-driver, make the use case about my own repeated workflow; only invent an external user when the notes imply one. Anchor on the stated workflow pain or validation criteria, then ask one question before suggesting features. Use plain text, no markdown headings.',
   },
 ];
 
@@ -86,7 +86,7 @@ export default function AiThinkingPanel({ idea, onApply }: AiThinkingPanelProps)
   const [preflight, setPreflight] = useState<AiPreflightResult | null>(null);
   const [preflightToken, setPreflightToken] = useState<string | undefined>();
   const [showConfirmBanner, setShowConfirmBanner] = useState(false);
-  const [pendingMessage, setPendingMessage] = useState<string | null>(null);
+  const [pendingMessage, setPendingMessage] = useState<{ content: string; freshContext: boolean } | null>(null);
 
   // Read provider config from the settings store (A2 — single source of truth).
   const aiConfig = useAiSettings();
@@ -140,7 +140,7 @@ export default function AiThinkingPanel({ idea, onApply }: AiThinkingPanelProps)
     return () => { cancelled = true; };
   }, [open, idea.id]);
 
-  const doSubmit = async (content: string, token?: string) => {
+  const doSubmit = async (content: string, token?: string, freshContext = false) => {
     setBusy(true);
     setError(null);
     setStreamingText('');
@@ -158,7 +158,7 @@ export default function AiThinkingPanel({ idea, onApply }: AiThinkingPanelProps)
         idea.id,
         content,
         (delta) => { setStreamingText((current) => current + delta); },
-        { aiConfirmationToken: token },
+        { aiConfirmationToken: token, freshContext },
       );
       setMessages((current) => [...current, assistant]);
     } catch (err) {
@@ -168,7 +168,7 @@ export default function AiThinkingPanel({ idea, onApply }: AiThinkingPanelProps)
         // Token expired or missing — remove the optimistic message, re-fire
         // preflight, and re-show the confirmation banner with the message queued.
         setMessages((current) => current.filter((m) => m.id !== msgId));
-        setPendingMessage(content);
+        setPendingMessage({ content, freshContext });
         // Re-fire preflight to get a fresh token.
         try {
           const pf = await preflightAiRequest({ feature: 'thinking-partner' as AiFeatureId });
@@ -185,7 +185,7 @@ export default function AiThinkingPanel({ idea, onApply }: AiThinkingPanelProps)
     }
   };
 
-  const submit = (override?: string) => {
+  const submit = (override?: string, freshContext = false) => {
     const content = (override ?? input).trim();
     if (!content || busy) return;
     setInput('');
@@ -193,16 +193,28 @@ export default function AiThinkingPanel({ idea, onApply }: AiThinkingPanelProps)
     // If a confirmation banner is showing and the user hasn't acknowledged it,
     // hold the message until they click "Got it / Proceed".
     if (showConfirmBanner && preflight?.requiresConfirmation) {
-      setPendingMessage(content);
+      setPendingMessage({ content, freshContext });
       return;
     }
 
-    void doSubmit(content, preflightToken);
+    void doSubmit(content, preflightToken, freshContext);
   };
 
   const applyMessage = (field: keyof Idea, content: string) => {
     if (typeof idea[field] !== 'string') return;
     onApply({ [field]: content } as Partial<Idea>);
+  };
+
+  const clearHistory = async () => {
+    if (busy) return;
+    setError(null);
+    try {
+      await clearAiConversation(idea.id);
+      setMessages([]);
+      setStreamingText('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
   };
 
   return (
@@ -226,12 +238,24 @@ export default function AiThinkingPanel({ idea, onApply }: AiThinkingPanelProps)
         <div className="border-t border-ink-100 p-4 space-y-4">
           {/* Link to full AI settings instead of inline popover */}
           <div className="flex justify-end">
-            <Link
-              to="/settings/ai-agents"
-              className="inline-flex items-center gap-1 text-xs text-ink-400 hover:text-sage-700 transition-colors"
-            >
-              <Settings className="w-3 h-3" /> AI settings
-            </Link>
+            <div className="flex items-center gap-2">
+              {messages.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => void clearHistory()}
+                  disabled={busy}
+                  className="inline-flex items-center gap-1 text-xs text-ink-400 hover:text-red-600 transition-colors disabled:opacity-50"
+                >
+                  <Trash2 className="w-3 h-3" /> Clear history
+                </button>
+              )}
+              <Link
+                to="/settings/ai-agents"
+                className="inline-flex items-center gap-1 text-xs text-ink-400 hover:text-sage-700 transition-colors"
+              >
+                <Settings className="w-3 h-3" /> AI settings
+              </Link>
+            </div>
           </div>
 
           {/* Preflight confirmation banner */}
@@ -262,9 +286,9 @@ export default function AiThinkingPanel({ idea, onApply }: AiThinkingPanelProps)
                   onClick={() => {
                     setShowConfirmBanner(false);
                     if (pendingMessage) {
-                      const msg = pendingMessage;
+                      const { content: msg, freshContext } = pendingMessage;
                       setPendingMessage(null);
-                      void doSubmit(msg, preflightToken);
+                      void doSubmit(msg, preflightToken, freshContext);
                     }
                   }}
                   className="px-3 py-1.5 text-xs font-semibold bg-amber-600 hover:bg-amber-700
@@ -286,7 +310,7 @@ export default function AiThinkingPanel({ idea, onApply }: AiThinkingPanelProps)
                 <button
                   key={mode.label}
                   type="button"
-                  onClick={() => submit(mode.prompt)}
+                  onClick={() => submit(mode.prompt, true)}
                   disabled={busy}
                   className="px-2.5 py-1 text-[11px] font-medium rounded-badge border bg-paper-warm border-ink-100 text-ink-500 hover:bg-sage-50 hover:text-sage-700 hover:border-sage-100 transition-colors disabled:opacity-50"
                 >

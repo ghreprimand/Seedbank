@@ -25,6 +25,8 @@ const THINKING_PARTNER_PROMPT = [
   'For each reply, first anchor your thinking to one or two concrete details from the supplied context, then ask a high-leverage question.',
   'When asked for Devil\'s Advocate, name the specific assumption you are challenging and tie it to a concrete note before asking the question.',
   'Avoid generic product-coaching questions when the raw notes already identify sharper tradeoffs, constraints, or validation criteria.',
+  'If the notes frame the idea as a personal daily-driver or learning project, focus on the user\'s own workflow and validation criteria instead of launch, market, or external-user metrics unless external users are explicitly mentioned.',
+  'Write in plain text for an app UI. Do not use markdown bold, markdown headings, or decorative labels.',
   'Keep responses concise and practical. Prefer one or two thoughtful questions over broad ideation.',
 ].join(' ');
 
@@ -33,6 +35,9 @@ const FIELD_ASSIST_PROMPT = [
   'Respond concisely and practically.',
   'When asked to write or rewrite text, provide a concrete answer immediately without asking for permission first.',
   'Focus only on the specified field — do not comment on or modify other parts of the idea.',
+  'Use the supplied idea context as source material and avoid generic product-coaching language.',
+  'If the notes frame the idea as a personal daily-driver or learning project, write for the user\'s own workflow unless external users are explicitly mentioned.',
+  'Write in plain text for an app UI. Do not use markdown bold, markdown headings, or decorative labels.',
   'Keep responses brief; the user can ask follow-up questions if they want more.',
 ].join(' ');
 
@@ -66,7 +71,8 @@ function formatContextValue(value: unknown): string {
   return value === null || value === undefined ? '(empty)' : String(value);
 }
 
-function ideaContext(idea: Idea): string {
+function ideaContext(idea: Idea, omitFields: AiSuggestionField[] = []): string {
+  const omitted = new Set<AiSuggestionField>(omitFields);
   const labeledFields = {
     pitch: idea.pitch,
     fullNotes: idea.fullNotes,
@@ -83,8 +89,10 @@ function ideaContext(idea: Idea): string {
     graduatedTo: idea.graduatedTo,
   };
   const filledFields = Object.entries(labeledFields)
-    .filter(([, value]) => hasContextValue(value))
+    .filter(([field, value]) => !omitted.has(field as AiSuggestionField) && hasContextValue(value))
     .map(([field]) => THINKING_PARTNER_FIELD_LABELS[field as keyof typeof THINKING_PARTNER_FIELD_LABELS]);
+  const valueFor = (field: AiSuggestionField, value: unknown): string =>
+    omitted.has(field) ? '(omitted for this write-from-scratch request)' : formatContextValue(value);
 
   return [
     'Current Seedbank idea context. Use this context over prior assistant messages.',
@@ -94,28 +102,28 @@ function ideaContext(idea: Idea): string {
     `Stage: ${idea.stage}`,
     `Filled fields: ${filledFields.length > 0 ? filledFields.join(', ') : 'none beyond title/category/stage'}`,
     '',
-    `Elevator Pitch (pitch): ${formatContextValue(idea.pitch)}`,
+    `Elevator Pitch (pitch): ${valueFor('pitch', idea.pitch)}`,
     '',
     'The Spark / Raw Notes (fullNotes, verbatim):',
-    formatContextValue(idea.fullNotes),
+    valueFor('fullNotes', idea.fullNotes),
     '',
     'Concept (hook):',
-    formatContextValue(idea.hook),
+    valueFor('hook', idea.hook),
     '',
     'The Case (whyItMightWork):',
-    formatContextValue(idea.whyItMightWork),
+    valueFor('whyItMightWork', idea.whyItMightWork),
     '',
     'Risks & Blockers (risks):',
-    formatContextValue(idea.risks),
+    valueFor('risks', idea.risks),
     '',
     'Build Notes (techStack):',
-    formatContextValue(idea.techStack),
+    valueFor('techStack', idea.techStack),
     '',
     'Aesthetic & Style (aesthetic):',
-    formatContextValue(idea.aesthetic),
+    valueFor('aesthetic', idea.aesthetic),
     '',
     'Retrospective (retrospective):',
-    formatContextValue(idea.retrospective),
+    valueFor('retrospective', idea.retrospective),
     '',
     `Tags: ${formatContextValue(idea.tags)}`,
     `Mood Labels: ${formatContextValue(idea.moodLabels)}`,
@@ -212,6 +220,10 @@ export function messagesForChat(idea: Idea, history: AiChatMessage[], nextUserMe
     { role: 'system', content: stagePersonality(idea.stage) },
     { role: 'system', content: ideaContext(idea) },
     ...history.slice(-20).map((message) => ({ role: message.role, content: message.content })),
+    {
+      role: 'system',
+      content: 'For the next reply, prioritize the current Seedbank idea context over older conversation turns. Keep the answer plain-text, concrete, and specific to the filled fields.',
+    },
     { role: 'user', content: nextUserMessage },
   ];
 }
@@ -248,6 +260,7 @@ export function promptForSuggestion(idea: Idea, field: AiSuggestionField, curren
         fieldSuggestionStageExpectation(idea.stage, field),
         'For this request, return only JSON with keys "suggestion" and "rationale".',
         'The suggestion must revise or extend the target field, not replace the user as the source of creativity.',
+        'The suggestion value must be usable field text, not a review of the field or a description of what you would change.',
       ].join(' '),
     },
     { role: 'system', content: ideaContext(idea) },
@@ -284,10 +297,14 @@ export function promptForFieldAssist(
         stagePersonality(idea.stage),
         fieldSuggestionStageExpectation(idea.stage, field),
         'For this field-assist request, return only JSON with keys "suggestion" and "rationale".',
-        'The suggestion must revise or extend the target field, not replace the user as the source of creativity.',
+        omitCurrentValue
+          ? 'This is a write-from-scratch request. The suggestion must be a complete standalone value for the target field using the rest of the idea context as source material.'
+          : 'The suggestion must revise or extend the target field, not replace the user as the source of creativity.',
+        'The suggestion value must be usable field text, not a review of the field or a description of what you would change.',
+        'Do not include markdown formatting in the suggestion or rationale.',
       ].join(' '),
     },
-    { role: 'system', content: ideaContext(idea) },
+    { role: 'system', content: ideaContext(idea, omitCurrentValue ? [field] : []) },
     {
       role: 'user',
       content: [

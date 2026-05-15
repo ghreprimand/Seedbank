@@ -16,9 +16,14 @@ What changed:
 - Organic prompt buttons now ask for project-specific questions instead of broad generic prompts.
 - Devil's Advocate now challenges an assumption that is actually present in the idea context; when the context is too sparse, it asks for the missing detail needed to critique accurately.
 - Organic modes now require the assistant to name its concrete context anchors before asking, so a terminal-emulator project should produce questions about emulator-vs-shell boundaries, semantic output reliability, MVP scope, or daily-driver validation rather than generic project coaching.
+- Organic Thinking Partner modes now run as fresh-context calls. They still save the resulting message in the visible conversation, but they do not replay older saved turns into the provider, which avoids stale bad outputs steering later preset-button runs.
+- The Thinking Partner panel now has a Clear history action for removing polluted local conversation history from an idea.
 - Seed/Sprout stage guidance no longer blocks critique outright; it keeps critique lightweight unless the user explicitly asks for it.
 - Thinking Partner messages now display newest-first in the panel while the stored history remains chronological for prompt construction.
 - Thinking Partner's header now reads the effective Thinking Partner feature route and then the preflight result after opening, so it matches the provider/model that will actually receive the request.
+- Prompt copy now explicitly treats personal daily-driver or learning projects as personal workflow validation unless the notes mention external users. This keeps terminal/tooling projects from drifting into launch metrics or generic user-growth framing.
+- Field assist now distinguishes write-from-scratch from improve/review. Fresh field requests omit the old value and ask for complete standalone field text from the rest of the idea context.
+- Short AI outputs now ask for plain text rather than markdown headings/bold markers because these panels render plain text.
 - Image gallery rendering now resolves Seedbank API image paths through the configured API base URL, so uploads display correctly when the frontend and API run on different ports.
 - Image fetch/delete routes now handle dotted filenames such as `.png` through explicit route parsing, and image reads stream files with a known content type instead of relying on `sendFile`.
 

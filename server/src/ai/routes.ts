@@ -355,6 +355,11 @@ export function registerAiRoutes(
     res.json({ messages: aiService.getConversation(routeParam(req, 'ideaId')) });
   }));
 
+  app.delete('/api/ai/conversations/:ideaId', requireScope('ai:suggest'), asyncRoute((req, res) => {
+    aiService.clearConversation(routeParam(req, 'ideaId'));
+    res.json({ ok: true });
+  }));
+
   app.post('/api/ai/suggest', requireScope('ai:suggest'), asyncRoute(async (req, res) => {
     const body = req.body as {
       ideaId?: unknown;
@@ -615,7 +620,7 @@ export function registerAiRoutes(
   }));
 
   app.post('/api/ai/chat', requireScope('ai:suggest'), async (req, res) => {
-    const body = req.body as { ideaId?: string; message?: string; aiConfirmationToken?: unknown };
+    const body = req.body as { ideaId?: string; message?: string; aiConfirmationToken?: unknown; freshContext?: unknown };
     if (!body.ideaId || !body.message?.trim()) {
       res.status(400).json({ error: 'ideaId and message are required.' });
       return;
@@ -652,6 +657,7 @@ export function registerAiRoutes(
           res.write(`event: delta\ndata: ${JSON.stringify({ delta })}\n\n`);
         },
         aiConfirmationToken.value,
+        body.freshContext === true,
       );
       res.write(`event: message\ndata: ${JSON.stringify({ message })}\n\n`);
       res.write('event: done\ndata: {}\n\n');

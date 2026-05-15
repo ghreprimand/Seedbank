@@ -832,6 +832,10 @@ export async function getAiConversation(ideaId: string): Promise<AiChatMessage[]
   return response.messages.map(hydrateAiMessage);
 }
 
+export async function clearAiConversation(ideaId: string): Promise<void> {
+  await request<{ ok: true }>(`/api/ai/conversations/${encodeURIComponent(ideaId)}`, { method: 'DELETE' });
+}
+
 export async function suggestIdeaField(
   ideaId: string,
   field: AiSuggestionField,
@@ -858,7 +862,7 @@ export async function streamAiChat(
   ideaId: string,
   message: string,
   onDelta: (delta: string) => void,
-  options: { aiConfirmationToken?: string } = {},
+  options: { aiConfirmationToken?: string; freshContext?: boolean } = {},
 ): Promise<AiChatMessage> {
   return streamAiMessage('/api/ai/chat', { ideaId, message, ...options }, onDelta);
 }
