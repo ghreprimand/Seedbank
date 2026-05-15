@@ -41,6 +41,7 @@ What changed:
 - Update GitHub repo stages the local project folder, commits changed files when present, configures `origin`, and pushes `main`.
 - Graduated project links now call back to the local Seedbank server to open the folder with the system file explorer instead of relying on browser-blocked `file://` URLs.
 - On Linux, Seedbank now prefers a real installed file manager such as Dolphin, Nautilus, Nemo, or Thunar before falling back to `xdg-open`, because `xdg-open` can be configured to route folders through a browser or wrapper script.
+- Duplicate idea now treats project wiring as instance-specific: it clears the local `graduatedTo` folder and removes GitHub links, while preserving normal reference links and idea content.
 
 Safety and permissions:
 - Existing project files are not overwritten.

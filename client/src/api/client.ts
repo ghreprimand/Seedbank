@@ -1,5 +1,6 @@
 import { db } from '@/db';
 import * as localIdeas from '@/db/ideas';
+import { duplicateIdeaPayload } from '../../../shared/ideaDuplication';
 import type {
   AggregateSettings,
   AiChatMessage,
@@ -524,14 +525,7 @@ export async function deleteIdea(id: string): Promise<void> {
 export async function duplicateIdea(id: string): Promise<Idea | undefined> {
   const original = await getIdea(id);
   if (!original) return undefined;
-  return createIdea({
-    ...original,
-    id: crypto.randomUUID(),
-    title: `Copy of ${original.title}`,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    deletedAt: null,
-  });
+  return createIdea(duplicateIdeaPayload(original, crypto.randomUUID(), new Date()));
 }
 
 export async function getVersions(ideaId: string): Promise<IdeaVersion[]> {

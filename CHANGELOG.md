@@ -17,6 +17,7 @@
 - Added GitHub repo update support that commits changed local project files when present and pushes `main` to the confirmed repo.
 - Replaced browser-blocked `file://` project-folder links with a local API action that opens graduated project folders through the system file explorer.
 - On Linux, project-folder opening now prefers installed file managers such as Dolphin, Nautilus, Nemo, or Thunar before falling back to `xdg-open`.
+- Duplicate idea now clears the graduated project path and GitHub repo links so copies can become independent projects.
 
 ### Project drafting
 
