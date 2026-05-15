@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### AI and media fixes
+
+- Tightened Thinking Partner prompt framing so organic prompt buttons, especially Devil's Advocate, ground questions in the actual idea context and ask for missing details when context is sparse.
+- Fixed image gallery rendering for uploaded images when the frontend runs on a different port than the API server.
+
 ### Project generation
 
 - Added an idea-detail Project generation section that creates/uses a local project folder, generates repo-ready docs, writes them to disk, and exposes GitHub publishing from the same workflow.

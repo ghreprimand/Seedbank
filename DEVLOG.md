@@ -4,6 +4,24 @@ Newest entries at the top.
 
 ---
 
+## 2026-05-15 — Thinking Partner Grounding and Image Gallery Fix
+
+Tightened two rough edges found during project testing.
+
+What changed:
+- Thinking Partner's base system prompt now explicitly grounds questions in the current idea context: title, pitch, stage, notes, risks, build notes, tags, and scores.
+- Organic prompt buttons now ask for project-specific questions instead of broad generic prompts.
+- Devil's Advocate now challenges an assumption that is actually present in the idea context; when the context is too sparse, it asks for the missing detail needed to critique accurately.
+- Image gallery rendering now resolves Seedbank API image paths through the configured API base URL, so uploads display correctly when the frontend and API run on different ports.
+
+Validation:
+- `npm run typecheck`
+- `npm run lint -w client`
+- `npm test -w server`
+- `npm run build`
+
+---
+
 ## 2026-05-15 — Project Generation Workflow
 
 Reworked the idea-detail project workflow so it matches how users actually want to move from seed to repo. The old visible action generated draft files in a modal and left folder creation/GitHub publishing as separate concepts. The new flow is local-first and repo-oriented from one section.

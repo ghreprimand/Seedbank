@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Trash2, Upload, X } from 'lucide-react';
-import { deleteIdeaImage, uploadIdeaImage } from '@/api/client';
+import { apiUrl, deleteIdeaImage, uploadIdeaImage } from '@/api/client';
 
 type UploadState = 'idle' | 'uploading';
 
@@ -13,6 +13,12 @@ function filenameFromImagePath(imagePath: string): string {
     const filename = imagePath.split('/').pop() ?? '';
     return decodeURIComponent(filename);
   }
+}
+
+function imageSrc(imagePath: string): string {
+  if (/^(https?:|data:|blob:)/i.test(imagePath)) return imagePath;
+  if (imagePath.startsWith('/api/')) return apiUrl(imagePath);
+  return imagePath;
 }
 
 interface ImageGalleryProps {
@@ -145,7 +151,7 @@ export default function ImageGallery({ ideaId, images, onChange }: ImageGalleryP
                 className="block w-full"
                 onClick={() => setActiveIndex(index)}
               >
-                <img src={imagePath} alt="Idea attachment" className="w-full aspect-video object-cover" loading="lazy" />
+                <img src={imageSrc(imagePath)} alt="Idea attachment" className="w-full aspect-video object-cover" loading="lazy" />
               </button>
               <button
                 type="button"
@@ -199,7 +205,7 @@ export default function ImageGallery({ ideaId, images, onChange }: ImageGalleryP
           )}
 
           <img
-            src={activeImage}
+            src={imageSrc(activeImage)}
             alt="Idea attachment"
             className="max-w-full max-h-full rounded-card border border-paper/20 shadow-modal"
             onClick={(event) => event.stopPropagation()}

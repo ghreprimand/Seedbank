@@ -33,6 +33,7 @@ test('messagesForChat includes stage-aware system guidance', () => {
     const messages = messagesForChat(idea, [], 'Help me move this idea forward.');
     assert.equal(messages[0]?.role, 'system');
     assert.equal(messages[1]?.role, 'system');
+    assert.match(messages[0]?.content ?? '', /Ground every question in the supplied idea context/);
     assert.ok(messages[1]?.content.includes(`Stage personality: ${promptStageLabel[stage]}.`));
   }
 });

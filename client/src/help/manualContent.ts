@@ -287,6 +287,7 @@ export const MANUAL_GROUPS: ManualGroup[] = [
         keywords: ['thinking partner', 'ai', 'chat', 'conversation', 'assistant', 'openai', 'anthropic', 'ollama', 'provider', 'key'],
         blocks: [
           { type: 'p', text: 'The Thinking Partner is an AI chat panel attached to each idea. It asks questions, reflects patterns, and helps scope ideas — it doesn\'t generate ideas for you.' },
+          { type: 'p', text: 'Questions are grounded in the current idea fields, stage, notes, risks, build notes, tags, and scores. If the idea is sparse, the assistant should ask for missing context instead of inventing a generic critique.' },
           { type: 'h3', text: 'Prompt modes' },
           { type: 'ul', items: [
             'What If — explores alternative directions.',
