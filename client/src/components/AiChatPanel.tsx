@@ -53,21 +53,27 @@ const FIELD_ACTIONS: Array<{ label: string; field: keyof Idea }> = [
 const ORGANIC_MODES: Array<{ label: string; prompt: string }> = [
   {
     label: 'What if?',
-    prompt: 'Ask exactly one provocative "what if" question grounded in at least two concrete details from this idea\'s raw notes, concept, build notes, or validation criteria. If this is a personal daily-driver or learning project, frame the question around my own workflow rather than external users. Return only the question itself. Do not include preamble, labels, headings, analysis, or suggestions.',
+    prompt: 'Ask exactly one provocative "what if" planning question grounded in at least two concrete details from this idea\'s raw notes, concept, build notes, or validation criteria. Use future-facing language unless the context explicitly says the project already exists or has been dogfooded. If this is a personal daily-driver or learning project, frame the question around the workflow the user intends to improve, not completed usage data. Return only the question itself. Do not include preamble, labels, headings, analysis, or suggestions.',
   },
   {
     label: "Devil's Advocate",
-    prompt: 'Constructively challenge the weakest assumption that is actually present in this idea context. Ask exactly one testable question that exposes whether that assumption is true. Work the assumption and evidence into a natural sentence instead of using labels. If this is a personal daily-driver or learning project, test it against my own workflow rather than launch or external-user metrics unless external users are explicitly mentioned. If the context is too sparse to identify one, ask for the missing detail instead of inventing a critique. Return only the challenge question. Do not include headings, labels, bullets, analysis, or suggestions.',
+    prompt: 'Constructively challenge the weakest assumption that is actually present in this idea context. Ask exactly one question that would help the user test that assumption before or during the first build. Use future-facing language unless the context explicitly says the project already exists or has been dogfooded. Work the assumption and evidence into a natural sentence instead of using labels. If this is a personal daily-driver or learning project, test it against the workflow the user intends to improve rather than launch or external-user metrics unless external users are explicitly mentioned. If the context is too sparse to identify one, ask for the missing detail instead of inventing a critique. Return only the challenge question. Do not include headings, labels, bullets, analysis, or suggestions.',
   },
   {
     label: 'Scope Down',
-    prompt: 'Help me find the smallest viable version of this specific idea. Anchor on the stated personal value, differentiators, or phase plan, then ask exactly one question that removes scope without removing the core value described here. Return one short sentence of context followed by one question. Do not include headings, labels, bullets, analysis, or feature suggestions.',
+    prompt: 'Help me find the smallest viable first build of this specific idea. Anchor on the stated personal value, differentiators, or phase plan, then ask exactly one question that removes scope without removing the core value described here. Use future-facing language unless the context explicitly says the project already exists. Return one short sentence of context followed by one question. Do not include headings, labels, bullets, analysis, or feature suggestions.',
   },
   {
     label: 'User Story',
-    prompt: 'Help me imagine one specific use case based on the actual context. If the notes frame this as a personal daily-driver, make the use case about my own repeated workflow; only invent an external user when the notes imply one. Return one concise use-case sentence and one follow-up question. Do not include headings, labels, bullets, analysis, or feature suggestions.',
+    prompt: 'Help me imagine one specific first-use or first-dogfood scenario based on the actual context. If the notes frame this as a personal daily-driver, make the use case about the user\'s intended repeated workflow; only invent an external user when the notes imply one. Use future-facing language unless the context explicitly says the project already exists. Return one concise use-case sentence and one follow-up question. Do not include headings, labels, bullets, analysis, or feature suggestions.',
   },
 ];
+
+interface ConversationTurn {
+  id: string;
+  user?: AiChatMessage;
+  assistant?: AiChatMessage;
+}
 
 export default function AiThinkingPanel({ idea, onApply }: AiThinkingPanelProps) {
   const [open, setOpen] = useState(false);
@@ -110,7 +116,28 @@ export default function AiThinkingPanel({ idea, onApply }: AiThinkingPanelProps)
     return aiConfig.ollamaModel;
   })();
 
-  const newestMessages = useMemo(() => [...messages].reverse(), [messages]);
+  const conversationTurns = useMemo<ConversationTurn[]>(() => {
+    const turns: ConversationTurn[] = [];
+    let pendingUser: AiChatMessage | undefined;
+
+    for (const message of messages) {
+      if (message.role === 'user') {
+        if (pendingUser) turns.push({ id: pendingUser.id, user: pendingUser });
+        pendingUser = message;
+        continue;
+      }
+
+      if (pendingUser) {
+        turns.push({ id: `${pendingUser.id}-${message.id}`, user: pendingUser, assistant: message });
+        pendingUser = undefined;
+      } else {
+        turns.push({ id: message.id, assistant: message });
+      }
+    }
+
+    if (pendingUser) turns.push({ id: pendingUser.id, user: pendingUser });
+    return turns.reverse();
+  }, [messages]);
 
   useEffect(() => {
     if (!open) return;
@@ -323,26 +350,28 @@ export default function AiThinkingPanel({ idea, onApply }: AiThinkingPanelProps)
                 {streamingText}
               </div>
             )}
-            {newestMessages.map((message) => (
-              <div
-                key={message.id}
-                className={`rounded-card px-3 py-2 text-sm whitespace-pre-wrap ${
-                  message.role === 'user' ? 'bg-paper-warm text-ink-700' : 'bg-sage-50 text-ink-800'
-                }`}
-              >
-                {message.content}
-                {message.role === 'assistant' && (
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {FIELD_ACTIONS.map((action) => (
-                      <button
-                        key={action.label}
-                        type="button"
-                        onClick={() => applyMessage(action.field, message.content)}
-                        className="px-1.5 py-0.5 text-[10px] font-mono text-sage-700 bg-paper border border-sage-100 rounded-badge hover:border-sage-300"
-                      >
-                        {action.label}
-                      </button>
-                    ))}
+            {conversationTurns.map((turn) => (
+              <div key={turn.id} className="space-y-1">
+                {turn.user && (
+                  <div className="rounded-card px-3 py-2 text-sm whitespace-pre-wrap bg-paper-warm text-ink-700">
+                    {turn.user.content}
+                  </div>
+                )}
+                {turn.assistant && (
+                  <div className="rounded-card px-3 py-2 text-sm whitespace-pre-wrap bg-sage-50 text-ink-800">
+                    {turn.assistant.content}
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {FIELD_ACTIONS.map((action) => (
+                        <button
+                          key={action.label}
+                          type="button"
+                          onClick={() => applyMessage(action.field, turn.assistant?.content ?? '')}
+                          className="px-1.5 py-0.5 text-[10px] font-mono text-sage-700 bg-paper border border-sage-100 rounded-badge hover:border-sage-300"
+                        >
+                          {action.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -372,8 +401,13 @@ export default function AiThinkingPanel({ idea, onApply }: AiThinkingPanelProps)
             </div>
           )}
 
+          <div className="space-y-1">
+            <label htmlFor={`thinking-partner-input-${idea.id}`} className="block text-[11px] font-semibold uppercase tracking-wide text-ink-400">
+              Custom question
+            </label>
           <div className="flex gap-2">
             <input
+              id={`thinking-partner-input-${idea.id}`}
               value={input}
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={(event) => {
@@ -382,7 +416,7 @@ export default function AiThinkingPanel({ idea, onApply }: AiThinkingPanelProps)
                   void submit();
                 }
               }}
-              placeholder="Ask a reflective question…"
+              placeholder="Ask your own question about this idea…"
               className="min-w-0 flex-1 px-3 py-2 text-sm bg-paper-warm border border-ink-100 rounded-card outline-none focus:ring-2 focus:ring-sage-400"
             />
             <button
@@ -393,6 +427,7 @@ export default function AiThinkingPanel({ idea, onApply }: AiThinkingPanelProps)
             >
               <Send className="w-4 h-4" />
             </button>
+          </div>
           </div>
         </div>
       )}

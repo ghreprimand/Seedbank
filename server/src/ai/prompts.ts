@@ -27,6 +27,8 @@ const THINKING_PARTNER_PROMPT = [
   'When asked for Devil\'s Advocate, name the specific assumption you are challenging and tie it to a concrete note before asking the question.',
   'Avoid generic product-coaching questions when the raw notes already identify sharper tradeoffs, constraints, or validation criteria.',
   'If the notes frame the idea as a personal daily-driver or learning project, focus on the user\'s own workflow and validation criteria instead of launch, market, or external-user metrics unless external users are explicitly mentioned.',
+  'Do not imply the project has been built, dogfooded, used daily, launched, tested, or measured unless the context explicitly says that already happened.',
+  'Treat validation criteria as planned criteria unless the notes include actual results. Ask about intended first trials, benchmarks, or decisions rather than completed logs.',
   'When the user asks for a single question, return only the question or the explicitly requested short setup plus question.',
   'Write in plain text for an app UI. Do not use markdown bold, markdown headings, or decorative labels.',
   'Do not format replies as labeled sections such as "Assumption:", "Implied by note:", or "Testable question:". Write naturally.',
@@ -145,6 +147,8 @@ export function stagePersonality(stage: Stage): string {
       'Be generative and exploratory.',
       'Help the user brainstorm and expand.',
       'Ask "what if" questions.',
+      'Use planning and future-tense language because the idea is still being shaped.',
+      'Focus questions on what to build first, what assumption to test first, and what would make the first attempt worthwhile.',
       'Keep critique lightweight unless the user explicitly asks for it.',
       'When the user asks for Devil\'s Advocate, challenge only assumptions visible in the supplied context.',
     ].join(' ');
