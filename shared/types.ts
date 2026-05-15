@@ -1052,6 +1052,7 @@ export interface AiPublicConfig {
   claudeAccountModel: string;
   claudeAccountCompact: boolean;
   codexAccountModel: string;
+  claudeReasoningEffort?: AiReasoningEffort;
   openaiReasoningEffort?: AiReasoningEffort;
   openaiTextVerbosity?: AiTextVerbosity;
   codexReasoningEffort?: AiReasoningEffort;
@@ -1255,6 +1256,7 @@ export interface AiConfigInput {
   claudeAccountModel?: string;
   claudeAccountCompact?: boolean;
   codexAccountModel?: string;
+  claudeReasoningEffort?: AiReasoningEffort | null;
   openaiReasoningEffort?: AiReasoningEffort | null;
   openaiTextVerbosity?: AiTextVerbosity | null;
   codexReasoningEffort?: AiReasoningEffort | null;

@@ -234,6 +234,11 @@ export function openAIModelSupportsTextVerbosity(model: string): boolean {
   return model.trim().toLowerCase().startsWith('gpt-5');
 }
 
+export function claudeModelSupportsReasoningEffort(model: string): boolean {
+  const normalized = model.trim().toLowerCase();
+  return normalized.includes('sonnet') || normalized.includes('opus') || normalized.includes('mythos');
+}
+
 export function routeModel(
   route: AiFeatureRoute,
   selectedInstance: AiPublicConfig['providerInstances'][AiProviderInstanceId] | null,
@@ -248,7 +253,19 @@ export function providerSupportsEffort(
 ): boolean {
   if (provider === 'default') return false;
   if (providerInstanceId === 'openai-api') return openAIModelSupportsReasoningEffort(model);
+  if (providerInstanceId === 'claude-api' || providerInstanceId === 'claude-account') {
+    return claudeModelSupportsReasoningEffort(model);
+  }
   return providerInstanceId === 'codex-account';
+}
+
+export function effortOptionsForProvider(
+  providerInstanceId: AiProviderInstanceId | null,
+): AiReasoningEffort[] {
+  if (providerInstanceId === 'claude-api' || providerInstanceId === 'claude-account') {
+    return ['low', 'medium', 'high'];
+  }
+  return ['minimal', 'low', 'medium', 'high'];
 }
 
 export function providerSupportsVerbosity(

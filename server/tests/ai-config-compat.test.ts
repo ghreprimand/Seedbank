@@ -61,7 +61,7 @@ test('AI config prefers ai.config over legacy ai:config when both are present', 
     const config = service.getConfig();
     assert.equal(config.provider, 'ollama');
     assert.equal(config.ollamaModel, 'mistral:7b');
-    assert.equal(config.anthropicModel, 'claude-sonnet-4-20250514');
+    assert.equal(config.anthropicModel, 'claude-sonnet-4-6');
   } finally {
     db.close();
   }
@@ -78,7 +78,7 @@ test('AI config migration resets stale legacy model defaults', () => {
 
     const config = service.getConfig();
     assert.equal(config.openaiModel, 'gpt-4.1-mini');
-    assert.equal(config.anthropicModel, 'claude-sonnet-4-20250514');
+    assert.equal(config.anthropicModel, 'claude-sonnet-4-6');
   } finally {
     db.close();
   }
@@ -176,6 +176,30 @@ test('Feature route effort and verbosity persist and resolve only for supported 
     assert.equal(unsupported.featureRoutes['thinking-partner']?.verbosity, 'low');
     assert.equal(unsupported.effectiveFeatureRoutes['thinking-partner']?.effort, undefined);
     assert.equal(unsupported.effectiveFeatureRoutes['thinking-partner']?.verbosity, undefined);
+  } finally {
+    db.close();
+  }
+});
+
+test('Feature route effort persists and resolves for Claude routes', () => {
+  const { db, service } = aiFixture();
+  try {
+    const configured = service.configure({
+      provider: 'anthropic',
+      anthropicApiKey: 'sk-ant-test',
+      anthropicModel: 'claude-sonnet-4-6',
+      featureRoutes: {
+        'thinking-partner': {
+          provider: 'anthropic',
+          providerInstanceId: 'claude-api',
+          model: 'claude-sonnet-4-6',
+          effort: 'medium',
+        },
+      },
+    });
+
+    assert.equal(configured.featureRoutes['thinking-partner']?.effort, 'medium');
+    assert.equal(configured.effectiveFeatureRoutes['thinking-partner']?.effort, 'medium');
   } finally {
     db.close();
   }

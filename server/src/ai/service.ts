@@ -121,7 +121,7 @@ const DEFAULT_CONFIG: AiStoredConfig = {
       capabilities: AI_PROVIDER_INSTANCE_DESCRIPTORS['claude-api'].capabilities,
       featureRoutable: true,
       modelDiscovery: true,
-      configuredModel: 'claude-sonnet-4-20250514',
+      configuredModel: 'claude-sonnet-4-6',
       discoveredModels: [],
       available: 'auth-required',
       requiresApiKey: true,
@@ -138,7 +138,7 @@ const DEFAULT_CONFIG: AiStoredConfig = {
       capabilities: AI_PROVIDER_INSTANCE_DESCRIPTORS['claude-account'].capabilities,
       featureRoutable: true,
       modelDiscovery: true,
-      configuredModel: 'claude-sonnet-latest',
+      configuredModel: 'claude-sonnet-4-6',
       discoveredModels: [],
       available: 'unavailable',
       requiresApiKey: false,
@@ -243,10 +243,11 @@ const DEFAULT_CONFIG: AiStoredConfig = {
   codexOpenAIServiceMethod: 'openai-api-key',
   localModelServiceMethod: 'ollama',
   openaiModel: 'gpt-4.1-mini',
-  anthropicModel: 'claude-sonnet-4-20250514',
-  claudeAccountModel: 'claude-sonnet-latest',
+  anthropicModel: 'claude-sonnet-4-6',
+  claudeAccountModel: 'claude-sonnet-4-6',
   claudeAccountCompact: true,
   codexAccountModel: 'codex-recommended',
+  claudeReasoningEffort: undefined,
   ollamaModel: 'llama3.2',
   ollamaBaseUrl: 'http://localhost:11434',
   localOpenaiCompatiblePreset: 'lm-studio',
@@ -394,6 +395,11 @@ function openAIModelSupportsReasoningEffort(model: string): boolean {
 
 function openAIModelSupportsTextVerbosity(model: string): boolean {
   return model.trim().toLowerCase().startsWith('gpt-5');
+}
+
+function claudeModelSupportsReasoningEffort(model: string): boolean {
+  const normalized = model.trim().toLowerCase();
+  return normalized.includes('sonnet') || normalized.includes('opus') || normalized.includes('mythos');
 }
 
 function defaultFeatureRoutes(): Record<AiFeatureId, AiFeatureRoute> {
@@ -645,6 +651,13 @@ function applyRouteControls(config: AiStoredConfig, route: AiFeatureRoute): AiSt
       codexReasoningEffort: route.effort,
     };
   }
+  if (config.provider === 'anthropic' || config.provider === 'claude-account') {
+    const model = modelFor(config);
+    return {
+      ...config,
+      claudeReasoningEffort: route.effort && claudeModelSupportsReasoningEffort(model) ? route.effort : undefined,
+    };
+  }
   return config;
 }
 
@@ -885,7 +898,9 @@ function effectiveFeatureRoutes(config: AiStoredConfig): Record<AiFeatureId, AiE
       provider: resolved.provider,
       providerInstanceId,
       model: modelFor(resolved),
-      ...(resolved.openaiReasoningEffort ?? resolved.codexReasoningEffort ? { effort: resolved.openaiReasoningEffort ?? resolved.codexReasoningEffort } : {}),
+      ...(resolved.openaiReasoningEffort ?? resolved.codexReasoningEffort ?? resolved.claudeReasoningEffort
+        ? { effort: resolved.openaiReasoningEffort ?? resolved.codexReasoningEffort ?? resolved.claudeReasoningEffort }
+        : {}),
       ...(resolved.openaiTextVerbosity ? { verbosity: resolved.openaiTextVerbosity } : {}),
       inherited: route?.provider === 'default',
     };
@@ -894,12 +909,20 @@ function effectiveFeatureRoutes(config: AiStoredConfig): Record<AiFeatureId, AiE
 }
 
 function migrateKnownStaleModelDefaults(config: AiStoredConfig): AiStoredConfig {
+  const claudeAccountModel = config.claudeAccountModel === 'claude-sonnet-latest'
+    || config.claudeAccountModel === 'claude-sonnet-4-20250514'
+    ? DEFAULT_CONFIG.claudeAccountModel
+    : config.claudeAccountModel;
+  const anthropicModel = config.anthropicModel === 'claude-sonnet-4-5'
+    || config.anthropicModel === 'claude-opus-4-5'
+    || config.anthropicModel === 'claude-sonnet-4-20250514'
+    ? DEFAULT_CONFIG.anthropicModel
+    : config.anthropicModel;
   return {
     ...config,
     openaiModel: config.openaiModel === 'gpt-5.5' ? DEFAULT_CONFIG.openaiModel : config.openaiModel,
-    anthropicModel: config.anthropicModel === 'claude-sonnet-4-5' || config.anthropicModel === 'claude-opus-4-5'
-      ? DEFAULT_CONFIG.anthropicModel
-      : config.anthropicModel,
+    anthropicModel,
+    claudeAccountModel,
   };
 }
 
@@ -1246,6 +1269,7 @@ function publicConfig(config: AiStoredConfig): AiPublicConfig {
     claudeAccountModel: config.claudeAccountModel,
     claudeAccountCompact: config.claudeAccountCompact !== false,
     codexAccountModel: config.codexAccountModel,
+    ...(config.claudeReasoningEffort ? { claudeReasoningEffort: config.claudeReasoningEffort } : {}),
     ...(config.openaiReasoningEffort ? { openaiReasoningEffort: config.openaiReasoningEffort } : {}),
     ...(config.openaiTextVerbosity ? { openaiTextVerbosity: config.openaiTextVerbosity } : {}),
     ...(config.codexReasoningEffort ? { codexReasoningEffort: config.codexReasoningEffort } : {}),
@@ -1387,9 +1411,8 @@ async function resolveExecutionModel(config: AiStoredConfig): Promise<string> {
   }
   if (config.provider === 'claude-account') {
     try {
-      const { getCatalog } = await import('./claude-account/catalog.js');
-      const catalog = await getCatalog();
-      return catalog.models.find((model) => model.id === requested || model.friendlyAlias === requested)?.id ?? requested;
+      const { resolveClaudeAccountModel } = await import('./claude-account/catalog.js');
+      return await resolveClaudeAccountModel(requested);
     } catch {
       return requested;
     }
@@ -1680,6 +1703,10 @@ export class AiService {
     const hasOpenaiEffortPatch = Object.prototype.hasOwnProperty.call(input, 'openaiReasoningEffort');
     const hasOpenaiVerbosityPatch = Object.prototype.hasOwnProperty.call(input, 'openaiTextVerbosity');
     const hasCodexEffortPatch = Object.prototype.hasOwnProperty.call(input, 'codexReasoningEffort');
+    const hasClaudeEffortPatch = Object.prototype.hasOwnProperty.call(input, 'claudeReasoningEffort');
+    const nextClaudeEffort = hasClaudeEffortPatch
+      ? sanitizeReasoningEffort(input.claudeReasoningEffort)
+      : current.claudeReasoningEffort;
     const nextOpenaiEffort = hasOpenaiEffortPatch
       ? sanitizeReasoningEffort(input.openaiReasoningEffort)
       : current.openaiReasoningEffort;
@@ -1710,6 +1737,7 @@ export class AiService {
         ? input.claudeAccountCompact
         : current.claudeAccountCompact !== false,
       codexAccountModel: input.codexAccountModel?.trim() || current.codexAccountModel,
+      ...(nextClaudeEffort ? { claudeReasoningEffort: nextClaudeEffort } : { claudeReasoningEffort: undefined }),
       ...(nextOpenaiEffort ? { openaiReasoningEffort: nextOpenaiEffort } : { openaiReasoningEffort: undefined }),
       ...(nextOpenaiVerbosity ? { openaiTextVerbosity: nextOpenaiVerbosity } : { openaiTextVerbosity: undefined }),
       ...(nextCodexEffort ? { codexReasoningEffort: nextCodexEffort } : { codexReasoningEffort: undefined }),

@@ -21,13 +21,13 @@ Each provider method is stored as a provider instance. Built-in instances cover 
 
 **OpenAI API** — enter your API key and model name (e.g. `gpt-4.1-mini`). Calls are made server-side to `api.openai.com`. Idea content is sent to OpenAI's servers.
 
-**Anthropic API** — enter your API key and model name (e.g. `claude-sonnet-4-20250514`). Calls are made server-side to `api.anthropic.com`. Works well for reflective critique and longer contextual responses. Idea content is sent to Anthropic's servers.
+**Anthropic API** — enter your API key and model name (e.g. `claude-sonnet-4-6`). Calls are made server-side to `api.anthropic.com`. Works well for reflective critique and longer contextual responses. Idea content is sent to Anthropic's servers.
 
 **Ollama** — configure the base URL (usually `http://localhost:11434`) and model name (e.g. `llama3.2`). No API key required. Calls stay on the configured Ollama host. Useful for local-only experimentation or privacy-sensitive archives.
 
 **Custom / OpenAI-compatible endpoint** — choose a preset or enter a compatible endpoint URL, API key when required, and model name. Use this for OpenRouter, Groq, Mistral, Together, Fireworks, LM Studio, vLLM, llama.cpp, LocalAI, or another service that accepts OpenAI Chat Completions requests. Local and cloud instances are stored separately so a local LM Studio server does not overwrite an OpenRouter setup.
 
-**Claude account** — account-auth method with login/status controls shown in the Claude service area. Use this to route AI chat through a Claude.ai subscription with Seedbank's native OAuth flow rather than an Anthropic API key.
+**Claude account** — account-auth method with login/status controls shown in the Claude service area. Use this to route AI chat through a Claude.ai subscription with Seedbank's native OAuth flow rather than an Anthropic API key. Seedbank requests the Claude Code-compatible account scopes needed for current account-model inference and sends Claude account requests in the same native-style shape: concrete model IDs such as `claude-sonnet-4-6`, Claude Code system blocks, adaptive thinking for supported Sonnet/Opus models, and context-management edits. Older Claude account logins that are missing the required scope are shown as needing re-login.
 
 **Codex account** — account-auth method that talks to the local Codex app-server over JSON-RPC. This requires a compatible Codex runtime installed locally. It is not OpenAI API billing.
 

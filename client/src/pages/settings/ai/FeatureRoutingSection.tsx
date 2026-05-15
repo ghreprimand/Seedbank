@@ -22,6 +22,7 @@ import {
   providerSupportsEffort,
   providerSupportsVerbosity,
   routeModel,
+  effortOptionsForProvider,
   updateRouteControl,
 } from './helpers';
 import { AI_FEATURE_ROWS } from './constants';
@@ -48,7 +49,9 @@ export function FeatureRoutingSection({
   onSaveDefault,
 }: FeatureRoutingSectionProps) {
   const defaultEffortForInstance = (instanceId: AiProviderInstanceId): AiReasoningEffort | '' =>
-    instanceId === 'codex-account'
+    instanceId === 'claude-api' || instanceId === 'claude-account'
+      ? ai.claudeReasoningEffort ?? ''
+      : instanceId === 'codex-account'
       ? ai.codexReasoningEffort ?? ''
       : instanceId === 'openai-api'
         ? ai.openaiReasoningEffort ?? ''
@@ -60,6 +63,7 @@ export function FeatureRoutingSection({
   const [lastDefaultDraft, setLastDefaultDraft] = useState(() => ({
     instanceId: ai.defaultProviderInstanceId,
     providerInstances: ai.providerInstances,
+    claudeReasoningEffort: ai.claudeReasoningEffort,
     codexReasoningEffort: ai.codexReasoningEffort,
     openaiReasoningEffort: ai.openaiReasoningEffort,
   }));
@@ -81,6 +85,7 @@ export function FeatureRoutingSection({
   if (
     ai.defaultProviderInstanceId !== lastDefaultDraft.instanceId ||
     ai.providerInstances !== lastDefaultDraft.providerInstances ||
+    ai.claudeReasoningEffort !== lastDefaultDraft.claudeReasoningEffort ||
     ai.codexReasoningEffort !== lastDefaultDraft.codexReasoningEffort ||
     ai.openaiReasoningEffort !== lastDefaultDraft.openaiReasoningEffort
   ) {
@@ -88,6 +93,7 @@ export function FeatureRoutingSection({
     setLastDefaultDraft({
       instanceId: ai.defaultProviderInstanceId,
       providerInstances: ai.providerInstances,
+      claudeReasoningEffort: ai.claudeReasoningEffort,
       codexReasoningEffort: ai.codexReasoningEffort,
       openaiReasoningEffort: ai.openaiReasoningEffort,
     });
@@ -126,6 +132,7 @@ export function FeatureRoutingSection({
     selectedDefaultInstanceId,
     defaultModel,
   );
+  const defaultEffortOptions = effortOptionsForProvider(selectedDefaultInstanceId);
 
   const modelPatchForInstance = (
     instanceId: AiProviderInstanceId,
@@ -146,6 +153,9 @@ export function FeatureRoutingSection({
     defaultProviderInstanceId: selectedDefaultInstanceId,
     provider: defaultProvider,
     ...modelPatchForInstance(selectedDefaultInstanceId, defaultModel),
+    ...(selectedDefaultInstanceId === 'claude-api' || selectedDefaultInstanceId === 'claude-account'
+      ? { claudeReasoningEffort: defaultSupportsEffort && defaultEffort ? defaultEffort : null }
+      : { claudeReasoningEffort: null }),
     ...(selectedDefaultInstanceId === 'openai-api'
       ? { openaiReasoningEffort: defaultSupportsEffort && defaultEffort ? defaultEffort : null }
       : { openaiReasoningEffort: null }),
@@ -268,7 +278,9 @@ export function FeatureRoutingSection({
               setDefaultInstanceId(nextId);
               setDefaultModel(instance.configuredModel || '');
               setDefaultEffort(
-                nextId === 'codex-account'
+                nextId === 'claude-api' || nextId === 'claude-account'
+                  ? ai.claudeReasoningEffort ?? ''
+                  : nextId === 'codex-account'
                   ? ai.codexReasoningEffort ?? ''
                   : nextId === 'openai-api'
                     ? ai.openaiReasoningEffort ?? ''
@@ -333,14 +345,11 @@ export function FeatureRoutingSection({
             className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800 disabled:bg-ink-50 disabled:text-ink-400"
           >
             <option value="">{defaultSupportsEffort ? 'Default' : 'Not available'}</option>
-            {defaultSupportsEffort && (
-              <>
-                <option value="minimal">Minimal</option>
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-              </>
-            )}
+            {defaultSupportsEffort && defaultEffortOptions.map((effort) => (
+              <option key={effort} value={effort}>
+                {effort[0].toUpperCase() + effort.slice(1)}
+              </option>
+            ))}
           </select>
           <span className="mt-1 block text-[11px] text-ink-400">
             {defaultSupportsEffort ? 'Inherited unless a feature overrides it.' : 'Not supported by this provider/model.'}
@@ -428,7 +437,7 @@ export function FeatureRoutingSection({
             selectedProvider === 'default'
               ? `Effective: ${providerInstanceBadge(ai, effective.providerInstanceId, effective.model)}`
               : selectedProvider === 'claude-account'
-                ? 'Try aliases like claude-sonnet-latest. List models shows alias + resolved ID.'
+                ? 'Use a listed Claude model ID such as claude-sonnet-4-6. Legacy aliases resolve server-side when possible.'
                 : selectedProvider === 'codex-account'
                   ? 'Use codex-recommended/codex-fast or a resolved catalog ID from List models.'
                   : selectedProvider === 'openai-compatible'
@@ -444,6 +453,7 @@ export function FeatureRoutingSection({
             selectedInstanceId,
             controlModel,
           );
+          const effortOptions = effortOptionsForProvider(selectedInstanceId);
           const supportsVerbosity = providerSupportsVerbosity(selectedInstanceId, controlModel);
           const effortHint = route.provider === 'default'
             ? 'Inherited from the global default route.'
@@ -564,14 +574,11 @@ export function FeatureRoutingSection({
                     className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800 disabled:bg-ink-50 disabled:text-ink-400"
                   >
                     <option value="">{supportsEffort ? 'Default' : 'Not available'}</option>
-                    {supportsEffort && (
-                      <>
-                        <option value="minimal">Minimal</option>
-                        <option value="low">Low</option>
-                        <option value="medium">Medium</option>
-                        <option value="high">High</option>
-                      </>
-                    )}
+                    {supportsEffort && effortOptions.map((effort) => (
+                      <option key={effort} value={effort}>
+                        {effort[0].toUpperCase() + effort.slice(1)}
+                      </option>
+                    ))}
                   </select>
                   <span className="mt-1 block text-[11px] text-ink-400">{effortHint}</span>
                 </label>

@@ -99,8 +99,10 @@ For large cloud catalogs such as OpenRouter, the expanded instance card includes
 
 ### Account providers
 
-- **Claude account** is an account-login transport for Claude.ai subscriptions. Login and logout from the Claude account card using Seedbank's native OAuth flow; token refresh is automatic.
+- **Claude account** is an account-login transport for Claude.ai subscriptions. Login and logout from the Claude account card using Seedbank's native OAuth flow; token refresh is automatic. The transport uses Claude Code-compatible account scopes and request shaping so current Claude Sonnet/Opus account models can use adaptive thinking, context-management edits, and server-side prompt caching through the account route.
 - **Codex account** is an account-login transport through the local Codex app-server auth flow. If Codex is missing or cannot start, the card reports that runtime failure directly.
+
+If a Claude account was linked before Seedbank requested the Claude Code-compatible scope set, the Claude card reports a re-login-required state and lists the missing scope instead of treating the old grant as connected.
 
 If this browser has previously seen Claude or Codex account auth succeed and the current server status later reports that auth is missing, Seedbank shows a persistent reauth notice in the app shell. The notice stays visible until the account is authenticated again and includes a direct **Open AI settings** link to `/settings/ai-agents`. Choosing **Log out** from the account card clears the browser-side reminder, so intentional sign-out does not keep nagging. The reminder stores only a local "this account was seen signed in before" flag; it does not store credentials.
 

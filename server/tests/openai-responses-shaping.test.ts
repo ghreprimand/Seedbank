@@ -18,7 +18,7 @@ function baseConfig(model = 'gpt-5-mini'): AiStoredConfig {
       'cloud-openai-compatible': {} as AiStoredConfig['providerInstances']['cloud-openai-compatible'],
     },
     openaiModel: model,
-    anthropicModel: 'claude-sonnet-4-20250514',
+    anthropicModel: 'claude-sonnet-4-6',
     claudeAccountModel: 'claude-sonnet-latest',
     codexAccountModel: 'codex-recommended',
     ollamaModel: 'llama3.2',

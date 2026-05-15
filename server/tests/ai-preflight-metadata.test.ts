@@ -44,7 +44,7 @@ test('AI preflight omits unresolved codex alias from resolved model metadata', (
   }
 });
 
-test('AI preflight omits unresolved claude latest alias from resolved model metadata', () => {
+test('AI preflight migrates stale Claude account default aliases to stable model ids', () => {
   const { db, service } = aiServiceFixture();
   try {
     service.configure({
@@ -58,8 +58,8 @@ test('AI preflight omits unresolved claude latest alias from resolved model meta
     const result = service.preflight('thinking-partner');
 
     assert.equal(result.provider, 'claude-account');
-    assert.equal(result.requestedModel, 'claude-sonnet-latest');
-    assert.equal('resolvedModelId' in result, false);
+    assert.equal(result.requestedModel, 'claude-sonnet-4-6');
+    assert.equal(result.resolvedModelId, 'claude-sonnet-4-6');
   } finally {
     db.close();
   }

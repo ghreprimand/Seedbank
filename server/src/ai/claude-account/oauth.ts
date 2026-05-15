@@ -1,7 +1,7 @@
 /**
  * Claude account PKCE OAuth bootstrap + refresh.
  *
- * Adapted from Archon's claude-native/oauth.ts. Uses the same Anthropic
+ * Adapted from the native Claude account OAuth flow. Uses the same Anthropic
  * OAuth endpoints and PKCE flow. The CLIENT_ID is the public PKCE client
  * identifier — it is NOT a secret (PKCE flows do not treat client_id as
  * confidential).
@@ -34,18 +34,24 @@ const CLIENT_ID = Buffer.from(CLIENT_ID_B64, 'base64').toString('utf8');
 const AUTHORIZE_URL = 'https://claude.ai/oauth/authorize';
 const TOKEN_URL = 'https://platform.claude.com/v1/oauth/token';
 const CALLBACK_HOST = '127.0.0.1';
-const CALLBACK_PORT = 53693; // Seedbank uses 53693 to avoid colliding with Archon's 53692
+const CALLBACK_PORT = 53693; // Seedbank uses a dedicated callback port for Claude account login.
 const CALLBACK_PATH = '/callback';
 const REDIRECT_URI = `http://localhost:${CALLBACK_PORT}${CALLBACK_PATH}`;
 
-// Match Archon's Claude Native account-login scope set so model catalog,
+// Match the Claude Code-compatible account-login scope set so model catalog,
 // profile/auth state, and account-token inference all share one consent grant.
 export const CLAUDE_ACCOUNT_OAUTH_SCOPES = [
   'org:create_api_key',
   'user:profile',
   'user:inference',
+  'user:sessions:claude_code',
+  'user:mcp_servers',
+  'user:file_upload',
 ] as const;
-export const CLAUDE_ACCOUNT_REQUIRED_SCOPES = ['user:inference'] as const;
+export const CLAUDE_ACCOUNT_REQUIRED_SCOPES = [
+  'user:inference',
+  'user:sessions:claude_code',
+] as const;
 const SCOPES = CLAUDE_ACCOUNT_OAUTH_SCOPES.join(' ');
 
 const REFRESH_LEAD_MS = 30_000;

@@ -4,6 +4,34 @@ Newest entries at the top.
 
 ---
 
+## 2026-05-15 — Claude Account Native Parity Fix
+
+Fixed the Claude account transport after release testing exposed a chain of misleading Anthropic account-beta failures: stale `claude-sonnet-latest` IDs returned 404s, partial account-login scopes looked connected but failed at inference time, and non-Claude-Code-shaped requests returned confusing 429/400 errors even though a Claude Code-compatible native request shape worked.
+
+Root cause:
+- Seedbank's Claude account route was close to the Claude Code-compatible native account path, but not identical.
+- New Claude account logins were only requesting the narrower `user:inference user:profile` scope set instead of the broader Claude Code-compatible grant.
+- The account request body sent `system` as a plain string, omitted the forced Claude Code first system block, omitted adaptive thinking/interleaved-thinking behavior for Sonnet 4.6, and allowed no-effort routes to send context-management `clear_thinking` without thinking enabled.
+- The provider still used the general 8 second HTTP timeout, which is too short for Claude account native-style requests and surfaced as a false "unreachable" error.
+
+What changed:
+- Updated the Claude account default model and stale-default migrations to concrete `claude-sonnet-4-6`.
+- Added alias resolution so legacy values such as `claude-sonnet-latest` and `sonnet` resolve to a concrete Messages API model ID before requests are sent.
+- Matched the Claude Code-compatible account OAuth scope set: `org:create_api_key`, `user:profile`, `user:inference`, `user:sessions:claude_code`, `user:mcp_servers`, and `user:file_upload`.
+- Added scope validation/status metadata so older narrow-scope logins are marked as requiring re-login instead of appearing healthy until inference fails.
+- Matched the Claude Code-compatible native wire shape for current Sonnet/Opus models: Claude Code first system block, block-form `system`, adaptive thinking, `output_config.effort`, interleaved-thinking beta, context-management edits, and high default effort when no route effort is set.
+- Added Claude account retry handling for transient 429/500/529 responses and raised Claude account request timeout to 120 seconds.
+- Exposed Claude account reasoning effort controls in AI settings and Feature Defaults where the selected Claude model supports effort.
+
+Validation:
+- `node --import tsx --test server/tests/claude-account-oauth-scopes.test.ts server/tests/claude-codex-regressions.test.ts server/tests/claude-account-catalog.test.ts`
+- `node --import tsx --test tests/ai-config-compat.test.ts tests/ai-preflight-metadata.test.ts` from `server/`
+- `npm run typecheck`
+- `npm run build`
+- Manual Claude account provider smoke: `ClaudeAccountProvider.complete(...)` with Sonnet 4.6 returns `Yes, here.`
+
+---
+
 ## 2026-05-15 — macOS App Launcher PATH Fix
 
 Fixed a macOS launcher issue found after the v1.0.0 archive release: the installer could start Seedbank successfully from Terminal, but the generated `~/Applications/Seedbank.app` did nothing when launched from Finder/Dock.
@@ -425,7 +453,7 @@ Validation and safety:
 
 ## 2026-05-14 — Documentation Accuracy Sweep + Contextual Help Redesign
 
-This session did two coordinated upgrades: (1) a code-based documentation/manual correction pass, and (2) a full contextual-help interaction redesign modeled on the Archon click-target flow.
+This session did two coordinated upgrades: (1) a code-based documentation/manual correction pass, and (2) a full contextual-help interaction redesign around click-target help.
 
 The help system was rebuilt around a global mode instead of scattered inline popovers. A new floating bottom-right help control now toggles help mode, supports collapse-to-chevron state, and keeps clear exit affordances (banner + Esc). While help mode is active, capture-phase click interception resolves the nearest `data-help` target and opens a contextual popover anchored to that UI region. Help entries now come from a central map (`client/src/help/helpContentMap.ts`) with resolver support for dataset overrides and generic fallback entries for unlabeled controls. The app now applies hover/highlight affordances in help mode, and opening the manual exits help mode to avoid interaction conflicts.
 

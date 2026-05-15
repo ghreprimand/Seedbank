@@ -15,14 +15,25 @@ import type { AiProvider, AiProviderCompleteOptions, AiProviderMessage, AiProvid
 
 const REQUEST_TIMEOUT_MS = 8_000;
 const OLLAMA_REQUEST_TIMEOUT_MS = 120_000;
+const CLAUDE_ACCOUNT_REQUEST_TIMEOUT_MS = 120_000;
 const OLLAMA_KEEP_ALIVE = '5m';
 const OLLAMA_SMOKE_PROMPT = 'Reply with exactly: pong';
 const CLAUDE_ACCOUNT_BETA_HEADER = 'claude-code-20250219,oauth-2025-04-20';
 const CLAUDE_CONTEXT_MANAGEMENT_BETA = 'context-management-2025-06-27';
 const CLAUDE_COMPACT_BETA = 'compact-2026-01-12';
 const CLAUDE_ACCOUNT_USER_AGENT = 'claude-cli/2.1.75';
+const CLAUDE_ACCOUNT_RETRY_BACKOFF_MS = [15_000, 30_000];
+const CLAUDE_INTERLEAVED_THINKING_BETA = 'interleaved-thinking-2025-05-14';
+const CLAUDE_CODE_FORCED_SYSTEM_BLOCK = "You are Claude Code, Anthropic's official CLI for Claude.";
+const CLAUDE_ADAPTIVE_MAX_TOKENS_BY_EFFORT: Record<'low' | 'medium' | 'high', number> = {
+  low: 8_192,
+  medium: 16_384,
+  high: 32_000,
+};
 
 export class AiProviderError extends Error {
+  readonly statusCode?: number;
+
   constructor(
     readonly provider: AiProviderId,
     readonly code: AiProviderErrorCode,
@@ -31,11 +42,27 @@ export class AiProviderError extends Error {
   ) {
     super(message);
     this.name = 'AiProviderError';
+    this.statusCode = status ? providerStatusCode(status) : undefined;
   }
+}
+
+function providerStatusCode(status: number): number {
+  if (status === 404) return 400;
+  if (status === 429) return 429;
+  if (status >= 400 && status < 500) return status;
+  if (status >= 500) return 502;
+  return 500;
 }
 
 function systemPrompt(messages: AiProviderMessage[]): string {
   return messages.filter((message) => message.role === 'system').map((message) => message.content).join('\n\n');
+}
+
+function claudeSystemBlocks(messages: AiProviderMessage[]): Array<{ type: 'text'; text: string }> {
+  const blocks = [{ type: 'text' as const, text: CLAUDE_CODE_FORCED_SYSTEM_BLOCK }];
+  const prompt = systemPrompt(messages).trim();
+  if (prompt) blocks.push({ type: 'text' as const, text: prompt });
+  return blocks;
 }
 
 function transcript(messages: AiProviderMessage[]): string {
@@ -102,6 +129,49 @@ async function fetchWithTimeout(url: string, init?: RequestInit, timeoutMs = REQ
   }
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function retryAfterMs(response: Response): number | undefined {
+  const raw = response.headers.get('retry-after');
+  if (!raw) return undefined;
+  const seconds = Number(raw);
+  if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1000;
+  const dateMs = Date.parse(raw);
+  if (Number.isFinite(dateMs)) return Math.max(0, dateMs - Date.now());
+  return undefined;
+}
+
+function isClaudeAccountRetryable(response: Response): boolean {
+  return response.status === 429 || response.status === 529 || response.status === 500;
+}
+
+async function fetchClaudeAccountWithRetry(url: string, init: RequestInit): Promise<Response> {
+  for (let attempt = 0; ; attempt += 1) {
+    const response = await fetchWithTimeout(url, init, CLAUDE_ACCOUNT_REQUEST_TIMEOUT_MS);
+    if (!isClaudeAccountRetryable(response) || attempt >= CLAUDE_ACCOUNT_RETRY_BACKOFF_MS.length) {
+      return response;
+    }
+    await response.arrayBuffer().catch(() => undefined);
+    const serverDelay = retryAfterMs(response);
+    const delayMs = serverDelay !== undefined
+      ? Math.min(Math.max(serverDelay, 0), 60_000)
+      : CLAUDE_ACCOUNT_RETRY_BACKOFF_MS[attempt];
+    console.warn(`[claude-account] ${response.status} from Anthropic; retrying in ${Math.round(delayMs / 1000)}s (${attempt + 1}/${CLAUDE_ACCOUNT_RETRY_BACKOFF_MS.length})`);
+    await sleep(delayMs);
+  }
+}
+
+function supportsClaudeAdaptiveThinking(model: string): boolean {
+  return model.includes('opus-4-6')
+    || model.includes('opus-4.6')
+    || model.includes('opus-4-7')
+    || model.includes('opus-4.7')
+    || model.includes('sonnet-4-6')
+    || model.includes('sonnet-4.6');
+}
+
 async function parseErrorBody(response: Response): Promise<string> {
   // Read as text first — response.json() consumes the body stream and its
   // parse failure leaves body.bodyUsed === true, making a subsequent text()
@@ -150,6 +220,16 @@ async function assertOk(provider: AiProviderId, response: Response, context: str
   if (response.ok) return;
   const detail = await parseErrorBody(response);
   const code: AiProviderErrorCode = response.status === 404 ? 'model_missing' : 'http_error';
+  if (response.status === 429) {
+    const providerLabel = aiProviderLabel(provider);
+    const providerDetail = detail && detail !== 'Error' ? ` Provider detail: ${detail}` : '';
+    throw new AiProviderError(
+      provider,
+      code,
+      `${context} failed: ${providerLabel} rate or usage limit was reached. Wait and retry, lower effort/model for this feature, or route it to another provider.${providerDetail}`,
+      response.status,
+    );
+  }
   throw new AiProviderError(provider, code, `${context} failed: ${response.status} ${detail}`, response.status);
 }
 
@@ -449,7 +529,13 @@ export class AnthropicProvider implements AiProvider {
     return apiKey;
   }
 
+  private selectedEffort(config: AiStoredConfig): 'low' | 'medium' | 'high' | undefined {
+    const effort = config.claudeReasoningEffort;
+    return effort === 'low' || effort === 'medium' || effort === 'high' ? effort : undefined;
+  }
+
   private body(messages: AiProviderMessage[], config: AiStoredConfig, stream = false) {
+    const effort = this.selectedEffort(config);
     return {
       model: config.anthropicModel,
       max_tokens: 800,
@@ -458,6 +544,7 @@ export class AnthropicProvider implements AiProvider {
         role: message.role,
         content: message.content,
       })),
+      ...(effort ? { output_config: { effort } } : {}),
       stream,
     };
   }
@@ -939,7 +1026,17 @@ export class ClaudeAccountProvider implements AiProvider {
   readonly id = 'claude-account';
 
   private configuredModel(config: AiStoredConfig): string {
-    return config.claudeAccountModel?.trim() || 'claude-sonnet-latest';
+    return config.claudeAccountModel?.trim() || 'claude-sonnet-4-6';
+  }
+
+  private selectedEffort(config: AiStoredConfig): 'low' | 'medium' | 'high' | undefined {
+    const effort = config.claudeReasoningEffort;
+    return effort === 'low' || effort === 'medium' || effort === 'high' ? effort : undefined;
+  }
+
+  private async resolvedModel(config: AiStoredConfig): Promise<string> {
+    const { resolveClaudeAccountModel } = await import('./claude-account/catalog.js');
+    return await resolveClaudeAccountModel(this.configuredModel(config));
   }
 
   private claudeAccountHeaders(accessToken: string, betaHeaders: string[] = []): Record<string, string> {
@@ -958,6 +1055,7 @@ export class ClaudeAccountProvider implements AiProvider {
       cache_control: { type: 'ephemeral' },
     };
     const betaHeaders: string[] = [];
+    if (supportsClaudeAdaptiveThinking(model)) betaHeaders.push(CLAUDE_INTERLEAVED_THINKING_BETA);
 
     let modelMeta: Awaited<ReturnType<typeof import('./claude-account/catalog.js').getCatalog>>['models'][number] | undefined;
     try {
@@ -991,18 +1089,22 @@ export class ClaudeAccountProvider implements AiProvider {
   }
 
   private async body(messages: AiProviderMessage[], config: AiStoredConfig, stream = false): Promise<{ betaHeaders: string[]; body: Record<string, unknown> }> {
-    const model = this.configuredModel(config);
+    const model = await this.resolvedModel(config);
     const options = await this.claudeNativeOptions(model, config);
+    const effort = this.selectedEffort(config) ?? (supportsClaudeAdaptiveThinking(model) ? 'high' : undefined);
+    const adaptiveThinking = effort && supportsClaudeAdaptiveThinking(model);
     return {
       betaHeaders: options.betaHeaders,
       body: {
         model,
-        max_tokens: 800,
-        system: systemPrompt(messages),
+        max_tokens: adaptiveThinking ? CLAUDE_ADAPTIVE_MAX_TOKENS_BY_EFFORT[effort] : 800,
+        system: claudeSystemBlocks(messages),
         messages: messages.filter((m) => m.role !== 'system').map((m) => ({
           role: m.role,
           content: m.content,
         })),
+        ...(adaptiveThinking ? { thinking: { type: 'adaptive', display: 'summarized' } } : {}),
+        ...(effort ? { output_config: { effort } } : {}),
         ...options.body,
         ...(stream ? { stream: true } : {}),
       },
@@ -1057,7 +1159,7 @@ export class ClaudeAccountProvider implements AiProvider {
     const accessToken = await this.requireTokens();
     const { betaHeaders, body } = await this.body(messages, config);
     try {
-      const response = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
+      const response = await fetchClaudeAccountWithRetry('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: this.claudeAccountHeaders(accessToken, betaHeaders),
         body: JSON.stringify(body),
@@ -1086,7 +1188,7 @@ export class ClaudeAccountProvider implements AiProvider {
     const accessToken = await this.requireTokens();
     const { betaHeaders, body } = await this.body(messages, config, true);
     try {
-      const response = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
+      const response = await fetchClaudeAccountWithRetry('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: this.claudeAccountHeaders(accessToken, betaHeaders),
         body: JSON.stringify(body),
@@ -1121,20 +1223,21 @@ export class ClaudeAccountProvider implements AiProvider {
   }
 
   async health(config: AiStoredConfig): Promise<AiProviderHealth> {
-    const model = this.configuredModel(config);
+    const requestedModel = this.configuredModel(config);
     try {
       // Health requires live auth — unauthenticated is not_configured, not healthy.
       await this.requireTokens();
+      const model = await this.resolvedModel(config);
       const models = await this.listModels(config);
       if (!models.ok) {
         throw new AiProviderError(this.id, models.code ?? 'unknown', models.message ?? 'Claude account model discovery failed.');
       }
       if (models.models.length > 0 && !models.models.some((m) => m.id === model)) {
-        throw new AiProviderError(this.id, 'model_missing', `Claude account model "${model}" was not returned by the model catalog.`);
+        throw new AiProviderError(this.id, 'model_missing', `Claude account model "${requestedModel}" resolved to "${model}", but that model was not returned by the model catalog.`);
       }
-      return providerHealth(this.id, model);
+      return { ...providerHealth(this.id, model), requestedModel, resolvedModelId: model };
     } catch (error) {
-      return providerHealth(this.id, model, error);
+      return providerHealth(this.id, requestedModel, error);
     }
   }
 
