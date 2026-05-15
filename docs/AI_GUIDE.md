@@ -125,13 +125,18 @@ Configure providers in **Settings → AI & Agents** — a small **Settings** lin
 
 The system behavior is intentionally constrained:
 
-- Ask questions before suggesting.
+- Treat the user's idea as the source material, not a prompt to invent unrelated ideas.
 - Reflect what is already in the idea.
 - Ground questions in the current idea fields, stage, notes, risks, build notes, tags, and scores.
 - Ask for missing context when the idea is sparse instead of inventing a generic critique.
-- Challenge assumptions gently.
+- For early-stage ideas, use future-facing planning language and do not imply the project has already been built, dogfooded, measured, or launched unless the notes say so.
+- Challenge assumptions gently and tie the challenge to a concrete note.
 - Avoid generating unrelated ideas.
 - Keep the user's creativity in control.
+
+Preset buttons such as **What If**, **Devil's Advocate**, **Scope Down**, and **User Story** run against fresh current idea context so stale conversation history does not steer them. The visible conversation stores the compact preset label, while the provider receives the full internal prompt.
+
+The **Custom question** field at the bottom of the panel is normal back-and-forth chat. It uses the per-idea Thinking Partner history so you can continue a thread with the assistant while it still sees the current idea context.
 
 Messages are streamed from `POST /api/ai/chat` and persisted per idea.
 
@@ -161,13 +166,13 @@ Supported fields:
 
 Organic modes are available in the AI chat panel.
 
-**What If** — asks one provocative "what if" question and waits for the user's response before going further. Good for breaking a stale framing, finding a surprising angle, or exploring inversions or constraints.
+**What If** — returns a compact thought unit: one grounded insight, one actionable next move, and one provocative "what if" question. Good for breaking a stale framing, finding a surprising angle, or exploring inversions or constraints.
 
-**Devil's Advocate** — challenges the weakest assumption that is actually present in the idea context without dismissing it. If the idea is too sparse, it asks for the missing detail needed to identify a real risk.
+**Devil's Advocate** — returns one grounded concern, one actionable way to test or reduce that concern before or during the first build, and one follow-up question. It challenges only assumptions that are actually present in the idea context.
 
-**Scope Down** — pushes the idea toward the smallest feasible version. Good for first prototypes and reducing a broad concept to one screen, one mechanic, or one workflow.
+**Scope Down** — returns one grounded insight about the core value, one actionable first-build scope cut, and one question that removes scope without removing that value.
 
-**User Story** — asks about a specific person in a specific situation. Good for clarifying who the idea serves, avoiding abstract feature lists, and finding the moment of need.
+**User Story** — returns one concrete first-use or first-dogfood scenario, one actionable thing to prepare or observe in that scenario, and one follow-up question. For personal daily-driver projects, it focuses on the user's intended repeated workflow rather than inventing an external user.
 
 ## Stage-Aware AI Personality
 
