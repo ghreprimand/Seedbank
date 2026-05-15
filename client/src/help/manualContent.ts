@@ -288,7 +288,7 @@ export const MANUAL_GROUPS: ManualGroup[] = [
         blocks: [
           { type: 'p', text: 'The Thinking Partner is an AI chat panel attached to each idea. It asks questions, reflects patterns, and helps scope ideas — it doesn\'t generate ideas for you.' },
           { type: 'p', text: 'Questions are grounded in the current idea fields, stage, notes, risks, build notes, tags, and scores. If the idea is sparse, the assistant should ask for missing context instead of inventing a generic critique.' },
-          { type: 'p', text: 'For early-stage ideas, preset prompts use future-facing planning language. They should ask about intended first workflows, assumptions, and validation plans rather than implying the project has already been built or dogfooded.' },
+          { type: 'p', text: 'For early-stage ideas, preset prompts use future-facing planning language. They should give a small grounded insight, an actionable next move, and a follow-up question rather than implying the project has already been built or dogfooded.' },
           { type: 'h3', text: 'Prompt modes' },
           { type: 'ul', items: [
             'What If — explores alternative directions.',

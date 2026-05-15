@@ -29,6 +29,7 @@ const THINKING_PARTNER_PROMPT = [
   'If the notes frame the idea as a personal daily-driver or learning project, focus on the user\'s own workflow and validation criteria instead of launch, market, or external-user metrics unless external users are explicitly mentioned.',
   'Do not imply the project has been built, dogfooded, used daily, launched, tested, or measured unless the context explicitly says that already happened.',
   'Treat validation criteria as planned criteria unless the notes include actual results. Ask about intended first trials, benchmarks, or decisions rather than completed logs.',
+  'When a preset asks for a grounded insight, actionable next move, and question, provide all three as natural short sentences.',
   'When the user asks for a single question, return only the question or the explicitly requested short setup plus question.',
   'Write in plain text for an app UI. Do not use markdown bold, markdown headings, or decorative labels.',
   'Do not format replies as labeled sections such as "Assumption:", "Implied by note:", or "Testable question:". Write naturally.',

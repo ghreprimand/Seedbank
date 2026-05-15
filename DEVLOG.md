@@ -31,6 +31,7 @@ What changed:
 - The preset prompts now ask for natural, unlabeled output: What If and Devil's Advocate return one focused question, while Scope Down and User Story return a short setup plus one question.
 - Thinking Partner now explicitly avoids implying that an early idea has already been built, dogfooded, measured, or used daily. Validation criteria are treated as planned criteria until the notes include actual results.
 - The preset prompts now frame early personal tools around intended first workflows and first-build decisions. User Story asks for a first-use/first-dogfood scenario, Scope Down asks for the smallest first build, and Devil's Advocate asks what to test before or during the first build.
+- Preset responses now target a small useful thought unit: a grounded insight, an actionable next move, and one follow-up question. This should make the presets feel more like thinking support and less like isolated interrogation.
 - Thinking Partner display now groups each newest-first user prompt with its response, and the bottom input is labeled as a Custom question field for normal history-aware chat.
 - Short AI outputs now ask for plain text rather than markdown headings/bold markers because these panels render plain text.
 - Image gallery rendering now resolves Seedbank API image paths through the configured API base URL, so uploads display correctly when the frontend and API run on different ports.
