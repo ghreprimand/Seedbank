@@ -2,11 +2,13 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import {
+  ArrowRight,
   ArrowLeft,
   Copy,
   Trash2,
   Snowflake,
   Check,
+  Circle,
   ChevronDown,
   Download,
   Rocket,
@@ -51,7 +53,7 @@ import type { GraduationResponse } from '@/api/client';
 import type { GitHubPublishResponse } from '@/api/client';
 import type { AiProjectGenerateResult } from '@/lib/types';
 import { exportIdeaAsMarkdown, exportIdeaAsJSON } from '@/lib/export';
-import { assessReadiness } from '@/lib/stageReadiness';
+import { assessReadiness, type StageReadinessAssessment } from '@/lib/stageReadiness';
 import { useCategoriesSettings } from '@/stores/settings';
 import { HelpButton } from '@/help/HelpPopover';
 
@@ -80,6 +82,101 @@ function displayLabelForField(field: string, stage: Stage): string {
   if (field === 'images') return 'Images';
   if (field === 'landscapeAnalysis') return 'Landscape Analysis';
   return field;
+}
+
+function StageProgressPanel({
+  idea,
+  readiness,
+  onMove,
+}: {
+  idea: Idea;
+  readiness: StageReadinessAssessment;
+  onMove: (stage: Stage) => void;
+}) {
+  if (readiness.nextStage === idea.stage) return null;
+
+  const checklist = [
+    ...readiness.met.map((label) => ({ label, complete: true })),
+    ...readiness.missing.map((label) => ({ label, complete: false })),
+  ];
+  const nextStageLabel = STAGE_LABELS[readiness.nextStage];
+
+  return (
+    <div
+      className={`rounded-card border px-3 py-3 ${
+        readiness.ready
+          ? 'border-sage-200 bg-sage-50'
+          : 'border-amber-200 bg-amber-50'
+      }`}
+      data-help="promotion-nudge"
+    >
+      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span
+              className={`w-7 h-7 rounded-full border flex items-center justify-center ${
+                readiness.ready
+                  ? 'bg-sage-100 border-sage-200 text-sage-700'
+                  : 'bg-paper border-amber-200 text-amber-700'
+              }`}
+            >
+              <Rocket className="w-3.5 h-3.5" />
+            </span>
+            <div>
+              <h2 className="text-sm font-serif font-semibold text-ink-900">Stage Progress</h2>
+              <p className="text-xs text-ink-500">
+                {readiness.ready
+                  ? `Ready to move from ${STAGE_LABELS[idea.stage]} to ${nextStageLabel}.`
+                  : `Working toward ${nextStageLabel}. Complete the checklist to advance automatically, or move manually anytime.`}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+            {checklist.map((item) => (
+              <div
+                key={item.label}
+                className={`flex items-center gap-1.5 text-xs ${
+                  item.complete ? 'text-sage-800' : 'text-amber-900'
+                }`}
+              >
+                {item.complete ? (
+                  <Check className="w-3.5 h-3.5 shrink-0" />
+                ) : (
+                  <Circle className="w-3.5 h-3.5 shrink-0" />
+                )}
+                <span>{item.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => onMove(readiness.nextStage)}
+          className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-badge transition-colors whitespace-nowrap ${
+            readiness.ready
+              ? 'bg-sage-600 hover:bg-sage-700 text-white'
+              : 'bg-paper hover:bg-amber-100 text-amber-900 border border-amber-200'
+          }`}
+        >
+          {readiness.ready ? 'Move to' : 'Move anyway to'} {nextStageLabel}
+          <ArrowRight className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function maybeAutoAdvanceStage(previous: Idea, next: Idea): Idea {
+  if (previous.stage !== next.stage) return next;
+
+  const before = assessReadiness(previous);
+  const after = assessReadiness(next);
+  if (before.nextStage === previous.stage || after.nextStage === next.stage) return next;
+  if (before.ready || !after.ready) return next;
+
+  return { ...next, stage: after.nextStage };
 }
 
 export default function IdeaDetail() {
@@ -168,7 +265,8 @@ export default function IdeaDetail() {
   const update = <K extends keyof Idea>(field: K, value: Idea[K]) => {
     setIdea((prev) => {
       if (!prev) return prev;
-      const next = { ...prev, [field]: value };
+      const changed = { ...prev, [field]: value };
+      const next = maybeAutoAdvanceStage(prev, changed);
       scheduleSave(next);
       return next;
     });
@@ -177,10 +275,13 @@ export default function IdeaDetail() {
   const saveNow = async (changes: Partial<Idea>) => {
     if (!idea) return;
     cancelSave();
-    setIdea((prev) => (prev ? { ...prev, ...changes } : prev));
+    const next = 'stage' in changes
+      ? { ...idea, ...changes }
+      : maybeAutoAdvanceStage(idea, { ...idea, ...changes });
+    setIdea(next);
     setSaveStatus('saving');
     try {
-      const updated = await updateIdea(idea.id, changes);
+      const updated = await updateIdea(idea.id, next);
       if (updated) setIdea(updated);
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus('idle'), 1500);
@@ -424,17 +525,6 @@ export default function IdeaDetail() {
             />
           </div>
 
-          {readiness && readiness.ready && readiness.nextStage !== idea.stage && (
-            <button
-              type="button"
-              onClick={() => saveNow({ stage: readiness.nextStage })}
-              className="px-2 py-0.5 text-[11px] font-medium font-mono text-amber-700 bg-amber-50 border border-amber-200 rounded-badge hover:border-amber-300 transition-colors"
-              data-help="promotion-nudge"
-            >
-              ✨ Ready for {STAGE_LABELS[readiness.nextStage]}
-            </button>
-          )}
-
           {/* Category picker */}
           <div className="relative">
             <button
@@ -496,6 +586,14 @@ export default function IdeaDetail() {
           )}
         </div>
       </div>
+
+      {readiness && (
+        <StageProgressPanel
+          idea={idea}
+          readiness={readiness}
+          onMove={(nextStage) => saveNow({ stage: nextStage })}
+        />
+      )}
 
       <StageTimeline ideaId={idea.id} />
 

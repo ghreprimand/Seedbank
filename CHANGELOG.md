@@ -4,6 +4,11 @@
 
 - Fixed Claude account routing so Seedbank uses the same Claude Code-compatible OAuth scopes and request shape as the working native Claude path: concrete Sonnet 4.6 model IDs, block-form system prompts, adaptive thinking, interleaved-thinking/context-management beta headers, high default effort for adaptive Claude models, transient retry handling, and a longer account request timeout.
 - Claude account status now detects older narrow-scope OAuth grants and asks for re-login instead of showing the provider as healthy until inference fails.
+- Hardened Codex account login/status on Windows by resolving npm-installed Codex CLI entrypoints through Node.js when needed, avoiding quoted `.cmd` launch failures, increasing account request timeout, and falling back to clear manual login instructions when the local Codex app-server cannot start interactively.
+- Clarified AI settings copy so users can distinguish API-key providers from account-login providers, including the local CLI/runtime requirement for Claude/Codex account routes.
+- Updated Linux, macOS, and Windows launchers so app-menu launches restart the local Seedbank runtime before opening the browser, helping code updates take effect without a separate manual stop/start step.
+- Changed the GitHub release workflow to manual dispatch only so tags can be created deliberately without automatically starting package jobs or self-hosted runner work.
+- Reworked idea stage progression so tags are optional, the next-stage checklist is visible in a Stage Progress panel, users can move stages manually at any time, and ideas auto-advance when an edit completes the current stage checklist.
 
 ## 1.0.1 — macOS App Launcher Fix
 

@@ -28,8 +28,23 @@ $Url = "http://127.0.0.1:$ClientPort"
 
 New-Item -ItemType Directory -Force -Path $CacheDir | Out-Null
 
-if (Test-Path $LocalNodeDir) {
-  $env:Path = @($LocalNodeDir, $env:Path) -join ';'
+function Add-ProcessPathEntry([string]$PathValue) {
+  if ([string]::IsNullOrWhiteSpace($PathValue) -or -not (Test-Path $PathValue)) {
+    return
+  }
+  $parts = @($env:Path -split ';' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+  if ($parts -notcontains $PathValue) {
+    $env:Path = @($PathValue, $env:Path) -join ';'
+  }
+}
+
+$commonCliDirs = @($LocalNodeDir)
+if ($env:APPDATA) { $commonCliDirs += (Join-Path $env:APPDATA 'npm') }
+if ($env:LOCALAPPDATA) { $commonCliDirs += (Join-Path $env:LOCALAPPDATA 'Programs\nodejs') }
+if ($env:ProgramFiles) { $commonCliDirs += (Join-Path $env:ProgramFiles 'nodejs') }
+if (${env:ProgramFiles(x86)}) { $commonCliDirs += (Join-Path ${env:ProgramFiles(x86)} 'nodejs') }
+foreach ($dir in $commonCliDirs) {
+  Add-ProcessPathEntry $dir
 }
 
 function Get-PortPid([int]$Port) {

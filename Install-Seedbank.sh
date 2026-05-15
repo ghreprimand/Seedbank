@@ -132,6 +132,52 @@ prepare_seedbank() {
   (cd "$SEEDBANK_DIR" && npm run build)
 }
 
+install_macos_runtime() {
+  local install_dir="$HOME/Library/Application Support/Seedbank/app"
+  local install_parent
+  local source_real
+  local install_real
+
+  install_parent="$(dirname "$install_dir")"
+  mkdir -p "$install_parent"
+  source_real="$(cd "$SCRIPT_DIR" && pwd -P)"
+  install_real="$(mkdir -p "$install_dir" && cd "$install_dir" && pwd -P)"
+
+  if [[ "$source_real" == "$install_real" ]]; then
+    SEEDBANK_DIR="$install_dir"
+    LAUNCHER="$SEEDBANK_DIR/scripts/seedbank"
+    say "Seedbank runtime is already in $SEEDBANK_DIR"
+    return 0
+  fi
+
+  say "Installing Seedbank runtime to $install_dir..."
+  if [[ -f "$install_dir/scripts/seedbank" ]]; then
+    SEEDBANK_DIR="$install_dir" bash "$install_dir/scripts/seedbank" stop >/dev/null 2>&1 || true
+  fi
+
+  if command -v rsync >/dev/null 2>&1; then
+    rsync -a --delete \
+      --exclude '.git' \
+      --exclude '.archon' \
+      --exclude '.release' \
+      --exclude 'node_modules' \
+      "$SCRIPT_DIR/" "$install_dir/"
+  else
+    rm -rf "$install_dir"
+    mkdir -p "$install_dir"
+    ditto "$SCRIPT_DIR" "$install_dir"
+    find "$install_dir" -name node_modules -type d -prune -exec rm -rf {} + 2>/dev/null || true
+    rm -rf "$install_dir/.git" "$install_dir/.archon" "$install_dir/.release"
+  fi
+
+  if command -v xattr >/dev/null 2>&1; then
+    xattr -dr com.apple.quarantine "$install_dir" >/dev/null 2>&1 || true
+  fi
+
+  SEEDBANK_DIR="$install_dir"
+  LAUNCHER="$SEEDBANK_DIR/scripts/seedbank"
+}
+
 install_linux_launcher() {
   say "Installing Linux application launcher..."
   bash "$SEEDBANK_DIR/scripts/install-desktop.sh"
@@ -197,7 +243,13 @@ export SEEDBANK_DIR="$SEEDBANK_DIR"
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:\${PATH:-}"
 LOG_DIR="\$HOME/Library/Logs/Seedbank"
 mkdir -p "\$LOG_DIR"
-exec "$LAUNCHER" start >> "\$LOG_DIR/launcher.log" 2>&1
+{
+  echo
+  echo "=== \$(date -Iseconds) Seedbank.app launch ==="
+  echo "SEEDBANK_DIR=\$SEEDBANK_DIR"
+  echo "PATH=\$PATH"
+  exec /bin/bash "$LAUNCHER" restart
+} >> "\$LOG_DIR/launcher.log" 2>&1
 EOF
   chmod +x "$executable"
 
@@ -237,7 +289,7 @@ install_launcher() {
   case "$(uname -s)" in
     Linux) install_linux_launcher ;;
     Darwin) install_macos_launcher ;;
-    *) say "Launcher install skipped for this OS. Use scripts/seedbank start." ;;
+    *) say "Launcher install skipped for this OS. Use scripts/seedbank restart." ;;
   esac
 }
 
@@ -245,6 +297,9 @@ main() {
   say "Seedbank installer"
   say "Location: $SEEDBANK_DIR"
   ensure_node
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    install_macos_runtime
+  fi
   prepare_seedbank
   install_launcher
 
@@ -253,7 +308,7 @@ main() {
     say "Starting Seedbank..."
     bash "$LAUNCHER" restart
   else
-    say "Start it later with: bash scripts/seedbank start"
+    say "Start it later from the app launcher or with: bash scripts/seedbank restart"
   fi
 }
 

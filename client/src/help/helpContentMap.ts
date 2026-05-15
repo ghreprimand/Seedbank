@@ -179,13 +179,13 @@ export const HELP_CONTENT_MAP: Record<string, HelpEntry> = {
   'health-check': {
     title: 'Idea Health Check',
     body: 'Combines field quality signals with stage-aware readiness criteria for your next lifecycle step.',
-    details: 'When criteria are met, it offers one-click promotion. Missing criteria are shown as a checklist (Spark+tags, then Concept, then Case+Pitch, then Risks+Build Notes).',
+    details: 'Missing criteria are shown as a checklist (Spark detail, then Concept, then Case+Pitch, then Risks+Build Notes). Tags are optional and never block stage progress.',
     manualSection: 'health-check',
   },
   'promotion-nudge': {
-    title: 'Promotion Nudge',
-    body: 'This pill appears when your idea meets the readiness criteria for the next stage.',
-    details: 'It is informational only. You can always change stage manually regardless of readiness.',
+    title: 'Stage Progress',
+    body: 'Shows the next lifecycle stage, the advisory checklist for getting there, and a direct move action.',
+    details: 'When an edit completes the checklist, Seedbank advances the idea automatically. You can still move stages manually at any time, even before the checklist is complete.',
     manualSection: 'stages',
   },
   'landscape-analysis': {

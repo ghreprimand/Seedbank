@@ -186,10 +186,10 @@ Current release scaffolding:
 - `npm run release:package -- --target <linux-x64|macos|windows-x64> --format <tar.gz|zip>`
 - `npm run release:smoke` (smoke-check all discovered release artifacts)
 - `npm run release:smoke -- <artifact-path>`
-- Tag-driven GitHub workflow: `.github/workflows/release.yml` (macOS package job requires a self-hosted runner with labels `[self-hosted, macOS]`)
+- Manual GitHub release workflow: `.github/workflows/release.yml` with a `release_tag` input for an existing tag. The macOS package job requires a self-hosted runner with labels `[self-hosted, macOS]`.
 - Full release notes: `docs/RELEASING.md`
 
-Public-repo runner safety note: self-hosted runners execute repository workflow code. Seedbank keeps self-hosted usage constrained to trusted release tag/manual paths, not PR/fork workflows.
+Public-repo runner safety note: self-hosted runners execute repository workflow code. Seedbank keeps self-hosted usage constrained to trusted manual release runs, not PR/fork workflows or automatic tag pushes.
 
 Deferred packaging:
 

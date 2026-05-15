@@ -457,9 +457,9 @@ export default function AiAgentsTab() {
           />
         </div>
         <p className="text-xs text-ink-400">
-          Configure each service family. Choose <strong>API key</strong> for direct provider access or{' '}
-          <strong>Account login</strong> to use your subscription. Global default and Feature Defaults apply to
-          chat/model-capable methods only.
+          Configure each service family. <strong>API key</strong> methods use provider API billing.
+          <strong> Account login</strong> methods use an already-signed-in local account or CLI runtime
+          where supported. Global default and Feature Defaults apply to chat/model-capable methods only.
         </p>
         {hasDisabledProviderMethods && disabledProviderNote}
         {providerDiagnostics.length > 0 && (
@@ -473,6 +473,11 @@ export default function AiAgentsTab() {
           {/* ── Claude Service ─────────────────────────────────────────────── */}
           <div className="rounded-card border border-ink-100 bg-paper p-3 space-y-3" data-help="settings-ai-claude-service">
             <p className="text-[10px] font-mono uppercase tracking-wider text-ink-400">Claude Service</p>
+            <p className="text-[11px] text-ink-500">
+              Choose <span className="font-semibold text-ink-700">API key</span> for Anthropic API billing,
+              or <span className="font-semibold text-ink-700">Account login</span> to use your Claude account
+              subscription through Seedbank&apos;s local Claude account flow.
+            </p>
             <ServiceMethodSwitch
               title="Method"
               value={claudeMethod}
@@ -554,6 +559,11 @@ export default function AiAgentsTab() {
           {/* ── Codex / OpenAI Service ─────────────────────────────────────── */}
           <div className="rounded-card border border-ink-100 bg-paper p-3 space-y-3" data-help="settings-ai-codex-service">
             <p className="text-[10px] font-mono uppercase tracking-wider text-ink-400">Codex / OpenAI Service</p>
+            <p className="text-[11px] text-ink-500">
+              Choose <span className="font-semibold text-ink-700">API key</span> for OpenAI API billing,
+              or <span className="font-semibold text-ink-700">Account login</span> to use a local Codex CLI
+              session. Codex account login requires the Codex CLI to be installed and visible to Seedbank.
+            </p>
             <ServiceMethodSwitch
               title="Method"
               value={openaiMethod}

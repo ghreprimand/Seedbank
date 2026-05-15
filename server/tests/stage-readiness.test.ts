@@ -3,17 +3,16 @@ import assert from 'node:assert/strict';
 import { assessReadiness } from '../../shared/stageReadiness.js';
 import { newIdea } from '../src/domain.js';
 
-test('seed readiness requires spark depth and at least one tag', () => {
+test('seed readiness requires spark depth only', () => {
   const missing = assessReadiness(newIdea({ stage: 'seed', fullNotes: 'Too short', tags: [] }));
   assert.equal(missing.ready, false);
   assert.equal(missing.nextStage, 'sprout');
-  assert.ok(missing.missing.includes('The Spark is at least 40 characters'));
-  assert.ok(missing.missing.includes('At least 1 tag is added'));
+  assert.ok(missing.missing.includes('The Spark has enough detail'));
 
   const ready = assessReadiness(newIdea({
     stage: 'seed',
     fullNotes: 'This spark is long enough to satisfy the minimum threshold for moving forward.',
-    tags: ['prototype'],
+    tags: [],
   }));
   assert.equal(ready.ready, true);
   assert.equal(ready.missing.length, 0);

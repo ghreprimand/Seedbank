@@ -27,9 +27,9 @@ Each provider method is stored as a provider instance. Built-in instances cover 
 
 **Custom / OpenAI-compatible endpoint** — choose a preset or enter a compatible endpoint URL, API key when required, and model name. Use this for OpenRouter, Groq, Mistral, Together, Fireworks, LM Studio, vLLM, llama.cpp, LocalAI, or another service that accepts OpenAI Chat Completions requests. Local and cloud instances are stored separately so a local LM Studio server does not overwrite an OpenRouter setup.
 
-**Claude account** — account-auth method with login/status controls shown in the Claude service area. Use this to route AI chat through a Claude.ai subscription with Seedbank's native OAuth flow rather than an Anthropic API key. Seedbank requests the Claude Code-compatible account scopes needed for current account-model inference and sends Claude account requests in the same native-style shape: concrete model IDs such as `claude-sonnet-4-6`, Claude Code system blocks, adaptive thinking for supported Sonnet/Opus models, and context-management edits. Older Claude account logins that are missing the required scope are shown as needing re-login.
+**Claude account** — account-auth method with login/status controls shown in the Claude service area. Use this to route AI chat through a Claude.ai subscription with Seedbank's native OAuth flow rather than an Anthropic API key. This is separate from Anthropic API billing. Seedbank requests the Claude Code-compatible account scopes needed for current account-model inference and sends Claude account requests in the same native-style shape: concrete model IDs such as `claude-sonnet-4-6`, Claude Code system blocks, adaptive thinking for supported Sonnet/Opus models, and context-management edits. Older Claude account logins that are missing the required scope are shown as needing re-login.
 
-**Codex account** — account-auth method that talks to the local Codex app-server over JSON-RPC. This requires a compatible Codex runtime installed locally. It is not OpenAI API billing.
+**Codex account** — account-auth method that talks to the local Codex app-server over JSON-RPC. This requires a compatible Codex CLI/runtime installed locally and logged in on the same computer. It is separate from OpenAI API billing and does not use an OpenAI API key. On Windows, Seedbank resolves common npm-installed Codex locations and starts the runtime through Node.js when needed.
 
 ### Account reauth notices
 
@@ -76,7 +76,7 @@ Feature Defaults let you route each AI feature independently (Thinking Partner, 
 - Pick from discovered models when available; free-text model IDs remain possible for custom endpoints.
 - Set reasoning effort when the selected provider/model supports it.
 
-Unavailable account transports can appear as options for visibility, but save is blocked when a route targets unavailable account providers.
+Unavailable account transports can appear as options for visibility, but save is blocked when a route targets unavailable account providers. For account-login routes, first install and sign in to the matching local runtime, then refresh status in Settings.
 
 ### Ask AI provider/model picker
 
@@ -188,9 +188,11 @@ Thinking Partner and field-assist prompts automatically adapt by stage:
 
 ## Idea Health Check
 
-The Idea Health Check appears on the idea detail page. It combines AI summary text with field-by-field readiness feedback for: Pitch, Hook, Why It Might Work, Risks, Tech Stack, and Tags.
+The Idea Health Check appears on the idea detail page. It combines AI summary text with field-by-field readiness feedback for: Pitch, Hook, Why It Might Work, Risks, Tech Stack, and optional Tags.
 
 Each field is marked as strong or needing attention, giving a concrete next editing target. No fields are auto-updated — you decide what to change.
+
+Stage progress is shown separately on the idea detail page. Tags are optional and never block stage movement. If an edit completes the current stage checklist, Seedbank can advance the idea to the next stage automatically; you can also move stages manually at any time.
 
 ---
 
