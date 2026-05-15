@@ -33,6 +33,18 @@ const INCLUDE_PATHS = [
   'docs',
 ];
 
+const TARGET_INSTALLERS = {
+  'linux-x64': ['Install-Seedbank.sh'],
+  macos: ['Install-Seedbank.command'],
+  'windows-x64': ['Install-Seedbank.bat'],
+};
+
+const TARGET_SCRIPT_KEEP = {
+  'linux-x64': new Set(['seedbank', 'install-desktop.sh', 'seedbank.desktop']),
+  macos: new Set(['seedbank']),
+  'windows-x64': new Set(['seedbank.ps1', 'Install-Seedbank.ps1']),
+};
+
 const ROOT_EXCLUDES = new Set([
   '.git',
   '.archon',
@@ -118,18 +130,68 @@ function shouldExclude(absPath) {
   return parts.some((segment) => ROOT_EXCLUDES.has(segment));
 }
 
+function copyPathToStage(stageDir, relPath, destRelPath = relPath) {
+  const src = path.join(ROOT, relPath);
+  if (!fs.existsSync(src)) return false;
+  const dest = path.join(stageDir, destRelPath);
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  fs.cpSync(src, dest, {
+    recursive: true,
+    force: true,
+    filter: (item) => !shouldExclude(item),
+  });
+  return true;
+}
+
 function copyIncludedTree(stageDir) {
   for (const relPath of INCLUDE_PATHS) {
-    const src = path.join(ROOT, relPath);
-    if (!fs.existsSync(src)) continue;
-    const dest = path.join(stageDir, relPath);
-    fs.mkdirSync(path.dirname(dest), { recursive: true });
-    fs.cpSync(src, dest, {
-      recursive: true,
-      force: true,
-      filter: (item) => !shouldExclude(item),
-    });
+    copyPathToStage(stageDir, relPath);
   }
+}
+
+function makeExecutableIfPresent(stageDir, relPath) {
+  const filePath = path.join(stageDir, relPath);
+  if (!fs.existsSync(filePath)) return;
+  const mode = fs.statSync(filePath).mode;
+  fs.chmodSync(filePath, mode | 0o755);
+}
+
+function pruneTargetScripts(stageDir, target) {
+  const scriptsDir = path.join(stageDir, 'scripts');
+  if (!fs.existsSync(scriptsDir)) return;
+
+  const keep = TARGET_SCRIPT_KEEP[target] ?? new Set();
+  for (const name of fs.readdirSync(scriptsDir)) {
+    if (keep.has(name)) continue;
+    fs.rmSync(path.join(scriptsDir, name), { recursive: true, force: true });
+  }
+}
+
+function installTargetInstallers(stageDir, target) {
+  for (const relPath of TARGET_INSTALLERS[target] ?? []) {
+    if (target === 'macos' && relPath === 'Install-Seedbank.command') {
+      if (!copyPathToStage(stageDir, 'Install-Seedbank.sh', relPath)) {
+        throw new Error('Missing Install-Seedbank.sh needed to create the macOS installer.');
+      }
+    } else if (!copyPathToStage(stageDir, relPath)) {
+      throw new Error(`Missing target installer: ${relPath}`);
+    }
+    makeExecutableIfPresent(stageDir, relPath);
+  }
+
+  if (target === 'windows-x64') {
+    if (!copyPathToStage(stageDir, 'Install-Seedbank.ps1', 'scripts/Install-Seedbank.ps1')) {
+      throw new Error('Missing Install-Seedbank.ps1 needed by the Windows batch installer.');
+    }
+  }
+
+  pruneTargetScripts(stageDir, target);
+  makeExecutableIfPresent(stageDir, 'scripts/seedbank');
+  makeExecutableIfPresent(stageDir, 'scripts/install-desktop.sh');
+}
+
+function pruneNonRuntimeFiles(stageDir) {
+  fs.rmSync(path.join(stageDir, 'server', 'tests'), { recursive: true, force: true });
 }
 
 function assertBuildOutputs() {
@@ -240,6 +302,8 @@ function createArtifactForTarget(versionTag, target, format) {
     fs.mkdirSync(stageDir, { recursive: true });
     fs.mkdirSync(ARTIFACT_ROOT, { recursive: true });
     copyIncludedTree(stageDir);
+    installTargetInstallers(stageDir, target);
+    pruneNonRuntimeFiles(stageDir);
 
     fs.rmSync(artifactPath, { force: true });
     if (format === 'tar.gz') {

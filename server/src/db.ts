@@ -80,10 +80,16 @@ export function latestFileInfo(dir: string, pattern: RegExp): { path: string; ti
 function migrationDir(): string {
   const candidates = [
     path.resolve(process.cwd(), 'migrations'),
+    path.resolve(process.cwd(), 'server/migrations'),
     path.resolve(__dirname, '../migrations'),
     path.resolve(__dirname, '../../migrations'),
+    path.resolve(__dirname, '../../../migrations'),
   ];
-  return candidates.find((candidate) => fs.existsSync(candidate)) ?? candidates[0];
+  const dir = candidates.find((candidate) => fs.existsSync(candidate));
+  if (!dir) {
+    throw new Error(`Seedbank migrations directory was not found. Checked: ${candidates.join(', ')}`);
+  }
+  return dir;
 }
 
 function runMigrations(db: Database.Database) {
@@ -99,12 +105,13 @@ function runMigrations(db: Database.Database) {
       .map((row) => (row as { filename: string }).filename),
   );
 
-  const migrations = fs.readdirSync(migrationDir())
+  const migrationsPath = migrationDir();
+  const migrations = fs.readdirSync(migrationsPath)
     .filter((name) => /^\d+_.*\.sql$/.test(name))
     .sort();
 
   const applyMigration = db.transaction((filename: string) => {
-    const sql = fs.readFileSync(path.join(migrationDir(), filename), 'utf8');
+    const sql = fs.readFileSync(path.join(migrationsPath, filename), 'utf8');
     db.exec(sql);
     db.prepare('INSERT INTO schema_migrations (filename, applied_at) VALUES (?, ?)')
       .run(filename, new Date().toISOString());

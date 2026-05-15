@@ -2,6 +2,51 @@
 
 ## Unreleased
 
+- No changes yet.
+
+## 1.0.0 — Public Archive Release
+
+### First-run setup and project root selection
+
+- Added a skippable first-run onboarding modal that asks for the project graduation directory and points users to AI assistance and GitHub publishing setup.
+- Added a Save action in onboarding so users can save the project root without leaving setup.
+- Added a Settings → General action to reopen onboarding for testing.
+- Added Browse controls for project-root fields in onboarding and Settings → Project Graduation.
+- Replaced fragile native Linux folder-picker portal handling with an in-app folder browser that works from the local Seedbank server, including folder navigation, typed paths, and new-folder creation.
+
+### Public archive installers
+
+- Added one-click archive installers for each supported OS:
+  - Linux: `Install-Seedbank.sh`
+  - macOS: `Install-Seedbank.command`
+  - Windows: `Install-Seedbank.bat`
+- Added archive packaging and smoke-test scripts for `linux-x64`, `macos`, and `windows-x64` release artifacts.
+- Trimmed release packages so each OS archive exposes only the correct user-facing installer and only the runtime scripts needed by that OS.
+- Updated install docs and release docs for the archive-based public distribution model.
+
+### Launcher and update hardening
+
+- Installers now rebuild the runtime on install/update so the client and server cannot get out of sync.
+- Linux launcher installs a desktop entry and icon, handles restart/update flows, cleans stale process state, and avoids duplicate browser tabs.
+- macOS installer creates `~/Applications/Seedbank.app` and generates an app icon.
+- Windows installer creates a Start Menu shortcut, can install Node.js automatically via winget or a portable Node.js download, stops old Seedbank processes from previous extracted folders, clears stale runtime state, refreshes shell icon cache, and logs hidden launcher failures.
+- Windows launch/start now uses `127.0.0.1` consistently and has a short browser-open debounce so manual Start Menu launches reliably open Seedbank.
+
+### Packaging fixes
+
+- Fixed macOS build failures caused by `HelpContext`/`helpContext` filename casing.
+- Fixed packaged Windows server startup by resolving migrations from the project root.
+- Replaced the old seed-style package icon with a green leaf mark used by the favicon and OS launchers.
+
+### Validation
+
+- `npm run typecheck -w client`
+- `npm run typecheck -w server`
+- `node --import tsx --test server/tests/system-open.test.ts`
+- `npm run build`
+- `npm run release:package -- --all --version-tag v1.0.0`
+- `npm run release:smoke -- .release/artifacts/seedbank-v1.0.0-linux-x64.tar.gz .release/artifacts/seedbank-v1.0.0-macos.tar.gz .release/artifacts/seedbank-v1.0.0-windows-x64.zip`
+
 ### AI and media fixes
 
 - Tightened Thinking Partner prompt framing so organic prompt buttons, especially Devil's Advocate, ground questions in the actual idea context and ask for missing details when context is sparse.

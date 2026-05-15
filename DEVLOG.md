@@ -4,6 +4,59 @@ Newest entries at the top.
 
 ---
 
+## 2026-05-15 — v1.0.0 Public Archive Release Prep
+
+Prepared Seedbank for public archive distribution across Linux, macOS, and Windows.
+
+What changed:
+- Added first-run onboarding that asks for the project graduation directory, explains AI assistance and GitHub publishing setup, links into Settings, and remains skippable.
+- Added a Settings → General action to reopen onboarding for testing without clearing existing configuration.
+- Added a separate Save action in onboarding so users can save the project root without leaving the setup screen.
+- Added warnings before jumping to AI or GitHub settings when no project root has been saved yet.
+- Added Browse support for project-root fields in onboarding and Settings → Project Graduation.
+- Replaced native Linux portal folder picking with a Seedbank in-app folder browser backed by the local server. The browser lists folders, supports Home/Up navigation, accepts typed paths, creates new folders, and applies the selected path directly to the field.
+- Added local directory listing/create API endpoints for that in-app folder browser.
+- Added archive installers for all supported desktop platforms:
+  - Linux: `Install-Seedbank.sh`
+  - macOS: `Install-Seedbank.command`
+  - Windows: `Install-Seedbank.bat`
+- Added release packaging and smoke-test scripts that create per-platform archives and reject wrong-platform installer leakage.
+- Trimmed release archives so each OS package exposes only the correct user-facing installer and only the runtime scripts needed by that OS.
+- Updated installers so rerunning them works as an update path: dependencies are refreshed, the runtime is rebuilt, launchers are rewritten, and Seedbank restarts.
+- Hardened Windows install/start behavior after cross-folder testing:
+  - auto-install or use portable Node.js when Node/npm are missing
+  - stop old Seedbank processes on ports `5173`/`4800` during reinstall
+  - clear stale pid/port/lock files
+  - use `127.0.0.1` consistently for client/API startup
+  - log hidden Start Menu launcher failures to `%APPDATA%\seedbank\seedbank.log`
+  - reduce browser-open debounce so manual Start Menu launches open a tab reliably
+- Hardened Linux launcher behavior:
+  - desktop entry install
+  - icon install
+  - restart/update flow
+  - stale-process cleanup
+  - single-browser-open debounce
+- Added macOS `~/Applications/Seedbank.app` creation and icon generation.
+- Replaced the old seed icon with a green leaf mark shared by the web favicon, Linux launcher icon, Windows `.ico`, and macOS app icon generation.
+- Fixed case-sensitive help context imports so macOS builds do not fail on `HelpContext`/`helpContext` filename casing.
+- Fixed server migration path lookup so packaged Windows runs include the root `migrations` directory correctly.
+- Updated `README.md`, `INSTALL.md`, and `docs/RELEASING.md` for archive-based public install flow.
+
+Release packaging decisions:
+- Seedbank remains a local web app bundle, not a native Electron/Tauri executable.
+- The public release ships archives that install Node dependencies, build the local runtime, create OS launchers, and start the app.
+- Release artifacts are named by tag, for example `seedbank-v1.0.0-linux-x64.tar.gz`, `seedbank-v1.0.0-macos.tar.gz`, and `seedbank-v1.0.0-windows-x64.zip`.
+
+Validation:
+- `npm run typecheck -w client`
+- `npm run typecheck -w server`
+- `node --import tsx --test server/tests/system-open.test.ts`
+- `npm run build`
+- `npm run release:package -- --all --version-tag v1.0.0`
+- `npm run release:smoke -- .release/artifacts/seedbank-v1.0.0-linux-x64.tar.gz .release/artifacts/seedbank-v1.0.0-macos.tar.gz .release/artifacts/seedbank-v1.0.0-windows-x64.zip`
+
+---
+
 ## 2026-05-15 — Thinking Partner Grounding and Image Gallery Fix
 
 Tightened two rough edges found during project testing.

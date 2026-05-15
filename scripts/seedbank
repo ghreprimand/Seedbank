@@ -19,6 +19,9 @@ SERVER_PORT_FILE="${CACHE_DIR}/server.port"
 LOG_FILE="${CACHE_DIR}/seedbank.log"
 START_LOCK_DIR="${CACHE_DIR}/start.lock.d"
 TRACE_FILE="${CACHE_DIR}/launcher-trace.log"
+BROWSER_OPEN_STAMP_FILE="${CACHE_DIR}/last-browser-open"
+BROWSER_OPEN_LOCK_DIR="${CACHE_DIR}/browser-open.lock.d"
+BROWSER_OPEN_DEBOUNCE_SECONDS="${SEEDBANK_BROWSER_OPEN_DEBOUNCE_SECONDS:-45}"
 
 mkdir -p "$CACHE_DIR"
 
@@ -300,6 +303,30 @@ wait_ready() {
 }
 
 open_browser() {
+  local now=0 last_opened=0
+  if ! mkdir "$BROWSER_OPEN_LOCK_DIR" 2>/dev/null; then
+    trace "browser open skipped url=$URL reason=lock-held"
+    return 0
+  fi
+
+  now=$(date +%s)
+  if [[ -f "$BROWSER_OPEN_STAMP_FILE" ]]; then
+    last_opened=$(cat "$BROWSER_OPEN_STAMP_FILE" 2>/dev/null || echo 0)
+  fi
+  if [[ "$last_opened" =~ ^[0-9]+$ ]] && (( now - last_opened < BROWSER_OPEN_DEBOUNCE_SECONDS )); then
+    trace "browser open skipped url=$URL debounce=${BROWSER_OPEN_DEBOUNCE_SECONDS}s"
+    notify "Seedbank already open" "$URL"
+    rmdir "$BROWSER_OPEN_LOCK_DIR" 2>/dev/null || true
+    return 0
+  fi
+
+  echo "$now" > "$BROWSER_OPEN_STAMP_FILE"
+  trace "browser open url=$URL"
+  if open_with_browser_command "$URL"; then
+    rmdir "$BROWSER_OPEN_LOCK_DIR" 2>/dev/null || true
+    return 0
+  fi
+
   if [[ "$(uname -s)" == "Darwin" ]] && command -v open >/dev/null 2>&1; then
     open "$URL" >/dev/null 2>&1 &
   elif command -v xdg-open >/dev/null 2>&1; then
@@ -307,6 +334,116 @@ open_browser() {
   else
     notify "Seedbank ready" "Open $URL"
   fi
+  rmdir "$BROWSER_OPEN_LOCK_DIR" 2>/dev/null || true
+}
+
+shell_quote() {
+  printf '%q' "$1"
+}
+
+desktop_entry_path() {
+  local desktop_id="$1"
+  local candidate=""
+  for base in \
+    "${XDG_DATA_HOME:-$HOME/.local/share}/applications" \
+    "$HOME/.local/share/applications" \
+    /usr/local/share/applications \
+    /usr/share/applications; do
+    candidate="$base/$desktop_id"
+    if [[ -f "$candidate" ]]; then
+      echo "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+default_browser_desktop_entry() {
+  local desktop_id=""
+  desktop_id=$(mimeapps_default_desktop_id || true)
+  if [[ -z "$desktop_id" ]] && command -v xdg-mime >/dev/null 2>&1; then
+    desktop_id=$(xdg-mime query default x-scheme-handler/http 2>/dev/null | awk 'NF { print; exit }')
+  fi
+  [[ -n "$desktop_id" ]] || return 1
+  desktop_entry_path "$desktop_id"
+}
+
+mimeapps_default_desktop_id() {
+  local file=""
+  for file in \
+    "$HOME/.config/mimeapps.list" \
+    "${XDG_CONFIG_HOME:-$HOME/.config}/mimeapps.list" \
+    "${XDG_DATA_HOME:-$HOME/.local/share}/applications/mimeapps.list" \
+    "$HOME/.local/share/applications/mimeapps.list"; do
+    [[ -f "$file" ]] || continue
+    awk '
+      /^\[/ { section = $0 }
+      section == "[Default Applications]" && /^x-scheme-handler\/http=/ {
+        sub(/^x-scheme-handler\/http=/, "")
+        split($0, candidates, ";")
+        for (i = 1; i <= length(candidates); i++) {
+          if (candidates[i] != "") {
+            print candidates[i]
+            exit
+          }
+        }
+      }
+    ' "$file" | head -n 1
+    return 0
+  done
+  return 1
+}
+
+open_with_desktop_entry() {
+  local url="$1"
+  local entry="$2"
+  local exec_line="" command_line="" quoted_url=""
+  exec_line=$(grep -m 1 '^Exec=' "$entry" 2>/dev/null || true)
+  exec_line="${exec_line#Exec=}"
+  [[ -n "$exec_line" ]] || return 1
+
+  quoted_url=$(shell_quote "$url")
+  command_line="$exec_line"
+  if [[ "$command_line" == *%* ]]; then
+    command_line="${command_line//%U/$quoted_url}"
+    command_line="${command_line//%u/$quoted_url}"
+    command_line="${command_line//%F/$quoted_url}"
+    command_line="${command_line//%f/$quoted_url}"
+    command_line="${command_line//%D/}"
+    command_line="${command_line//%d/}"
+    command_line="${command_line//%N/}"
+    command_line="${command_line//%n/}"
+    command_line="${command_line//%i/}"
+    command_line="${command_line//%c/Seedbank}"
+    command_line="${command_line//%k/}"
+    command_line="${command_line//%v/}"
+    command_line="${command_line//%m/}"
+    command_line="${command_line//%%/%}"
+  else
+    command_line="$command_line $quoted_url"
+  fi
+
+  trace "browser open via desktop entry=$(basename "$entry")"
+  bash -lc "$command_line" >/dev/null 2>&1 &
+  return 0
+}
+
+open_with_browser_command() {
+  local url="$1"
+  local entry=""
+
+  if [[ -n "${SEEDBANK_BROWSER:-}" ]]; then
+    trace "browser open via SEEDBANK_BROWSER"
+    "${SEEDBANK_BROWSER}" "$url" >/dev/null 2>&1 &
+    return 0
+  fi
+
+  entry=$(default_browser_desktop_entry || true)
+  if [[ -n "$entry" ]] && open_with_desktop_entry "$url" "$entry"; then
+    return 0
+  fi
+
+  return 1
 }
 
 start() {
@@ -324,8 +461,9 @@ start() {
   } >> "$LOG_FILE"
 
   if is_running; then
-    notify "Restarting Seedbank" "Stopping existing instance first"
-    stop
+    notify "Seedbank already running" "$URL"
+    open_browser
+    return 0
   fi
 
   ensure_port_available CLIENT_PORT "client" "true"

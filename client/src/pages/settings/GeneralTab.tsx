@@ -1,12 +1,13 @@
 /** Settings → General: import/export and keyboard shortcuts. */
 import { useState, useCallback } from 'react';
-import { ArrowUpDown, Keyboard } from 'lucide-react';
+import { ArrowUpDown, Keyboard, RefreshCw } from 'lucide-react';
 import ImportExportModal from '@/components/ImportExportModal';
 import ShortcutRecorder from '@/components/ShortcutRecorder';
 import { useNavigate } from 'react-router-dom';
 import { HelpButton } from '@/help/HelpPopover';
 import { useSettingsStore } from '@/stores/settings';
 import { bindingLabel, DEFAULT_SHORTCUTS } from '@/lib/shortcuts';
+import { requestOnboardingOpen, resetOnboarding } from '@/lib/onboarding';
 import { patchSettings } from '@/api/client';
 import type { ShortcutBinding, ShortcutConfig } from '@/lib/types';
 
@@ -115,6 +116,36 @@ export default function GeneralTab() {
         >
           <ArrowUpDown className="w-4 h-4" />
           Import &amp; Export
+        </button>
+      </section>
+
+      {/* Onboarding test hook */}
+      <section data-help="settings-general-onboarding">
+        <div className="flex items-center gap-2 mb-1">
+          <h3 className="text-base font-serif font-semibold text-ink-800">Onboarding</h3>
+          <HelpButton
+            helpId="general-onboarding"
+            title="Onboarding"
+            summary="Reopens the first-run setup prompt so you can test project directory setup and settings links after the app has already been configured."
+            alwaysShow
+          />
+        </div>
+        <p className="text-sm text-ink-400 mb-4">
+          Reset and reopen the first-run prompt without clearing any saved Seedbank settings.
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            resetOnboarding();
+            requestOnboardingOpen();
+          }}
+          className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium
+                     bg-paper border border-ink-200 hover:border-sage-300 hover:bg-sage-50
+                     text-ink-700 rounded-card shadow-card hover:shadow-card-hover
+                     transition-all duration-200"
+        >
+          <RefreshCw className="w-4 h-4" />
+          Show onboarding
         </button>
       </section>
 

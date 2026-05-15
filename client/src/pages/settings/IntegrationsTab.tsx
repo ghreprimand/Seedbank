@@ -13,8 +13,9 @@
  *   GET /api/integrations/:id/health without mutating state.
  */
 import { useEffect, useState } from 'react';
-import { FolderPlus, Network, Check, Loader2, CheckCircle2, AlertTriangle, XCircle, HelpCircle as HelpCircleIcon, GitBranch, ExternalLink } from 'lucide-react';
+import { FolderOpen, FolderPlus, Network, Check, Loader2, CheckCircle2, AlertTriangle, XCircle, HelpCircle as HelpCircleIcon, GitBranch, ExternalLink } from 'lucide-react';
 import { checkIntegrationHealth, configureIntegration, getGitHubPublishStatus, type GitHubPublishStatus } from '@/api/client';
+import DirectoryPickerModal from '@/components/DirectoryPickerModal';
 import { useIntegrationsSettings, useSettingsStore, useSettingsOffline } from '@/stores/settings';
 import { HelpButton } from '@/help/HelpPopover';
 import type { ConfigFieldDescriptor, IntegrationHealthResult, IntegrationSummary } from '@/lib/types';
@@ -69,6 +70,7 @@ interface CardState {
   health: IntegrationHealthResult | null;
   healthChecking: boolean;
   healthMessage: string | null;
+  browsingField: string | null;
 }
 
 function defaultCardState(integration: IntegrationSummary): CardState {
@@ -80,7 +82,12 @@ function defaultCardState(integration: IntegrationSummary): CardState {
     health: null,
     healthChecking: false,
     healthMessage: null,
+    browsingField: null,
   };
+}
+
+function isDirectoryField(field: ConfigFieldDescriptor): boolean {
+  return field.type !== 'secret' && /(^|_)(projectRoot|workspaceRoot|root|path)$/i.test(field.key);
 }
 
 // ── Dynamic field renderer ────────────────────────────────────────────────────
@@ -89,14 +96,21 @@ function ConfigField({
   field,
   value,
   integrationId,
+  disabled,
+  browsing,
   onChange,
+  onBrowse,
 }: {
   field: ConfigFieldDescriptor;
   value: string;
   integrationId: string;
+  disabled: boolean;
+  browsing: boolean;
   onChange: (key: string, val: string) => void;
+  onBrowse: (key: string, currentValue: string) => void;
 }) {
   const inputId = `field-${integrationId}-${field.key}`;
+  const canBrowse = isDirectoryField(field);
   return (
     <div>
       <div className="flex items-center gap-1.5 mb-1">
@@ -116,17 +130,33 @@ function ConfigField({
           />
         )}
       </div>
-      <input
-        id={inputId}
-        type={field.type === 'secret' ? 'password' : 'text'}
-        value={value}
-        onChange={(e) => onChange(field.key, e.target.value)}
-        placeholder={field.placeholder ?? ''}
-        autoComplete={field.type === 'secret' ? 'off' : undefined}
-        className="w-full px-3 py-2 text-sm bg-paper-warm border border-ink-100
-                   rounded-card outline-none focus:ring-2 focus:ring-sage-400
-                   transition-all placeholder:text-ink-300"
-      />
+      <div className="flex gap-2">
+        <input
+          id={inputId}
+          type={field.type === 'secret' ? 'password' : 'text'}
+          value={value}
+          onChange={(e) => onChange(field.key, e.target.value)}
+          placeholder={field.placeholder ?? ''}
+          autoComplete={field.type === 'secret' ? 'off' : undefined}
+          disabled={disabled || browsing}
+          className="min-w-0 flex-1 px-3 py-2 text-sm bg-paper-warm border border-ink-100
+                     rounded-card outline-none focus:ring-2 focus:ring-sage-400
+                     transition-all placeholder:text-ink-300 disabled:opacity-60"
+        />
+        {canBrowse && (
+          <button
+            type="button"
+            onClick={() => onBrowse(field.key, value)}
+            disabled={disabled || browsing}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium
+                       bg-paper border border-ink-200 hover:border-ink-300 text-ink-600
+                       hover:text-ink-800 rounded-card transition-colors disabled:opacity-50"
+          >
+            {browsing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FolderOpen className="w-3.5 h-3.5" />}
+            Browse
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -154,9 +184,10 @@ interface IntegrationCardProps {
   onSave: (integration: IntegrationSummary) => Promise<void>;
   onTest: (integration: IntegrationSummary) => Promise<void>;
   onFieldChange: (integrationId: string, key: string, value: string) => void;
+  onBrowseDirectory: (integrationId: string, key: string, currentValue: string) => void;
 }
 
-function IntegrationCard({ integration, state, offline, onSave, onTest, onFieldChange }: IntegrationCardProps) {
+function IntegrationCard({ integration, state, offline, onSave, onTest, onFieldChange, onBrowseDirectory }: IntegrationCardProps) {
   const copy = ADAPTER_COPY[integration.id];
   const description = copy?.description ?? integration.description;
 
@@ -215,7 +246,10 @@ function IntegrationCard({ integration, state, offline, onSave, onTest, onFieldC
               field={field}
               value={state.values[field.key] ?? ''}
               integrationId={integration.id}
+              disabled={state.busy || offline}
+              browsing={state.browsingField === field.key}
               onChange={(key, val) => onFieldChange(integration.id, key, val)}
+              onBrowse={(key, val) => { void onBrowseDirectory(integration.id, key, val); }}
             />
           ))}
         </div>
@@ -493,6 +527,11 @@ export default function IntegrationsTab() {
     for (const item of integrations) initial[item.id] = defaultCardState(item);
     return initial;
   });
+  const [directoryPicker, setDirectoryPicker] = useState<{
+    integrationId: string;
+    key: string;
+    initialPath: string;
+  } | null>(null);
 
   const patchCard = (id: string, patch: Partial<CardState>) =>
     setCardState((prev) => ({
@@ -514,6 +553,11 @@ export default function IntegrationsTab() {
         },
       },
     }));
+  };
+
+  const handleBrowseDirectory = (integrationId: string, key: string, currentValue: string) => {
+    patchCard(integrationId, { browsingField: key, error: null });
+    setDirectoryPicker({ integrationId, key, initialPath: currentValue });
   };
 
   const handleSave = async (integration: IntegrationSummary) => {
@@ -566,6 +610,7 @@ export default function IntegrationsTab() {
   const advancedIntegrations = integrations.filter((i) => i.id !== 'generic-project');
 
   return (
+    <>
     <div className="space-y-6 max-w-xl" data-help="settings-integrations-page">
       {/* Tab header */}
       <div className="flex items-start gap-2">
@@ -604,6 +649,7 @@ export default function IntegrationsTab() {
           onSave={handleSave}
           onTest={handleTestConnection}
           onFieldChange={handleFieldChange}
+          onBrowseDirectory={handleBrowseDirectory}
         />
       )}
 
@@ -633,6 +679,7 @@ export default function IntegrationsTab() {
                 onSave={handleSave}
                 onTest={handleTestConnection}
                 onFieldChange={handleFieldChange}
+                onBrowseDirectory={handleBrowseDirectory}
               />
             ))}
           </div>
@@ -646,5 +693,21 @@ export default function IntegrationsTab() {
         </div>
       )}
     </div>
+    {directoryPicker && (
+      <DirectoryPickerModal
+        title="Choose project root"
+        initialPath={directoryPicker.initialPath}
+        onClose={() => {
+          patchCard(directoryPicker.integrationId, { browsingField: null });
+          setDirectoryPicker(null);
+        }}
+        onSelect={(selectedPath) => {
+          handleFieldChange(directoryPicker.integrationId, directoryPicker.key, selectedPath);
+          patchCard(directoryPicker.integrationId, { browsingField: null });
+          setDirectoryPicker(null);
+        }}
+      />
+    )}
+    </>
   );
 }

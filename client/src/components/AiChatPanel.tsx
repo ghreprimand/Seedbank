@@ -26,7 +26,7 @@ function isConfirmationRequiredError(msg: string): boolean {
 function GuardrailSettingsLink() {
   return (
     <Link
-      to="/settings/ai"
+      to="/settings/ai-agents"
       className="inline-flex items-center gap-1 text-[11px] font-medium text-sage-700
                  hover:text-sage-900 underline underline-offset-2"
     >
