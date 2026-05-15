@@ -1299,6 +1299,12 @@ export type AiSuggestionField =
   | 'aesthetic'
   | 'retrospective';
 
+export type AiFieldAssistIntent =
+  | 'improve'
+  | 'fresh'
+  | 'explain'
+  | 'playbook';
+
 export interface AiSuggestion {
   field: AiSuggestionField;
   suggestion: string;
@@ -1310,6 +1316,7 @@ export interface AiFieldSuggestionRequest {
   field: AiSuggestionField;
   currentValue: string;
   prompt?: string;
+  intent?: AiFieldAssistIntent;
   omitCurrentValue?: boolean;
   aiConfirmationToken?: string;
   providerInstanceId?: AiProviderInstanceId;

@@ -842,7 +842,7 @@ export async function suggestIdeaField(
   currentValue: string,
   options: Pick<
     AiFieldSuggestionRequest,
-    'prompt' | 'omitCurrentValue' | 'aiConfirmationToken' | 'providerInstanceId' | 'model' | 'effort' | 'verbosity'
+    'prompt' | 'intent' | 'omitCurrentValue' | 'aiConfirmationToken' | 'providerInstanceId' | 'model' | 'effort' | 'verbosity'
   > = {},
 ): Promise<AiSuggestion> {
   return request<AiSuggestion>('/api/ai/suggest', {
