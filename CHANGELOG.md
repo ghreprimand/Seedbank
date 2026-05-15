@@ -15,6 +15,8 @@
 - Added field-specific and intent-specific AI Assistance contracts for Elevator Pitch, The Spark / Raw Notes, Concept, The Case, Risks & Blockers, Build Notes, Aesthetic & Style, and Retrospective across Improve, Write from scratch, Expand, and Playbook flows.
 - Removed Thinking Partner question-framing from one-shot field generation so field outputs return directly usable text instead of questions, reviews, or generic coaching.
 - Thinking Partner preset buttons now store clean labels such as "Scope Down" in the visible conversation instead of saving the full internal prompt text, and preset prompts now request natural single-question outputs where appropriate.
+- Reframed Thinking Partner preset prompts for early-stage ideas so they ask about planned first workflows, first-build scope, and assumptions to test instead of implying dogfooding or usage metrics already exist.
+- Grouped newest-first Thinking Partner turns so preset labels/custom questions display with their assistant response, and made the custom question input explicit.
 - Fixed the Thinking Partner header so it displays the feature-specific effective route/preflight provider instead of the global default provider.
 - Fixed image gallery rendering and lightbox display for uploaded images when the frontend runs on a different port than the API server, including dotted filenames like `.png`.
 

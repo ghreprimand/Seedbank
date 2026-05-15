@@ -288,6 +288,7 @@ export const MANUAL_GROUPS: ManualGroup[] = [
         blocks: [
           { type: 'p', text: 'The Thinking Partner is an AI chat panel attached to each idea. It asks questions, reflects patterns, and helps scope ideas — it doesn\'t generate ideas for you.' },
           { type: 'p', text: 'Questions are grounded in the current idea fields, stage, notes, risks, build notes, tags, and scores. If the idea is sparse, the assistant should ask for missing context instead of inventing a generic critique.' },
+          { type: 'p', text: 'For early-stage ideas, preset prompts use future-facing planning language. They should ask about intended first workflows, assumptions, and validation plans rather than implying the project has already been built or dogfooded.' },
           { type: 'h3', text: 'Prompt modes' },
           { type: 'ul', items: [
             'What If — explores alternative directions.',
@@ -295,6 +296,8 @@ export const MANUAL_GROUPS: ManualGroup[] = [
             'Scope Down — finds a smallest viable version.',
             'User Story — frames the idea from a user\'s perspective.',
           ]},
+          { type: 'h3', text: 'Custom questions' },
+          { type: 'p', text: 'Use the Custom question field at the bottom of the panel for normal back-and-forth chat. Custom questions keep the per-idea Thinking Partner history, while preset buttons run against fresh current idea context so older conversation drift does not steer the preset response.' },
           { type: 'h3', text: 'Stage-aware AI' },
           { type: 'p', text: 'Thinking Partner and field suggestions automatically adapt to the idea stage. Seed and Sprout are exploratory, Bloom is sharpening and critical, Greenhouse/Plot are implementation-focused, Dormant/Cold Storage are reflective about revival, and Market is retrospective.' },
           { type: 'h3', text: 'Provider' },
