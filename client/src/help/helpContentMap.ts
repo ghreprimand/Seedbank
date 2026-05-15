@@ -411,6 +411,11 @@ export const HELP_CONTENT_MAP: Record<string, HelpEntry> = {
     body: 'Set adapter-specific config and test connection health before graduating ideas.',
     manualSection: 'settings-integrations',
   },
+  'settings-github-publishing': {
+    title: 'GitHub Publishing',
+    body: 'Checks local gh CLI auth and enables optional post-graduation repo publishing. Seedbank does not store GitHub tokens.',
+    manualSection: 'settings-integrations',
+  },
 
   // About
   'settings-about': {
@@ -450,6 +455,17 @@ export const HELP_CONTENT_MAP: Record<string, HelpEntry> = {
     body: 'Generates draft files from the current idea using your configured Project drafting provider, model, and effort.',
     details: 'Review each file before downloading it. Canonical idea fields are not overwritten.',
     manualSection: 'project-drafting',
+  },
+  'github-publish-modal': {
+    title: 'Publish to GitHub',
+    body: 'Creates a GitHub repository from a graduated local project path. Visibility and initial push are explicit choices.',
+    details: 'Auth is read from local gh CLI state; Seedbank does not store GitHub tokens.',
+    manualSection: 'github-publishing',
+  },
+  'github-publish-button': {
+    title: 'Publish to GitHub Button',
+    body: 'This action appears after graduation creates a local project folder path.',
+    manualSection: 'github-publishing',
   },
 };
 

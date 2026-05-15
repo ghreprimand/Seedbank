@@ -15,6 +15,14 @@ import {
 import { BackupService } from './backups/service.js';
 import { registerBackupRoutes } from './backups/routes.js';
 import { IntegrationRegistry } from './integrations/registry.js';
+import {
+  ensurePublishableIdea,
+  getGitHubAuthStatus,
+  GitHubPublishError,
+  parseGitHubPublishRequest,
+  publishIdeaProject,
+  repoNameFromIdeaTitle,
+} from './integrations/githubClient.js';
 import { authMiddleware, requireImplicitLocal, requireScope } from './middleware/auth.js';
 import { archiveToMarkdown, ideaToMarkdown, parseMarkdownArchive } from './markdown.js';
 import { openApiSpec } from './openapi.js';
@@ -442,6 +450,21 @@ function parseProjectDraftApplyFiles(value: unknown): AiProjectDraftFile[] | nul
     });
   }
   return files.length > 0 ? files : null;
+}
+
+function upsertGitHubIdeaLink(ideaId: string, repoUrl: string) {
+  const idea = repository.getIdea(ideaId, true);
+  if (!idea) return undefined;
+  const normalizedUrl = repoUrl.trim();
+  if (!normalizedUrl) return idea;
+
+  const nextLinks = idea.links.filter((link) => {
+    const isGitHubLabel = link.label.trim().toLowerCase() === 'github';
+    const sameUrl = link.url.trim() === normalizedUrl;
+    return !isGitHubLabel && !sameUrl;
+  });
+  nextLinks.push({ label: 'GitHub', url: normalizedUrl });
+  return repository.updateIdea(ideaId, { links: nextLinks });
 }
 
 function listOptionsFromQuery(query: Request['query']): ListIdeasOptions {
@@ -1050,6 +1073,32 @@ app.get('/api/integrations', requireScope('read:ideas'), asyncRoute((req, res) =
   res.json(items);
 }));
 
+app.get('/api/integrations/github/status', requireScope('read:ideas'), asyncRoute(async (_req, res) => {
+  const status = await getGitHubAuthStatus();
+  res.json(status);
+}));
+
+app.post('/api/integrations/github/publish/:ideaId', requireScope('write:ideas'), asyncRoute(async (req, res) => {
+  const ideaId = routeParam(req, 'ideaId');
+  const idea = repository.getIdea(ideaId);
+  const { projectPath } = ensurePublishableIdea(idea);
+  const publishIdea = idea!;
+  const allowedRoots = integrations.configuredRoots().map((root) => path.resolve(root));
+  if (allowedRoots.length > 0 && !allowedRoots.some((root) => isInsidePath(projectPath, root))) {
+    res.status(403).json({ error: 'Graduated project path is outside configured project roots.' });
+    return;
+  }
+
+  const fallbackRepoName = repoNameFromIdeaTitle(publishIdea.title);
+  const publishRequest = parseGitHubPublishRequest(req.body, fallbackRepoName);
+  const result = await publishIdeaProject(publishIdea, publishRequest);
+  let updatedIdea = publishIdea;
+  if (result.repoUrl) {
+    updatedIdea = upsertGitHubIdeaLink(ideaId, result.repoUrl) ?? publishIdea;
+  }
+  res.json({ ...result, idea: updatedIdea });
+}));
+
 app.get('/api/integrations/:id/health', requireScope('read:ideas'), asyncRoute(async (req, res) => {
   const result = await integrations.healthCheck(routeParam(req, 'id'));
   if (!result) {
@@ -1123,6 +1172,10 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   }
 
   const message = err instanceof Error ? err.message : 'Unexpected server error';
+  if (err instanceof GitHubPublishError) {
+    res.status(err.statusCode).json({ error: message });
+    return;
+  }
   const statusCode = typeof (err as { statusCode?: unknown })?.statusCode === 'number'
     ? (err as { statusCode: number }).statusCode
     : 500;

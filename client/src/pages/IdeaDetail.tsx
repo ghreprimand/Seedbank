@@ -12,6 +12,7 @@ import {
   ExternalLink,
   Sparkles,
   Rocket,
+  GitBranch,
 } from 'lucide-react';
 
 import type { Idea, Stage } from '@/lib/types';
@@ -38,6 +39,7 @@ import LinkEditor from '@/components/LinkEditor';
 import RelatedIdeasLinker from '@/components/RelatedIdeasLinker';
 import VersionHistory from '@/components/VersionHistory';
 import GraduationModal from '@/components/GraduationModal';
+import GitHubPublishModal from '@/components/GitHubPublishModal';
 import AiChatPanel from '@/components/AiChatPanel';
 import ProjectDraftPanel from '@/components/ProjectDraftPanel';
 import LandscapeAnalysis from '@/components/LandscapeAnalysis';
@@ -46,6 +48,7 @@ import AiSuggestionButton from '@/components/AiSuggestionButton';
 import StageTimeline from '@/components/StageTimeline';
 import ImageGallery from '@/components/ImageGallery';
 import type { GraduationResponse } from '@/api/client';
+import type { GitHubPublishResponse } from '@/api/client';
 import { exportIdeaAsMarkdown, exportIdeaAsJSON } from '@/lib/export';
 import { assessReadiness } from '@/lib/stageReadiness';
 import { useCategoriesSettings } from '@/stores/settings';
@@ -92,6 +95,8 @@ export default function IdeaDetail() {
   const [exportOpen, setExportOpen] = useState(false);
   const [graduationOpen, setGraduationOpen] = useState(false);
   const [graduationMessage, setGraduationMessage] = useState<string | null>(null);
+  const [gitHubPublishOpen, setGitHubPublishOpen] = useState(false);
+  const [gitHubPublishMessage, setGitHubPublishMessage] = useState<string | null>(null);
   const [projectDraftOpen, setProjectDraftOpen] = useState(false);
 
   const categorySettings = useCategoriesSettings();
@@ -219,6 +224,12 @@ export default function IdeaDetail() {
     setGraduationOpen(false);
   };
 
+  const handleGitHubPublished = (result: GitHubPublishResponse) => {
+    if (result.idea) setIdea(result.idea);
+    setGitHubPublishMessage(result.message ?? (result.repoUrl ? `Repository created: ${result.repoUrl}` : 'GitHub publish completed.'));
+    setGitHubPublishOpen(false);
+  };
+
   const canShowGraduation = (current: Idea) =>
     STAGES.indexOf(current.stage) >= STAGES.indexOf('pitch') && current.stage !== 'shelved' && current.stage !== 'cold-storage';
 
@@ -307,6 +318,16 @@ export default function IdeaDetail() {
               <Rocket className="w-4 h-4" />
             </button>
           )}
+          <button
+            onClick={() => {
+              if (idea.graduatedTo) setGitHubPublishOpen(true);
+            }}
+            disabled={!idea.graduatedTo}
+            title={idea.graduatedTo ? 'Publish to GitHub' : 'Graduate this idea first to create a local project path'}
+            className="p-1.5 text-ink-300 hover:text-ink-700 transition-all rounded-card hover:bg-ink-50 disabled:opacity-40 disabled:hover:bg-transparent"
+          >
+            <GitBranch className="w-4 h-4" />
+          </button>
           <button
             onClick={handleShelve}
             title={idea.stage === 'cold-storage' ? 'Move back to dormant' : 'Move to cold storage'}
@@ -443,6 +464,11 @@ export default function IdeaDetail() {
               </a>
             </div>
           )}
+          {!idea.graduatedTo && (
+            <span className="text-[11px] text-ink-400 font-mono" data-help="github-publish-button">
+              Publish to GitHub unlocks after graduation creates a local project folder.
+            </span>
+          )}
         </div>
       </div>
 
@@ -451,6 +477,11 @@ export default function IdeaDetail() {
       {graduationMessage && (
         <div className="px-3 py-2 bg-sage-50 border border-sage-100 rounded-card text-xs text-sage-800">
           {graduationMessage}
+        </div>
+      )}
+      {gitHubPublishMessage && (
+        <div className="px-3 py-2 bg-sage-50 border border-sage-100 rounded-card text-xs text-sage-800">
+          {gitHubPublishMessage}
         </div>
       )}
 
@@ -820,6 +851,14 @@ export default function IdeaDetail() {
           onClose={() => {
             setProjectDraftOpen(false);
           }}
+        />
+      )}
+
+      {gitHubPublishOpen && (
+        <GitHubPublishModal
+          idea={idea}
+          onClose={() => setGitHubPublishOpen(false)}
+          onPublished={handleGitHubPublished}
         />
       )}
     </div>

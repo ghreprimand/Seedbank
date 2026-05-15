@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### GitHub Publishing
+
+- Added optional post-graduation GitHub publishing for ideas that already have a local project folder.
+- Added GitHub status/details in Settings using the local `gh` CLI session: avatar, login/name, profile link, repo counts, followers/following, and plan/private-repo metadata when GitHub returns it.
+- Added an explicit Publish to GitHub modal with repo name, optional owner, public/private visibility, and initial-push controls.
+- Added server-side GitHub repo creation and bounded `git` initialization/commit/push orchestration without storing GitHub tokens in Seedbank.
+- Added `GET /api/integrations/github/status` and `POST /api/integrations/github/publish/:ideaId` endpoints.
+- Added in-app manual, contextual help, and docs explaining GitHub CLI setup, local-first publishing, token handling, and retry/partial-failure behavior.
+
 ### Account reauth notice and documentation accuracy
 
 - Added a persistent Claude/Codex account reauth notice that appears only after this browser has previously seen a successful account auth and current status later requires sign-in again.

@@ -1,0 +1,84 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { newIdea } from '../src/domain.js';
+import {
+  ensurePublishableIdea,
+  GitHubPublishError,
+  parseGhAuthStatusOutput,
+  parseGitHubPublishRequest,
+  repoNameFromIdeaTitle,
+  sanitizeGitHubRepoName,
+} from '../src/integrations/githubClient.js';
+
+test('parseGhAuthStatusOutput extracts login and scopes', () => {
+  const parsed = parseGhAuthStatusOutput([
+    'github.com',
+    '  ✓ Logged in to github.com account octocat (/home/user/.config/gh/hosts.yml)',
+    '  - Active account: true',
+    "  - Token scopes: 'repo', 'read:org', 'gist'",
+  ].join('\n'));
+
+  assert.equal(parsed.authenticated, true);
+  assert.equal(parsed.login, 'octocat');
+  assert.deepEqual(parsed.scopes, ['repo', 'read:org', 'gist']);
+});
+
+test('sanitizeGitHubRepoName strips unsafe characters and normalizes', () => {
+  const safe = sanitizeGitHubRepoName('  My Cool__Repo!!! v2  ');
+  assert.equal(safe, 'my-cool-repo-v2');
+
+  const empty = sanitizeGitHubRepoName('...___---');
+  assert.equal(empty, '');
+});
+
+test('repoNameFromIdeaTitle slugifies idea title', () => {
+  assert.equal(repoNameFromIdeaTitle('Seedbank Project: Alpha/Beta'), 'seedbank-project-alpha-beta');
+});
+
+test('parseGitHubPublishRequest validates visibility and repo name', () => {
+  assert.throws(
+    () => parseGitHubPublishRequest({ visibility: 'friends-only', pushInitial: true }, 'fallback-name'),
+    (error: unknown) => {
+      assert.ok(error instanceof GitHubPublishError);
+      assert.equal(error.statusCode, 400);
+      assert.match(error.message, /visibility must be/i);
+      return true;
+    },
+  );
+
+  const request = parseGitHubPublishRequest(
+    { repoName: ' Test Repo ', visibility: 'private', pushInitial: false },
+    'fallback-name',
+  );
+  assert.equal(request.repoName, 'test-repo');
+  assert.equal(request.visibility, 'private');
+  assert.equal(request.pushInitial, false);
+});
+
+test('ensurePublishableIdea rejects ideas without graduated project path', () => {
+  const idea = newIdea({
+    id: 'idea-no-project',
+    title: 'No project path',
+    graduatedTo: null,
+  });
+
+  assert.throws(
+    () => ensurePublishableIdea(idea),
+    (error: unknown) => {
+      assert.ok(error instanceof GitHubPublishError);
+      assert.equal(error.statusCode, 400);
+      assert.match(error.message, /has not been graduated/i);
+      return true;
+    },
+  );
+});
+
+test('ensurePublishableIdea returns resolved path for graduated idea', () => {
+  const idea = newIdea({
+    id: 'idea-with-project',
+    title: 'Has project path',
+    graduatedTo: './tmp/project-path',
+  });
+  const resolved = ensurePublishableIdea(idea);
+  assert.ok(resolved.projectPath.endsWith('/tmp/project-path') || resolved.projectPath.endsWith('\\tmp\\project-path'));
+});

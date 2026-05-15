@@ -4,6 +4,40 @@ Newest entries at the top.
 
 ---
 
+## 2026-05-15 — GitHub Publishing V1
+
+Added optional GitHub publishing as a post-graduation workflow. The design stays deliberately local-first: Seedbank creates or uses a local project folder first, then the user explicitly publishes that folder to GitHub.
+
+What shipped:
+- Settings → Project Graduation now includes a GitHub Publishing card.
+- The card checks the local `gh` CLI session and shows account proof when linked: avatar, login/name, profile link, public repos, followers/following, and private/plan metadata when GitHub returns it.
+- Unauthenticated states explain how to install GitHub CLI, run `gh auth login`, and refresh status.
+- Idea Detail now shows a Publish to GitHub action once an idea has a local `graduatedTo` project path.
+- The publish modal asks for repo name, optional owner, public/private visibility, and whether to push initial files.
+- Server endpoints:
+  - `GET /api/integrations/github/status`
+  - `POST /api/integrations/github/publish/:ideaId`
+- Server publishing creates the GitHub repo and can initialize git, make an initial commit, set `main`, add/update `origin`, and push.
+- Successful repo creation adds or updates a single `GitHub` link on the idea.
+- Partial failures are explicit: a repo can be created while the push fails, and the response tells the user what happened instead of hiding the state.
+
+Security and operational choices:
+- Seedbank does not store GitHub tokens or PATs.
+- Auth comes from the user's local `gh` CLI session; token reads happen only through bounded `gh` calls.
+- Git and GitHub operations use `execFile`/fetch with timeouts and output caps, not shell interpolation.
+- GitHub publishing is optional and never required for normal project graduation.
+
+Documentation updated:
+- In-app manual includes a GitHub Publishing section with setup and workflow notes.
+- Contextual help covers the Settings card, publish button, and publish modal.
+- `docs/SETTINGS.md`, `docs/INTEGRATIONS.md`, and `docs/API.md` describe the setup, endpoints, and local-first behavior.
+
+Validation:
+- `npm run typecheck`
+- `npm run lint -w client`
+- `npm test -w server` (116 passing)
+- `npm run build`
+
 ## 2026-05-15 — Lifecycle Release Checkpoint, Parser Hardening, and Neutral Project Context
 
 Closed the stage-lifecycle work as a committable release checkpoint and captured the late polish that happened after the main Phase 6 sweep.

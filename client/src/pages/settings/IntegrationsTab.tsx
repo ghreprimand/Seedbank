@@ -12,9 +12,9 @@
  * Health: each card exposes a "Test connection" button that calls
  *   GET /api/integrations/:id/health without mutating state.
  */
-import { useState } from 'react';
-import { FolderPlus, Network, Check, Loader2, CheckCircle2, AlertTriangle, XCircle, HelpCircle as HelpCircleIcon } from 'lucide-react';
-import { checkIntegrationHealth, configureIntegration } from '@/api/client';
+import { useEffect, useState } from 'react';
+import { FolderPlus, Network, Check, Loader2, CheckCircle2, AlertTriangle, XCircle, HelpCircle as HelpCircleIcon, GitBranch, ExternalLink } from 'lucide-react';
+import { checkIntegrationHealth, configureIntegration, getGitHubPublishStatus, type GitHubPublishStatus } from '@/api/client';
 import { useIntegrationsSettings, useSettingsStore, useSettingsOffline } from '@/stores/settings';
 import { HelpButton } from '@/help/HelpPopover';
 import type { ConfigFieldDescriptor, IntegrationHealthResult, IntegrationSummary } from '@/lib/types';
@@ -290,6 +290,196 @@ function IntegrationCard({ integration, state, offline, onSave, onTest, onFieldC
   );
 }
 
+function GitHubPublishingCard({ offline }: { offline: boolean }) {
+  const [status, setStatus] = useState<GitHubPublishStatus | null>(null);
+  const [initialLoaded, setInitialLoaded] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refreshStatus = async () => {
+    if (offline) return;
+    setRefreshing(true);
+    setError(null);
+    try {
+      const next = await getGitHubPublishStatus();
+      setStatus(next);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load GitHub status');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    if (offline) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const next = await getGitHubPublishStatus();
+        if (!cancelled) {
+          setStatus(next);
+          setError(null);
+        }
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load GitHub status');
+      } finally {
+        if (!cancelled) setInitialLoaded(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [offline]);
+
+  const loading = !offline && !initialLoaded && !status && !error;
+
+  const accountLabel = status?.name && status?.login
+    ? `${status.name} (@${status.login})`
+    : (status?.login ? `@${status.login}` : status?.name);
+  const availabilityBadge = offline
+    ? 'offline'
+    : status?.authenticated
+      ? 'linked'
+      : status?.available
+        ? 'auth required'
+        : 'unavailable';
+  const availabilityClass = offline
+    ? 'bg-ink-100 text-ink-600'
+    : status?.authenticated
+      ? 'bg-sage-100 text-sage-700'
+      : status?.available
+        ? 'bg-amber-100 text-amber-700'
+        : 'bg-red-100 text-red-700';
+
+  return (
+    <div className="p-5 bg-paper border border-ink-100 rounded-card shadow-card space-y-4" data-help="settings-github-publishing">
+      <div className="flex items-start gap-3">
+        <span className="mt-0.5 text-ink-700">
+          <GitBranch className="w-4 h-4" />
+        </span>
+        <div className="flex-1 min-w-0 space-y-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-semibold text-ink-800">GitHub Publishing</span>
+            <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-badge ${availabilityClass}`}>
+              {availabilityBadge}
+            </span>
+          </div>
+          <p className="text-xs text-ink-400">
+            Optional post-graduation publishing flow. Seedbank never stores GitHub tokens; auth stays in your local `gh` CLI session.
+          </p>
+        </div>
+        <HelpButton
+          helpId="settings-github-publishing"
+          title="GitHub Publishing"
+          summary="Checks local gh CLI auth and lets you publish a graduated project to a GitHub repo with explicit user confirmation."
+          manualSection="settings-integrations"
+          alwaysShow
+        />
+      </div>
+
+      {loading ? (
+        <div className="flex items-center gap-2 text-xs text-ink-400 font-mono">
+          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          Loading GitHub status…
+        </div>
+      ) : (
+        <>
+          {offline && (
+            <div className="px-3 py-2 rounded-card border border-ink-200 bg-ink-50 text-xs text-ink-600">
+              API offline. Reconnect, then refresh GitHub status.
+            </div>
+          )}
+
+          {!offline && status?.authenticated && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                {status.avatarUrl && (
+                  <img
+                    src={status.avatarUrl}
+                    alt={status.login ? `${status.login} avatar` : 'GitHub avatar'}
+                    className="w-10 h-10 rounded-full border border-ink-100 object-cover"
+                    loading="lazy"
+                  />
+                )}
+                <div className="min-w-0">
+                  {accountLabel && <p className="text-sm font-medium text-ink-800 truncate">{accountLabel}</p>}
+                  {status.profileUrl && (
+                    <a
+                      href={status.profileUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 text-xs text-sage-700 hover:text-sage-900"
+                    >
+                      View profile <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <Stat label="Public repos" value={status.publicRepos} />
+                <Stat label="Followers" value={status.followers} />
+                <Stat label="Following" value={status.following} />
+                {(status.ownedPrivateRepos !== undefined || status.totalPrivateRepos !== undefined) && (
+                  <Stat label="Private repos" value={status.ownedPrivateRepos ?? status.totalPrivateRepos} />
+                )}
+                {status.plan?.name && <Stat label="Plan" value={status.plan.name} />}
+              </div>
+            </div>
+          )}
+
+          {!offline && !status?.authenticated && (
+            <div className="space-y-2 text-xs text-ink-600">
+              <p className="font-medium text-ink-700">
+                Link GitHub CLI on this machine to enable publishing:
+              </p>
+              <ol className="list-decimal pl-4 space-y-1">
+                <li>Install GitHub CLI (`gh`).</li>
+                <li>Run `gh auth login`.</li>
+                <li>Choose `GitHub.com` and your preferred git protocol (HTTPS or SSH).</li>
+                <li>Allow repo access so private repository publishing works when selected.</li>
+                <li>Return here and click Refresh status.</li>
+              </ol>
+              {status?.message && (
+                <p className="text-[11px] text-ink-500 font-mono">{status.message}</p>
+              )}
+            </div>
+          )}
+        </>
+      )}
+
+      {error && (
+        <div className="px-3 py-2 rounded-card border border-amber-200 bg-amber-50 text-xs text-amber-800">
+          {error}
+        </div>
+      )}
+
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => { void refreshStatus(); }}
+          disabled={refreshing || offline}
+          className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium
+                     bg-paper border border-ink-200 hover:border-ink-300 text-ink-600
+                     hover:text-ink-800 rounded-card transition-colors disabled:opacity-50"
+        >
+          {refreshing && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+          Refresh status
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: number | string | undefined }) {
+  if (value === undefined || value === null || value === '') return null;
+  return (
+    <div className="px-2.5 py-2 rounded-card border border-ink-100 bg-paper-warm">
+      <p className="text-[10px] uppercase tracking-wide text-ink-400 font-mono">{label}</p>
+      <p className="text-sm text-ink-800 font-medium truncate">{String(value)}</p>
+    </div>
+  );
+}
+
 // ── Main tab ──────────────────────────────────────────────────────────────────
 
 export default function IntegrationsTab() {
@@ -416,6 +606,8 @@ export default function IntegrationsTab() {
           onFieldChange={handleFieldChange}
         />
       )}
+
+      <GitHubPublishingCard offline={offline} />
 
       {/* Advanced adapters — collapsed by default */}
       {advancedIntegrations.length > 0 && (
