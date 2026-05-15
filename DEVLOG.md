@@ -4,6 +4,20 @@ Newest entries at the top.
 
 ---
 
+## 2026-05-15 — Project Draft Parser Hardening
+
+Fixed a project-drafting failure seen while testing a sparse Seed-stage idea through the Codex account route. The idea did not need more fields filled out; the failure came from the AI returning JSON-like object syntax that was close to valid JSON but used unquoted keys/trailing commas.
+
+What changed:
+- The shared AI JSON extractor now attempts a conservative repair pass for common model output drift: unquoted object keys and trailing commas.
+- Project draft parsing still runs the existing file-path sanitizer after repair, so unsafe absolute paths, parent traversal, and hidden directories remain rejected.
+- Added regression tests for sparse project-draft prompts, strict JSON, repaired Codex-style object output, and unsafe-path filtering.
+
+Validation:
+- `npm run typecheck`
+- `npm run lint -w client`
+- `npm test -w server` (120 passing)
+
 ## 2026-05-15 — Claude Reauth Callback UX
 
 Polished the Claude account reauth flow after a confusing manual test. The OAuth tab is expected to redirect to Seedbank's local callback page and replace the long Claude URL with a simple "linked" page, but the Settings card was not actively watching for that callback to finish.

@@ -402,14 +402,138 @@ function extractJsonObject(text: string, errorMessage = 'AI response was not val
   const trimmed = text.trim();
   const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
   const candidate = fenced?.[1]?.trim() ?? trimmed;
-  try {
-    return JSON.parse(candidate);
-  } catch {
-    const start = candidate.indexOf('{');
-    const end = candidate.lastIndexOf('}');
-    if (start >= 0 && end > start) return JSON.parse(candidate.slice(start, end + 1));
-    throw new Error(errorMessage);
+
+  const parseCandidates = [candidate];
+  const start = candidate.indexOf('{');
+  const end = candidate.lastIndexOf('}');
+  if (start >= 0 && end > start) parseCandidates.push(candidate.slice(start, end + 1));
+
+  let lastError: unknown;
+  for (const item of parseCandidates) {
+    for (const attempt of [item, repairJsonLikeObject(item)]) {
+      try {
+        return JSON.parse(attempt);
+      } catch (err) {
+        lastError = err;
+      }
+    }
   }
+
+  const detail = lastError instanceof Error ? ` ${lastError.message}` : '';
+  throw new Error(`${errorMessage}${detail}`);
+}
+
+function repairJsonLikeObject(value: string): string {
+  return removeTrailingCommasOutsideStrings(quoteObjectKeysOutsideStrings(value.replace(/^\uFEFF/, '')));
+}
+
+function quoteObjectKeysOutsideStrings(value: string): string {
+  let output = '';
+  let index = 0;
+  let inString = false;
+  let quote = '';
+  let escaped = false;
+
+  while (index < value.length) {
+    const char = value[index] ?? '';
+    output += char;
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === '\\') {
+        escaped = true;
+      } else if (char === quote) {
+        inString = false;
+        quote = '';
+      }
+      index += 1;
+      continue;
+    }
+
+    if (char === '"' || char === "'") {
+      inString = true;
+      quote = char;
+      index += 1;
+      continue;
+    }
+
+    if (char !== '{' && char !== ',') {
+      index += 1;
+      continue;
+    }
+
+    let cursor = index + 1;
+    while (cursor < value.length && /\s/.test(value[cursor] ?? '')) {
+      output += value[cursor] ?? '';
+      cursor += 1;
+    }
+
+    const keyStart = cursor;
+    const first = value[cursor] ?? '';
+    if (!/[A-Za-z_$]/.test(first)) {
+      index = cursor;
+      continue;
+    }
+
+    cursor += 1;
+    while (cursor < value.length && /[\w$-]/.test(value[cursor] ?? '')) cursor += 1;
+    const key = value.slice(keyStart, cursor);
+    let colonCursor = cursor;
+    while (colonCursor < value.length && /\s/.test(value[colonCursor] ?? '')) colonCursor += 1;
+
+    if (value[colonCursor] === ':') {
+      output += `"${key}"`;
+      output += value.slice(cursor, colonCursor + 1);
+      index = colonCursor + 1;
+    } else {
+      output += key;
+      index = cursor;
+    }
+  }
+
+  return output;
+}
+
+function removeTrailingCommasOutsideStrings(value: string): string {
+  let output = '';
+  let inString = false;
+  let quote = '';
+  let escaped = false;
+
+  for (let index = 0; index < value.length; index += 1) {
+    const char = value[index] ?? '';
+
+    if (inString) {
+      output += char;
+      if (escaped) {
+        escaped = false;
+      } else if (char === '\\') {
+        escaped = true;
+      } else if (char === quote) {
+        inString = false;
+        quote = '';
+      }
+      continue;
+    }
+
+    if (char === '"' || char === "'") {
+      inString = true;
+      quote = char;
+      output += char;
+      continue;
+    }
+
+    if (char === ',') {
+      let cursor = index + 1;
+      while (cursor < value.length && /\s/.test(value[cursor] ?? '')) cursor += 1;
+      if (value[cursor] === '}' || value[cursor] === ']') continue;
+    }
+
+    output += char;
+  }
+
+  return output;
 }
 
 function sanitizeDraftPath(value: unknown): string | undefined {
