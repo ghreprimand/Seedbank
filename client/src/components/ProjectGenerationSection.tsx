@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertCircle, Check, ExternalLink, FolderPlus, GitBranch, Loader2, Sparkles } from 'lucide-react';
 import type { AiProjectGenerateResult, Idea } from '@/lib/types';
-import { generateProjectFiles, getIntegrations, preflightAiRequest } from '@/api/client';
+import { generateProjectFiles, getGitHubPublishStatus, getIntegrations, preflightAiRequest } from '@/api/client';
 import { HelpButton } from '@/help/HelpPopover';
 
 interface ProjectGenerationSectionProps {
@@ -31,9 +31,13 @@ export default function ProjectGenerationSection({
   const [result, setResult] = useState<AiProjectGenerateResult | null>(null);
   const [projectRootConfigured, setProjectRootConfigured] = useState<boolean | null>(null);
   const [projectRootValue, setProjectRootValue] = useState('');
+  const [githubAuthenticated, setGithubAuthenticated] = useState<boolean | null>(null);
+  const [githubAvailable, setGithubAvailable] = useState<boolean | null>(null);
+  const [githubLogin, setGithubLogin] = useState('');
 
   const projectPath = result?.idea.graduatedTo ?? idea.graduatedTo;
   const hasProjectPath = Boolean(projectPath);
+  const canPublishToGitHub = hasProjectPath && githubAvailable === true && githubAuthenticated === true;
 
   useEffect(() => {
     let cancelled = false;
@@ -52,6 +56,26 @@ export default function ProjectGenerationSection({
       cancelled = true;
     };
   }, [idea.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getGitHubPublishStatus()
+      .then((status) => {
+        if (cancelled) return;
+        setGithubAvailable(status.available);
+        setGithubAuthenticated(status.authenticated);
+        setGithubLogin(status.login ?? '');
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setGithubAvailable(false);
+        setGithubAuthenticated(false);
+        setGithubLogin('');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const generate = async () => {
     setLoading(true);
@@ -115,9 +139,15 @@ export default function ProjectGenerationSection({
           <button
             type="button"
             onClick={onPublishClick}
-            disabled={!hasProjectPath}
+            disabled={!canPublishToGitHub}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border border-ink-200 text-ink-700 hover:border-sage-300 hover:text-sage-800 hover:bg-sage-50 disabled:opacity-40 disabled:hover:bg-transparent rounded-card transition-colors"
-            title={hasProjectPath ? 'Create GitHub repo and push files' : 'Generate project files first'}
+            title={
+              !hasProjectPath
+                ? 'Generate project files first'
+                : canPublishToGitHub
+                  ? 'Create GitHub repo and push files'
+                  : 'Connect GitHub in Settings first'
+            }
           >
             <GitBranch className="w-3.5 h-3.5" />
             Create GitHub repo
@@ -130,7 +160,7 @@ export default function ProjectGenerationSection({
         <textarea
           value={prompt}
           onChange={(event) => setPrompt(event.target.value)}
-          rows={3}
+          rows={5}
           className="mt-1 w-full px-3 py-2 text-sm bg-paper-warm border border-ink-100 rounded-card outline-none focus:ring-2 focus:ring-sage-400 resize-y text-ink-800 placeholder:text-ink-300"
         />
       </label>
@@ -156,6 +186,22 @@ export default function ProjectGenerationSection({
       {projectRootConfigured === true && projectRootValue && !projectPath && (
         <div className="px-3 py-2 rounded-card border border-ink-100 bg-paper-warm text-xs text-ink-600">
           New project folders will be created under <span className="font-mono text-ink-700">{projectRootValue}</span>.
+        </div>
+      )}
+
+      {hasProjectPath && githubAuthenticated === false && (
+        <div className="px-3 py-2 rounded-card border border-amber-200 bg-amber-50 text-xs text-amber-900">
+          GitHub is not linked yet. Connect the local <span className="font-mono">gh</span> CLI session in{' '}
+          <Link to="/settings/integrations" className="font-semibold underline hover:text-amber-950">
+            Settings → Project Graduation
+          </Link>
+          {' '}before creating a repo.
+        </div>
+      )}
+
+      {hasProjectPath && githubAvailable === true && githubAuthenticated === true && githubLogin && (
+        <div className="px-3 py-2 rounded-card border border-ink-100 bg-paper-warm text-xs text-ink-600">
+          GitHub publishing is ready for <span className="font-mono text-ink-700">{githubLogin}</span>.
         </div>
       )}
 
