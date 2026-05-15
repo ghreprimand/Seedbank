@@ -35,6 +35,26 @@ The Settings tab stores adapter configuration in the server `settings` table und
 - `POST /api/integrations/:id/configure`
 - `POST /api/integrations/:id/graduate/:ideaId`
 
+## GitHub Publishing (Optional, Post-Graduation)
+
+GitHub publishing is a separate action after graduation. It does not replace local scaffolding and is never required.
+
+Flow:
+1. Idea is graduated and has a local `graduatedTo` project path.
+2. User authenticates locally with GitHub CLI (`gh auth login`).
+3. Client checks status via `GET /api/integrations/github/status`.
+4. User explicitly publishes via `POST /api/integrations/github/publish/:ideaId` with:
+   - `repoName`
+   - optional `owner`
+   - `visibility` (`public` or `private`)
+   - `pushInitial` (whether to initialize/push immediately)
+5. Server returns granular outcome (`repoCreated`, `pushed`, `repoUrl`, `projectPath`, message/error), so local project creation is never rolled back silently.
+
+Security model:
+- Seedbank does not store GitHub PATs or account credentials.
+- Auth state remains owned by local `gh` CLI.
+- Publishing uses bounded server-side orchestration and explicit user intent.
+
 All graduation routes are authenticated through the standard API middleware and use `read:ideas` / `write:ideas` scopes for bearer mode.
 
 API/webhook/MCP docs now live under the **API & Automation** concept:

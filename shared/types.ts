@@ -430,6 +430,47 @@ export interface GraduationResult {
   message: string;
 }
 
+export interface GitHubAuthStatusResult {
+  available: boolean;
+  authenticated: boolean;
+  login?: string;
+  name?: string;
+  avatarUrl?: string;
+  profileUrl?: string;
+  publicRepos?: number;
+  followers?: number;
+  following?: number;
+  totalPrivateRepos?: number;
+  ownedPrivateRepos?: number;
+  privateGists?: number;
+  plan?: {
+    name?: string;
+    privateRepos?: number;
+    collaborators?: number;
+    space?: number;
+  };
+  scopes?: string[];
+  message: string;
+}
+
+export interface GitHubPublishRequest {
+  repoName: string;
+  owner?: string;
+  visibility: 'public' | 'private';
+  pushInitial: boolean;
+}
+
+export interface GitHubPublishResult {
+  repoCreated: boolean;
+  pushed: boolean;
+  repoUrl?: string;
+  remoteUrl?: string;
+  projectPath: string;
+  message: string;
+  error?: string;
+  idea?: Idea;
+}
+
 // ── AI assistance types ────────────────────────────────────────────
 
 export type AiProviderId =

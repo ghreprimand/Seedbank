@@ -273,7 +273,20 @@ Configure where Seedbank creates project folders when you graduate an idea. (Thi
 
 - **Local Project scaffold** — set the parent folder (project root) where Seedbank creates project directories. This works for any project type and does not require any external tool.
 - **Test connection** — checks that the saved path can be found or created later. Passes if the path already exists as a directory, or if its parent folder exists (the directory is created on first graduation). Does not probe write permissions.
+- **GitHub Publishing (optional)** — shows local `gh` CLI auth status and account details, and enables explicit post-graduation publish actions from idea detail pages. Seedbank does not store GitHub tokens; authentication remains in `gh`.
 - **Custom adapters (Advanced, collapsed by default)** — optional adapters that integrate with a specific local workflow tool. Not required for standard project graduation. Expand the Advanced section to configure them if needed.
+
+### GitHub Publishing (optional)
+
+GitHub publishing is local-first and explicit:
+
+1. Graduate an idea first to create/use a local project folder.
+2. Install GitHub CLI and authenticate once on this machine: `gh auth login`.
+3. Use the GitHub Publishing card in this tab to verify status (linked account details, profile link, repo/follower counts, and optional private-repo/plan fields when available from GitHub).
+4. Open the idea detail page and click **Publish to GitHub**.
+5. Choose repository name, visibility (`public`/`private`), and whether to push initial files now.
+
+This flow is optional and never required for graduation.
 
 See [`docs/INTEGRATIONS.md`](./INTEGRATIONS.md) for adapter internals and custom adapter implementation.
 

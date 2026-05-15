@@ -193,6 +193,47 @@ export interface GraduationResponse {
   idea: Idea;
 }
 
+export interface GitHubPublishStatus {
+  available: boolean;
+  authenticated: boolean;
+  message?: string;
+  login?: string;
+  name?: string;
+  avatarUrl?: string;
+  profileUrl?: string;
+  publicRepos?: number;
+  followers?: number;
+  following?: number;
+  totalPrivateRepos?: number;
+  ownedPrivateRepos?: number;
+  privateGists?: number;
+  plan?: {
+    name?: string;
+    privateRepos?: number;
+    collaborators?: number;
+    space?: number;
+  };
+  scopes?: string[];
+}
+
+export interface GitHubPublishRequest {
+  repoName: string;
+  owner?: string;
+  visibility: 'public' | 'private';
+  pushInitial: boolean;
+}
+
+export interface GitHubPublishResponse {
+  repoCreated: boolean;
+  pushed: boolean;
+  repoUrl?: string;
+  remoteUrl?: string;
+  projectPath: string;
+  message: string;
+  error?: string;
+  idea?: Idea;
+}
+
 export interface AiConversationResponse {
   messages: AiChatMessage[];
 }
@@ -1062,6 +1103,25 @@ export async function graduateIdea(
     { method: 'POST' },
   );
   response.idea = hydrateIdea(response.idea);
+  return response;
+}
+
+export async function getGitHubPublishStatus(): Promise<GitHubPublishStatus> {
+  return request<GitHubPublishStatus>('/api/integrations/github/status');
+}
+
+export async function publishIdeaToGitHub(
+  ideaId: string,
+  payload: GitHubPublishRequest,
+): Promise<GitHubPublishResponse> {
+  const response = await request<GitHubPublishResponse>(
+    `/api/integrations/github/publish/${encodeURIComponent(ideaId)}`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+  );
+  if (response.idea) response.idea = hydrateIdea(response.idea);
   return response;
 }
 
