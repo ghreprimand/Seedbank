@@ -22,6 +22,9 @@ const THINKING_PARTNER_PROMPT = [
   'Use concrete details from the title, pitch, raw notes, concept, risks, build notes, tags, and scores when they are present.',
   'Treat empty fields as unknown. Do not infer unstated audiences, markets, technology, or constraints.',
   'If the context is sparse, ask for the most important missing detail instead of making a generic or invented critique.',
+  'For each reply, first anchor your thinking to one or two concrete details from the supplied context, then ask a high-leverage question.',
+  'When asked for Devil\'s Advocate, name the specific assumption you are challenging and tie it to a concrete note before asking the question.',
+  'Avoid generic product-coaching questions when the raw notes already identify sharper tradeoffs, constraints, or validation criteria.',
   'Keep responses concise and practical. Prefer one or two thoughtful questions over broad ideation.',
 ].join(' ');
 
@@ -56,6 +59,13 @@ function hasContextValue(value: unknown): boolean {
   return value !== null && value !== undefined;
 }
 
+function formatContextValue(value: unknown): string {
+  if (Array.isArray(value)) return value.length > 0 ? value.join(', ') : '(empty)';
+  if (typeof value === 'number') return value > 0 ? String(value) : '(empty)';
+  if (typeof value === 'string') return value.trim() || '(empty)';
+  return value === null || value === undefined ? '(empty)' : String(value);
+}
+
 function ideaContext(idea: Idea): string {
   const labeledFields = {
     pitch: idea.pitch,
@@ -72,19 +82,46 @@ function ideaContext(idea: Idea): string {
     moodLabels: idea.moodLabels,
     graduatedTo: idea.graduatedTo,
   };
+  const filledFields = Object.entries(labeledFields)
+    .filter(([, value]) => hasContextValue(value))
+    .map(([field]) => THINKING_PARTNER_FIELD_LABELS[field as keyof typeof THINKING_PARTNER_FIELD_LABELS]);
 
   return [
-    'Current idea context:',
-    JSON.stringify({
-      fieldLabels: THINKING_PARTNER_FIELD_LABELS,
-      filledFields: Object.entries(labeledFields)
-        .filter(([, value]) => hasContextValue(value))
-        .map(([field]) => THINKING_PARTNER_FIELD_LABELS[field as keyof typeof THINKING_PARTNER_FIELD_LABELS]),
-      title: idea.title,
-      category: idea.category,
-      stage: idea.stage,
-      ...labeledFields,
-    }, null, 2),
+    'Current Seedbank idea context. Use this context over prior assistant messages.',
+    '',
+    `Title: ${idea.title}`,
+    `Category: ${idea.category}`,
+    `Stage: ${idea.stage}`,
+    `Filled fields: ${filledFields.length > 0 ? filledFields.join(', ') : 'none beyond title/category/stage'}`,
+    '',
+    `Elevator Pitch (pitch): ${formatContextValue(idea.pitch)}`,
+    '',
+    'The Spark / Raw Notes (fullNotes, verbatim):',
+    formatContextValue(idea.fullNotes),
+    '',
+    'Concept (hook):',
+    formatContextValue(idea.hook),
+    '',
+    'The Case (whyItMightWork):',
+    formatContextValue(idea.whyItMightWork),
+    '',
+    'Risks & Blockers (risks):',
+    formatContextValue(idea.risks),
+    '',
+    'Build Notes (techStack):',
+    formatContextValue(idea.techStack),
+    '',
+    'Aesthetic & Style (aesthetic):',
+    formatContextValue(idea.aesthetic),
+    '',
+    'Retrospective (retrospective):',
+    formatContextValue(idea.retrospective),
+    '',
+    `Tags: ${formatContextValue(idea.tags)}`,
+    `Mood Labels: ${formatContextValue(idea.moodLabels)}`,
+    `Feasibility (jamScore): ${formatContextValue(idea.jamScore)}`,
+    `Personal Excitement (excitementScore): ${formatContextValue(idea.excitementScore)}`,
+    `Local Project Folder (graduatedTo): ${formatContextValue(idea.graduatedTo)}`,
   ].join('\n');
 }
 

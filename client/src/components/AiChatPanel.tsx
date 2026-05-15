@@ -53,19 +53,19 @@ const FIELD_ACTIONS: Array<{ label: string; field: keyof Idea }> = [
 const ORGANIC_MODES: Array<{ label: string; prompt: string }> = [
   {
     label: 'What if?',
-    prompt: 'Ask one provocative "what if" question grounded in this idea\'s actual title, pitch, notes, stage, and constraints. Wait for my answer before suggesting anything.',
+    prompt: 'Ask one provocative "what if" question grounded in at least two concrete details from this idea\'s raw notes, concept, build notes, or validation criteria. First name the context details you are anchoring on. Wait for my answer before suggesting anything.',
   },
   {
     label: "Devil's Advocate",
-    prompt: 'Constructively challenge the weakest assumption that is actually present in this idea context. Ask one specific question that would expose whether that assumption is true. If the context is too sparse to identify one, ask for the missing detail instead of inventing a critique.',
+    prompt: 'Constructively challenge the weakest assumption that is actually present in this idea context. First name the specific assumption and the note that implies it, then ask one testable question that would expose whether that assumption is true. If the context is too sparse to identify one, ask for the missing detail instead of inventing a critique.',
   },
   {
     label: 'Scope Down',
-    prompt: 'Help me find the smallest viable version of this specific idea. Ask one question that removes scope without removing the core user value described here.',
+    prompt: 'Help me find the smallest viable version of this specific idea. Anchor on the stated personal value, differentiators, or phase plan, then ask one question that removes scope without removing the core value described here.',
   },
   {
     label: 'User Story',
-    prompt: 'Help me imagine one specific person using this idea based on the actual context. Ask one question about their situation before suggesting features.',
+    prompt: 'Help me imagine one specific person using this idea based on the actual context. Anchor on the stated workflow pain or validation criteria, then ask one question about their situation before suggesting features.',
   },
 ];
 

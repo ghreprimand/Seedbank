@@ -35,6 +35,7 @@ test('messagesForChat includes stage-aware system guidance', () => {
     assert.equal(messages[1]?.role, 'system');
     assert.match(messages[0]?.content ?? '', /Ground every question in the supplied idea context/);
     assert.match(messages[0]?.content ?? '', /Treat empty fields as unknown/);
+    assert.match(messages[0]?.content ?? '', /first anchor your thinking/);
     assert.ok(messages[1]?.content.includes(`Stage personality: ${promptStageLabel[stage]}.`));
   }
 });
@@ -53,13 +54,11 @@ test('messagesForChat labels and includes the core idea context fields', () => {
   });
   const context = messagesForChat(idea, [], 'What should I think about next?')[2]?.content ?? '';
 
-  assert.match(context, /"fullNotes": "Raw notes about seed rotations/);
-  assert.match(context, /"hook": "A local-first planting calendar."/);
-  assert.match(context, /"whyItMightWork": "Gardeners need reminders even when offline."/);
-  assert.match(context, /"techStack": "SQLite, React, and a local notification scheduler."/);
-  assert.match(context, /"fullNotes": "The Spark \/ Raw Notes"/);
-  assert.match(context, /"hook": "Concept"/);
-  assert.match(context, /"filledFields"/);
+  assert.match(context, /The Spark \/ Raw Notes \(fullNotes, verbatim\):\nRaw notes about seed rotations/);
+  assert.match(context, /Concept \(hook\):\nA local-first planting calendar\./);
+  assert.match(context, /The Case \(whyItMightWork\):\nGardeners need reminders even when offline\./);
+  assert.match(context, /Build Notes \(techStack\):\nSQLite, React, and a local notification scheduler\./);
+  assert.match(context, /Filled fields: .*The Spark \/ Raw Notes.*Concept.*The Case.*Build Notes/);
 });
 
 test('field suggestion prompts adapt expectations by stage', () => {
