@@ -8,6 +8,8 @@
 - Added `POST /api/ai/project-generate` to combine project-folder creation, Project drafting AI output, required repo doc fallbacks, safe file writes, and idea `graduatedTo` updates.
 - Standardized project generation around `README.md`, `SPEC.md`, `IMPLEMENTATION_NOTES.md`, and `TODO.md`, with a Settings → Project Graduation link when no project root is configured.
 - Improved the Project generation section with a taller brief field and inline GitHub setup guidance when the local `gh` session is not linked yet.
+- Added live GitHub repo detection for generated projects; existing repos now show a repo link and an Update GitHub repo action instead of another create button.
+- Added GitHub repo update support that commits changed local project files when present and pushes `main` to the confirmed repo.
 
 ### Project drafting
 

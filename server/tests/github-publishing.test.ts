@@ -6,6 +6,7 @@ import {
   GitHubPublishError,
   parseGhAuthStatusOutput,
   parseGitHubPublishRequest,
+  parseGitHubRepositoryReference,
   repoNameFromIdeaTitle,
   sanitizeGitHubRepoName,
 } from '../src/integrations/githubClient.js';
@@ -33,6 +34,30 @@ test('sanitizeGitHubRepoName strips unsafe characters and normalizes', () => {
 
 test('repoNameFromIdeaTitle slugifies idea title', () => {
   assert.equal(repoNameFromIdeaTitle('Seedbank Project: Alpha/Beta'), 'seedbank-project-alpha-beta');
+});
+
+test('parseGitHubRepositoryReference accepts browser and git remote URLs', () => {
+  assert.deepEqual(parseGitHubRepositoryReference('https://github.com/octocat/hello-world'), {
+    owner: 'octocat',
+    name: 'hello-world',
+    repoUrl: 'https://github.com/octocat/hello-world',
+  });
+
+  assert.deepEqual(parseGitHubRepositoryReference('https://github.com/octocat/hello-world.git'), {
+    owner: 'octocat',
+    name: 'hello-world',
+    repoUrl: 'https://github.com/octocat/hello-world',
+    remoteUrl: 'https://github.com/octocat/hello-world.git',
+  });
+
+  assert.deepEqual(parseGitHubRepositoryReference('git@github.com:octocat/hello-world.git'), {
+    owner: 'octocat',
+    name: 'hello-world',
+    repoUrl: 'https://github.com/octocat/hello-world',
+    remoteUrl: 'git@github.com:octocat/hello-world.git',
+  });
+
+  assert.equal(parseGitHubRepositoryReference('https://example.com/octocat/hello-world'), null);
 });
 
 test('parseGitHubPublishRequest validates visibility and repo name', () => {

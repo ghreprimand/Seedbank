@@ -135,7 +135,7 @@ Usage readouts show tokens consumed in the last 24 hours and last 7 days (from `
 
 The idea detail page includes a **Project generation** section. It uses the **Project drafting** Feature Defaults route, so the selected provider, model, effort, token budgets, model allowlist, and remote-provider confirmation are configured here.
 
-Project generation creates or uses a local project folder, generates repo-ready text files (`README.md`, `SPEC.md`, `IMPLEMENTATION_NOTES.md`, `TODO.md`), writes them to disk without overwriting existing files, and then exposes the GitHub publishing action from the same idea section. It does not overwrite idea fields.
+Project generation creates or uses a local project folder, generates repo-ready text files (`README.md`, `SPEC.md`, `IMPLEMENTATION_NOTES.md`, `TODO.md`), writes them to disk without overwriting existing files, and then exposes GitHub create/update actions from the same idea section. It does not overwrite idea fields.
 
 See [`docs/PROJECT_DRAFTING.md`](./PROJECT_DRAFTING.md) and [`docs/AI_GUIDE.md`](./AI_GUIDE.md).
 
@@ -283,8 +283,9 @@ GitHub publishing is local-first and explicit:
 1. Graduate an idea first to create/use a local project folder.
 2. Install GitHub CLI and authenticate once on this machine: `gh auth login`.
 3. Use the GitHub Publishing card in this tab to verify status (linked account details, profile link, repo/follower counts, and optional private-repo/plan fields when available from GitHub).
-4. Open the idea detail page and click **Publish to GitHub**.
+4. Open the idea detail page and click **Create GitHub repo** in Project generation.
 5. Choose repository name, visibility (`public`/`private`), and whether to push initial files now.
+6. Once GitHub confirms the repo exists, the idea page shows the repo link and **Update GitHub repo**. Update stages local project files, commits changes when present, and pushes `main`.
 
 This flow is optional and never required for graduation.
 

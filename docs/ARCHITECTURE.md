@@ -212,6 +212,8 @@ The route resolves Feature Defaults in the same way as Thinking Partner, field s
 
 The provider returns JSON containing a summary and proposed files. The parser tolerates common model drift such as unquoted object keys and trailing commas. The server accepts only safe relative paths, rejects traversal/hidden paths, caps the number and size of files, and protects existing project files from overwrite. The generate endpoint creates a project folder when the idea does not already have one, ensures the standard repo docs are present (`README.md`, `SPEC.md`, `IMPLEMENTATION_NOTES.md`, `TODO.md`), writes them locally, and updates `graduatedTo`. The feature does not write canonical idea fields.
 
+GitHub publishing remains a separate local-first step. `server/src/integrations/githubClient.ts` reads local `gh` CLI auth, creates repos on explicit request, and can later verify the idea's saved GitHub link or local git `origin` against GitHub. Once a repo is confirmed, the project section switches from create mode to update mode; update stages the local project folder, commits changed files when present, configures `origin`, and pushes `main`.
+
 ## Integration Architecture
 
 Integrations live under `server/src/integrations/` and implement a shared adapter interface. The registry currently provides:

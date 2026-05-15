@@ -42,13 +42,15 @@ GitHub publishing is a separate action after graduation. It does not replace loc
 Flow:
 1. Idea is graduated and has a local `graduatedTo` project path.
 2. User authenticates locally with GitHub CLI (`gh auth login`).
-3. Client checks status via `GET /api/integrations/github/status`.
+3. Client checks account status via `GET /api/integrations/github/status`.
 4. User explicitly publishes via `POST /api/integrations/github/publish/:ideaId` with:
    - `repoName`
    - optional `owner`
    - `visibility` (`public` or `private`)
    - `pushInitial` (whether to initialize/push immediately)
 5. Server returns granular outcome (`repoCreated`, `pushed`, `repoUrl`, `projectPath`, message/error), so local project creation is never rolled back silently.
+
+After a repo exists, the idea stores a `GitHub` link and the project folder has an `origin` remote. Seedbank reads live repo status with `GET /api/integrations/github/repo-status/:ideaId`; if GitHub confirms the repo still exists, the idea detail page shows the repo link and an update action instead of another create action. `POST /api/integrations/github/update/:ideaId` stages the local project folder, commits changed files when needed, configures `origin`, and pushes `main`.
 
 Security model:
 - Seedbank does not store GitHub PATs or account credentials.

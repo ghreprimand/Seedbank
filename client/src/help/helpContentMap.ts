@@ -469,8 +469,9 @@ export const HELP_CONTENT_MAP: Record<string, HelpEntry> = {
     manualSection: 'github-publishing',
   },
   'github-publish-button': {
-    title: 'Publish to GitHub Button',
-    body: 'This action appears after graduation creates a local project folder path.',
+    title: 'GitHub Repo Action',
+    body: 'This action appears after Project generation creates a local project folder path.',
+    details: 'Seedbank checks GitHub before deciding whether to create a repo or show the existing repo link and update action.',
     manualSection: 'github-publishing',
   },
 };

@@ -236,6 +236,33 @@ export interface GitHubPublishResponse {
   idea?: Idea;
 }
 
+export interface GitHubRepoStatus {
+  available: boolean;
+  authenticated: boolean;
+  projectPath?: string;
+  repoKnown: boolean;
+  exists: boolean;
+  source: 'idea-link' | 'git-remote' | 'none';
+  repoUrl?: string;
+  remoteUrl?: string;
+  owner?: string;
+  name?: string;
+  private?: boolean;
+  defaultBranch?: string;
+  message: string;
+}
+
+export interface GitHubRepoUpdateResponse {
+  pushed: boolean;
+  committed: boolean;
+  repoUrl: string;
+  remoteUrl?: string;
+  projectPath: string;
+  message: string;
+  error?: string;
+  idea?: Idea;
+}
+
 export interface AiConversationResponse {
   messages: AiChatMessage[];
 }
@@ -1121,6 +1148,10 @@ export async function getGitHubPublishStatus(): Promise<GitHubPublishStatus> {
   return request<GitHubPublishStatus>('/api/integrations/github/status');
 }
 
+export async function getIdeaGitHubRepoStatus(ideaId: string): Promise<GitHubRepoStatus> {
+  return request<GitHubRepoStatus>(`/api/integrations/github/repo-status/${encodeURIComponent(ideaId)}`);
+}
+
 export async function publishIdeaToGitHub(
   ideaId: string,
   payload: GitHubPublishRequest,
@@ -1131,6 +1162,15 @@ export async function publishIdeaToGitHub(
       method: 'POST',
       body: JSON.stringify(payload),
     },
+  );
+  if (response.idea) response.idea = hydrateIdea(response.idea);
+  return response;
+}
+
+export async function updateIdeaGitHubRepo(ideaId: string): Promise<GitHubRepoUpdateResponse> {
+  const response = await request<GitHubRepoUpdateResponse>(
+    `/api/integrations/github/update/${encodeURIComponent(ideaId)}`,
+    { method: 'POST' },
   );
   if (response.idea) response.idea = hydrateIdea(response.idea);
   return response;

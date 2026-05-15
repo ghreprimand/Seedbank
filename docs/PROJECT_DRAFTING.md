@@ -24,6 +24,7 @@ Usage guardrails, remote-provider confirmation, model allowlists, disabled provi
 4. Adjust the file generation brief if you want a narrower scope.
 5. Click **Create project files**. Seedbank creates the local project folder when needed, generates starter files, and writes them to disk.
 6. Click **Create GitHub repo** from the same section when you want to publish and push the generated files.
+7. After the repo exists, the section shows the GitHub repo link and **Update GitHub repo** instead. That action commits changed local project files when present and pushes them to the linked repo.
 
 The default generation prompt asks for `README.md`, `SPEC.md`, `IMPLEMENTATION_NOTES.md`, and `TODO.md`. The server adds conservative fallback versions for any of those files that the AI omits.
 
