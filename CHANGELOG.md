@@ -4,6 +4,10 @@
 
 - No changes yet.
 
+## 1.0.1 — macOS App Launcher Fix
+
+- Fixed the generated macOS `Seedbank.app` launcher so Finder/Dock launches get a usable Homebrew/system PATH and write troubleshooting output to `~/Library/Logs/Seedbank/launcher.log`.
+
 ## 1.0.0 — Public Archive Release
 
 ### First-run setup and project root selection

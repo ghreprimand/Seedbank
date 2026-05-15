@@ -194,7 +194,10 @@ install_macos_launcher() {
   cat > "$executable" <<EOF
 #!/usr/bin/env bash
 export SEEDBANK_DIR="$SEEDBANK_DIR"
-exec "$LAUNCHER" start
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:\${PATH:-}"
+LOG_DIR="\$HOME/Library/Logs/Seedbank"
+mkdir -p "\$LOG_DIR"
+exec "$LAUNCHER" start >> "\$LOG_DIR/launcher.log" 2>&1
 EOF
   chmod +x "$executable"
 

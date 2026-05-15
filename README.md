@@ -139,7 +139,7 @@ From a release archive or checkout, double-click `Install-Seedbank.command` or r
 bash Install-Seedbank.command
 ```
 
-This installs dependencies, prepares the runtime, creates `~/Applications/Seedbank.app`, and starts Seedbank. To start manually later:
+This installs dependencies, prepares the runtime, creates `~/Applications/Seedbank.app`, and starts Seedbank. Finder/Dock launch logs are written to `~/Library/Logs/Seedbank/launcher.log`. To start manually later:
 
 ```bash
 bash scripts/seedbank start
