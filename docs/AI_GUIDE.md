@@ -218,11 +218,11 @@ This preserves Seedbank's core promise: the archive remains useful even without 
 
 ---
 
-## Project Drafting
+## Project Generation
 
-The **Draft project files** button on the idea detail page asks the configured **Project drafting** route to generate reviewable starter files from the current idea. It uses the same provider configuration, account auth, model selection, reasoning effort, token budgets, and guardrails as every other AI assist feature.
+The **Project generation** section on the idea detail page asks the configured **Project drafting** route to generate repo-ready starter files from the current idea. It uses the same provider configuration, account auth, model selection, reasoning effort, token budgets, and guardrails as every other AI assist feature.
 
-Typical outputs include `SPEC.md`, `IMPLEMENTATION_NOTES.md`, `RESEARCH_NOTES.md`, and `TODO.md`. The server accepts only safe relative paths and returns the files to the browser for review. Canonical idea fields are not overwritten. For graduated ideas, the reviewed selection can be saved into the project path when that path is inside a configured project root; existing files are not overwritten.
+The standard outputs are `README.md`, `SPEC.md`, `IMPLEMENTATION_NOTES.md`, and `TODO.md`. The server accepts only safe relative paths, creates or reuses the idea's local project folder, writes files without overwriting existing files, and updates the idea's project path. Canonical idea fields are not overwritten. GitHub publishing remains a separate explicit action from the same section.
 
 See [`docs/PROJECT_DRAFTING.md`](./PROJECT_DRAFTING.md) for the API shape and safety model.
 

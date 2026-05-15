@@ -199,6 +199,12 @@ export const HELP_CONTENT_MAP: Record<string, HelpEntry> = {
     body: 'Generates reviewable project files using the Project drafting AI route configured in Settings → AI & Agents.',
     manualSection: 'project-drafting',
   },
+  'project-generation': {
+    title: 'Project Generation',
+    body: 'Creates or uses a local project folder, generates repo-ready starter files, and prepares the folder for optional GitHub publishing.',
+    details: 'Set your preferred project folder in Settings → Project Graduation. If it is blank, Seedbank uses its default graduated-project folder.',
+    manualSection: 'project-drafting',
+  },
   'idea-thinking-partner': {
     title: 'Thinking Partner',
     body: 'Discuss and refine your idea with AI while retaining final editorial control.',

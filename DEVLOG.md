@@ -4,6 +4,24 @@ Newest entries at the top.
 
 ---
 
+## 2026-05-15 — Project Generation Workflow
+
+Reworked the idea-detail project workflow so it matches how users actually want to move from seed to repo. The old visible action generated draft files in a modal and left folder creation/GitHub publishing as separate concepts. The new flow is local-first and repo-oriented from one section.
+
+What changed:
+- Added a Project generation section near the bottom of idea detail pages.
+- The section creates a local project folder when the idea does not already have one.
+- It uses the existing Project drafting AI route to generate repo-ready docs and writes them directly to the project folder.
+- The standard file set is now `README.md`, `SPEC.md`, `IMPLEMENTATION_NOTES.md`, and `TODO.md`.
+- If the AI omits one of those required repo docs, the server adds a conservative fallback before writing files.
+- The section shows the current/new project path and links to Settings → Project Graduation when the preferred project folder has not been explicitly configured.
+- GitHub publishing now sits in the same section, so the intended flow is: generate local project files first, then create/push the GitHub repo.
+
+Safety and permissions:
+- Existing project files are not overwritten.
+- File paths still reject absolute paths, parent traversal, hidden directories, and empty files.
+- The generate endpoint requires both `ai:suggest` and `write:ideas` for bearer-token callers because it sends content to AI and updates the idea's local project path.
+
 ## 2026-05-15 — Project Draft Parser Hardening
 
 Fixed a project-drafting failure seen while testing a sparse Seed-stage idea through the Codex account route. The idea did not need more fields filled out; the failure came from the AI returning JSON-like object syntax that was close to valid JSON but used unquoted keys/trailing commas.

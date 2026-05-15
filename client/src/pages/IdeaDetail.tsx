@@ -10,7 +10,6 @@ import {
   ChevronDown,
   Download,
   ExternalLink,
-  Sparkles,
   Rocket,
   GitBranch,
 } from 'lucide-react';
@@ -41,7 +40,7 @@ import VersionHistory from '@/components/VersionHistory';
 import GraduationModal from '@/components/GraduationModal';
 import GitHubPublishModal from '@/components/GitHubPublishModal';
 import AiChatPanel from '@/components/AiChatPanel';
-import ProjectDraftPanel from '@/components/ProjectDraftPanel';
+import ProjectGenerationSection from '@/components/ProjectGenerationSection';
 import LandscapeAnalysis from '@/components/LandscapeAnalysis';
 import IdeaHealthCheck from '@/components/IdeaHealthCheck';
 import AiSuggestionButton from '@/components/AiSuggestionButton';
@@ -49,6 +48,7 @@ import StageTimeline from '@/components/StageTimeline';
 import ImageGallery from '@/components/ImageGallery';
 import type { GraduationResponse } from '@/api/client';
 import type { GitHubPublishResponse } from '@/api/client';
+import type { AiProjectGenerateResult } from '@/lib/types';
 import { exportIdeaAsMarkdown, exportIdeaAsJSON } from '@/lib/export';
 import { assessReadiness } from '@/lib/stageReadiness';
 import { useCategoriesSettings } from '@/stores/settings';
@@ -97,7 +97,6 @@ export default function IdeaDetail() {
   const [graduationMessage, setGraduationMessage] = useState<string | null>(null);
   const [gitHubPublishOpen, setGitHubPublishOpen] = useState(false);
   const [gitHubPublishMessage, setGitHubPublishMessage] = useState<string | null>(null);
-  const [projectDraftOpen, setProjectDraftOpen] = useState(false);
 
   const categorySettings = useCategoriesSettings();
   const activeCategories = categorySettings.items
@@ -228,6 +227,13 @@ export default function IdeaDetail() {
     if (result.idea) setIdea(result.idea);
     setGitHubPublishMessage(result.message ?? (result.repoUrl ? `Repository created: ${result.repoUrl}` : 'GitHub publish completed.'));
     setGitHubPublishOpen(false);
+  };
+
+  const handleProjectGenerated = (result: AiProjectGenerateResult) => {
+    setIdea(result.idea);
+    setGraduationMessage(
+      `${result.createdProject ? 'Created project folder' : 'Updated project folder'} at ${result.targetPath}. Wrote ${result.filesWritten.length} file${result.filesWritten.length === 1 ? '' : 's'}.`,
+    );
   };
 
   const canShowGraduation = (current: Idea) =>
@@ -776,27 +782,13 @@ export default function IdeaDetail() {
         <IdeaHealthCheck idea={idea} onPromote={(nextStage) => saveNow({ stage: nextStage })} />
       </div>
 
+      <ProjectGenerationSection
+        idea={idea}
+        onGenerated={handleProjectGenerated}
+        onPublishClick={() => setGitHubPublishOpen(true)}
+      />
+
       <div className="pt-5 border-t border-ink-100 space-y-3" data-help="idea-thinking-partner">
-        <div className="flex items-center justify-end gap-2">
-          <HelpButton
-            helpId="project-draft"
-            title="Draft Project Files"
-            summary="Uses the Project drafting route from Settings → AI & Agents to propose reviewable project files from this idea."
-            details="The selected provider, model, effort, token budgets, and remote-provider guardrails are configured in Feature Defaults."
-            manualSection="project-drafting"
-            alwaysShow
-          />
-          <button
-            type="button"
-            onClick={() => setProjectDraftOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium
-                       border border-ink-200 text-ink-600 hover:border-sage-300 hover:text-sage-700
-                       hover:bg-sage-50 rounded-card transition-colors"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            Draft project files
-          </button>
-        </div>
         <AiChatPanel idea={idea} onApply={saveNow} />
       </div>
 
@@ -842,15 +834,6 @@ export default function IdeaDetail() {
           idea={idea}
           onClose={() => setGraduationOpen(false)}
           onGraduated={handleGraduated}
-        />
-      )}
-
-      {projectDraftOpen && (
-        <ProjectDraftPanel
-          idea={idea}
-          onClose={() => {
-            setProjectDraftOpen(false);
-          }}
         />
       )}
 

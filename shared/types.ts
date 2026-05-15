@@ -932,6 +932,15 @@ export interface AiProjectDraftApplyResult {
   filesWritten: string[];
 }
 
+export interface AiProjectGenerateRequest extends AiProjectDraftRequest {}
+
+export interface AiProjectGenerateResult extends AiProjectDraftResult {
+  targetPath: string;
+  filesWritten: string[];
+  createdProject: boolean;
+  idea: Idea;
+}
+
 export interface AiLandscapeAnalysisRequest {
   ideaId: string;
   prompt?: string;

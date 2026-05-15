@@ -26,7 +26,7 @@ function downloadFile(file: AiProjectDraftFile) {
 }
 
 export default function ProjectDraftPanel({ idea, onClose }: ProjectDraftPanelProps) {
-  const [prompt, setPrompt] = useState('Write a SPEC.md, IMPLEMENTATION_NOTES.md, and TODO.md for the smallest useful version of this idea.');
+  const [prompt, setPrompt] = useState('Write a README.md, SPEC.md, IMPLEMENTATION_NOTES.md, and TODO.md for the smallest useful version of this idea.');
   const [summary, setSummary] = useState('');
   const [files, setFiles] = useState<AiProjectDraftFile[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());

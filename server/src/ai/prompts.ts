@@ -333,7 +333,7 @@ export function promptForProjectDraft(idea: Idea, prompt?: string): AiProviderMe
       content: [
         requestedFiles,
         '',
-        'Good default outputs include SPEC.md, IMPLEMENTATION_NOTES.md, RESEARCH_NOTES.md, or TODO.md when they fit the idea.',
+        'Good default outputs include README.md, SPEC.md, IMPLEMENTATION_NOTES.md, and TODO.md when they fit the idea.',
         'Keep each file focused enough for the user to review before using it.',
       ].join('\n'),
     },
