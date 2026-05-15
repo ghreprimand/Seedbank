@@ -127,6 +127,8 @@ The system behavior is intentionally constrained:
 
 - Ask questions before suggesting.
 - Reflect what is already in the idea.
+- Ground questions in the current idea fields, stage, notes, risks, build notes, tags, and scores.
+- Ask for missing context when the idea is sparse instead of inventing a generic critique.
 - Challenge assumptions gently.
 - Avoid generating unrelated ideas.
 - Keep the user's creativity in control.
@@ -161,7 +163,7 @@ Organic modes are available in the AI chat panel.
 
 **What If** — asks one provocative "what if" question and waits for the user's response before going further. Good for breaking a stale framing, finding a surprising angle, or exploring inversions or constraints.
 
-**Devil's Advocate** — challenges the weakest assumption in the idea without dismissing it. Good for finding hidden risks, testing whether the idea has a real user, and separating excitement from evidence.
+**Devil's Advocate** — challenges the weakest assumption that is actually present in the idea context without dismissing it. If the idea is too sparse, it asks for the missing detail needed to identify a real risk.
 
 **Scope Down** — pushes the idea toward the smallest feasible version. Good for first prototypes and reducing a broad concept to one screen, one mechanic, or one workflow.
 

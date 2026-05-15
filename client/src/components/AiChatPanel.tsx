@@ -53,19 +53,19 @@ const FIELD_ACTIONS: Array<{ label: string; field: keyof Idea }> = [
 const ORGANIC_MODES: Array<{ label: string; prompt: string }> = [
   {
     label: 'What if?',
-    prompt: 'Ask one provocative "what if" question about this idea. Wait for my answer before suggesting anything.',
+    prompt: 'Ask one provocative "what if" question grounded in this idea\'s actual title, pitch, notes, stage, and constraints. Wait for my answer before suggesting anything.',
   },
   {
     label: "Devil's Advocate",
-    prompt: 'Constructively challenge the weakest assumption in this idea. Ask me one question that would expose whether it is true.',
+    prompt: 'Constructively challenge the weakest assumption that is actually present in this idea context. Ask one specific question that would expose whether that assumption is true. If the context is too sparse to identify one, ask for the missing detail instead of inventing a critique.',
   },
   {
     label: 'Scope Down',
-    prompt: 'Help me find the smallest viable version of this idea. Ask one question that removes scope without removing the core.',
+    prompt: 'Help me find the smallest viable version of this specific idea. Ask one question that removes scope without removing the core user value described here.',
   },
   {
     label: 'User Story',
-    prompt: 'Help me imagine one specific person using this idea. Ask one question about their situation before suggesting features.',
+    prompt: 'Help me imagine one specific person using this idea based on the actual context. Ask one question about their situation before suggesting features.',
   },
 ];
 

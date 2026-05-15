@@ -163,7 +163,16 @@ function fallbackAiSuggestion(mode: string, context: unknown): string {
   }
 
   if (mode === 'devils-advocate') {
-    return `What assumption behind ${title} would make the whole idea weaker if it turned out false? Name that assumption, then write the smallest way to test it.`;
+    const knownContext = [
+      pitch.trim() ? `pitch: ${pitch.trim()}` : '',
+      stringField(idea, 'hook').trim() ? `concept: ${stringField(idea, 'hook').trim()}` : '',
+      stringField(idea, 'whyItMightWork').trim() ? `case: ${stringField(idea, 'whyItMightWork').trim()}` : '',
+      stringField(idea, 'techStack').trim() ? `build notes: ${stringField(idea, 'techStack').trim()}` : '',
+      risks.trim() ? `known risks: ${risks.trim()}` : '',
+    ].filter(Boolean).join(' ');
+    return knownContext
+      ? `For ${title}, use this context only: ${knownContext} What specific assumption in that context would most weaken the project if false, and what is the smallest way to test it?`
+      : `For ${title}, there is not enough project context to challenge accurately yet. What missing detail would reveal the riskiest assumption: target user, core workflow, technical approach, or why now?`;
   }
 
   if (mode === 'scope-down') {
