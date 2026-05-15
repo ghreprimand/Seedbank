@@ -27,6 +27,8 @@ What changed:
 - One-shot field assistance also carries the selected intent into the server prompt, so Improve, Write from scratch, Expand my draft, and Playbook requests have different instructions instead of all sharing a broad "make it better" prompt.
 - One-shot field generation no longer inherits Thinking Partner stage-personality instructions such as "ask what if questions." That guidance is appropriate for chat, but it was steering field-writing requests into questions and reviews instead of usable field text.
 - Built-in playbooks now defer to the target field's contract when a playbook would push the output in the wrong direction, and hidden-risk playbooks are scoped to the Risks & Blockers field.
+- Thinking Partner preset prompts now separate internal instruction from visible conversation text. The provider still receives the full preset prompt, but the saved user message is the compact preset label, so the panel no longer shows hidden instructions as if the user typed them.
+- The preset prompts now ask for natural, unlabeled output: What If and Devil's Advocate return one focused question, while Scope Down and User Story return a short setup plus one question.
 - Short AI outputs now ask for plain text rather than markdown headings/bold markers because these panels render plain text.
 - Image gallery rendering now resolves Seedbank API image paths through the configured API base URL, so uploads display correctly when the frontend and API run on different ports.
 - Image fetch/delete routes now handle dotted filenames such as `.png` through explicit route parsing, and image reads stream files with a known content type instead of relying on `sendFile`.
