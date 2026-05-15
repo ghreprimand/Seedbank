@@ -4,6 +4,26 @@ Newest entries at the top.
 
 ---
 
+## 2026-05-15 — macOS App Launcher PATH Fix
+
+Fixed a macOS launcher issue found after the v1.0.0 archive release: the installer could start Seedbank successfully from Terminal, but the generated `~/Applications/Seedbank.app` did nothing when launched from Finder/Dock.
+
+Root cause:
+- macOS GUI apps do not inherit the user's interactive shell environment.
+- The generated app wrapper was only setting `SEEDBANK_DIR`, then invoking `scripts/seedbank`.
+- On machines where Node.js is installed through Homebrew or another shell-configured path, Finder-launched apps may not see `node`/`npm`, so the launcher exits invisibly.
+
+What changed:
+- The generated macOS app wrapper now sets a conservative PATH including `/opt/homebrew/bin`, `/usr/local/bin`, and system bin paths before starting Seedbank.
+- The wrapper now logs Finder/Dock launch output to `~/Library/Logs/Seedbank/launcher.log`, so future macOS launcher failures leave an inspectable trace.
+
+Validation:
+- `npm run build`
+- `npm run release:package -- --all --version-tag v1.0.1`
+- `npm run release:smoke -- .release/artifacts/seedbank-v1.0.1-linux-x64.tar.gz .release/artifacts/seedbank-v1.0.1-macos.tar.gz .release/artifacts/seedbank-v1.0.1-windows-x64.zip`
+
+---
+
 ## 2026-05-15 — v1.0.0 Public Archive Release Prep
 
 Prepared Seedbank for public archive distribution across Linux, macOS, and Windows.

@@ -1,7 +1,7 @@
 {
   "name": "seedbank-workspace",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Seedbank monorepo workspace for the React client and persistent storage server.",
   "type": "module",
   "scripts": {

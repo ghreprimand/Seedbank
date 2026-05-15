@@ -21,6 +21,7 @@ bash Install-Seedbank.command
 ```
 
 The installer checks Node.js/npm, uses Homebrew if available for Node.js, creates `~/Applications/Seedbank.app`, and starts Seedbank.
+The app launcher writes troubleshooting output to `~/Library/Logs/Seedbank/launcher.log`.
 
 ### Windows
 Double-click `Install-Seedbank.bat`, or run it from Command Prompt.
