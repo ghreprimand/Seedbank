@@ -1,6 +1,7 @@
 import { extractSuggestion } from './utils/suggestion-parser.js';
 import type {
   AiChatMessage,
+  AiFieldAssistIntent,
   AiFieldAssistMessage,
   AiFeatureId,
   AiLandscapeAnalysisSections,
@@ -27,6 +28,7 @@ const THINKING_PARTNER_PROMPT = [
   'Avoid generic product-coaching questions when the raw notes already identify sharper tradeoffs, constraints, or validation criteria.',
   'If the notes frame the idea as a personal daily-driver or learning project, focus on the user\'s own workflow and validation criteria instead of launch, market, or external-user metrics unless external users are explicitly mentioned.',
   'Write in plain text for an app UI. Do not use markdown bold, markdown headings, or decorative labels.',
+  'Do not format replies as labeled sections such as "Assumption:", "Implied by note:", or "Testable question:". Write naturally.',
   'Keep responses concise and practical. Prefer one or two thoughtful questions over broad ideation.',
 ].join(' ');
 
@@ -38,6 +40,7 @@ const FIELD_ASSIST_PROMPT = [
   'Use the supplied idea context as source material and avoid generic product-coaching language.',
   'If the notes frame the idea as a personal daily-driver or learning project, write for the user\'s own workflow unless external users are explicitly mentioned.',
   'Write in plain text for an app UI. Do not use markdown bold, markdown headings, or decorative labels.',
+  'Do not return meta-commentary about the request. Return directly usable field text.',
   'Keep responses brief; the user can ask follow-up questions if they want more.',
 ].join(' ');
 
@@ -214,6 +217,105 @@ function fieldSuggestionStageExpectation(stage: Stage, field: AiSuggestionField)
   ].join(' ');
 }
 
+function fieldOutputContract(field: AiSuggestionField): string {
+  const contracts: Record<AiSuggestionField, string[]> = {
+    pitch: [
+      'Output contract for Elevator Pitch:',
+      'Write one crisp sentence, or two short sentences only if needed.',
+      'Say what the project is and the main value it creates.',
+      'For personal tools, frame the payoff around the user\'s own workflow instead of a market claim.',
+    ],
+    fullNotes: [
+      'Output contract for The Spark / Raw Notes:',
+      'Preserve the user\'s raw thinking while making it easier to scan.',
+      'Use short paragraphs or simple hyphen bullets when useful.',
+      'Do not polish away uncertainty, questions, constraints, or rough edges that matter to the idea.',
+    ],
+    hook: [
+      'Output contract for Concept:',
+      'Write a concise plain-language explanation of what this thing is.',
+      'Name the core mechanism, workflow, or experience when the context supports it.',
+      'Do not turn the concept into a marketing pitch.',
+    ],
+    whyItMightWork: [
+      'Output contract for The Case:',
+      'Write one or two plain paragraphs that answer why this is worth building from the captured idea context.',
+      'For a personal daily-driver or learning project, center the user\'s own friction, learning goals, workflow payoff, and validation criteria.',
+      'Do not turn it into a launch, market, growth, or external-user argument unless those are explicitly present in the notes.',
+    ],
+    risks: [
+      'Output contract for Risks & Blockers:',
+      'List concrete risks, blockers, tradeoffs, and failure modes grounded in the supplied idea context.',
+      'Prefer specific implementation, scope, validation, usability, or maintenance risks over generic startup risk language.',
+      'Simple hyphen bullets are appropriate for this field.',
+    ],
+    techStack: [
+      'Output contract for Build Notes:',
+      'Write practical implementation notes: stack direction, architecture choices, early spikes, scope boundaries, and first build steps.',
+      'Name concrete technologies only when the context supports them.',
+      'Include tradeoffs or open decisions instead of pretending every technical choice is settled.',
+    ],
+    aesthetic: [
+      'Output contract for Aesthetic & Style:',
+      'Describe actionable visual, interaction, and tone direction.',
+      'Use concrete UI qualities, references, constraints, and feel.',
+      'Avoid vague vibe-only phrasing that would not help someone design the project.',
+    ],
+    retrospective: [
+      'Output contract for Retrospective:',
+      'Write candid notes about outcome, lessons, surprises, and what to carry forward.',
+      'Use past-tense outcome language only when the idea context supports it.',
+      'If the project is not complete, frame this as a retrospective scaffold or evaluation notes instead of inventing results.',
+    ],
+  };
+
+  return [
+    ...contracts[field],
+    'Return directly usable field text.',
+    'Do not ask questions, explain your process, write a review, or include headings or decorative labels.',
+  ].join(' ');
+}
+
+function fieldAssistIntentContract(intent: AiFieldAssistIntent | undefined, omitCurrentValue = false): string {
+  if (omitCurrentValue || intent === 'fresh') {
+    return [
+      'Mode contract: Write from scratch.',
+      'Ignore the current value entirely.',
+      'Use the rest of the idea context as source material.',
+      'Return a complete standalone value for the target field.',
+    ].join(' ');
+  }
+
+  if (intent === 'improve') {
+    return [
+      'Mode contract: Improve this field.',
+      'Preserve the user\'s intent and factual meaning while improving clarity, specificity, and usefulness.',
+      'Do not add unsupported audiences, markets, promises, or technologies.',
+    ].join(' ');
+  }
+
+  if (intent === 'explain') {
+    return [
+      'Mode contract: Expand my draft.',
+      'Keep the current direction, then add useful depth from the idea context.',
+      'Do not change the project scope or replace the user\'s framing.',
+    ].join(' ');
+  }
+
+  if (intent === 'playbook') {
+    return [
+      'Mode contract: Apply the selected playbook only where it fits the target field and idea context.',
+      'If the playbook wording conflicts with the field output contract or the idea context, obey the field output contract.',
+      'For personal daily-driver projects, do not force external-user or market framing unless the notes explicitly call for it.',
+    ].join(' ');
+  }
+
+  return [
+    'Mode contract: Suggest a useful field revision.',
+    'Revise or extend the field while preserving the user\'s intent.',
+  ].join(' ');
+}
+
 export function messagesForChat(idea: Idea, history: AiChatMessage[], nextUserMessage: string): AiProviderMessage[] {
   return [
     { role: 'system', content: THINKING_PARTNER_PROMPT },
@@ -255,12 +357,14 @@ export function promptForSuggestion(idea: Idea, field: AiSuggestionField, curren
     {
       role: 'system',
       content: [
-        THINKING_PARTNER_PROMPT,
-        stagePersonality(idea.stage),
+        FIELD_ASSIST_PROMPT,
         fieldSuggestionStageExpectation(idea.stage, field),
+        fieldOutputContract(field),
+        fieldAssistIntentContract('improve'),
         'For this request, return only JSON with keys "suggestion" and "rationale".',
         'The suggestion must revise or extend the target field, not replace the user as the source of creativity.',
         'The suggestion value must be usable field text, not a review of the field or a description of what you would change.',
+        'Do not include markdown formatting in the suggestion or rationale.',
       ].join(' '),
     },
     { role: 'system', content: ideaContext(idea) },
@@ -281,6 +385,7 @@ export function promptForFieldAssist(
   field: AiSuggestionField,
   currentValue: string,
   customPrompt?: string,
+  intent?: AiFieldAssistIntent,
   omitCurrentValue = false,
 ): AiProviderMessage[] {
   const currentValueLines = omitCurrentValue
@@ -294,8 +399,9 @@ export function promptForFieldAssist(
       role: 'system',
       content: [
         FIELD_ASSIST_PROMPT,
-        stagePersonality(idea.stage),
         fieldSuggestionStageExpectation(idea.stage, field),
+        fieldOutputContract(field),
+        fieldAssistIntentContract(intent, omitCurrentValue),
         'For this field-assist request, return only JSON with keys "suggestion" and "rationale".',
         omitCurrentValue
           ? 'This is a write-from-scratch request. The suggestion must be a complete standalone value for the target field using the rest of the idea context as source material.'
@@ -337,8 +443,8 @@ export function fieldAssistConversationMessages(
       role: 'system',
       content: [
         FIELD_ASSIST_PROMPT,
-        stagePersonality(idea.stage),
         fieldSuggestionStageExpectation(idea.stage, field),
+        fieldOutputContract(field),
         'You are assisting with one specific Seedbank idea field in a modal-local conversation.',
         'Do not use or update the persistent Thinking Partner conversation.',
         'Keep replies focused on the target field. If you draft field text, make it easy to apply.',

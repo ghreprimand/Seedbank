@@ -308,6 +308,7 @@ export const MANUAL_GROUPS: ManualGroup[] = [
         keywords: ['suggestion', 'ai', 'field', 'elevator pitch', 'concept', 'the case', 'risks', 'build notes', 'draft', 'generate', 'guided', 'modal', 'intent', 'playbook', 'refine', 'conversation', 'apply', 'improve', 'fresh', 'explain'],
         blocks: [
           { type: 'p', text: 'Fields like The Spark/Raw Notes, Concept, The Case, Elevator Pitch, Risks, and Build Notes have a ✨ button that opens the AI Assistance modal. You choose how you want help, review the result, and apply only what you want.' },
+          { type: 'p', text: 'Each field has its own output shape. For example, Elevator Pitch aims for a crisp one-liner, The Case explains why the idea is worth building, Risks & Blockers lists concrete failure modes, and Build Notes focuses on implementation direction.' },
           { type: 'h3', text: 'Choosing an intent' },
           { type: 'p', text: 'The modal opens with an intent selection step. Pick the mode that fits your situation:' },
           { type: 'ul', items: [

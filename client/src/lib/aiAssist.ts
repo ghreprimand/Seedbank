@@ -103,7 +103,7 @@ export const BUILTIN_PLAYBOOKS: AiPlaybook[] = [
     label: 'Surface hidden risks',
     description: 'Non-obvious risks and failure modes.',
     promptPrefix: 'Play devil\'s advocate. What are the non-obvious risks, hidden assumptions, or failure modes that could undermine this idea?',
-    fields: ['risks', 'whyItMightWork'],
+    fields: ['risks'],
   },
   {
     id: 'technical',
@@ -119,6 +119,63 @@ export function playbooksForField(field: string): AiPlaybook[] {
   return BUILTIN_PLAYBOOKS.filter(
     (pb) => pb.fields.length === 0 || pb.fields.includes(field),
   );
+}
+
+type OneShotAssistIntent = Exclude<AiAssistIntent, 'question'>;
+
+function fieldRole(field: string): string {
+  switch (field) {
+    case 'pitch':
+      return 'This field should be a crisp elevator pitch: what the project is and its main payoff.';
+    case 'fullNotes':
+      return 'This field should preserve the user\'s raw notes while making them easier to scan.';
+    case 'hook':
+      return 'This field should explain the core concept in plain language, not as marketing copy.';
+    case 'whyItMightWork':
+      return 'This field should explain why the idea is worth building, grounded in the user\'s notes and validation criteria.';
+    case 'risks':
+      return 'This field should capture concrete risks, blockers, tradeoffs, and failure modes.';
+    case 'techStack':
+      return 'This field should capture practical build notes: stack, architecture, spikes, scope boundaries, and next steps.';
+    case 'aesthetic':
+      return 'This field should describe actionable visual, interaction, and tone direction.';
+    case 'retrospective':
+      return 'This field should capture candid outcome notes, lessons, surprises, and what to carry forward.';
+    default:
+      return 'This field should be directly usable in the idea.';
+  }
+}
+
+function fieldIntentInstruction(field: string, label: string, ideaTitle: string, intent: OneShotAssistIntent): string {
+  const subject = `the "${label}" field for "${ideaTitle}"`;
+  const role = fieldRole(field);
+
+  if (intent === 'fresh') {
+    switch (field) {
+      case 'pitch':
+        return `Write a new ${subject} from scratch. ${role} Use one sentence unless two short sentences are clearly better.`;
+      case 'whyItMightWork':
+        return `Write a new ${subject} from scratch. ${role} For personal daily-driver or learning projects, focus on the user's own friction, workflow payoff, and learning value rather than launch or market claims.`;
+      case 'risks':
+        return `Write a new ${subject} from scratch. ${role} Use specific bullets grounded in the idea context.`;
+      case 'techStack':
+        return `Write a new ${subject} from scratch. ${role} Include concrete early technical decisions and open questions where the notes do not settle them.`;
+      case 'fullNotes':
+        return `Create a cleaned-up version of ${subject} from scratch using the rest of the idea context. ${role} Keep uncertainty, questions, constraints, and rough edges intact.`;
+      default:
+        return `Write a new ${subject} from scratch. ${role}`;
+    }
+  }
+
+  if (intent === 'improve') {
+    return `Improve ${subject}. ${role} Preserve the author's intent and factual meaning while making the text clearer, more specific, and easier to use. Do not add unsupported audiences, markets, promises, or technologies.`;
+  }
+
+  if (intent === 'explain') {
+    return `Expand ${subject}. ${role} Keep the current direction, then add useful depth from the idea context without changing the project scope or replacing the user's framing.`;
+  }
+
+  return `Apply the selected playbook to ${subject}. ${role} If the playbook conflicts with this field's purpose or the idea context, prioritize the field purpose and the user's notes.`;
 }
 
 // ── Assist context / request ──────────────────────────────────────────────────
@@ -168,18 +225,25 @@ export function buildAssistPrompt(req: AiAssistRequest): string {
 
   if (intent === 'playbook' && playbookId) {
     const pb = BUILTIN_PLAYBOOKS.find((p) => p.id === playbookId);
-    if (pb) base = `${pb.promptPrefix}\n\nFor the "${label}" field of "${ideaTitle}":`;
+    if (pb) {
+      base = [
+        fieldIntentInstruction(context.field, label, ideaTitle, 'playbook'),
+        '',
+        `Selected playbook: ${pb.label}.`,
+        pb.promptPrefix,
+      ].join('\n');
+    }
   } else if (intent === 'improve') {
-    base = `Improve the "${label}" field for "${ideaTitle}". Keep the author's intent but make it clearer and more compelling.`;
+    base = fieldIntentInstruction(context.field, label, ideaTitle, 'improve');
   } else if (intent === 'fresh') {
     base = [
-      `Write a new "${label}" for "${ideaTitle}" from scratch.`,
+      fieldIntentInstruction(context.field, label, ideaTitle, 'fresh'),
       'Use the rest of the idea context as source material, especially Raw Notes, Concept, Build Notes, risks, and validation criteria when present.',
       'Return only clean field text that could be applied directly. Do not review the field, explain the task, or use markdown formatting.',
       'Do not use the current value as a reference.',
     ].join(' ');
   } else if (intent === 'explain') {
-    base = `Expand and add depth to the "${label}" for "${ideaTitle}". Keep the core idea and add useful specificity.`;
+    base = fieldIntentInstruction(context.field, label, ideaTitle, 'explain');
   }
 
   if (current && intent !== 'fresh') {

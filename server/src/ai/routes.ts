@@ -4,6 +4,7 @@ import type { AiConfigPatch } from './types.js';
 import type { AiService } from './service.js';
 import type {
   AiFeatureId,
+  AiFieldAssistIntent,
   AiFieldAssistChatRequest,
   AiFieldAssistMessage,
   AiFieldSuggestionRequest,
@@ -46,6 +47,7 @@ const AI_SUGGESTION_FIELDS: readonly AiSuggestionField[] = [
 ];
 const AI_SUGGESTION_FIELD_ERROR = 'field must be one of pitch, fullNotes, risks, techStack, hook, whyItMightWork, aesthetic, or retrospective.';
 const AI_FEATURE_IDS: readonly AiFeatureId[] = ['thinking-partner', 'field-suggestions', 'health-check', 'discover-insights', 'landscape-analysis', 'project-drafting', 'default'];
+const AI_FIELD_ASSIST_INTENTS: readonly AiFieldAssistIntent[] = ['improve', 'fresh', 'explain', 'playbook'];
 const AI_REASONING_EFFORTS: readonly AiReasoningEffort[] = ['minimal', 'low', 'medium', 'high'];
 const AI_TEXT_VERBOSITIES: readonly AiTextVerbosity[] = ['low', 'medium', 'high'];
 
@@ -58,6 +60,12 @@ function parseAiSuggestionField(value: unknown): AiSuggestionField | undefined {
 function parseAiFeatureId(value: unknown): AiFeatureId | undefined {
   return typeof value === 'string' && AI_FEATURE_IDS.includes(value as AiFeatureId)
     ? value as AiFeatureId
+    : undefined;
+}
+
+function parseAiFieldAssistIntent(value: unknown): AiFieldAssistIntent | undefined {
+  return typeof value === 'string' && AI_FIELD_ASSIST_INTENTS.includes(value as AiFieldAssistIntent)
+    ? value as AiFieldAssistIntent
     : undefined;
 }
 
@@ -366,6 +374,7 @@ export function registerAiRoutes(
       field?: unknown;
       currentValue?: unknown;
       prompt?: unknown;
+      intent?: unknown;
       omitCurrentValue?: unknown;
       aiConfirmationToken?: unknown;
       providerInstanceId?: unknown;
@@ -406,16 +415,22 @@ export function registerAiRoutes(
         res.status(400).json({ error: 'omitCurrentValue must be a boolean.' });
         return;
       }
+      if (body.intent !== undefined && !parseAiFieldAssistIntent(body.intent)) {
+        res.status(400).json({ error: 'intent must be one of improve, fresh, explain, or playbook.' });
+        return;
+      }
       const model = optionalString(body.model, 'model');
       if (!model.ok) {
         res.status(400).json({ error: model.error });
         return;
       }
+      const intent = parseAiFieldAssistIntent(body.intent);
       const suggestionRequest: AiFieldSuggestionRequest = {
         ideaId: ideaId.value,
         field,
         currentValue: currentValue.value ?? '',
         ...(prompt.value?.trim() ? { prompt: prompt.value.trim() } : {}),
+        ...(intent ? { intent } : {}),
         ...(body.omitCurrentValue === true ? { omitCurrentValue: true } : {}),
         providerInstanceId: parseProviderInstanceId(body.providerInstanceId),
         ...(model.value?.trim() ? { model: model.value.trim() } : {}),
@@ -428,6 +443,7 @@ export function registerAiRoutes(
         suggestionRequest.currentValue,
         clientKey(req),
         suggestionRequest.prompt,
+        suggestionRequest.intent,
         suggestionRequest.omitCurrentValue,
         aiConfirmationToken.value,
         {

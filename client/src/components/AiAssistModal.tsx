@@ -877,12 +877,14 @@ export default function AiAssistModal({
         refinement: refinementText,
         featureKey,
       });
+      const oneShotIntent = intent === 'question' ? undefined : intent;
       const result = await suggestIdeaField(
         context.idea.id,
         context.field as AiSuggestionField,
         context.currentValue,
         {
           prompt: customPrompt,
+          ...(oneShotIntent ? { intent: oneShotIntent } : {}),
           omitCurrentValue: intent === 'fresh',
           aiConfirmationToken: confirmationToken,
           ...routeRequest,

@@ -89,6 +89,7 @@ test('fresh field assist writes standalone field text without current value', ()
     'whyItMightWork',
     idea.whyItMightWork,
     'Write a new The Case from scratch.',
+    'fresh',
     true,
   ).map((message) => message.content).join('\n');
 
@@ -110,9 +111,39 @@ test('field suggestion prompts adapt expectations by stage', () => {
   assert.ok(pitchPrompt.includes('should be polished and presentation-ready'));
 });
 
-test('field assist prompts include stage personality and expectation guidance', () => {
+test('field assist prompts include field and intent contracts without thinking-partner question framing', () => {
   const idea = newIdea({ stage: 'prototype' });
-  const prompt = promptForFieldAssist(idea, 'techStack', '').map((message) => message.content).join('\n');
-  assert.ok(prompt.includes('Stage personality: greenhouse.'));
+  const prompt = promptForFieldAssist(idea, 'techStack', '', undefined, 'explain').map((message) => message.content).join('\n');
+  assert.ok(prompt.includes('Output contract for Build Notes'));
+  assert.ok(prompt.includes('Mode contract: Expand my draft'));
   assert.ok(prompt.includes('keep output practical and build-oriented'));
+  assert.doesNotMatch(prompt, /Stage personality: greenhouse/);
+  assert.doesNotMatch(prompt, /Ask "what if" questions/);
+});
+
+test('field assist prompts have field-specific output contracts for every generated field', () => {
+  const idea = newIdea({
+    stage: 'sprout',
+    fullNotes: 'Personal terminal project for faster git/test/debug loops.',
+  });
+  const expectations = [
+    ['pitch', 'Output contract for Elevator Pitch', 'one crisp sentence'],
+    ['fullNotes', 'Output contract for The Spark / Raw Notes', 'Preserve the user\'s raw thinking'],
+    ['hook', 'Output contract for Concept', 'plain-language explanation'],
+    ['whyItMightWork', 'Output contract for The Case', 'personal daily-driver'],
+    ['risks', 'Output contract for Risks & Blockers', 'failure modes'],
+    ['techStack', 'Output contract for Build Notes', 'architecture choices'],
+    ['aesthetic', 'Output contract for Aesthetic & Style', 'interaction'],
+    ['retrospective', 'Output contract for Retrospective', 'inventing results'],
+  ] as const;
+
+  for (const [field, heading, detail] of expectations) {
+    const prompt = promptForFieldAssist(idea, field, '', undefined, 'fresh', true)
+      .map((message) => message.content)
+      .join('\n');
+    assert.match(prompt, new RegExp(heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    assert.match(prompt, new RegExp(detail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    assert.match(prompt, /Mode contract: Write from scratch/);
+    assert.doesNotMatch(prompt, /Ask "what if" questions/);
+  }
 });

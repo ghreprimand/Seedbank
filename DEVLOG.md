@@ -23,6 +23,10 @@ What changed:
 - Thinking Partner's header now reads the effective Thinking Partner feature route and then the preflight result after opening, so it matches the provider/model that will actually receive the request.
 - Prompt copy now explicitly treats personal daily-driver or learning projects as personal workflow validation unless the notes mention external users. This keeps terminal/tooling projects from drifting into launch metrics or generic user-growth framing.
 - Field assist now distinguishes write-from-scratch from improve/review. Fresh field requests omit the old value and ask for complete standalone field text from the rest of the idea context.
+- Field assist now has explicit output contracts for each generated field: Elevator Pitch, The Spark / Raw Notes, Concept, The Case, Risks & Blockers, Build Notes, Aesthetic & Style, and Retrospective.
+- One-shot field assistance also carries the selected intent into the server prompt, so Improve, Write from scratch, Expand my draft, and Playbook requests have different instructions instead of all sharing a broad "make it better" prompt.
+- One-shot field generation no longer inherits Thinking Partner stage-personality instructions such as "ask what if questions." That guidance is appropriate for chat, but it was steering field-writing requests into questions and reviews instead of usable field text.
+- Built-in playbooks now defer to the target field's contract when a playbook would push the output in the wrong direction, and hidden-risk playbooks are scoped to the Risks & Blockers field.
 - Short AI outputs now ask for plain text rather than markdown headings/bold markers because these panels render plain text.
 - Image gallery rendering now resolves Seedbank API image paths through the configured API base URL, so uploads display correctly when the frontend and API run on different ports.
 - Image fetch/delete routes now handle dotted filenames such as `.png` through explicit route parsing, and image reads stream files with a known content type instead of relying on `sendFile`.

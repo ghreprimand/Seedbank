@@ -4,6 +4,7 @@ import type {
   AiChatMessage,
   AiClaudeServiceMethod,
   AiCodexOpenAIServiceMethod,
+  AiFieldAssistIntent,
   AiLocalModelServiceMethod,
   AiEffectiveFeatureRoute,
   AiFieldAssistMessage,
@@ -2226,6 +2227,7 @@ export class AiService {
     currentValue: string,
     key: string,
     customPrompt?: string,
+    intent?: AiFieldAssistIntent,
     omitCurrentValue = false,
     confirmationToken?: string,
     override: AiRequestRouteOverride = {},
@@ -2238,7 +2240,7 @@ export class AiService {
     try {
       const result = await this.completeFieldSuggestion(
         config,
-        promptForFieldAssist(idea, field, currentValue, customPrompt, omitCurrentValue),
+        promptForFieldAssist(idea, field, currentValue, customPrompt, intent, omitCurrentValue),
       );
       await this.recordUsage(config, 'field-suggestions', result);
       return parseSuggestion(field, result.text);
