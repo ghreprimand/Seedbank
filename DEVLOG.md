@@ -13,6 +13,7 @@ What changed:
 - Organic prompt buttons now ask for project-specific questions instead of broad generic prompts.
 - Devil's Advocate now challenges an assumption that is actually present in the idea context; when the context is too sparse, it asks for the missing detail needed to critique accurately.
 - Image gallery rendering now resolves Seedbank API image paths through the configured API base URL, so uploads display correctly when the frontend and API run on different ports.
+- Image fetch/delete routes now handle dotted filenames such as `.png` through explicit route parsing, and image reads stream files with a known content type instead of relying on `sendFile`.
 
 Validation:
 - `npm run typecheck`
