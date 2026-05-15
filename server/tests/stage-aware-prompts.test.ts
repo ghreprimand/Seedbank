@@ -39,6 +39,7 @@ test('messagesForChat includes stage-aware system guidance', () => {
     assert.match(messages[0]?.content ?? '', /personal daily-driver or learning project/);
     assert.match(messages[0]?.content ?? '', /Do not imply the project has been built/);
     assert.match(messages[0]?.content ?? '', /Treat validation criteria as planned criteria/);
+    assert.match(messages[0]?.content ?? '', /grounded insight, actionable next move, and question/);
     assert.match(messages[0]?.content ?? '', /Do not use markdown bold/);
     assert.match(messages[0]?.content ?? '', /Do not echo or restate the user's instruction text/);
     assert.ok(messages[1]?.content.includes(`Stage personality: ${promptStageLabel[stage]}.`));
