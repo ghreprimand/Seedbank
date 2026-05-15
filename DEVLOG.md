@@ -10,8 +10,12 @@ Tightened two rough edges found during project testing.
 
 What changed:
 - Thinking Partner's base system prompt now explicitly grounds questions in the current idea context: title, pitch, stage, notes, risks, build notes, tags, and scores.
+- Thinking Partner context now includes field-label metadata so providers know that `fullNotes` means The Spark / Raw Notes, `hook` means Concept, `whyItMightWork` means The Case, and `techStack` means Build Notes.
+- The context payload also lists which idea fields are actually filled in, so sparse ideas should get missing-detail questions instead of invented critique.
 - Organic prompt buttons now ask for project-specific questions instead of broad generic prompts.
 - Devil's Advocate now challenges an assumption that is actually present in the idea context; when the context is too sparse, it asks for the missing detail needed to critique accurately.
+- Seed/Sprout stage guidance no longer blocks critique outright; it keeps critique lightweight unless the user explicitly asks for it.
+- Thinking Partner messages now display newest-first in the panel while the stored history remains chronological for prompt construction.
 - Thinking Partner's header now reads the effective Thinking Partner feature route and then the preflight result after opening, so it matches the provider/model that will actually receive the request.
 - Image gallery rendering now resolves Seedbank API image paths through the configured API base URL, so uploads display correctly when the frontend and API run on different ports.
 - Image fetch/delete routes now handle dotted filenames such as `.png` through explicit route parsing, and image reads stream files with a known content type instead of relying on `sendFile`.
