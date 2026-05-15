@@ -10,6 +10,8 @@ import type {
   AiMethodCapability,
   AiProjectDraftApplyRequest,
   AiProjectDraftApplyResult,
+  AiLandscapeAnalysisRequest,
+  AiLandscapeAnalysisResult,
   AiModelListResult,
   AiProjectDraftRequest,
   AiProjectDraftResult,
@@ -28,7 +30,9 @@ import type {
   IdeaVersion,
   IntegrationHealthResult,
   IntegrationSummary,
+  LandscapeReport,
   PublicToken,
+  StageTransition,
 } from '@/lib/types';
 
 export type ConnectionStatus = 'checking' | 'online' | 'offline';
@@ -44,6 +48,8 @@ export interface SeedbankArchive {
   exportedAt: string;
   ideas: Idea[];
   versions: IdeaVersion[];
+  stageTransitions?: StageTransition[];
+  landscapeReports?: LandscapeReport[];
 }
 
 export interface MigrationInspection {
@@ -191,6 +197,12 @@ export interface AiConversationResponse {
   messages: AiChatMessage[];
 }
 
+export interface IdeaImageMutationResponse {
+  images: string[];
+  path?: string;
+  ok?: boolean;
+}
+
 const API_BASE_URL = import.meta.env.VITE_SEEDBANK_API_URL ?? 'http://localhost:4800';
 
 
@@ -280,6 +292,8 @@ async function readApiErrorMessage(response: Response): Promise<string> {
 function hydrateIdea(raw: Idea): Idea {
   return {
     ...raw,
+    aesthetic: raw.aesthetic ?? '',
+    retrospective: raw.retrospective ?? '',
     createdAt: new Date(raw.createdAt),
     updatedAt: new Date(raw.updatedAt),
     deletedAt: raw.deletedAt ? new Date(raw.deletedAt) : raw.deletedAt,
@@ -294,6 +308,20 @@ function hydrateVersion(raw: IdeaVersion): IdeaVersion {
 }
 
 function hydrateAiMessage(raw: AiChatMessage): AiChatMessage {
+  return {
+    ...raw,
+    createdAt: new Date(raw.createdAt),
+  };
+}
+
+function hydrateStageTransition(raw: StageTransition): StageTransition {
+  return {
+    ...raw,
+    transitionedAt: new Date(raw.transitionedAt),
+  };
+}
+
+function hydrateLandscapeReport(raw: LandscapeReport): LandscapeReport {
   return {
     ...raw,
     createdAt: new Date(raw.createdAt),
@@ -318,6 +346,13 @@ function extractVersions(payload: IdeaVersion[] | { versions?: IdeaVersion[]; da
 
 function extractVersion(payload: IdeaVersion | { version?: IdeaVersion; data?: IdeaVersion }): IdeaVersion {
   return hydrateVersion(('version' in payload ? payload.version : undefined) ?? ('data' in payload ? payload.data : undefined) ?? payload as IdeaVersion);
+}
+
+function extractStageTransitions(
+  payload: StageTransition[] | { items?: StageTransition[]; transitions?: StageTransition[]; data?: StageTransition[] },
+): StageTransition[] {
+  if (Array.isArray(payload)) return payload.map(hydrateStageTransition);
+  return (payload.items ?? payload.transitions ?? payload.data ?? []).map(hydrateStageTransition);
 }
 
 async function cacheIdeas(ideas: Idea[]) {
@@ -433,6 +468,51 @@ export async function getVersions(ideaId: string): Promise<IdeaVersion[]> {
   } catch {
     return localIdeas.getVersions(ideaId);
   }
+}
+
+export async function getStageTransitions(ideaId: string): Promise<StageTransition[]> {
+  try {
+    return extractStageTransitions(
+      await request<StageTransition[] | { items?: StageTransition[]; transitions?: StageTransition[]; data?: StageTransition[] }>(
+        `/api/ideas/${encodeURIComponent(ideaId)}/stage-transitions`,
+      ),
+    );
+  } catch {
+    return [];
+  }
+}
+
+export async function uploadIdeaImage(ideaId: string, file: File): Promise<IdeaImageMutationResponse> {
+  const form = new FormData();
+  form.append('image', file);
+
+  let response: Response;
+  try {
+    response = await fetch(apiUrl(`/api/ideas/${encodeURIComponent(ideaId)}/images`), {
+      method: 'POST',
+      headers: { Accept: 'application/json' },
+      body: form,
+    });
+  } catch (error) {
+    setConnectionStatus('offline');
+    throw error;
+  }
+
+  if (!response.ok) {
+    setConnectionStatus(response.status >= 500 ? 'offline' : 'online');
+    throw new Error(`Seedbank API ${response.status}: ${await readApiErrorMessage(response)}`);
+  }
+
+  setConnectionStatus('online');
+  return response.json() as Promise<IdeaImageMutationResponse>;
+}
+
+export async function deleteIdeaImage(ideaId: string, filename: string): Promise<IdeaImageMutationResponse> {
+  const response = await request<IdeaImageMutationResponse>(
+    `/api/ideas/${encodeURIComponent(ideaId)}/images/${encodeURIComponent(filename)}`,
+    { method: 'DELETE' },
+  );
+  return response;
 }
 
 export async function createVersion(
@@ -828,6 +908,26 @@ export async function draftProjectFiles(input: AiProjectDraftRequest): Promise<A
     method: 'POST',
     body: JSON.stringify(input),
   });
+}
+
+export async function analyzeLandscape(input: AiLandscapeAnalysisRequest): Promise<AiLandscapeAnalysisResult> {
+  const result = await request<AiLandscapeAnalysisResult>('/api/ai/landscape-analysis', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+  return {
+    ...result,
+    report: hydrateLandscapeReport(result.report),
+  };
+}
+
+export async function getLatestLandscapeReport(ideaId: string): Promise<{ report: LandscapeReport | null }> {
+  const payload = await request<{ report: LandscapeReport | null }>(
+    `/api/ideas/${encodeURIComponent(ideaId)}/landscape-report`,
+  );
+  return {
+    report: payload.report ? hydrateLandscapeReport(payload.report) : null,
+  };
 }
 
 export async function applyProjectDraftFiles(input: AiProjectDraftApplyRequest): Promise<AiProjectDraftApplyResult> {

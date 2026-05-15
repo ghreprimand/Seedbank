@@ -10,8 +10,12 @@ import { CATEGORIES, DEFAULT_CATEGORY_DEFINITIONS } from '../../shared/types.js'
 
 function repositoryFixture(): { db: Database.Database; repository: SeedbankRepository } {
   const db = new Database(':memory:');
-  const migration = fs.readFileSync(path.resolve('migrations/001_initial_schema.sql'), 'utf8');
-  db.exec(migration);
+  const migrations = fs.readdirSync(path.resolve('migrations'))
+    .filter((name) => /^\d+_.*\.sql$/.test(name))
+    .sort();
+  for (const migration of migrations) {
+    db.exec(fs.readFileSync(path.resolve('migrations', migration), 'utf8'));
+  }
   return { db, repository: new SeedbankRepository(db) };
 }
 

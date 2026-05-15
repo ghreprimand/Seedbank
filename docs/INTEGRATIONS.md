@@ -50,7 +50,7 @@ Config fields:
 
 Behavior:
 - creates a standalone scaffold in a configured external project root
-- generates `README.md`, `CLAUDE.md`, and a seed context file from the idea
+- generates `README.md`, `AGENTS.md`, and a seed context file from the idea
 - chooses target stage based on category
 
 ### Custom Local Adapters

@@ -1,6 +1,6 @@
 /** Idea detail / editor page — all 14 fields, auto-save, version history, and actions. */
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   ArrowLeft,
   Copy,
@@ -17,7 +17,9 @@ import {
 import type { Idea, Stage } from '@/lib/types';
 import {
   CATEGORY_LABELS,
+  IDEA_FIELD_VISIBILITY_KEYS,
   STAGES,
+  STAGE_FIELD_VISIBILITY,
   STAGE_LABELS,
   STAGE_ICONS,
 } from '@/lib/types';
@@ -38,15 +40,43 @@ import VersionHistory from '@/components/VersionHistory';
 import GraduationModal from '@/components/GraduationModal';
 import AiChatPanel from '@/components/AiChatPanel';
 import ProjectDraftPanel from '@/components/ProjectDraftPanel';
+import LandscapeAnalysis from '@/components/LandscapeAnalysis';
 import IdeaHealthCheck from '@/components/IdeaHealthCheck';
 import AiSuggestionButton from '@/components/AiSuggestionButton';
+import StageTimeline from '@/components/StageTimeline';
+import ImageGallery from '@/components/ImageGallery';
 import type { GraduationResponse } from '@/api/client';
 import { exportIdeaAsMarkdown, exportIdeaAsJSON } from '@/lib/export';
+import { assessReadiness } from '@/lib/stageReadiness';
 import { useCategoriesSettings } from '@/stores/settings';
 import { HelpButton } from '@/help/HelpPopover';
 
 /** Auto-save debounce delay in ms */
 const SAVE_DELAY = 800;
+
+const PROGRESSIVE_UNLOCK_NEXT_STAGE: Partial<Record<Stage, Stage>> = {
+  seed: 'sprout',
+  sprout: 'pitch',
+  pitch: 'prototype',
+  prototype: 'plot',
+};
+
+function displayLabelForField(field: string, stage: Stage): string {
+  if (field === 'fullNotes') return stage === 'seed' ? 'The Spark' : 'Raw Notes';
+  if (field === 'hook') return 'Concept';
+  if (field === 'whyItMightWork') return 'The Case';
+  if (field === 'pitch') return 'Elevator Pitch';
+  if (field === 'risks') return 'Risks & Blockers';
+  if (field === 'techStack') return 'Build Notes';
+  if (field === 'aesthetic') return 'Aesthetic & Style';
+  if (field === 'retrospective') return 'Retrospective';
+  if (field === 'jamScore') return 'Feasibility';
+  if (field === 'links') return 'Links';
+  if (field === 'relatedIdeaIds') return 'Related Ideas';
+  if (field === 'images') return 'Images';
+  if (field === 'landscapeAnalysis') return 'Landscape Analysis';
+  return field;
+}
 
 export default function IdeaDetail() {
   const { id } = useParams<{ id: string }>();
@@ -70,10 +100,28 @@ export default function IdeaDetail() {
     .sort((a, b) => a.sortOrder - b.sortOrder);
 
   const [reloadKey, setReloadKey] = useState(0);
+  const [showAllFieldsByIdea, setShowAllFieldsByIdea] = useState<Record<string, boolean>>({});
+  const [teaserExpandedFor, setTeaserExpandedFor] = useState<string | null>(null);
 
   // Loading is derived from "have I finished fetching the requested id?"
   // — avoids a synchronous setLoading(true) inside the effect.
   const loading = !!id && loadedId !== id;
+  const readiness = useMemo(() => (idea ? assessReadiness(idea) : null), [idea]);
+  const showAllFields = id ? (showAllFieldsByIdea[id] ?? false) : false;
+  const visibleFieldKeys = idea
+    ? (showAllFields
+      ? new Set(Object.values(STAGE_FIELD_VISIBILITY).flat())
+      : new Set(STAGE_FIELD_VISIBILITY[idea.stage]))
+    : new Set<string>();
+  const canSee = (field: string) => showAllFields || visibleFieldKeys.has(field);
+  const stageFieldKeys = idea ? new Set(STAGE_FIELD_VISIBILITY[idea.stage]) : new Set<string>();
+  const hiddenFieldsForStage = idea
+    ? IDEA_FIELD_VISIBILITY_KEYS.filter((field) => !stageFieldKeys.has(field))
+    : [];
+  const hiddenFields = showAllFields ? [] : hiddenFieldsForStage;
+  const nextStageForUnlock = idea ? PROGRESSIVE_UNLOCK_NEXT_STAGE[idea.stage] : undefined;
+  const teaserContextKey = `${id ?? ''}:${idea?.stage ?? ''}`;
+  const teaserExpanded = teaserExpandedFor === teaserContextKey;
 
   // ── Load idea ────────────────────────────────────────────
 
@@ -134,6 +182,10 @@ export default function IdeaDetail() {
       console.error('Save failed:', err);
       setSaveStatus('idle');
     }
+  };
+
+  const syncImages = (images: string[]) => {
+    setIdea((prev) => (prev ? { ...prev, images } : prev));
   };
 
   // ── Actions ──────────────────────────────────────────────
@@ -257,7 +309,7 @@ export default function IdeaDetail() {
           )}
           <button
             onClick={handleShelve}
-            title={idea.stage === 'cold-storage' ? 'Move back to shelved' : 'Move to cold storage'}
+            title={idea.stage === 'cold-storage' ? 'Move back to dormant' : 'Move to cold storage'}
             className="p-1.5 text-ink-300 hover:text-frost-600 transition-all rounded-card hover:bg-frost-50"
           >
             <Snowflake className="w-4 h-4" />
@@ -324,10 +376,21 @@ export default function IdeaDetail() {
             <HelpButton
               helpId="stage"
               title="Lifecycle Stages"
-              summary="Every idea moves through gardening-themed stages from Seed to Shipped. Change stage at any time — it affects filtering, graduation eligibility, and discovery tools."
+              summary="Every idea moves through gardening-themed stages from Seed to Market. Change stage at any time — it affects filtering, graduation eligibility, and discovery tools."
               manualSection="stages"
             />
           </div>
+
+          {readiness && readiness.ready && readiness.nextStage !== idea.stage && (
+            <button
+              type="button"
+              onClick={() => saveNow({ stage: readiness.nextStage })}
+              className="px-2 py-0.5 text-[11px] font-medium font-mono text-amber-700 bg-amber-50 border border-amber-200 rounded-badge hover:border-amber-300 transition-colors"
+              data-help="promotion-nudge"
+            >
+              ✨ Ready for {STAGE_LABELS[readiness.nextStage]}
+            </button>
+          )}
 
           {/* Category picker */}
           <div className="relative">
@@ -383,6 +446,8 @@ export default function IdeaDetail() {
         </div>
       </div>
 
+      <StageTimeline ideaId={idea.id} />
+
       {graduationMessage && (
         <div className="px-3 py-2 bg-sage-50 border border-sage-100 rounded-card text-xs text-sage-800">
           {graduationMessage}
@@ -391,134 +456,279 @@ export default function IdeaDetail() {
 
       {/* ── Editor sections ──────────────────────────────── */}
       <div className="space-y-6" data-help="idea-core-fields">
-        <Section
-          label="Pitch"
-          hint="One-line hook — what is this?"
-          action={<AiSuggestionButton idea={idea} field="pitch" currentValue={idea.pitch} onApply={(value) => saveNow({ pitch: value })} />}
-        >
-          <input
-            type="text"
-            value={idea.pitch}
-            onChange={(e) => update('pitch', e.target.value)}
-            placeholder="One sentence that captures the idea…"
-            className="w-full px-3 py-2.5 text-sm bg-paper-warm border border-ink-100 rounded-card
-                       outline-none focus:ring-2 focus:ring-sage-400 focus:border-sage-300
-                       transition-all text-ink-800 placeholder:text-ink-300"
-          />
-        </Section>
+        {canSee('fullNotes') && (
+          <Section
+            label={idea.stage === 'seed' ? 'The Spark' : 'Raw Notes'}
+            hint={idea.stage === 'seed'
+              ? 'Your initial brain dump, unfiltered'
+              : 'Your original thoughts plus anything new'}
+            action={<AiSuggestionButton idea={idea} field="fullNotes" currentValue={idea.fullNotes} onApply={(value) => saveNow({ fullNotes: value })} />}
+          >
+            <AutoGrowTextarea
+              value={idea.fullNotes}
+              onChange={(v) => update('fullNotes', v)}
+              placeholder={idea.stage === 'seed'
+                ? 'Brain dump your idea - rough thoughts, a scenario, whatever comes to mind...'
+                : 'Keep extending the spark with details, constraints, and examples...'}
+              minRows={4}
+            />
+          </Section>
+        )}
 
-        <Section
-          label="Full Notes"
-          hint="Detailed description, raw thoughts, anything goes"
-          action={<AiSuggestionButton idea={idea} field="fullNotes" currentValue={idea.fullNotes} onApply={(value) => saveNow({ fullNotes: value })} />}
-        >
-          <AutoGrowTextarea
-            value={idea.fullNotes}
-            onChange={(v) => update('fullNotes', v)}
-            placeholder="Pour out your thoughts…"
-            minRows={4}
-          />
-        </Section>
+        {canSee('hook') && (
+          <Section
+            label="Concept"
+            hint="What is this thing? Describe it like you're explaining to a friend"
+            action={<AiSuggestionButton idea={idea} field="hook" currentValue={idea.hook} onApply={(value) => saveNow({ hook: value })} />}
+          >
+            <AutoGrowTextarea
+              value={idea.hook}
+              onChange={(v) => update('hook', v)}
+              placeholder="Describe the concept in plain language..."
+              minRows={2}
+            />
+          </Section>
+        )}
 
-        <Section
-          label="Hook / 30-Second Demo"
-          hint="How would you show this off in 30 seconds?"
-          action={<AiSuggestionButton idea={idea} field="hook" currentValue={idea.hook} onApply={(value) => saveNow({ hook: value })} />}
-        >
-          <AutoGrowTextarea
-            value={idea.hook}
-            onChange={(v) => update('hook', v)}
-            placeholder="The elevator pitch demo…"
-            minRows={2}
-          />
-        </Section>
+        {canSee('whyItMightWork') && (
+          <Section
+            label="The Case"
+            hint="Why is this worth building? What need does it meet?"
+            action={<AiSuggestionButton idea={idea} field="whyItMightWork" currentValue={idea.whyItMightWork} onApply={(value) => saveNow({ whyItMightWork: value })} />}
+          >
+            <AutoGrowTextarea
+              value={idea.whyItMightWork}
+              onChange={(v) => update('whyItMightWork', v)}
+              placeholder="What makes this interesting, useful, or timely?"
+              minRows={2}
+            />
+          </Section>
+        )}
 
-        <Section
-          label="Why It Might Work"
-          hint="Arguments in favour"
-          action={<AiSuggestionButton idea={idea} field="whyItMightWork" currentValue={idea.whyItMightWork} onApply={(value) => saveNow({ whyItMightWork: value })} />}
-        >
-          <AutoGrowTextarea
-            value={idea.whyItMightWork}
-            onChange={(v) => update('whyItMightWork', v)}
-            placeholder="What makes this interesting, useful, or timely?"
-            minRows={2}
-          />
-        </Section>
+        {canSee('pitch') && (
+          <Section
+            label="Elevator Pitch"
+            hint="Distill the concept into one sentence"
+            action={<AiSuggestionButton idea={idea} field="pitch" currentValue={idea.pitch} onApply={(value) => saveNow({ pitch: value })} />}
+          >
+            <input
+              type="text"
+              value={idea.pitch}
+              onChange={(e) => update('pitch', e.target.value)}
+              placeholder="One sentence that captures the concept..."
+              className="w-full px-3 py-2.5 text-sm bg-paper-warm border border-ink-100 rounded-card
+                         outline-none focus:ring-2 focus:ring-sage-400 focus:border-sage-300
+                         transition-all text-ink-800 placeholder:text-ink-300"
+            />
+          </Section>
+        )}
 
-        <Section
-          label="Risks & Blockers"
-          hint="What could go wrong or get in the way?"
-          action={<AiSuggestionButton idea={idea} field="risks" currentValue={idea.risks} onApply={(value) => saveNow({ risks: value })} />}
-        >
-          <AutoGrowTextarea
-            value={idea.risks}
-            onChange={(v) => update('risks', v)}
-            placeholder="Technical debt, scope creep, motivation decay…"
-            minRows={2}
-          />
-        </Section>
+        {canSee('risks') && (
+          <Section
+            label="Risks & Blockers"
+            hint="What could go wrong or get in the way?"
+            action={<AiSuggestionButton idea={idea} field="risks" currentValue={idea.risks} onApply={(value) => saveNow({ risks: value })} />}
+          >
+            <AutoGrowTextarea
+              value={idea.risks}
+              onChange={(v) => update('risks', v)}
+              placeholder="Technical debt, scope creep, motivation decay…"
+              minRows={2}
+            />
+          </Section>
+        )}
 
-        <Section
-          label="Tech Stack Notes"
-          hint="Languages, frameworks, tools you'd reach for"
-          action={<AiSuggestionButton idea={idea} field="techStack" currentValue={idea.techStack} onApply={(value) => saveNow({ techStack: value })} />}
-        >
-          <AutoGrowTextarea
-            value={idea.techStack}
-            onChange={(v) => update('techStack', v)}
-            placeholder="React, Rust, SQLite, p5.js…"
-            minRows={2}
-          />
-        </Section>
+        {canSee('techStack') && (
+          <Section
+            label="Build Notes"
+            hint="Tech stack, architecture ideas, scope boundaries, first steps"
+            action={<AiSuggestionButton idea={idea} field="techStack" currentValue={idea.techStack} onApply={(value) => saveNow({ techStack: value })} />}
+          >
+            <AutoGrowTextarea
+              value={idea.techStack}
+              onChange={(v) => update('techStack', v)}
+              placeholder="Stack choices, architecture, scope constraints, first build steps..."
+              minRows={2}
+            />
+          </Section>
+        )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4" data-help="idea-tags-and-scores">
-          <TagInput
-            label="Tags"
-            tags={idea.tags}
-            onChange={(tags) => update('tags', tags)}
-            placeholder="Add tag… (Enter or comma)"
-          />
-          <TagInput
-            label="Mood Labels"
-            tags={idea.moodLabels}
-            onChange={(labels) => update('moodLabels', labels)}
-            placeholder="e.g. cozy, chaotic, meditative"
-          />
-        </div>
+        {canSee('aesthetic') && (
+          <div data-help="aesthetic-style">
+            <Section
+              label="Aesthetic & Style"
+              hint="Visual direction, references, and creative tone"
+              action={<AiSuggestionButton idea={idea} field="aesthetic" currentValue={idea.aesthetic} onApply={(value) => saveNow({ aesthetic: value })} />}
+            >
+              <AutoGrowTextarea
+                value={idea.aesthetic}
+                onChange={(v) => update('aesthetic', v)}
+                placeholder="Color direction, typography, visual references, tone words, and style constraints..."
+                minRows={2}
+              />
+            </Section>
+          </div>
+        )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4" data-help="idea-tags-and-scores">
-          <ScorePicker
-            label="Personal Excitement"
-            value={idea.excitementScore}
-            onChange={(v) => update('excitementScore', v)}
-            helpSummary="How excited are you about this idea? 1 = vague interest, 5 = can't stop thinking about it. Used for sorting and health checks."
-            helpManualSection="idea-editing"
-          />
-          <ScorePicker
-            label="Jam Suitability"
-            value={idea.jamScore}
-            onChange={(v) => update('jamScore', v)}
-            helpSummary="How well does this idea fit a game jam or hackathon format? 1 = needs months, 5 = could ship in a weekend."
-            helpManualSection="idea-editing"
-          />
-        </div>
+        {(canSee('tags') || canSee('moodLabels')) && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4" data-help="idea-tags-and-scores">
+            {canSee('tags') && (
+              <TagInput
+                label="Tags"
+                tags={idea.tags}
+                onChange={(tags) => update('tags', tags)}
+                placeholder="Add tag… (Enter or comma)"
+              />
+            )}
+            {canSee('moodLabels') && (
+              <TagInput
+                label="Mood Labels"
+                tags={idea.moodLabels}
+                onChange={(labels) => update('moodLabels', labels)}
+                placeholder="e.g. cozy, chaotic, meditative"
+              />
+            )}
+          </div>
+        )}
 
-        <div data-help="idea-links-related">
-          <LinkEditor
-            links={idea.links}
-            onChange={(links) => update('links', links)}
-          />
-        </div>
+        {(canSee('excitementScore') || canSee('jamScore')) && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4" data-help="idea-tags-and-scores">
+            {canSee('excitementScore') && (
+              <ScorePicker
+                label="Personal Excitement"
+                value={idea.excitementScore}
+                onChange={(v) => update('excitementScore', v)}
+                helpSummary="How excited are you about this idea? 1 = vague interest, 5 = can't stop thinking about it. Used for sorting and health checks."
+                helpManualSection="idea-editing"
+              />
+            )}
+            {canSee('jamScore') && (
+              <ScorePicker
+                label="Feasibility"
+                value={idea.jamScore}
+                onChange={(v) => update('jamScore', v)}
+                helpSummary="How feasible is this to build? 1 = major unknowns, 5 = very doable with current skills and time."
+                helpManualSection="idea-editing"
+              />
+            )}
+          </div>
+        )}
 
-        <div data-help="idea-links-related">
-          <RelatedIdeasLinker
+        {canSee('images') && (
+          <ImageGallery
             ideaId={idea.id}
-            relatedIds={idea.relatedIdeaIds}
-            onChange={(ids) => update('relatedIdeaIds', ids)}
+            images={idea.images}
+            onChange={syncImages}
           />
-        </div>
+        )}
+
+        {canSee('links') && (
+          <div data-help="idea-links-related">
+            <LinkEditor
+              links={idea.links}
+              onChange={(links) => update('links', links)}
+            />
+          </div>
+        )}
+
+        {canSee('relatedIdeaIds') && (
+          <div data-help="idea-links-related">
+            <RelatedIdeasLinker
+              ideaId={idea.id}
+              relatedIds={idea.relatedIdeaIds}
+              onChange={(ids) => update('relatedIdeaIds', ids)}
+            />
+          </div>
+        )}
+
+        {!showAllFields && hiddenFields.length > 0 && nextStageForUnlock && (
+          <div
+            className="rounded-card border border-sage-100 bg-sage-50/50 px-3 py-2.5"
+            data-help="progressive-disclosure-teaser"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs text-sage-800">
+                Unlock more fields by advancing to{' '}
+                <button
+                  type="button"
+                  onClick={() => saveNow({ stage: nextStageForUnlock })}
+                  className="font-medium text-sage-900 hover:text-sage-950 underline underline-offset-2 cursor-pointer"
+                >
+                  {STAGE_LABELS[nextStageForUnlock]}
+                </button>.
+              </p>
+              <button
+                type="button"
+                onClick={() => setTeaserExpandedFor((value) => (value === teaserContextKey ? null : teaserContextKey))}
+                className="text-[11px] font-mono text-sage-700 hover:text-sage-900"
+              >
+                {teaserExpanded ? 'Hide details' : 'Show details'}
+              </button>
+            </div>
+            {teaserExpanded && (
+              <div className="mt-2 space-y-2">
+                <p className="text-[11px] text-sage-700">
+                  Hidden now: {hiddenFields.map((field) => displayLabelForField(field, idea.stage)).join(', ')}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!id) return;
+                    setShowAllFieldsByIdea((prev) => ({ ...prev, [id]: true }));
+                    setTeaserExpandedFor(null);
+                  }}
+                  className="text-[11px] font-medium text-sage-800 hover:text-sage-950 underline underline-offset-2"
+                >
+                  Show all fields anyway
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {showAllFields && hiddenFieldsForStage.length > 0 && (
+          <div className="rounded-card border border-sage-100 bg-sage-50/50 px-3 py-2.5">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs text-sage-700">
+                Showing all fields. Some are beyond the current <strong>{STAGE_LABELS[idea.stage]}</strong> stage.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!id) return;
+                  setShowAllFieldsByIdea((prev) => ({ ...prev, [id]: false }));
+                }}
+                className="text-[11px] font-mono text-sage-700 hover:text-sage-900 whitespace-nowrap"
+              >
+                Show stage fields only
+              </button>
+            </div>
+          </div>
+        )}
       </div>
+
+      {canSee('retrospective') && (
+        <div className="pt-5 border-t border-ink-100" data-help="retrospective">
+          <Section
+            label="Retrospective"
+            hint="What happened, what worked, and what to carry into the next idea"
+            action={<AiSuggestionButton idea={idea} field="retrospective" currentValue={idea.retrospective} onApply={(value) => saveNow({ retrospective: value })} />}
+          >
+            <AutoGrowTextarea
+              value={idea.retrospective}
+              onChange={(v) => update('retrospective', v)}
+              placeholder="Capture outcomes, surprises, tradeoffs, and lessons learned..."
+              minRows={3}
+            />
+          </Section>
+        </div>
+      )}
+
+      {canSee('landscapeAnalysis') && (
+        <div className="pt-5 border-t border-ink-100">
+          <LandscapeAnalysis idea={idea} />
+        </div>
+      )}
 
       {/* ── Thinking Partner ─────────────────────────────── */}
       <div className="pt-5 border-t border-ink-100" data-help="health-check">
@@ -527,12 +737,12 @@ export default function IdeaDetail() {
           <HelpButton
             helpId="health-check"
             title="Idea Health Check"
-            summary="Analyses your idea against a completeness rubric: pitch clarity, hook presence, risks, tech-stack specificity, and score balance. Returns field-by-field feedback."
+            summary="Combines field quality feedback with stage-aware readiness criteria so you can see exactly what is missing before promotion."
             manualSection="health-check"
             alwaysShow
           />
         </div>
-        <IdeaHealthCheck idea={idea} />
+        <IdeaHealthCheck idea={idea} onPromote={(nextStage) => saveNow({ stage: nextStage })} />
       </div>
 
       <div className="pt-5 border-t border-ink-100 space-y-3" data-help="idea-thinking-partner">

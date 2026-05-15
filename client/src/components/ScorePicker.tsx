@@ -1,4 +1,4 @@
-/** Clickable 1–5 star picker for excitement and jam suitability scores. */
+/** Clickable 1–5 star picker for excitement and feasibility scores. */
 import { Star } from 'lucide-react';
 import { HelpButton } from '@/help/HelpPopover';
 

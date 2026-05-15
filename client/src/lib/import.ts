@@ -10,7 +10,7 @@
 import { v4 as uuid } from 'uuid';
 import { db } from '@/db';
 import { createIdea, importArchive } from '@/api/client';
-import type { Idea, IdeaVersion, IdeaLink } from '@/lib/types';
+import type { Idea, IdeaVersion, IdeaLink, LandscapeReport, StageTransition } from '@/lib/types';
 import { CATEGORIES, STAGES } from '@/lib/types';
 import type { SeedbankArchive } from '@/lib/export';
 
@@ -81,6 +81,8 @@ function parseArchiveJSON(text: string): SeedbankArchive {
     exportedAt: (data.exportedAt as string) ?? new Date().toISOString(),
     ideas: data.ideas as Idea[],
     versions: (data.versions as IdeaVersion[]) ?? [],
+    stageTransitions: (data.stageTransitions as StageTransition[]) ?? [],
+    landscapeReports: (data.landscapeReports as LandscapeReport[]) ?? [],
   };
 }
 
@@ -90,6 +92,8 @@ function parseArchiveJSON(text: string): SeedbankArchive {
 function hydrateIdeaDates(idea: Idea): Idea {
   return {
     ...idea,
+    aesthetic: idea.aesthetic ?? '',
+    retrospective: idea.retrospective ?? '',
     createdAt: new Date(idea.createdAt),
     updatedAt: new Date(idea.updatedAt),
   };
@@ -285,6 +289,7 @@ export function parseMarkdownIdea(markdown: string): Partial<Idea> {
           if (stars > 0) idea.excitementScore = stars;
           break;
         }
+        case 'feasibility':
         case 'jam suitability': {
           const stars = (value.match(/★/g) || []).length;
           if (stars > 0) idea.jamScore = stars;
@@ -321,6 +326,12 @@ export function parseMarkdownIdea(markdown: string): Partial<Idea> {
   }
   if (sectionContent['tech stack'] || sectionContent['tech stack notes']) {
     idea.techStack = getSection('tech stack') || getSection('tech stack notes');
+  }
+  if (sectionContent['aesthetic & style'] || sectionContent['aesthetic']) {
+    idea.aesthetic = getSection('aesthetic & style') || getSection('aesthetic');
+  }
+  if (sectionContent['retrospective']) {
+    idea.retrospective = getSection('retrospective');
   }
 
   // Parse links from the links section

@@ -17,6 +17,35 @@
 - Reframed absolute “always local” one-liners to conditional wording when cloud AI providers or offsite backup destinations are enabled.
 - Updated About tagline to: “Local by default, cloud only if you opt in.”
 
+### Stage lifecycle enhancement (Phases 1-6)
+
+- Added timestamped stage-transition tracking (`stage_transitions` table), repository write hooks on stage changes, timeline API endpoint (`GET /api/ideas/:id/stage-transitions`), client fetch wrapper, Idea Detail stage timeline UI, and export/import support for transition history.
+- Implemented progressive disclosure by stage with a shared field-visibility map, stage-based section rendering in Idea Detail, and a session-scoped "Show all fields anyway" override to keep users unblocked.
+- Added stage readiness criteria (`shared/stageReadiness.ts`), health-check checklist integration, one-click promotion actions when criteria are met, and informational promotion nudges near the stage badge.
+- Added AI Landscape Analysis (`POST /api/ai/landscape-analysis`) with structured sections (alternatives, gaps, demand, positioning, viability), full Feature Defaults routing/guardrail support, and in-app results + disclaimer messaging.
+- Added stage-aware AI prompt personality tuning for Thinking Partner and field-assist suggestions so tone and rigor adapt automatically to idea stage.
+- Added Garden Stages view with horizontal stage lanes, native HTML5 drag/drop stage moves, collapsed late-stage lanes, touch fallback (tap-to-move), and a persisted `Grid | Stages` toggle.
+- Completed full documentation and help sweep across in-app manual, contextual help entries, Architecture/Settings/API docs, README feature list, and devlog rationale notes.
+
+### Lifecycle terminology and workflow refinement
+
+- Finalized garden-themed display stage names while preserving DB keys: Pitch→Bloom (`pitch`), Prototype→Greenhouse (`prototype`), Shelved→Dormant (`shelved`), Shipped→Market (`shipped`).
+- Renamed key field labels across UI/manual/help to reflect idea maturity flow: The Spark/Raw Notes (`fullNotes`), Concept (`hook`), The Case (`whyItMightWork`), Elevator Pitch (`pitch`), Build Notes (`techStack`), and Feasibility (`jamScore` display).
+- Changed graduated project scaffolds from Claude-specific `CLAUDE.md` output to provider-neutral `AGENTS.md` context files.
+- Replaced Kanban wording/layout with **Stages View** swim lanes and a persisted `Grid | Stages` header toggle.
+- Redistributed progressive disclosure so each stage introduces focused new work:
+  - Seed core capture
+  - Sprout adds Concept
+  - Bloom adds The Case + Elevator Pitch
+  - Greenhouse adds Risks + Build Notes
+  - Plot adds Aesthetic & Style, Feasibility, links, images, related ideas
+  - Market includes Retrospective
+- Added `aesthetic` and `retrospective` fields to the idea model and editing flow.
+- Added Plot-stage **Image Gallery** workflows: upload, browse, lightbox navigation, and delete.
+- Persisted landscape analyses in `landscape_reports`; idea detail now loads latest saved report and supports re-analysis.
+- Updated progressive teaser UX with direct stage-advance actions and a stage-only reset path after full-field override.
+- Renamed AI assist lens copy from "Jam / hackathon" to **Scope down**.
+
 ## 2.3.0 — Customizable Keyboard Shortcuts & Cloud Backup Guide
 
 ### Customizable keyboard shortcuts
@@ -208,7 +237,7 @@ Seedbank v1.0.0 was a local-first project idea manager built with React, TypeScr
 - Quick "Plant a Seed" flow with title and notes.
 - 14-field editor for pitch, notes, hook, risks, tech stack, tags, scores, related ideas, links, and images.
 - Board view with search, filters, and sorting.
-- Gardening lifecycle stages from Seed to Shipped.
+- Gardening lifecycle stages from Seed to Market.
 - Debounced auto-save to IndexedDB.
 - Automatic version snapshots and restore.
 - Discovery tools: Daily Seed, Cross-Pollinate, Draw from Storage, and Idea Weather.

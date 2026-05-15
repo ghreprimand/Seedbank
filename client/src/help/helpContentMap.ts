@@ -60,6 +60,12 @@ export const HELP_CONTENT_MAP: Record<string, HelpEntry> = {
     body: 'Each card opens the full idea detail view with fields, scores, links, and history.',
     manualSection: 'idea-editing',
   },
+  'stages-view': {
+    title: 'Stages View',
+    body: 'Switch between Grid and Stages in The Garden. Stages View groups ideas into horizontal stage lanes and supports drag-and-drop stage changes.',
+    details: 'On touch devices, tap a card to move it. Dormant, Cold Storage, and Market lanes start collapsed to keep focus on active work.',
+    manualSection: 'stages-view',
+  },
 
   // Discover
   'discover-page': {
@@ -79,7 +85,7 @@ export const HELP_CONTENT_MAP: Record<string, HelpEntry> = {
   },
   'discover-storage-draw': {
     title: 'Draw from Storage',
-    body: 'Pulls a shelved or cold-storage idea back into active attention.',
+    body: 'Pulls a dormant or cold-storage idea back into active attention.',
     manualSection: 'discover',
   },
   'discover-weather': {
@@ -113,17 +119,35 @@ export const HELP_CONTENT_MAP: Record<string, HelpEntry> = {
   },
   'idea-actions': {
     title: 'Idea Actions',
-    body: 'Export, graduate, move to cold storage (or restore to shelved), duplicate, and delete from this control group.',
+    body: 'Export, graduate, move to cold storage (or restore to dormant), duplicate, and delete from this control group.',
     manualSection: 'idea-editing',
   },
   'idea-header': {
     title: 'Title, Stage, Category',
-    body: 'Set the core identity and lifecycle position of this idea.',
+    body: 'Set the core identity and lifecycle position of this idea. Field visibility now follows stage by default, with an optional "show all fields anyway" override.',
+    manualSection: 'stages',
+  },
+  'stage': {
+    title: 'Lifecycle Stages',
+    body: 'Stages represent idea maturity and control progressive field visibility, using garden labels: Seed, Sprout, Bloom, Greenhouse, Plot, Dormant, Cold Storage, and Market.',
+    details: 'You can change stage manually at any time, and use "Show all fields anyway" to bypass progressive disclosure for the current idea in this session.',
+    manualSection: 'stages',
+  },
+  'stage-timeline': {
+    title: 'Stage Timeline',
+    body: 'Shows historical stage changes for this idea in chronological order.',
+    details: 'Entries are recorded automatically whenever the stage changes.',
+    manualSection: 'stages',
+  },
+  'progressive-disclosure-teaser': {
+    title: 'Progressive Field Visibility',
+    body: 'Seedbank reveals fields as ideas mature to reduce early-stage friction.',
+    details: 'Use "Show all fields anyway" to temporarily unlock every field for this idea in the current session.',
     manualSection: 'stages',
   },
   'idea-core-fields': {
     title: 'Core Idea Fields',
-    body: 'Capture pitch, notes, hook, why it might work, risks, and tech stack. Auto-saves apply after edits.',
+    body: 'Capture The Spark/Raw Notes, Concept, The Case, Elevator Pitch, Risks & Blockers, Build Notes, Aesthetic direction, and Retrospective notes. Auto-saves apply after edits.',
     manualSection: 'idea-editing',
   },
   'idea-tags-and-scores': {
@@ -136,10 +160,39 @@ export const HELP_CONTENT_MAP: Record<string, HelpEntry> = {
     body: 'Attach references and connect related seeds for easier navigation and synthesis.',
     manualSection: 'idea-editing',
   },
+  'image-gallery': {
+    title: 'Image Gallery',
+    body: 'Upload concept art, mockups, screenshots, and references for this idea.',
+    details: 'Images are stored in your local Seedbank data directory and linked to this idea. You can open in a lightbox and delete per image.',
+    manualSection: 'idea-editing',
+  },
+  'aesthetic-style': {
+    title: 'Aesthetic & Style',
+    body: 'Capture visual direction: tone words, references, and UI/brand style constraints.',
+    manualSection: 'idea-editing',
+  },
+  retrospective: {
+    title: 'Retrospective',
+    body: 'Document outcomes, lessons learned, and what to carry forward.',
+    manualSection: 'idea-editing',
+  },
   'health-check': {
     title: 'Idea Health Check',
-    body: 'Analyzes completeness and quality signals across critical idea fields.',
+    body: 'Combines field quality signals with stage-aware readiness criteria for your next lifecycle step.',
+    details: 'When criteria are met, it offers one-click promotion. Missing criteria are shown as a checklist (Spark+tags, then Concept, then Case+Pitch, then Risks+Build Notes).',
     manualSection: 'health-check',
+  },
+  'promotion-nudge': {
+    title: 'Promotion Nudge',
+    body: 'This pill appears when your idea meets the readiness criteria for the next stage.',
+    details: 'It is informational only. You can always change stage manually regardless of readiness.',
+    manualSection: 'stages',
+  },
+  'landscape-analysis': {
+    title: 'Landscape Analysis',
+    body: 'Runs a structured AI scan of alternatives, unmet gaps, demand signals, positioning angle, and viability.',
+    details: 'Reports are saved per idea and the latest report reloads automatically. Re-analyze any time to generate a new saved report. Treat this as a starting point for research, not a definitive market report.',
+    manualSection: 'landscape-analysis',
   },
   'project-draft': {
     title: 'Draft Project Files',

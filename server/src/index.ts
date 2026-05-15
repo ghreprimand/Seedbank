@@ -1,11 +1,14 @@
 import cors from 'cors';
 import express, { type NextFunction, type Request, type Response } from 'express';
+import multer from 'multer';
 import fs from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { AiService } from './ai/service.js';
 import { registerAiRoutes } from './ai/routes.js';
 import { AiStore } from './ai/store.js';
 import {
+  dataDir,
   dbPath,
   openDatabase,
 } from './db.js';
@@ -119,6 +122,36 @@ function readServerVersion(): string {
 
 const SERVER_VERSION = readServerVersion();
 const webhookEmitter = new WebhookEmitter(SERVER_VERSION, () => webhooksConfig());
+const IMAGES_ROOT = path.join(dataDir, 'images');
+const IMAGE_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
+const IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp']);
+const uploadImage = multer({
+  storage: multer.diskStorage({
+    destination: (req, _file, cb) => {
+      const ideaId = routeParam(req, 'id');
+      const destination = path.join(IMAGES_ROOT, ideaId);
+      fs.mkdirSync(destination, { recursive: true });
+      cb(null, destination);
+    },
+    filename: (_req, file, cb) => {
+      const extFromName = path.extname(file.originalname || '').toLowerCase();
+      const ext = IMAGE_EXTENSIONS.has(extFromName)
+        ? extFromName
+        : (file.mimetype === 'image/png'
+            ? '.png'
+            : file.mimetype === 'image/gif'
+              ? '.gif'
+              : file.mimetype === 'image/webp'
+                ? '.webp'
+                : '.jpg');
+      cb(null, `${Date.now()}-${randomUUID().slice(0, 8)}${ext}`);
+    },
+  }),
+  fileFilter: (_req, file, cb) => {
+    cb(null, IMAGE_MIME_TYPES.has(file.mimetype));
+  },
+  limits: { fileSize: 10 * 1024 * 1024 },
+});
 
 function uiThemeConfig(): UiThemeConfig {
   const stored = repository.getSetting<Partial<UiThemeConfig>>(SETTINGS_KEYS.uiTheme) ?? {};
@@ -368,6 +401,16 @@ function boolParam(value: unknown): boolean {
 function routeParam(req: Request, name: string): string {
   const value = req.params[name];
   return Array.isArray(value) ? value[0] ?? '' : value;
+}
+
+function safeFilename(raw: string): string {
+  const name = path.basename(raw);
+  if (!name || name === '.' || name === '..') return '';
+  return name;
+}
+
+function imagePublicPath(ideaId: string, filename: string): string {
+  return `/api/images/${encodeURIComponent(ideaId)}/${encodeURIComponent(filename)}`;
 }
 
 function safeDraftRelativePath(value: unknown): string | undefined {
@@ -701,6 +744,8 @@ app.get('/api/mcp/ideas/:id', requireScope('mcp:read'), asyncRoute((req, res) =>
         whyItMightWork: idea.whyItMightWork,
         risks: idea.risks,
         techStack: idea.techStack,
+        aesthetic: idea.aesthetic,
+        retrospective: idea.retrospective,
       },
     },
     attachments: idea.images.map((pathValue) => ({ path: pathValue })),
@@ -801,6 +846,106 @@ app.delete('/api/ideas/:id', requireScope('write:ideas'), asyncRoute((req, res) 
   }
 
   res.json(idea);
+}));
+
+app.get('/api/ideas/:id/stage-transitions', requireScope('read:ideas'), asyncRoute((req, res) => {
+  const id = routeParam(req, 'id');
+  if (!repository.getIdea(id, true)) {
+    res.status(404).json({ error: 'Idea not found' });
+    return;
+  }
+
+  res.json(repository.getStageTransitions(id));
+}));
+
+app.get('/api/ideas/:id/landscape-report', requireScope('read:ideas'), asyncRoute((req, res) => {
+  const id = routeParam(req, 'id');
+  if (!repository.getIdea(id, true)) {
+    res.status(404).json({ error: 'Idea not found' });
+    return;
+  }
+
+  res.json({ report: repository.getLatestLandscapeReport(id) });
+}));
+
+app.post(
+  '/api/ideas/:id/images',
+  requireScope('write:ideas'),
+  uploadImage.single('image'),
+  asyncRoute((req, res) => {
+    const ideaId = routeParam(req, 'id');
+    const idea = repository.getIdea(ideaId);
+    if (!idea) {
+      const uploadedPath = req.file?.path;
+      if (uploadedPath && fs.existsSync(uploadedPath)) fs.rmSync(uploadedPath, { force: true });
+      res.status(404).json({ error: 'Idea not found' });
+      return;
+    }
+    if (!req.file) {
+      res.status(400).json({ error: 'image file is required (multipart field name: image).' });
+      return;
+    }
+
+    const filename = safeFilename(req.file.filename);
+    if (!filename) {
+      res.status(400).json({ error: 'Invalid file name.' });
+      return;
+    }
+    const imagePath = imagePublicPath(ideaId, filename);
+    const images = idea.images.includes(imagePath)
+      ? idea.images
+      : [...idea.images, imagePath];
+    const updated = repository.updateIdea(ideaId, { images });
+    if (!updated) {
+      res.status(500).json({ error: 'Failed to attach uploaded image.' });
+      return;
+    }
+    res.status(201).json({ path: imagePath, images: updated.images });
+  }),
+);
+
+app.get('/api/images/:ideaId/:filename', requireScope('read:ideas'), asyncRoute((req, res) => {
+  const ideaId = routeParam(req, 'ideaId');
+  const filename = safeFilename(routeParam(req, 'filename'));
+  if (!filename) {
+    res.status(400).json({ error: 'Invalid image file name.' });
+    return;
+  }
+  const filePath = path.join(IMAGES_ROOT, ideaId, filename);
+  if (!fs.existsSync(filePath)) {
+    res.status(404).json({ error: 'Image not found.' });
+    return;
+  }
+  res.sendFile(filePath);
+}));
+
+app.delete('/api/ideas/:id/images/:filename', requireScope('write:ideas'), asyncRoute((req, res) => {
+  const ideaId = routeParam(req, 'id');
+  const filename = safeFilename(routeParam(req, 'filename'));
+  if (!filename) {
+    res.status(400).json({ error: 'Invalid image file name.' });
+    return;
+  }
+
+  const idea = repository.getIdea(ideaId);
+  if (!idea) {
+    res.status(404).json({ error: 'Idea not found' });
+    return;
+  }
+
+  const normalizedPath = imagePublicPath(ideaId, filename);
+  const remainingImages = idea.images.filter((imagePath) =>
+    imagePath !== normalizedPath && !imagePath.endsWith(`/${filename}`),
+  );
+  const updated = repository.updateIdea(ideaId, { images: remainingImages });
+  if (!updated) {
+    res.status(500).json({ error: 'Failed to update idea images.' });
+    return;
+  }
+
+  const filePath = path.join(IMAGES_ROOT, ideaId, filename);
+  if (fs.existsSync(filePath)) fs.rmSync(filePath, { force: true });
+  res.json({ ok: true, images: updated.images });
 }));
 
 app.get('/api/ideas/:id/versions', requireScope('read:ideas'), asyncRoute((req, res) => {
@@ -968,6 +1113,15 @@ app.post('/api/import', requireScope('write:ideas'), asyncRoute((req, res) => {
 }));
 
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      res.status(400).json({ error: 'Image must be 10MB or smaller.' });
+      return;
+    }
+    res.status(400).json({ error: err.message });
+    return;
+  }
+
   const message = err instanceof Error ? err.message : 'Unexpected server error';
   const statusCode = typeof (err as { statusCode?: unknown })?.statusCode === 'number'
     ? (err as { statusCode: number }).statusCode

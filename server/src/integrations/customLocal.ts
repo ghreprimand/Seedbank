@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { ConfigFieldDescriptor, GraduationResult, Idea } from '../../../shared/types.js';
 import {
-  claudeFor,
+  agentGuideFor,
   expandHome,
   readinessFor,
   uniqueProjectDir,
@@ -132,14 +132,14 @@ export class CustomLocalIntegration implements Integration {
       '',
       '- Workspace root is configured in Seedbank Settings.',
       '- This project was scaffolded by Seedbank for a custom local project workflow.',
-      '- Keep implementation notes in README.md and agent-facing context in CLAUDE.md.',
+      '- Keep implementation notes in README.md and agent-facing context in AGENTS.md.',
       '',
     ].join('\n');
     const filesCreated = writeBaseScaffold(projectDir, idea, this.name, adapterContext);
 
     fs.writeFileSync(
-      path.join(projectDir, 'CLAUDE.md'),
-      claudeFor(idea, this.name, adapterContext),
+      path.join(projectDir, 'AGENTS.md'),
+      agentGuideFor(idea, this.name, adapterContext),
     );
 
     fs.mkdirSync(path.join(projectDir, '.seedbank'), { recursive: true });

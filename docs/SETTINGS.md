@@ -19,6 +19,15 @@ Settings uses a tabbed shell. On desktop (`md+`) a left-rail sidebar lists every
 
 The header API-status pill (top-right, next to the gear icon) is now a link that jumps to **API & Server** when clicked.
 
+### Garden view preference (outside Settings tabs)
+
+The Garden header has a `Grid | Stages` toggle. This preference is intentionally lightweight and local-only:
+
+- Stored in browser `localStorage` as `seedbank:garden-view-mode`
+- Values: `grid` or `stages`
+- Restored on app load
+- Not stored in server settings (it is treated as a per-device UI preference)
+
 ### Contextual help mode
 
 A floating **?** control in the bottom-right corner toggles contextual help mode. When active, click UI sections to open a help popover for that surface, with optional deep-link into the in-app manual section. The control is collapsible to a compact chevron tab and can be exited with **Esc**.
@@ -188,7 +197,7 @@ Configure an outbound webhook URL that receives a `POST` request on idea lifecyc
   |-------|---------|
   | `idea.created` | A new idea is saved |
   | `idea.graduated` | An idea is graduated via an integration |
-  | `idea.shipped` | An idea is marked shipped |
+  | `idea.shipped` | An idea is marked as Market stage |
 
 - Changes are saved via **Save webhook**. The button is disabled when offline.
 - Stored server-side in `settings` under `api.webhooks`. Update programmatically with `PATCH /api/settings/api`.
@@ -256,7 +265,7 @@ Configure where Seedbank creates project folders when you graduate an idea. (Thi
 **What graduation does:** when you graduate a seed, Seedbank creates a project directory inside the root you set here. The directory is named after the idea title. It always contains:
 
 - `README.md` — idea title, brief, and key context.
-- `CLAUDE.md` — AI context pre-filled for use with an AI coding session.
+- `AGENTS.md` — AI-agent context pre-filled for use with Codex, Claude, Gemini, or another coding assistant.
 - `package.json` + starter file — for all ideas except games.
 - `project.godot` stub — for game ideas.
 

@@ -150,6 +150,8 @@ Supported fields:
 | `techStack` | Suggest implementation tools and constraints |
 | `hook` | Clarify the 30-second demo |
 | `whyItMightWork` | Strengthen the argument for the idea |
+| `aesthetic` | Refine visual direction and style references |
+| `retrospective` | Summarize outcomes, lessons, and carry-forward insights |
 
 ---
 
@@ -161,9 +163,19 @@ Organic modes are available in the AI chat panel.
 
 **Devil's Advocate** — challenges the weakest assumption in the idea without dismissing it. Good for finding hidden risks, testing whether the idea has a real user, and separating excitement from evidence.
 
-**Scope Down** — pushes the idea toward the smallest viable test. Good for jam projects, first prototypes, and reducing a broad concept to one screen, one mechanic, or one workflow.
+**Scope Down** — pushes the idea toward the smallest feasible version. Good for first prototypes and reducing a broad concept to one screen, one mechanic, or one workflow.
 
 **User Story** — asks about a specific person in a specific situation. Good for clarifying who the idea serves, avoiding abstract feature lists, and finding the moment of need.
+
+## Stage-Aware AI Personality
+
+Thinking Partner and field-assist prompts automatically adapt by stage:
+
+- **Seed / Sprout**: exploratory, generative, and momentum-focused.
+- **Bloom**: sharpening and critical framing around audience/differentiation.
+- **Greenhouse / Plot**: practical execution, feasibility, and concrete next steps.
+- **Dormant / Cold Storage**: reflective revival framing.
+- **Market**: retrospective synthesis of what worked and what to carry forward.
 
 ---
 

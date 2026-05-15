@@ -3,11 +3,14 @@ import type {
   AiChatMessage,
   AiFieldAssistMessage,
   AiFeatureId,
+  AiLandscapeAnalysisSections,
   AiProjectDraftFile,
   AiSuggestion,
   AiSuggestionField,
   Idea,
+  Stage,
 } from '../../../shared/types.js';
+import { assessReadiness } from '../../../shared/stageReadiness.js';
 import type { AiProviderMessage } from './types.js';
 
 const THINKING_PARTNER_PROMPT = [
@@ -41,6 +44,8 @@ function ideaContext(idea: Idea): string {
       whyItMightWork: idea.whyItMightWork,
       risks: idea.risks,
       techStack: idea.techStack,
+      aesthetic: idea.aesthetic,
+      retrospective: idea.retrospective,
       jamScore: idea.jamScore,
       excitementScore: idea.excitementScore,
       graduatedTo: idea.graduatedTo,
@@ -48,9 +53,90 @@ function ideaContext(idea: Idea): string {
   ].join('\n');
 }
 
+export function stagePersonality(stage: Stage): string {
+  if (stage === 'seed' || stage === 'sprout') {
+    return [
+      `Stage personality: ${stage}.`,
+      'Be generative and exploratory.',
+      'Help the user brainstorm and expand.',
+      'Ask "what if" questions.',
+      'Do not critique yet.',
+    ].join(' ');
+  }
+
+  if (stage === 'pitch') {
+    return [
+      'Stage personality: bloom.',
+      'Be critical and sharpening.',
+      'The idea has bloomed. Help tighten the concept.',
+      'Ask about audience, differentiators, and constraints.',
+    ].join(' ');
+  }
+
+  if (stage === 'prototype' || stage === 'plot') {
+    return [
+      `Stage personality: ${stage === 'prototype' ? 'greenhouse' : 'plot'}.`,
+      'Be practical and implementation-focused.',
+      stage === 'prototype'
+        ? 'The idea is in the greenhouse. Focus on technical feasibility, architecture decisions, and next concrete steps.'
+        : 'Focus on technical feasibility, architecture decisions, and next concrete steps.',
+    ].join(' ');
+  }
+
+  if (stage === 'shelved' || stage === 'cold-storage') {
+    return [
+      `Stage personality: ${stage === 'shelved' ? 'dormant' : 'cold-storage'}.`,
+      'Be reflective.',
+      stage === 'shelved'
+        ? 'This idea is dormant. Help the user decide if it deserves revival.'
+        : 'This idea is in cold storage. Help the user decide if it deserves revival.',
+      'Ask what changed since it was paused.',
+    ].join(' ');
+  }
+
+  return [
+    'Stage personality: market.',
+    'Be retrospective.',
+    'This idea has gone to market. Help the user reflect on what worked, what did not, and what to carry forward.',
+  ].join(' ');
+}
+
+function fieldSuggestionStageExpectation(stage: Stage, field: AiSuggestionField): string {
+  const label = AI_FIELD_DISPLAY_LABELS[field];
+  if (stage === 'seed' || stage === 'sprout') {
+    return [
+      `Stage expectation for ${label}: early-stage drafts can be rough and exploratory.`,
+      'Prioritize momentum, clarity of direction, and options over polish.',
+    ].join(' ');
+  }
+  if (stage === 'pitch') {
+    return [
+      `Stage expectation for ${label}: this should be polished and presentation-ready.`,
+      'Prioritize precision, confidence, and concrete differentiation.',
+    ].join(' ');
+  }
+  if (stage === 'prototype' || stage === 'plot') {
+    return [
+      `Stage expectation for ${label}: keep output practical and build-oriented.`,
+      'Prefer concrete execution details, constraints, and implementation choices.',
+    ].join(' ');
+  }
+  if (stage === 'shelved' || stage === 'cold-storage') {
+    return [
+      `Stage expectation for ${label}: optimize for re-entry and reassessment.`,
+      'Capture what should be revisited now that context may have changed.',
+    ].join(' ');
+  }
+  return [
+    `Stage expectation for ${label}: support retrospective clarity.`,
+    'Focus on lessons learned and transferability to future ideas.',
+  ].join(' ');
+}
+
 export function messagesForChat(idea: Idea, history: AiChatMessage[], nextUserMessage: string): AiProviderMessage[] {
   return [
     { role: 'system', content: THINKING_PARTNER_PROMPT },
+    { role: 'system', content: stagePersonality(idea.stage) },
     { role: 'system', content: ideaContext(idea) },
     ...history.slice(-20).map((message) => ({ role: message.role, content: message.content })),
     { role: 'user', content: nextUserMessage },
@@ -58,12 +144,25 @@ export function messagesForChat(idea: Idea, history: AiChatMessage[], nextUserMe
 }
 
 const FIELD_SUGGESTION_PROMPTS: Record<AiSuggestionField, string> = {
-  pitch: 'Help sharpen this pitch into a clearer one-line version.',
-  fullNotes: 'Help expand, organize, and clarify these full notes while preserving the user\'s raw thinking.',
+  pitch: 'Help distill this concept into a clearer one-line elevator pitch.',
+  fullNotes: 'Help expand, organize, and clarify The Spark / Raw Notes while preserving the user\'s unfiltered thinking.',
   risks: 'Identify concrete risks, blind spots, or blockers the user may be missing.',
-  techStack: 'Suggest technologies that fit the idea and explain the fit briefly.',
-  hook: 'Help find a concise demo hook for this idea.',
-  whyItMightWork: 'Strengthen the argument for why this idea might work.',
+  techStack: 'Strengthen the Build Notes with practical stack choices, architecture direction, scope boundaries, and first steps.',
+  hook: 'Help clarify the Concept: what this thing is, explained in plain language.',
+  whyItMightWork: 'Strengthen The Case for why this idea is worth building.',
+  aesthetic: 'Refine the visual direction: describe aesthetic style, references, and mood in actionable terms.',
+  retrospective: 'Help write a candid retrospective with outcomes, lessons learned, and what to carry forward.',
+};
+
+const AI_FIELD_DISPLAY_LABELS: Record<AiSuggestionField, string> = {
+  pitch: 'Elevator Pitch',
+  fullNotes: 'The Spark / Raw Notes',
+  risks: 'Risks & Blockers',
+  techStack: 'Build Notes',
+  hook: 'Concept',
+  whyItMightWork: 'The Case',
+  aesthetic: 'Aesthetic & Style',
+  retrospective: 'Retrospective',
 };
 
 export function promptForSuggestion(idea: Idea, field: AiSuggestionField, currentValue: string): AiProviderMessage[] {
@@ -72,6 +171,8 @@ export function promptForSuggestion(idea: Idea, field: AiSuggestionField, curren
       role: 'system',
       content: [
         THINKING_PARTNER_PROMPT,
+        stagePersonality(idea.stage),
+        fieldSuggestionStageExpectation(idea.stage, field),
         'For this request, return only JSON with keys "suggestion" and "rationale".',
         'The suggestion must revise or extend the target field, not replace the user as the source of creativity.',
       ].join(' '),
@@ -82,7 +183,7 @@ export function promptForSuggestion(idea: Idea, field: AiSuggestionField, curren
       content: [
         FIELD_SUGGESTION_PROMPTS[field],
         '',
-        `Target field: ${field}`,
+        `Target field: ${field} (${AI_FIELD_DISPLAY_LABELS[field]})`,
         `Current value: ${currentValue || '(empty)'}`,
       ].join('\n'),
     },
@@ -107,6 +208,8 @@ export function promptForFieldAssist(
       role: 'system',
       content: [
         FIELD_ASSIST_PROMPT,
+        stagePersonality(idea.stage),
+        fieldSuggestionStageExpectation(idea.stage, field),
         'For this field-assist request, return only JSON with keys "suggestion" and "rationale".',
         'The suggestion must revise or extend the target field, not replace the user as the source of creativity.',
       ].join(' '),
@@ -117,7 +220,7 @@ export function promptForFieldAssist(
       content: [
         customPrompt?.trim() || FIELD_SUGGESTION_PROMPTS[field],
         '',
-        `Target field: ${field}`,
+        `Target field: ${field} (${AI_FIELD_DISPLAY_LABELS[field]})`,
         ...currentValueLines,
       ].join('\n'),
     },
@@ -144,6 +247,8 @@ export function fieldAssistConversationMessages(
       role: 'system',
       content: [
         FIELD_ASSIST_PROMPT,
+        stagePersonality(idea.stage),
+        fieldSuggestionStageExpectation(idea.stage, field),
         'You are assisting with one specific Seedbank idea field in a modal-local conversation.',
         'Do not use or update the persistent Thinking Partner conversation.',
         'Keep replies focused on the target field. If you draft field text, make it easy to apply.',
@@ -153,7 +258,7 @@ export function fieldAssistConversationMessages(
     {
       role: 'system',
       content: [
-        `Target field: ${field}`,
+        `Target field: ${field} (${AI_FIELD_DISPLAY_LABELS[field]})`,
         `Current value: ${currentValue || '(empty)'}`,
       ].join('\n'),
     },
@@ -163,6 +268,9 @@ export function fieldAssistConversationMessages(
 }
 
 export function promptForMode(mode: string, context: unknown, prompt?: string): AiProviderMessage[] {
+  const stageAwareHealthContext = mode === 'health-check'
+    ? healthCheckStageContext(context)
+    : undefined;
   return [
     {
       role: 'system',
@@ -177,11 +285,33 @@ export function promptForMode(mode: string, context: unknown, prompt?: string): 
       content: [
         `Mode: ${mode}`,
         prompt ? `Prompt: ${prompt}` : '',
+        ...(stageAwareHealthContext ? [stageAwareHealthContext] : []),
         'Context:',
         JSON.stringify(context ?? {}, null, 2),
       ].filter(Boolean).join('\n'),
     },
   ];
+}
+
+function healthCheckStageContext(context: unknown): string {
+  if (!context || typeof context !== 'object') return '';
+  const idea = (context as { idea?: unknown }).idea;
+  if (!idea || typeof idea !== 'object') return '';
+  const stage = (idea as { stage?: unknown }).stage;
+  if (typeof stage !== 'string') return '';
+
+  try {
+    const readiness = assessReadiness(idea as Idea);
+    return [
+      `Health-check stage context: current stage is "${stage}".`,
+      `Readiness toward "${readiness.nextStage}": ${readiness.ready ? 'ready' : 'not ready'}.`,
+      readiness.met.length > 0 ? `Criteria met: ${readiness.met.join('; ')}` : 'Criteria met: none yet.',
+      readiness.missing.length > 0 ? `Criteria missing: ${readiness.missing.join('; ')}` : 'Criteria missing: none.',
+      'Calibrate your critique to this stage. Do not penalize early-stage ideas for fields that are intentionally later-stage.',
+    ].join('\n');
+  } catch {
+    return `Health-check stage context: current stage is "${stage}". Calibrate feedback to this stage and avoid irrelevant late-stage criticism.`;
+  }
 }
 
 export function promptForProjectDraft(idea: Idea, prompt?: string): AiProviderMessage[] {
@@ -210,13 +340,65 @@ export function promptForProjectDraft(idea: Idea, prompt?: string): AiProviderMe
   ];
 }
 
+export function promptForLandscapeAnalysis(idea: Idea, prompt?: string): AiProviderMessage[] {
+  const requestedScope = prompt?.trim() || 'Assess this idea’s competitive landscape and viability honestly.';
+  const context: Record<string, unknown> = {};
+  if (idea.title) context.title = idea.title;
+  if (idea.pitch) context.pitch = idea.pitch;
+  if (idea.category) context.category = idea.category;
+  if (idea.stage) context.stage = idea.stage;
+  if (idea.tags?.length) context.tags = idea.tags;
+  if (idea.fullNotes) context.fullNotes = idea.fullNotes;
+  if (idea.hook) context.hook = idea.hook;
+  if (idea.whyItMightWork) context.whyItMightWork = idea.whyItMightWork;
+  if (idea.risks) context.risks = idea.risks;
+  if (idea.techStack) context.techStack = idea.techStack;
+  if (idea.moodLabels?.length) context.moodLabels = idea.moodLabels;
+  if (idea.aesthetic) context.aesthetic = idea.aesthetic;
+  if (idea.retrospective) context.retrospective = idea.retrospective;
+
+  return [
+    {
+      role: 'system',
+      content: [
+        'You evaluate product/idea landscapes with candid, evidence-oriented reasoning.',
+        'Return only JSON with keys: "existingAlternatives", "gapsAndPainPoints", "demandSignals", "positioningAngle", "overallViability".',
+        'Each JSON value must be a readable string, not a nested object or array.',
+        'Be honest over optimistic. Call out when the space is crowded, weakly demanded, or unclear.',
+        'Avoid cheerleading. Include uncertainty when evidence is thin.',
+      ].join(' '),
+    },
+    {
+      role: 'system',
+      content: [
+        'Landscape analysis context:',
+        JSON.stringify(context, null, 2),
+      ].join('\n'),
+    },
+    {
+      role: 'user',
+      content: [
+        requestedScope,
+        '',
+        'Cover these sections clearly:',
+        '1) Existing Alternatives (overlap and maturity)',
+        '2) Gaps & Pain Points (underserved needs, user frustration)',
+        '3) Demand Signals (evidence users seek solutions)',
+        '4) Positioning Angle (what could make this compelling)',
+        '5) Overall Viability (candid conclusion)',
+      ].join('\n'),
+    },
+  ];
+}
+
 export function featureForMode(mode: string): AiFeatureId {
   if (mode === 'health-check') return 'health-check';
   if (mode === 'pattern-insights' || mode === 'smart-cross-pollinate') return 'discover-insights';
+  if (mode === 'landscape-analysis') return 'landscape-analysis';
   return 'default';
 }
 
-function extractJsonObject(text: string): unknown {
+function extractJsonObject(text: string, errorMessage = 'AI response was not valid JSON.'): unknown {
   const trimmed = text.trim();
   const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
   const candidate = fenced?.[1]?.trim() ?? trimmed;
@@ -226,7 +408,7 @@ function extractJsonObject(text: string): unknown {
     const start = candidate.indexOf('{');
     const end = candidate.lastIndexOf('}');
     if (start >= 0 && end > start) return JSON.parse(candidate.slice(start, end + 1));
-    throw new Error('AI project draft response was not valid JSON.');
+    throw new Error(errorMessage);
   }
 }
 
@@ -240,7 +422,7 @@ function sanitizeDraftPath(value: unknown): string | undefined {
 }
 
 export function parseProjectDraft(text: string): { summary: string; files: AiProjectDraftFile[] } {
-  const parsed = extractJsonObject(text) as { summary?: unknown; files?: unknown };
+  const parsed = extractJsonObject(text, 'AI project draft response was not valid JSON.') as { summary?: unknown; files?: unknown };
   if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.files)) {
     throw new Error('AI project draft response must contain a files array.');
   }
@@ -265,6 +447,148 @@ export function parseProjectDraft(text: string): { summary: string; files: AiPro
       : 'Draft project files generated from this idea.',
     files,
   };
+}
+
+export function parseLandscapeAnalysis(text: string): AiLandscapeAnalysisSections {
+  const isRecord = (value: unknown): value is Record<string, unknown> => (
+    Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+  );
+
+  const labelForKey = (key: string): string => key
+    .replace(/[_-]+/g, ' ')
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+
+  const indent = (value: string, prefix: string): string => value
+    .split('\n')
+    .map((line) => `${prefix}${line}`)
+    .join('\n');
+
+  const formatLandscapeValue = (value: unknown): string => {
+    if (typeof value === 'string') return value.trim();
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    if (Array.isArray(value)) {
+      return value
+        .map((item) => {
+          const formatted = formatLandscapeValue(item);
+          if (!formatted) return '';
+          return formatted.includes('\n') ? `- ${formatted.replace(/\n/g, '\n  ')}` : `- ${formatted}`;
+        })
+        .filter(Boolean)
+        .join('\n');
+    }
+    if (isRecord(value)) {
+      return Object.entries(value)
+        .map(([key, item]) => {
+          const formatted = formatLandscapeValue(item);
+          if (!formatted) return '';
+          const label = labelForKey(key);
+          return Array.isArray(item) || formatted.includes('\n')
+            ? `${label}:\n${indent(formatted, '  ')}`
+            : `${label}: ${formatted}`;
+        })
+        .filter(Boolean)
+        .join('\n');
+    }
+    return '';
+  };
+
+  // Try to find a value across common key-name variations.
+  const findKey = (obj: Record<string, unknown>, ...candidates: string[]): string => {
+    for (const key of candidates) {
+      if (obj[key] !== undefined) {
+        const formatted = formatLandscapeValue(obj[key]);
+        if (formatted) return formatted;
+      }
+    }
+    // Also try case-insensitive match.
+    const lowerCandidates = candidates.map((c) => c.toLowerCase());
+    for (const [k, v] of Object.entries(obj)) {
+      if (lowerCandidates.includes(k.toLowerCase())) {
+        const formatted = formatLandscapeValue(v);
+        if (formatted) return formatted;
+      }
+    }
+    return '';
+  };
+
+  try {
+    const parsed = extractJsonObject(text, 'AI landscape analysis response was not valid JSON.') as Record<string, unknown>;
+
+    const result: AiLandscapeAnalysisSections = {
+      existingAlternatives: findKey(parsed, 'existingAlternatives', 'existing_alternatives', 'alternatives', 'existingAlternative'),
+      gapsAndPainPoints: findKey(parsed, 'gapsAndPainPoints', 'gaps_and_pain_points', 'gapsPainPoints', 'gaps', 'painPoints', 'gapsAndPains'),
+      demandSignals: findKey(parsed, 'demandSignals', 'demand_signals', 'demand'),
+      positioningAngle: findKey(parsed, 'positioningAngle', 'positioning_angle', 'positioning'),
+      overallViability: findKey(parsed, 'overallViability', 'overall_viability', 'viability', 'overall'),
+    };
+
+    // If JSON parsed but all sections are empty, the AI returned JSON with unexpected keys
+    // Fall back to raw text so the user at least sees something
+    const allEmpty = Object.values(result).every((v) => !v);
+    if (allEmpty) {
+      return {
+        existingAlternatives: '',
+        gapsAndPainPoints: '',
+        demandSignals: '',
+        positioningAngle: '',
+        overallViability: text.trim() || 'No analysis returned.',
+      };
+    }
+    return result;
+  } catch {
+    // JSON extraction failed entirely — try parsing markdown headers
+    const sections: AiLandscapeAnalysisSections = {
+      existingAlternatives: '',
+      gapsAndPainPoints: '',
+      demandSignals: '',
+      positioningAngle: '',
+      overallViability: '',
+    };
+
+    const headerMap: Array<[RegExp, keyof AiLandscapeAnalysisSections]> = [
+      [/#+\s*existing\s+alternatives?/i, 'existingAlternatives'],
+      [/#+\s*gaps?\s*(?:&|and)\s*pain\s*points?/i, 'gapsAndPainPoints'],
+      [/#+\s*demand\s+signals?/i, 'demandSignals'],
+      [/#+\s*positioning\s+angle/i, 'positioningAngle'],
+      [/#+\s*overall\s+viability/i, 'overallViability'],
+    ];
+
+    const lines = text.split('\n');
+    let currentKey: keyof AiLandscapeAnalysisSections | null = null;
+    const buffer: string[] = [];
+
+    for (const line of lines) {
+      let matched = false;
+      for (const [pattern, key] of headerMap) {
+        if (pattern.test(line)) {
+          if (currentKey && buffer.length) {
+            sections[currentKey] = buffer.join('\n').trim();
+            buffer.length = 0;
+          }
+          currentKey = key;
+          matched = true;
+          break;
+        }
+      }
+      if (!matched && currentKey) {
+        buffer.push(line);
+      }
+    }
+    if (currentKey && buffer.length) {
+      sections[currentKey] = buffer.join('\n').trim();
+    }
+
+    // If markdown parsing also found nothing, put raw text in overallViability
+    const allEmpty = Object.values(sections).every((v) => !v);
+    if (allEmpty) {
+      sections.overallViability = text.trim() || 'No analysis returned.';
+    }
+
+    return sections;
+  }
 }
 
 export function parseSuggestion(field: AiSuggestionField, text: string): AiSuggestion {

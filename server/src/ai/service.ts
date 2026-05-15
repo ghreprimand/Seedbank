@@ -24,6 +24,7 @@ import type {
   AiProviderInstanceId,
   AiProviderInstanceAvailability,
   AiProjectDraftResult,
+  AiLandscapeAnalysisResult,
   AiPublicConfig,
   AiMethodCapability,
   AiSuggestion,
@@ -61,7 +62,9 @@ import {
   fieldAssistConversationMessages,
   messagesForChat,
   parseProjectDraft,
+  parseLandscapeAnalysis,
   parseSuggestion,
+  promptForLandscapeAnalysis,
   promptForFieldAssist,
   promptForMode,
   promptForProjectDraft,
@@ -260,6 +263,7 @@ const DEFAULT_CONFIG: AiStoredConfig = {
     'field-suggestions': { provider: 'default', providerInstanceId: 'ollama' },
     'health-check': { provider: 'default', providerInstanceId: 'ollama' },
     'discover-insights': { provider: 'default', providerInstanceId: 'ollama' },
+    'landscape-analysis': { provider: 'default', providerInstanceId: 'ollama' },
     'project-drafting': { provider: 'default', providerInstanceId: 'ollama' },
     default: { provider: 'default', providerInstanceId: 'ollama' },
   },
@@ -269,6 +273,7 @@ const DEFAULT_CONFIG: AiStoredConfig = {
       'field-suggestions': true,
       'health-check': true,
       'discover-insights': true,
+      'landscape-analysis': true,
       'project-drafting': true,
       default: true,
     },
@@ -324,6 +329,7 @@ const AI_FEATURE_IDS: AiFeatureId[] = [
   'field-suggestions',
   'health-check',
   'discover-insights',
+  'landscape-analysis',
   'project-drafting',
   'default',
 ];
@@ -395,6 +401,7 @@ function defaultFeatureRoutes(): Record<AiFeatureId, AiFeatureRoute> {
     'field-suggestions': { provider: 'default' },
     'health-check': { provider: 'default' },
     'discover-insights': { provider: 'default' },
+    'landscape-analysis': { provider: 'default' },
     'project-drafting': { provider: 'default' },
     default: { provider: 'default' },
   };
@@ -465,6 +472,7 @@ function defaultGuardrails(): AiGuardrailsConfig {
       'field-suggestions': true,
       'health-check': true,
       'discover-insights': true,
+      'landscape-analysis': true,
       'project-drafting': true,
       default: true,
     },
@@ -2308,6 +2316,52 @@ export class AiService {
       return result.text;
     } catch (error) {
       this.recordProviderFailure(feature, config, error);
+      throw error;
+    }
+  }
+
+  async landscapeAnalysis(
+    input: {
+      ideaId: string;
+      prompt?: string;
+      providerInstanceId?: AiProviderInstanceId;
+      model?: string;
+      effort?: AiReasoningEffort;
+      verbosity?: AiTextVerbosity;
+    },
+    key: string,
+    confirmationToken?: string,
+  ): Promise<AiLandscapeAnalysisResult> {
+    const idea = this.repository.getIdea(input.ideaId);
+    if (!idea) throw new Error('Idea not found.');
+    const config = resolveFeatureConfig(this.getConfig(), 'landscape-analysis', {
+      providerInstanceId: input.providerInstanceId,
+      model: input.model,
+      effort: input.effort,
+      verbosity: input.verbosity,
+    });
+    this.checkGuardrails(config, 'landscape-analysis', key, { confirmationToken });
+
+    try {
+      const result = await this.provider(config).complete(promptForLandscapeAnalysis(idea, input.prompt), config);
+      const resolvedModelId = await this.recordUsage(config, 'landscape-analysis', result);
+      const providerInstanceId = normalizeDefaultProviderInstance(config.defaultProviderInstanceId);
+      const sections = parseLandscapeAnalysis(result.text);
+      const report = this.repository.saveLandscapeReport(
+        idea.id,
+        sections,
+        providerInstanceId,
+        resolvedModelId,
+      );
+      return {
+        sections,
+        provider: config.provider,
+        providerInstanceId,
+        model: resolvedModelId,
+        report,
+      };
+    } catch (error) {
+      this.recordProviderFailure('landscape-analysis', config, error);
       throw error;
     }
   }
