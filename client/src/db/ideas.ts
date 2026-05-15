@@ -7,6 +7,7 @@
 
 import { v4 as uuid } from 'uuid';
 import { db } from '@/db';
+import { duplicateIdeaPayload } from '../../../shared/ideaDuplication';
 import type {
   Idea,
   IdeaVersion,
@@ -219,13 +220,7 @@ export async function duplicateIdea(id: string): Promise<Idea | undefined> {
   const original = await db.ideas.get(id);
   if (!original) return undefined;
 
-  const copy = newIdea({
-    ...original,
-    id: uuid(),
-    title: `Copy of ${original.title}`,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  });
+  const copy = newIdea(duplicateIdeaPayload(original, uuid(), new Date()));
 
   await db.ideas.add(copy);
   return copy;
