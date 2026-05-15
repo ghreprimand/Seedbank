@@ -5,7 +5,7 @@
 ### AI and media fixes
 
 - Tightened Thinking Partner prompt framing so organic prompt buttons, especially Devil's Advocate, ground questions in the actual idea context and ask for missing details when context is sparse.
-- Fixed image gallery rendering for uploaded images when the frontend runs on a different port than the API server.
+- Fixed image gallery rendering and lightbox display for uploaded images when the frontend runs on a different port than the API server, including dotted filenames like `.png`.
 
 ### Project generation
 

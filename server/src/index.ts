@@ -434,6 +434,17 @@ function routeParam(req: Request, name: string): string {
   return Array.isArray(value) ? value[0] ?? '' : value;
 }
 
+function positionalRouteParam(req: Request, index: number): string {
+  const params = req.params as Record<string, string | string[] | undefined>;
+  const value = params[String(index)];
+  const raw = Array.isArray(value) ? value[0] ?? '' : value ?? '';
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
+
 function safeFilename(raw: string): string {
   const name = path.basename(raw);
   if (!name || name === '.' || name === '..') return '';
@@ -442,6 +453,21 @@ function safeFilename(raw: string): string {
 
 function imagePublicPath(ideaId: string, filename: string): string {
   return `/api/images/${encodeURIComponent(ideaId)}/${encodeURIComponent(filename)}`;
+}
+
+function imageContentType(filename: string): string {
+  const ext = path.extname(filename).toLowerCase();
+  if (ext === '.png') return 'image/png';
+  if (ext === '.gif') return 'image/gif';
+  if (ext === '.webp') return 'image/webp';
+  return 'image/jpeg';
+}
+
+function imageFilenameParam(req: Request): string {
+  const dottedName = routeParam(req, 'name');
+  const extension = routeParam(req, 'ext');
+  if (dottedName && extension) return `${dottedName}.${extension}`;
+  return routeParam(req, 'filename') || positionalRouteParam(req, 1);
 }
 
 function safeDraftRelativePath(value: unknown): string | undefined {
@@ -1080,9 +1106,9 @@ app.post(
   }),
 );
 
-app.get('/api/images/:ideaId/:filename', requireScope('read:ideas'), asyncRoute((req, res) => {
-  const ideaId = routeParam(req, 'ideaId');
-  const filename = safeFilename(routeParam(req, 'filename'));
+app.get(/^\/api\/images\/([^/]+)\/([^/]+)$/, requireScope('read:ideas'), asyncRoute((req, res) => {
+  const ideaId = routeParam(req, 'ideaId') || positionalRouteParam(req, 0);
+  const filename = safeFilename(imageFilenameParam(req));
   if (!filename) {
     res.status(400).json({ error: 'Invalid image file name.' });
     return;
@@ -1092,12 +1118,21 @@ app.get('/api/images/:ideaId/:filename', requireScope('read:ideas'), asyncRoute(
     res.status(404).json({ error: 'Image not found.' });
     return;
   }
-  res.sendFile(filePath);
+  res.type(imageContentType(filename));
+  const stream = fs.createReadStream(filePath);
+  stream.on('error', (err) => {
+    if (res.headersSent) {
+      res.destroy(err);
+      return;
+    }
+    res.status(500).json({ error: 'Failed to read image file.' });
+  });
+  stream.pipe(res);
 }));
 
-app.delete('/api/ideas/:id/images/:filename', requireScope('write:ideas'), asyncRoute((req, res) => {
-  const ideaId = routeParam(req, 'id');
-  const filename = safeFilename(routeParam(req, 'filename'));
+app.delete(/^\/api\/ideas\/([^/]+)\/images\/([^/]+)$/, requireScope('write:ideas'), asyncRoute((req, res) => {
+  const ideaId = routeParam(req, 'id') || positionalRouteParam(req, 0);
+  const filename = safeFilename(imageFilenameParam(req));
   if (!filename) {
     res.status(400).json({ error: 'Invalid image file name.' });
     return;
