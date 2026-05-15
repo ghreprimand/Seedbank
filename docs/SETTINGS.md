@@ -131,11 +131,11 @@ The **Usage & Guardrails** section includes a daily token limit plus advanced sa
 
 Usage readouts show tokens consumed in the last 24 hours and last 7 days (from `ai_usage`).
 
-### Project drafting
+### Project generation and drafting
 
-The idea detail page includes **Draft project files**. It uses the **Project drafting** Feature Defaults route, so the selected provider, model, effort, token budgets, model allowlist, and remote-provider confirmation are configured here.
+The idea detail page includes a **Project generation** section. It uses the **Project drafting** Feature Defaults route, so the selected provider, model, effort, token budgets, model allowlist, and remote-provider confirmation are configured here.
 
-Drafting returns reviewable text files such as `SPEC.md`, `IMPLEMENTATION_NOTES.md`, or `TODO.md`. It does not overwrite idea fields. The user reviews files in the panel, then downloads selected files or explicitly saves them into the graduated project path when that path is inside a configured project root.
+Project generation creates or uses a local project folder, generates repo-ready text files (`README.md`, `SPEC.md`, `IMPLEMENTATION_NOTES.md`, `TODO.md`), writes them to disk without overwriting existing files, and then exposes the GitHub publishing action from the same idea section. It does not overwrite idea fields.
 
 See [`docs/PROJECT_DRAFTING.md`](./PROJECT_DRAFTING.md) and [`docs/AI_GUIDE.md`](./AI_GUIDE.md).
 

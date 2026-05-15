@@ -10,6 +10,8 @@ import type {
   AiMethodCapability,
   AiProjectDraftApplyRequest,
   AiProjectDraftApplyResult,
+  AiProjectGenerateRequest,
+  AiProjectGenerateResult,
   AiLandscapeAnalysisRequest,
   AiLandscapeAnalysisResult,
   AiModelListResult,
@@ -976,6 +978,15 @@ export async function applyProjectDraftFiles(input: AiProjectDraftApplyRequest):
     method: 'POST',
     body: JSON.stringify(input),
   });
+}
+
+export async function generateProjectFiles(input: AiProjectGenerateRequest): Promise<AiProjectGenerateResult> {
+  const response = await request<AiProjectGenerateResult>('/api/ai/project-generate', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+  response.idea = hydrateIdea(response.idea);
+  return response;
 }
 
 // ── Aggregate Settings ────────────────────────────────────────────────────────

@@ -200,17 +200,17 @@ These routes require `mcp:read` for bearer auth and are designed for external AI
 
 ## Project Drafting Architecture
 
-Project drafting is implemented as a normal AI feature route:
+Project generation is implemented as a local-first wrapper around the normal AI project-drafting feature route:
 
 - shared feature id: `project-drafting`
-- API route: `POST /api/ai/project-draft`
+- API routes: `POST /api/ai/project-draft` for review-only drafts and `POST /api/ai/project-generate` for create-folder-and-write flow
 - service method: `AiService.draftProject`
 - prompt/parser helpers: `server/src/ai/prompts.ts`
-- client panel: `client/src/components/ProjectDraftPanel.tsx`
+- client section: `client/src/components/ProjectGenerationSection.tsx`
 
 The route resolves Feature Defaults in the same way as Thinking Partner, field suggestions, health check, and Discover insights. Guardrails, remote-provider confirmation, disabled providers, model allowlists, rate limits, and token budgets are enforced before the request reaches the provider.
 
-The provider returns strict JSON containing a summary and proposed files. The server accepts only safe relative paths, rejects traversal/hidden paths, caps the number and size of files, and returns the result for user review. A separate apply endpoint can write the reviewed selection into the idea's graduated project path when that path is inside a configured project root; existing files are not overwritten. The feature does not write canonical idea fields.
+The provider returns JSON containing a summary and proposed files. The parser tolerates common model drift such as unquoted object keys and trailing commas. The server accepts only safe relative paths, rejects traversal/hidden paths, caps the number and size of files, and protects existing project files from overwrite. The generate endpoint creates a project folder when the idea does not already have one, ensures the standard repo docs are present (`README.md`, `SPEC.md`, `IMPLEMENTATION_NOTES.md`, `TODO.md`), writes them locally, and updates `graduatedTo`. The feature does not write canonical idea fields.
 
 ## Integration Architecture
 

@@ -1,6 +1,6 @@
-# Project Drafting
+# Project Generation and Drafting
 
-Project drafting generates reviewable starter files from a Seedbank idea using the normal AI provider routing system. It does not launch a separate runner and does not use a separate auth path.
+Project generation creates a local project folder, generates repo-ready starter files from a Seedbank idea, writes them to that folder, and then lets the user publish the folder to GitHub as a separate explicit step. It uses the normal AI provider routing system. It does not launch a separate runner and does not use a separate auth path.
 
 ## How It Is Configured
 
@@ -19,13 +19,13 @@ Usage guardrails, remote-provider confirmation, model allowlists, disabled provi
 ## User Workflow
 
 1. Open an idea detail page.
-2. Click **Draft project files** above the Thinking Partner panel.
-3. Adjust the prompt if you want specific files or a narrower scope.
-4. Generate the draft.
-5. Review each proposed file in the panel.
-6. Download the selected files, or save them into the graduated project when the idea already has a configured project path.
+2. Use the **Project generation** section near the bottom of the page.
+3. If the Settings project root is blank, either follow the section link to **Settings → Project Graduation** or let Seedbank use the default `~/Projects/Seedbank-Graduated`.
+4. Adjust the file generation brief if you want a narrower scope.
+5. Click **Create project files**. Seedbank creates the local project folder when needed, generates starter files, and writes them to disk.
+6. Click **Create GitHub repo** from the same section when you want to publish and push the generated files.
 
-The default prompt asks for practical starter files such as `SPEC.md`, `IMPLEMENTATION_NOTES.md`, and `TODO.md`. The model may also produce `RESEARCH_NOTES.md` or similar text files when they fit the idea.
+The default generation prompt asks for `README.md`, `SPEC.md`, `IMPLEMENTATION_NOTES.md`, and `TODO.md`. The server adds conservative fallback versions for any of those files that the AI omits.
 
 ## API
 
@@ -42,6 +42,22 @@ Request:
   "model": "optional-request-model-override",
   "effort": "medium",
   "verbosity": "medium"
+}
+```
+
+`POST /api/ai/project-generate` requires `ai:suggest` and `write:ideas`, and accepts the same request shape. It creates or reuses the idea project folder, writes repo-ready files to disk, updates `graduatedTo`, and returns:
+
+```json
+{
+  "summary": "Generated starter documentation.",
+  "provider": "codex-account",
+  "providerInstanceId": "codex-account",
+  "model": "gpt-5.3-codex",
+  "targetPath": "/path/to/project",
+  "filesWritten": ["README.md", "SPEC.md", "IMPLEMENTATION_NOTES.md", "TODO.md"],
+  "createdProject": true,
+  "idea": { "id": "uuid", "graduatedTo": "/path/to/project" },
+  "files": []
 }
 ```
 
@@ -65,16 +81,14 @@ Response:
 
 ## Safety Model
 
-Project drafting is review-first:
+Project generation is local-first:
 
 - It generates text content and safe relative paths only.
 - Absolute paths, parent traversal, hidden directories, and empty files are rejected server-side.
-- It returns at most eight files per request.
+- Drafting returns at most eight model files per request; generation may add required fallback repo docs.
 - It does not overwrite canonical idea fields.
-- Saving to a project is an explicit second step after review.
-- Project saves are allowed only when the idea has a `graduatedTo` path inside a configured project root.
-- Existing project files are not overwritten; if a selected path already exists, the apply request returns `409`.
-- The browser downloads or saves only the files the user selects.
+- Project generation creates a local folder first; GitHub publishing is optional.
+- Existing project files are not overwritten; if a selected/generated path already exists, the request returns an error.
 
 ## Apply API
 

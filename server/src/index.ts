@@ -16,6 +16,12 @@ import { BackupService } from './backups/service.js';
 import { registerBackupRoutes } from './backups/routes.js';
 import { IntegrationRegistry } from './integrations/registry.js';
 import {
+  expandHome,
+  readmeFor,
+  targetStageFor,
+  uniqueProjectDir,
+} from './integrations/scaffold.js';
+import {
   ensurePublishableIdea,
   getGitHubAuthStatus,
   GitHubPublishError,
@@ -34,10 +40,15 @@ import type {
   AggregateSettings,
   AiProjectDraftApplyRequest,
   AiProjectDraftFile,
+  AiProjectGenerateRequest,
+  AiProviderInstanceId,
+  AiReasoningEffort,
+  AiTextVerbosity,
   BackupConfig,
   CategoryDefinition,
   CategorySettings,
   Category,
+  Idea,
   PublicToken,
   ServerInfo,
   Stage,
@@ -47,7 +58,7 @@ import type {
   ShortcutConfig,
   WebhooksConfig,
 } from '../../shared/types.js';
-import { DEFAULT_CATEGORY_DEFINITIONS } from '../../shared/types.js';
+import { DEFAULT_CATEGORY_DEFINITIONS, STAGES } from '../../shared/types.js';
 
 const PORT = Number(process.env.PORT ?? 4800);
 const app = express();
@@ -66,6 +77,16 @@ const SETTINGS_KEYS = {
   apiWebhooks: 'api.webhooks',
   categoryConfig: 'categories.config',
 } as const;
+
+const PROJECT_DRAFT_DEFAULT_PROMPT = [
+  'Generate repository-ready starter documentation for this idea.',
+  'Return README.md, SPEC.md, IMPLEMENTATION_NOTES.md, and TODO.md.',
+  'Keep the README useful for a GitHub repository: what it is, why it exists, setup assumptions, and first milestone.',
+  'Keep the other files practical and scoped to the smallest useful version.',
+].join(' ');
+
+const AI_REASONING_EFFORTS: readonly AiReasoningEffort[] = ['minimal', 'low', 'medium', 'high'];
+const AI_TEXT_VERBOSITIES: readonly AiTextVerbosity[] = ['low', 'medium', 'high'];
 
 const backupService = new BackupService(repository, SETTINGS_KEYS.backupConfig);
 
@@ -435,6 +456,28 @@ function isInsidePath(childPath: string, parentPath: string): boolean {
   return relative === '' || (!!relative && !relative.startsWith('..') && !path.isAbsolute(relative));
 }
 
+function clientKey(req: Request): string {
+  return req.ip || req.socket.remoteAddress || 'local';
+}
+
+function parseProviderInstanceId(value: unknown): AiProviderInstanceId | undefined {
+  return typeof value === 'string' && value.trim()
+    ? value.trim() as AiProviderInstanceId
+    : undefined;
+}
+
+function parseAiReasoningEffort(value: unknown): AiReasoningEffort | undefined {
+  return typeof value === 'string' && AI_REASONING_EFFORTS.includes(value as AiReasoningEffort)
+    ? value as AiReasoningEffort
+    : undefined;
+}
+
+function parseAiTextVerbosity(value: unknown): AiTextVerbosity | undefined {
+  return typeof value === 'string' && AI_TEXT_VERBOSITIES.includes(value as AiTextVerbosity)
+    ? value as AiTextVerbosity
+    : undefined;
+}
+
 function parseProjectDraftApplyFiles(value: unknown): AiProjectDraftFile[] | null {
   if (!Array.isArray(value)) return null;
   const files: AiProjectDraftFile[] = [];
@@ -450,6 +493,109 @@ function parseProjectDraftApplyFiles(value: unknown): AiProjectDraftFile[] | nul
     });
   }
   return files.length > 0 ? files : null;
+}
+
+function projectRootForGeneration(): string {
+  const stored = repository.getSetting<{ projectRoot?: string }>('integration:generic-project') ?? {};
+  return expandHome(stored.projectRoot?.trim() || '~/Projects/Seedbank-Graduated');
+}
+
+function repoDocFallbacks(idea: Idea): AiProjectDraftFile[] {
+  return [
+    {
+      path: 'README.md',
+      description: 'GitHub-facing project overview',
+      content: readmeFor(idea, 'Seedbank project generation'),
+    },
+    {
+      path: 'SPEC.md',
+      description: 'Smallest useful version specification',
+      content: [
+        `# ${idea.title || 'Untitled Project'} Spec`,
+        '',
+        '## Problem',
+        '',
+        idea.pitch || 'Define the core problem this project solves.',
+        '',
+        '## Smallest Useful Version',
+        '',
+        idea.hook || 'Describe the smallest coherent product or prototype.',
+        '',
+        '## Success Criteria',
+        '',
+        '- A user can understand the project from the README.',
+        '- The first milestone is small enough to build and test.',
+        '- Open questions and risks are captured before implementation expands.',
+        '',
+      ].join('\n'),
+    },
+    {
+      path: 'IMPLEMENTATION_NOTES.md',
+      description: 'Build notes and constraints',
+      content: [
+        `# ${idea.title || 'Untitled Project'} Implementation Notes`,
+        '',
+        '## Suggested Approach',
+        '',
+        idea.techStack || 'Choose the simplest stack that can validate the core workflow.',
+        '',
+        '## Context',
+        '',
+        idea.fullNotes || 'Add project context as implementation decisions become clearer.',
+        '',
+        '## Risks',
+        '',
+        idea.risks || 'List technical, product, and scope risks here.',
+        '',
+      ].join('\n'),
+    },
+    {
+      path: 'TODO.md',
+      description: 'Initial build checklist',
+      content: [
+        '# TODO',
+        '',
+        '- [ ] Confirm the smallest useful version.',
+        '- [ ] Create a basic project skeleton.',
+        '- [ ] Implement the first end-to-end workflow.',
+        '- [ ] Add a README usage example.',
+        '- [ ] Review risks before expanding scope.',
+        '',
+      ].join('\n'),
+    },
+  ];
+}
+
+function ensureRepoDocs(idea: Idea, files: AiProjectDraftFile[]): AiProjectDraftFile[] {
+  const next = [...files];
+  const existing = new Set(next.map((file) => file.path.toLowerCase()));
+  for (const fallback of repoDocFallbacks(idea)) {
+    if (!existing.has(fallback.path.toLowerCase())) {
+      next.push(fallback);
+      existing.add(fallback.path.toLowerCase());
+    }
+  }
+  return next.slice(0, 12);
+}
+
+function writeDraftFilesToProject(targetRoot: string, files: AiProjectDraftFile[]): string[] {
+  const written: string[] = [];
+  for (const file of files) {
+    const destination = path.resolve(targetRoot, file.path);
+    if (!isInsidePath(destination, targetRoot)) {
+      throw new Error(`Unsafe draft file path: ${file.path}`);
+    }
+    if (fs.existsSync(destination)) {
+      throw new Error(`File already exists: ${file.path}`);
+    }
+  }
+  for (const file of files) {
+    const destination = path.resolve(targetRoot, file.path);
+    fs.mkdirSync(path.dirname(destination), { recursive: true });
+    fs.writeFileSync(destination, file.content, { encoding: 'utf8', flag: 'wx' });
+    written.push(file.path);
+  }
+  return written;
 }
 
 function upsertGitHubIdeaLink(ideaId: string, repoUrl: string) {
@@ -1000,6 +1146,79 @@ app.post('/api/ideas/:id/versions/restore/:versionId', requireScope('write:ideas
   }
 
   res.json(idea);
+}));
+
+app.post('/api/ai/project-generate', requireScope('ai:suggest'), requireScope('write:ideas'), asyncRoute(async (req, res) => {
+  const body = (req.body ?? {}) as Partial<AiProjectGenerateRequest>;
+  const ideaId = typeof body.ideaId === 'string' ? body.ideaId.trim() : '';
+  if (!ideaId) {
+    res.status(400).json({ error: 'ideaId is required.' });
+    return;
+  }
+
+  const idea = repository.getIdea(ideaId);
+  if (!idea) {
+    res.status(404).json({ error: 'Idea not found.' });
+    return;
+  }
+
+  const prompt = typeof body.prompt === 'string' && body.prompt.trim()
+    ? body.prompt.trim()
+    : PROJECT_DRAFT_DEFAULT_PROMPT;
+  const draft = await aiService.draftProject(
+    {
+      ideaId,
+      prompt,
+      providerInstanceId: parseProviderInstanceId(body.providerInstanceId),
+      ...(typeof body.model === 'string' && body.model.trim() ? { model: body.model.trim() } : {}),
+      effort: parseAiReasoningEffort(body.effort),
+      verbosity: parseAiTextVerbosity(body.verbosity),
+    },
+    clientKey(req),
+    typeof body.aiConfirmationToken === 'string' ? body.aiConfirmationToken : undefined,
+  );
+
+  const existingProjectPath = idea.graduatedTo?.trim();
+  const createdProject = !existingProjectPath;
+  const targetRoot = existingProjectPath
+    ? path.resolve(existingProjectPath)
+    : uniqueProjectDir(projectRootForGeneration(), idea.title);
+  const allowedRoots = integrations.configuredRoots().map((root) => path.resolve(root));
+  if (allowedRoots.length > 0 && !allowedRoots.some((root) => isInsidePath(targetRoot, root))) {
+    res.status(403).json({ error: 'Project path is outside configured project roots.' });
+    return;
+  }
+
+  fs.mkdirSync(targetRoot, { recursive: true });
+  const files = ensureRepoDocs(idea, draft.files);
+  let filesWritten: string[];
+  try {
+    filesWritten = writeDraftFilesToProject(targetRoot, files);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(message.startsWith('File already exists:') ? 409 : 400).json({ error: message });
+    return;
+  }
+
+  const stage = targetStageFor(idea.category, 'prototype');
+  const updated = repository.updateIdea(idea.id, {
+    graduatedTo: targetRoot,
+    ...(STAGES.indexOf(idea.stage) < STAGES.indexOf(stage) ? { stage } : {}),
+  });
+  if (!updated) {
+    res.status(500).json({ error: 'Project files were written, but the idea record could not be updated.' });
+    return;
+  }
+
+  webhookEmitter.emit('idea.graduated', updated);
+  res.json({
+    ...draft,
+    files,
+    targetPath: targetRoot,
+    filesWritten,
+    createdProject,
+    idea: updated,
+  });
 }));
 
 app.post('/api/ai/project-draft/apply', requireScope('ai:suggest'), asyncRoute((req, res) => {

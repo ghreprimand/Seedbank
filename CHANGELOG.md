@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Project generation
+
+- Added an idea-detail Project generation section that creates/uses a local project folder, generates repo-ready docs, writes them to disk, and exposes GitHub publishing from the same workflow.
+- Added `POST /api/ai/project-generate` to combine project-folder creation, Project drafting AI output, required repo doc fallbacks, safe file writes, and idea `graduatedTo` updates.
+- Standardized project generation around `README.md`, `SPEC.md`, `IMPLEMENTATION_NOTES.md`, and `TODO.md`, with a Settings → Project Graduation link when no project root is configured.
+
 ### Project drafting
 
 - Hardened project-draft response parsing so Codex-style JSON-like output with unquoted keys or trailing commas no longer fails before files can be shown.

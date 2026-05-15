@@ -231,6 +231,9 @@ export const openApiSpec: OpenAPIObject = {
     '/api/ai/project-draft': {
       post: { summary: 'Generate reviewable project files from an idea using the configured Project drafting AI route', security: [{ bearerAuth: [] }] },
     },
+    '/api/ai/project-generate': {
+      post: { summary: 'Create/use a local project folder, generate repo-ready starter docs, write them to disk, and update the idea project path', security: [{ bearerAuth: [] }] },
+    },
     '/api/ai/landscape-analysis': {
       post: {
         summary: 'Generate a structured AI landscape and viability analysis for an idea',
