@@ -1,6 +1,7 @@
 import cors from 'cors';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import multer from 'multer';
+import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
@@ -482,6 +483,43 @@ function safeDraftRelativePath(value: unknown): string | undefined {
 function isInsidePath(childPath: string, parentPath: string): boolean {
   const relative = path.relative(path.resolve(parentPath), path.resolve(childPath));
   return relative === '' || (!!relative && !relative.startsWith('..') && !path.isAbsolute(relative));
+}
+
+function folderOpenCommand(folderPath: string, platform = process.platform): { command: string; args: string[] } {
+  if (platform === 'darwin') return { command: 'open', args: [folderPath] };
+  if (platform === 'win32') return { command: 'explorer.exe', args: [folderPath] };
+  return { command: 'xdg-open', args: [folderPath] };
+}
+
+function openFolderInFileManager(folderPath: string): Promise<void> {
+  const { command, args } = folderOpenCommand(folderPath);
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: false,
+    });
+    let settled = false;
+    const settle = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      fn();
+    };
+    child.once('error', (err) => {
+      settle(() => reject(err));
+    });
+    child.once('spawn', () => {
+      child.unref();
+    });
+    child.once('close', (code) => {
+      if (code && code !== 0) {
+        settle(() => reject(new Error(`${command} exited with code ${code}`)));
+      }
+    });
+    setTimeout(() => {
+      settle(resolve);
+    }, 750);
+  });
 }
 
 function clientKey(req: Request): string {
@@ -1311,6 +1349,40 @@ app.post('/api/ai/project-draft/apply', requireScope('ai:suggest'), asyncRoute((
   }
 
   res.json({ targetPath: targetRoot, filesWritten: written });
+}));
+
+app.post('/api/ideas/:id/open-project-folder', requireScope('read:ideas'), requireImplicitLocal, asyncRoute(async (req, res) => {
+  const idea = repository.getIdea(routeParam(req, 'id'));
+  if (!idea) {
+    res.status(404).json({ error: 'Idea not found.' });
+    return;
+  }
+  if (!idea.graduatedTo?.trim()) {
+    res.status(400).json({ error: 'This idea has not been graduated to a project path.' });
+    return;
+  }
+
+  const projectPath = path.resolve(idea.graduatedTo);
+  let stat: fs.Stats;
+  try {
+    stat = fs.statSync(projectPath);
+  } catch {
+    res.status(404).json({ error: `Project folder does not exist: ${projectPath}` });
+    return;
+  }
+  if (!stat.isDirectory()) {
+    res.status(400).json({ error: `Project path is not a folder: ${projectPath}` });
+    return;
+  }
+
+  try {
+    await openFolderInFileManager(projectPath);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(503).json({ error: `Could not open the system file explorer: ${message}` });
+    return;
+  }
+  res.json({ ok: true, path: projectPath, message: `Opened project folder: ${projectPath}` });
 }));
 
 app.get('/api/stats', requireScope('read:ideas'), asyncRoute((_req, res) => {

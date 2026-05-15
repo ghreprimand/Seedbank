@@ -262,6 +262,9 @@ export const openApiSpec: OpenAPIObject = {
     '/api/ai/project-draft/apply': {
       post: { summary: 'Write selected reviewed project draft files into the idea graduated project path', security: [{ bearerAuth: [] }] },
     },
+    '/api/ideas/{id}/open-project-folder': {
+      post: { summary: 'Open an idea graduated project folder in the local system file explorer', security: [{ bearerAuth: [] }] },
+    },
     '/api/ai/chat': {
       post: { summary: 'Streaming AI chat', security: [{ bearerAuth: [] }] },
     },

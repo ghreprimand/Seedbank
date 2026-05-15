@@ -15,6 +15,7 @@
 - Improved the Project generation section with a taller brief field and inline GitHub setup guidance when the local `gh` session is not linked yet.
 - Added live GitHub repo detection for generated projects; existing repos now show a repo link and an Update GitHub repo action instead of another create button.
 - Added GitHub repo update support that commits changed local project files when present and pushes `main` to the confirmed repo.
+- Replaced browser-blocked `file://` project-folder links with a local API action that opens graduated project folders through the system file explorer.
 
 ### Project drafting
 

@@ -39,12 +39,14 @@ What changed:
 - The section now checks the idea's GitHub link or local `origin` remote against GitHub before showing repo actions.
 - When GitHub confirms the repo already exists, Seedbank shows the repo link and an Update GitHub repo action instead of another create button.
 - Update GitHub repo stages the local project folder, commits changed files when present, configures `origin`, and pushes `main`.
+- Graduated project links now call back to the local Seedbank server to open the folder with the system file explorer instead of relying on browser-blocked `file://` URLs.
 
 Safety and permissions:
 - Existing project files are not overwritten.
 - File paths still reject absolute paths, parent traversal, hidden directories, and empty files.
 - GitHub repo status and update calls still rely on `gh` CLI auth; Seedbank does not store GitHub tokens.
 - The generate endpoint requires both `ai:suggest` and `write:ideas` for bearer-token callers because it sends content to AI and updates the idea's local project path.
+- The folder-open endpoint is local-session only and reads the stored idea project path rather than accepting arbitrary filesystem paths from the browser.
 
 ## 2026-05-15 — Project Draft Parser Hardening
 

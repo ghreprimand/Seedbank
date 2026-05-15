@@ -792,7 +792,7 @@ export const MANUAL_GROUPS: ManualGroup[] = [
             'Confirm — files are created in your configured project root and the idea stage is updated by the selected adapter.',
           ]},
           { type: 'h3', text: 'After graduation' },
-          { type: 'p', text: 'The idea shows a "Graduated to" badge that links to the generated project path.' },
+          { type: 'p', text: 'The idea shows a "Graduated" badge that opens the generated project path in your system file explorer from the local Seedbank server.' },
           { type: 'h3', text: 'Generated files' },
           { type: 'ul', items: [
             'README.md — summary and context you can share with collaborators.',

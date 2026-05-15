@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertCircle, Check, ExternalLink, FolderPlus, GitBranch, Loader2, RefreshCw, Sparkles } from 'lucide-react';
+import { AlertCircle, Check, FolderOpen, FolderPlus, GitBranch, Loader2, RefreshCw, Sparkles } from 'lucide-react';
 import type { AiProjectGenerateResult, Idea } from '@/lib/types';
 import {
   generateProjectFiles,
   getGitHubPublishStatus,
   getIdeaGitHubRepoStatus,
   getIntegrations,
+  openIdeaProjectFolder,
   preflightAiRequest,
   updateIdeaGitHubRepo,
   type GitHubRepoStatus,
@@ -46,6 +47,7 @@ export default function ProjectGenerationSection({
   const [githubLogin, setGithubLogin] = useState('');
   const [repoStatusRecord, setRepoStatusRecord] = useState<{ ideaId: string; projectPath: string; status: GitHubRepoStatus } | null>(null);
   const [repoActionLoading, setRepoActionLoading] = useState(false);
+  const [folderOpenLoading, setFolderOpenLoading] = useState(false);
   const [repoMessage, setRepoMessage] = useState<string | null>(null);
 
   const projectPath = result?.idea.graduatedTo ?? idea.graduatedTo;
@@ -172,6 +174,21 @@ export default function ProjectGenerationSection({
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setRepoActionLoading(false);
+    }
+  };
+
+  const openFolder = async () => {
+    if (!projectPath || folderOpenLoading) return;
+    setFolderOpenLoading(true);
+    setRepoMessage(null);
+    setError(null);
+    try {
+      const response = await openIdeaProjectFolder(idea.id);
+      setRepoMessage(response.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setFolderOpenLoading(false);
     }
   };
 
@@ -310,12 +327,14 @@ export default function ProjectGenerationSection({
       {projectPath && (
         <div className="flex flex-wrap items-center gap-2 text-xs text-ink-500">
           <span className="font-mono text-ink-600 truncate max-w-full">{projectPath}</span>
-          <a
-            href={`file://${projectPath}`}
-            className="inline-flex items-center gap-1 text-sage-700 hover:text-sage-900 underline"
+          <button
+            type="button"
+            onClick={() => { void openFolder(); }}
+            disabled={folderOpenLoading}
+            className="inline-flex items-center gap-1 text-sage-700 hover:text-sage-900 underline disabled:opacity-50"
           >
-            Open folder <ExternalLink className="w-3 h-3" />
-          </a>
+            {folderOpenLoading ? 'Opening...' : 'Open folder'} <FolderOpen className="w-3 h-3" />
+          </button>
         </div>
       )}
 
