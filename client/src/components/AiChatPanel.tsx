@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, Bot, ChevronDown, ExternalLink, Send, Settings, Shield, X } from 'lucide-react';
 import { aiProviderLabel, type AiChatMessage, type AiFeatureId, type AiPreflightResult, type Idea } from '@/lib/types';
@@ -109,6 +109,8 @@ export default function AiThinkingPanel({ idea, onApply }: AiThinkingPanelProps)
     if (aiConfig.provider === 'openai-compatible') return aiConfig.openaiCompatibleModel || `${aiProviderLabel('openai-compatible')} model needed`;
     return aiConfig.ollamaModel;
   })();
+
+  const newestMessages = useMemo(() => [...messages].reverse(), [messages]);
 
   useEffect(() => {
     if (!open) return;
@@ -292,7 +294,12 @@ export default function AiThinkingPanel({ idea, onApply }: AiThinkingPanelProps)
                 </button>
               ))}
             </div>
-            {messages.map((message) => (
+            {streamingText && (
+              <div className="rounded-card px-3 py-2 text-sm whitespace-pre-wrap bg-sage-50 text-ink-800">
+                {streamingText}
+              </div>
+            )}
+            {newestMessages.map((message) => (
               <div
                 key={message.id}
                 className={`rounded-card px-3 py-2 text-sm whitespace-pre-wrap ${
@@ -316,11 +323,6 @@ export default function AiThinkingPanel({ idea, onApply }: AiThinkingPanelProps)
                 )}
               </div>
             ))}
-            {streamingText && (
-              <div className="rounded-card px-3 py-2 text-sm whitespace-pre-wrap bg-sage-50 text-ink-800">
-                {streamingText}
-              </div>
-            )}
           </div>
 
           {error && (

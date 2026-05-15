@@ -5,6 +5,8 @@
 ### AI and media fixes
 
 - Tightened Thinking Partner prompt framing so organic prompt buttons, especially Devil's Advocate, ground questions in the actual idea context and ask for missing details when context is sparse.
+- Added explicit Thinking Partner field labels for raw notes, concept, case, risks, build notes, and scores so providers can interpret Seedbank's internal field names more accurately.
+- Changed Thinking Partner conversation display to show the newest prompt/response at the top while preserving chronological history for provider context.
 - Fixed the Thinking Partner header so it displays the feature-specific effective route/preflight provider instead of the global default provider.
 - Fixed image gallery rendering and lightbox display for uploaded images when the frontend runs on a different port than the API server, including dotted filenames like `.png`.
 

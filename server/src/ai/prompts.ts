@@ -18,7 +18,9 @@ const THINKING_PARTNER_PROMPT = [
   'Your role is to help the user develop THEIR idea through questions, reflections, and gentle challenges.',
   'Never generate ideas unprompted. Ask before suggesting.',
   'Focus on drawing out what the user already intuitively knows.',
-  'Ground every question in the supplied idea context: title, pitch, stage, notes, risks, build notes, tags, and scores.',
+  'Ground every question in the supplied idea context, using the field labels provided with that context.',
+  'Use concrete details from the title, pitch, raw notes, concept, risks, build notes, tags, and scores when they are present.',
+  'Treat empty fields as unknown. Do not infer unstated audiences, markets, technology, or constraints.',
   'If the context is sparse, ask for the most important missing detail instead of making a generic or invented critique.',
   'Keep responses concise and practical. Prefer one or two thoughtful questions over broad ideation.',
 ].join(' ');
@@ -31,26 +33,57 @@ const FIELD_ASSIST_PROMPT = [
   'Keep responses brief; the user can ask follow-up questions if they want more.',
 ].join(' ');
 
+const THINKING_PARTNER_FIELD_LABELS = {
+  pitch: 'Elevator Pitch',
+  fullNotes: 'The Spark / Raw Notes',
+  hook: 'Concept',
+  whyItMightWork: 'The Case',
+  risks: 'Risks & Blockers',
+  techStack: 'Build Notes',
+  aesthetic: 'Aesthetic & Style',
+  retrospective: 'Retrospective',
+  jamScore: 'Feasibility',
+  excitementScore: 'Personal Excitement',
+  tags: 'Tags',
+  moodLabels: 'Mood Labels',
+  graduatedTo: 'Local Project Folder',
+} as const;
+
+function hasContextValue(value: unknown): boolean {
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === 'number') return value > 0;
+  if (typeof value === 'string') return value.trim().length > 0;
+  return value !== null && value !== undefined;
+}
+
 function ideaContext(idea: Idea): string {
+  const labeledFields = {
+    pitch: idea.pitch,
+    fullNotes: idea.fullNotes,
+    hook: idea.hook,
+    whyItMightWork: idea.whyItMightWork,
+    risks: idea.risks,
+    techStack: idea.techStack,
+    aesthetic: idea.aesthetic,
+    retrospective: idea.retrospective,
+    jamScore: idea.jamScore,
+    excitementScore: idea.excitementScore,
+    tags: idea.tags,
+    moodLabels: idea.moodLabels,
+    graduatedTo: idea.graduatedTo,
+  };
+
   return [
     'Current idea context:',
     JSON.stringify({
+      fieldLabels: THINKING_PARTNER_FIELD_LABELS,
+      filledFields: Object.entries(labeledFields)
+        .filter(([, value]) => hasContextValue(value))
+        .map(([field]) => THINKING_PARTNER_FIELD_LABELS[field as keyof typeof THINKING_PARTNER_FIELD_LABELS]),
       title: idea.title,
-      pitch: idea.pitch,
       category: idea.category,
       stage: idea.stage,
-      tags: idea.tags,
-      moodLabels: idea.moodLabels,
-      fullNotes: idea.fullNotes,
-      hook: idea.hook,
-      whyItMightWork: idea.whyItMightWork,
-      risks: idea.risks,
-      techStack: idea.techStack,
-      aesthetic: idea.aesthetic,
-      retrospective: idea.retrospective,
-      jamScore: idea.jamScore,
-      excitementScore: idea.excitementScore,
-      graduatedTo: idea.graduatedTo,
+      ...labeledFields,
     }, null, 2),
   ].join('\n');
 }
@@ -62,7 +95,8 @@ export function stagePersonality(stage: Stage): string {
       'Be generative and exploratory.',
       'Help the user brainstorm and expand.',
       'Ask "what if" questions.',
-      'Do not critique yet.',
+      'Keep critique lightweight unless the user explicitly asks for it.',
+      'When the user asks for Devil\'s Advocate, challenge only assumptions visible in the supplied context.',
     ].join(' ');
   }
 

@@ -34,8 +34,32 @@ test('messagesForChat includes stage-aware system guidance', () => {
     assert.equal(messages[0]?.role, 'system');
     assert.equal(messages[1]?.role, 'system');
     assert.match(messages[0]?.content ?? '', /Ground every question in the supplied idea context/);
+    assert.match(messages[0]?.content ?? '', /Treat empty fields as unknown/);
     assert.ok(messages[1]?.content.includes(`Stage personality: ${promptStageLabel[stage]}.`));
   }
+});
+
+test('messagesForChat labels and includes the core idea context fields', () => {
+  const idea = newIdea({
+    title: 'Offline garden planner',
+    pitch: 'Plan a small garden without a cloud account.',
+    stage: 'sprout',
+    fullNotes: 'Raw notes about seed rotations and low-connectivity use.',
+    hook: 'A local-first planting calendar.',
+    whyItMightWork: 'Gardeners need reminders even when offline.',
+    risks: 'Seasonality data can be wrong by region.',
+    techStack: 'SQLite, React, and a local notification scheduler.',
+    tags: ['gardening', 'offline'],
+  });
+  const context = messagesForChat(idea, [], 'What should I think about next?')[2]?.content ?? '';
+
+  assert.match(context, /"fullNotes": "Raw notes about seed rotations/);
+  assert.match(context, /"hook": "A local-first planting calendar."/);
+  assert.match(context, /"whyItMightWork": "Gardeners need reminders even when offline."/);
+  assert.match(context, /"techStack": "SQLite, React, and a local notification scheduler."/);
+  assert.match(context, /"fullNotes": "The Spark \/ Raw Notes"/);
+  assert.match(context, /"hook": "Concept"/);
+  assert.match(context, /"filledFields"/);
 });
 
 test('field suggestion prompts adapt expectations by stage', () => {
