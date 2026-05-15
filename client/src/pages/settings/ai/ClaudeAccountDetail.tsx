@@ -1,7 +1,7 @@
 /**
  * ClaudeAccountDetail — login + model config for Claude account-based access.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Info } from 'lucide-react';
 import type { AiModelInfo } from '@/lib/types';
 import {
@@ -41,6 +41,7 @@ export function ClaudeAccountDetail({
   const [lastCompactEnabled, setLastCompactEnabled] = useState(compactEnabled);
   const [listedModels, setListedModels] = useState<AiModelInfo[]>([]);
   const [loginLoading, setLoginLoading] = useState(false);
+  const [loginPolling, setLoginPolling] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [loginResult, setLoginResult] = useState<ClaudeAccountLoginResult | null>(null);
   const [manualCallbackUrl, setManualCallbackUrl] = useState('');
@@ -50,11 +51,22 @@ export function ClaudeAccountDetail({
   const [saving, setSaving] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
   const [error, setError] = useState('');
+  const loginPollTimerRef = useRef<number | null>(null);
   const refreshSettings = useSettingsStore((s) => s.refresh);
   const scheduleSettingsRefresh = () => {
     for (const delayMs of [1500, 4000, 8000]) {
       window.setTimeout(() => void refreshSettings(), delayMs);
     }
+  };
+  const clearLoginPollTimer = () => {
+    if (loginPollTimerRef.current !== null) {
+      window.clearTimeout(loginPollTimerRef.current);
+      loginPollTimerRef.current = null;
+    }
+  };
+  const stopLoginStatusPolling = () => {
+    clearLoginPollTimer();
+    setLoginPolling(false);
   };
 
   if (compactEnabled !== lastCompactEnabled) {
@@ -97,6 +109,50 @@ export function ClaudeAccountDetail({
     return () => window.clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    if (authenticated) clearLoginPollTimer();
+  }, [authenticated]);
+
+  useEffect(() => () => clearLoginPollTimer(), []);
+
+  const startLoginStatusPolling = () => {
+    stopLoginStatusPolling();
+    const startedAt = Date.now();
+    setLoginPolling(true);
+
+    const poll = async () => {
+      if (!available) {
+        stopLoginStatusPolling();
+        return;
+      }
+
+      try {
+        const status = await getClaudeAccountStatus();
+        setExpiresAt(status.expiresAt ?? null);
+        if (status.authenticated) {
+          rememberAccountAuth('claude-account');
+          onStatusChange?.('connected');
+          await refreshSettings();
+          scheduleSettingsRefresh();
+          stopLoginStatusPolling();
+          return;
+        }
+        onStatusChange?.('key-needed');
+      } catch {
+        // Keep polling briefly; the callback server may still be exchanging tokens.
+      }
+
+      if (Date.now() - startedAt >= 120_000) {
+        stopLoginStatusPolling();
+        return;
+      }
+
+      loginPollTimerRef.current = window.setTimeout(poll, 2000);
+    };
+
+    loginPollTimerRef.current = window.setTimeout(poll, 2000);
+  };
+
   const handleStartLogin = async () => {
     if (!available) return;
     setLoginLoading(true);
@@ -105,6 +161,7 @@ export function ClaudeAccountDetail({
       const result = await startClaudeAccountLogin();
       setLoginResult(result);
       window.open(result.authorizationUrl, '_blank', 'noopener');
+      if (!result.manualFallback) startLoginStatusPolling();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       onStatusChange?.('unreachable');
@@ -123,6 +180,7 @@ export function ClaudeAccountDetail({
     setCompleting(true);
     setError('');
     try {
+      stopLoginStatusPolling();
       await completeClaudeAccountLogin(callbackUrl);
       setManualCallbackUrl('');
       await refreshStatus();
@@ -138,6 +196,7 @@ export function ClaudeAccountDetail({
     setLogoutLoading(true);
     setError('');
     try {
+      stopLoginStatusPolling();
       await logoutClaudeAccount();
       forgetAccountAuth('claude-account');
       await refreshSettings();
@@ -226,7 +285,9 @@ export function ClaudeAccountDetail({
               <p>
                 {loginResult.manualFallback
                   ? 'Manual callback is required in this environment.'
-                  : 'Browser sign-in opened in a new tab.'}
+                  : loginPolling
+                    ? 'Browser sign-in opened in a new tab. Waiting for Claude to finish linking…'
+                    : 'Browser sign-in opened in a new tab. After the callback page says Claude is linked, return here.'}
               </p>
               {loginResult.manualReason && (
                 <p className="text-ink-500">{loginResult.manualReason}</p>
@@ -236,12 +297,12 @@ export function ClaudeAccountDetail({
 
           <div className="space-y-2 p-2 bg-paper-warm border border-ink-100 rounded">
             <label className="block text-[11px] text-ink-600">
-              Callback URL
+              Manual callback URL
               <input
                 type="text"
                 value={manualCallbackUrl}
                 onChange={(event) => setManualCallbackUrl(event.target.value)}
-                placeholder="Paste the full redirect URL from your browser"
+                placeholder="Only paste this if the callback tab cannot reach Seedbank"
                 className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-xs text-ink-800"
               />
             </label>
