@@ -23,7 +23,7 @@ function claudeConfig(): AiStoredConfig {
       'cloud-openai-compatible': {} as AiStoredConfig['providerInstances']['cloud-openai-compatible'],
     },
     openaiModel: 'gpt-4.1-mini',
-    anthropicModel: 'claude-sonnet-4-20250514',
+    anthropicModel: 'claude-sonnet-4-6',
     claudeAccountModel: 'claude-sonnet-latest',
     codexAccountModel: 'codex-recommended',
     ollamaModel: 'llama3.2',
@@ -68,7 +68,7 @@ test('Claude catalog requests include account-beta identity headers', { concurre
       refreshToken: 'refresh-1',
       expiresAt: Date.now() + 60_000,
       tokenType: 'Bearer',
-      scope: 'user:inference',
+      scope: 'user:inference user:sessions:claude_code',
       obtainedAt: Date.now(),
     });
 
@@ -76,7 +76,7 @@ test('Claude catalog requests include account-beta identity headers', { concurre
     const calls: Array<{ url: string; headers: Headers }> = [];
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       calls.push({ url: String(input), headers: new Headers(init?.headers) });
-      return new Response(JSON.stringify({ data: [{ id: 'claude-sonnet-4-20250514' }] }), {
+      return new Response(JSON.stringify({ data: [{ id: 'claude-sonnet-4-6' }] }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -104,7 +104,7 @@ test('Claude account inference requests include account-beta identity headers', 
       refreshToken: 'refresh-2',
       expiresAt: Date.now() + 60_000,
       tokenType: 'Bearer',
-      scope: 'user:inference',
+      scope: 'user:inference user:sessions:claude_code',
       obtainedAt: Date.now(),
     });
 
@@ -119,7 +119,7 @@ test('Claude account inference requests include account-beta identity headers', 
       if (String(input).includes('/v1/models')) {
         return new Response(JSON.stringify({
           data: [{
-            id: 'claude-sonnet-latest',
+            id: 'claude-sonnet-4-6',
             capabilities: {
               context_management: true,
               compact: true,
@@ -147,7 +147,11 @@ test('Claude account inference requests include account-beta identity headers', 
     const request = calls.find((call) => call.url === 'https://api.anthropic.com/v1/messages');
     assert.ok(request, 'expected one inference request');
     assert.equal(request.url, 'https://api.anthropic.com/v1/messages');
-    assert.equal(request.headers.get('anthropic-beta'), 'claude-code-20250219,oauth-2025-04-20,context-management-2025-06-27,compact-2026-01-12');
+    assert.equal(request.headers.get('anthropic-beta'), 'claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14,context-management-2025-06-27,compact-2026-01-12');
+    assert.equal((request.body as { model?: string }).model, 'claude-sonnet-4-6');
+    assert.deepEqual((request.body as { system?: unknown }).system, [
+      { type: 'text', text: "You are Claude Code, Anthropic's official CLI for Claude." },
+    ]);
     assert.equal(request.headers.get('x-app'), 'cli');
     assert.match(request.headers.get('user-agent') ?? '', /Claude|Seedbank|Codex/i);
     assert.deepEqual((request.body as { context_management?: { edits?: Array<{ type?: string }> } }).context_management?.edits?.map((edit) => edit.type), [
@@ -166,7 +170,7 @@ test('Claude account compact can be explicitly disabled while retaining prompt c
       refreshToken: 'refresh-compact-off',
       expiresAt: Date.now() + 60_000,
       tokenType: 'Bearer',
-      scope: 'user:inference',
+      scope: 'user:inference user:sessions:claude_code',
       obtainedAt: Date.now(),
     });
 
@@ -181,7 +185,7 @@ test('Claude account compact can be explicitly disabled while retaining prompt c
       if (String(input).includes('/v1/models')) {
         return new Response(JSON.stringify({
           data: [{
-            id: 'claude-sonnet-latest',
+            id: 'claude-sonnet-4-6',
             capabilities: {
               context_management: true,
               compact: true,
@@ -208,9 +212,106 @@ test('Claude account compact can be explicitly disabled while retaining prompt c
 
     const request = calls.find((call) => call.url === 'https://api.anthropic.com/v1/messages');
     assert.ok(request, 'expected one inference request');
-    assert.equal(request.headers.get('anthropic-beta'), 'claude-code-20250219,oauth-2025-04-20');
+    assert.equal((request.body as { model?: string }).model, 'claude-sonnet-4-6');
+    assert.equal(request.headers.get('anthropic-beta'), 'claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14');
     assert.equal('context_management' in (request.body as Record<string, unknown>), false);
     assert.deepEqual((request.body as { cache_control?: unknown }).cache_control, { type: 'ephemeral' });
+  });
+});
+
+test('Claude account request includes selected reasoning effort', { concurrency: false }, async () => {
+  await withAuthSnapshot(async () => {
+    await saveTokens({
+      accessToken: 'token-effort',
+      refreshToken: 'refresh-effort',
+      expiresAt: Date.now() + 60_000,
+      tokenType: 'Bearer',
+      scope: 'user:inference user:sessions:claude_code',
+      obtainedAt: Date.now(),
+    });
+
+    const originalFetch = globalThis.fetch;
+    const calls: Array<{ url: string; body?: unknown }> = [];
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({
+        url: String(input),
+        body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined,
+      });
+      if (String(input).includes('/v1/models')) {
+        return new Response(JSON.stringify({
+          data: [{
+            id: 'claude-sonnet-4-6',
+            capabilities: { context_management: true },
+          }],
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response(JSON.stringify({ content: [{ text: 'ok' }], usage: { input_tokens: 1, output_tokens: 1 } }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }) as typeof fetch;
+
+    try {
+      const provider = new ClaudeAccountProvider();
+      await provider.complete(
+        [{ role: 'user', content: 'hello' }],
+        { ...claudeConfig(), claudeReasoningEffort: 'medium' },
+      );
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    const request = calls.find((call) => call.url === 'https://api.anthropic.com/v1/messages');
+    assert.ok(request, 'expected one inference request');
+    assert.deepEqual((request.body as { output_config?: unknown }).output_config, { effort: 'medium' });
+    assert.deepEqual((request.body as { thinking?: unknown }).thinking, { type: 'adaptive', display: 'summarized' });
+    assert.equal((request.body as { max_tokens?: number }).max_tokens, 16_384);
+  });
+});
+
+test('Claude account rate limit surfaces as actionable 429', { concurrency: false }, async () => {
+  await withAuthSnapshot(async () => {
+    await saveTokens({
+      accessToken: 'token-rate-limit',
+      refreshToken: 'refresh-rate-limit',
+      expiresAt: Date.now() + 60_000,
+      tokenType: 'Bearer',
+      scope: 'user:inference user:sessions:claude_code',
+      obtainedAt: Date.now(),
+    });
+
+    const originalFetch = globalThis.fetch;
+    let inferenceCalls = 0;
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      if (String(input).includes('/v1/models')) {
+        return new Response(JSON.stringify({ data: [{ id: 'claude-sonnet-4-6' }] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      inferenceCalls += 1;
+      return new Response('Error', { status: 429, headers: { 'Retry-After': '0' } });
+    }) as typeof fetch;
+
+    try {
+      const provider = new ClaudeAccountProvider();
+      await assert.rejects(
+        () => provider.complete([{ role: 'user', content: 'hello' }], claudeConfig()),
+        (error: unknown) => {
+          const err = error as { status?: number; statusCode?: number; message?: string };
+          assert.equal(err.status, 429);
+          assert.equal(err.statusCode, 429);
+          assert.match(err.message ?? '', /rate or usage limit/i);
+          return true;
+        },
+      );
+      assert.equal(inferenceCalls, 3);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 });
 
@@ -232,7 +333,7 @@ test('Claude account listModels surfaces refresh failures instead of false logou
       refreshToken: 'refresh-stale',
       expiresAt: Date.now() - 1_000,
       tokenType: 'Bearer',
-      scope: 'user:inference',
+      scope: 'user:inference user:sessions:claude_code',
       obtainedAt: Date.now() - 60_000,
     });
 
@@ -500,7 +601,7 @@ test('ensureLiveTokens refreshes expired Claude token with single-flight lock', 
       refreshToken: 'refresh-token',
       expiresAt: Date.now() - 5_000,
       tokenType: 'Bearer',
-      scope: 'user:inference',
+      scope: 'user:inference user:sessions:claude_code',
       obtainedAt: Date.now() - 60_000,
     });
 
@@ -516,7 +617,7 @@ test('ensureLiveTokens refreshes expired Claude token with single-flight lock', 
           refresh_token: 'refresh-token-next',
           expires_in: 3600,
           token_type: 'Bearer',
-          scope: 'user:inference',
+          scope: 'user:inference user:sessions:claude_code',
         }), { status: 200, headers: { 'Content-Type': 'application/json' } });
       }
       throw new Error(`Unexpected fetch URL in test: ${url}`);
@@ -545,7 +646,7 @@ test('ensureLiveTokens surfaces refresh/network failures distinctly from signed-
       refreshToken: 'refresh-token',
       expiresAt: Date.now() - 5_000,
       tokenType: 'Bearer',
-      scope: 'user:inference',
+      scope: 'user:inference user:sessions:claude_code',
       obtainedAt: Date.now() - 60_000,
     });
 

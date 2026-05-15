@@ -5,7 +5,7 @@
  * config/settings so they are never exported, backed up, or sent to the
  * browser. File is mode 0600, parent dir created as needed.
  *
- * Shape mirrors the sibling Archon implementation but uses the Seedbank
+ * Shape mirrors the native Claude account implementation but uses the Seedbank
  * data dir.
  */
 

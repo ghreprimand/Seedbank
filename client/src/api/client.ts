@@ -777,6 +777,9 @@ export interface ClaudeAccountStatus {
   authenticated: boolean;
   expiresAt: number | null;
   obtainedAt: number | null;
+  missingScopes?: string[];
+  grantedScope?: string | null;
+  reauthRequired?: boolean;
 }
 
 export interface ClaudeAccountLoginResult {

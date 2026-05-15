@@ -280,8 +280,18 @@ export function registerAiRoutes(
       return;
     }
     const { setCachedClaudeAccountAuth } = await import('./service.js');
+    const { validateClaudeAccountScopes, ClaudeAccountScopeError } = await import('./claude-account/oauth.js');
     const tokens = await loadTokens();
-    const authenticated = tokens !== null && tokens.expiresAt > Date.now();
+    let scopeError: InstanceType<typeof ClaudeAccountScopeError> | null = null;
+    if (tokens) {
+      try {
+        validateClaudeAccountScopes(tokens.scope);
+      } catch (error) {
+        if (error instanceof ClaudeAccountScopeError) scopeError = error;
+        else throw error;
+      }
+    }
+    const authenticated = tokens !== null && tokens.expiresAt > Date.now() && scopeError === null;
     setCachedClaudeAccountAuth(authenticated);
     if (authenticated) await aiService.refreshDiscoveredModels('claude-account');
     res.json({
@@ -289,6 +299,9 @@ export function registerAiRoutes(
       authenticated,
       expiresAt: tokens?.expiresAt ?? null,
       obtainedAt: tokens?.obtainedAt ?? null,
+      missingScopes: scopeError?.missingScopes ?? [],
+      grantedScope: scopeError?.grantedScope ?? tokens?.scope ?? null,
+      reauthRequired: scopeError !== null,
     });
   }));
 

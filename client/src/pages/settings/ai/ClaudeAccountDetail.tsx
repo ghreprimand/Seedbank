@@ -47,6 +47,8 @@ export function ClaudeAccountDetail({
   const [manualCallbackUrl, setManualCallbackUrl] = useState('');
   const [completing, setCompleting] = useState(false);
   const [expiresAt, setExpiresAt] = useState<number | null>(null);
+  const [reauthRequired, setReauthRequired] = useState(false);
+  const [missingScopes, setMissingScopes] = useState<string[]>([]);
   const [now, setNow] = useState(() => Date.now());
   const [saving, setSaving] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
@@ -85,6 +87,8 @@ export function ClaudeAccountDetail({
     try {
       const status = await getClaudeAccountStatus();
       setExpiresAt(status.expiresAt ?? null);
+      setReauthRequired(status.reauthRequired === true);
+      setMissingScopes(status.missingScopes ?? []);
       if (status.authenticated) rememberAccountAuth('claude-account');
       onStatusChange?.(status.authenticated ? 'connected' : 'key-needed');
       await refreshSettings();
@@ -129,6 +133,8 @@ export function ClaudeAccountDetail({
       try {
         const status = await getClaudeAccountStatus();
         setExpiresAt(status.expiresAt ?? null);
+        setReauthRequired(status.reauthRequired === true);
+        setMissingScopes(status.missingScopes ?? []);
         if (status.authenticated) {
           rememberAccountAuth('claude-account');
           onStatusChange?.('connected');
@@ -261,6 +267,14 @@ export function ClaudeAccountDetail({
               </span>
             </div>
           )}
+          {reauthRequired && (
+            <div className="flex items-center gap-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
+              <span className="font-semibold">Re-login required</span>
+              <span>
+                — Your Claude login is missing {missingScopes.join(', ') || 'required Claude Code'} scope.
+              </span>
+            </div>
+          )}
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
@@ -377,13 +391,13 @@ export function ClaudeAccountDetail({
               discoveredModels={modelOptions}
               value={localModel}
               onChange={setLocalModel}
-              placeholder="claude-sonnet-latest"
+              placeholder="claude-sonnet-4-6"
               className="mt-0.5 block w-full rounded border border-neutral-300 bg-paper px-2 py-1 text-[12px] font-mono text-ink-800"
             />
           </label>
           <p className="text-[10px] text-neutral-500">
-            Use an alias like <code>claude-sonnet-latest</code> or a specific version like{' '}
-            <code>claude-sonnet-4-20250514</code>.
+            Use a specific version like <code>claude-sonnet-4-6</code>. Legacy aliases such as{' '}
+            <code>claude-sonnet-latest</code> are resolved server-side when possible.
           </p>
           {compactSupported && (
             <label className="flex items-start gap-2 rounded border border-neutral-200 bg-neutral-50 px-2 py-1.5 text-[11px] text-neutral-700">

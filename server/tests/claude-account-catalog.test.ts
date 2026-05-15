@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { saveTokens } from '../src/ai/claude-account/auth.js';
-import { getCatalog, resetCatalogCacheForTests } from '../src/ai/claude-account/catalog.js';
+import { getCatalog, resetCatalogCacheForTests, resolveClaudeAccountModel } from '../src/ai/claude-account/catalog.js';
 import { ClaudeAccountProvider } from '../src/ai/providers.js';
 import { withClaudeAuthSnapshot as withAuthSnapshot } from './helpers/claudeAuthSnapshot.js';
 import type { AiStoredConfig } from '../src/ai/types.js';
@@ -20,7 +20,7 @@ function claudeConfig(): AiStoredConfig {
       'cloud-openai-compatible': {} as AiStoredConfig['providerInstances']['cloud-openai-compatible'],
     },
     openaiModel: 'gpt-4.1-mini',
-    anthropicModel: 'claude-sonnet-4-20250514',
+    anthropicModel: 'claude-sonnet-4-6',
     claudeAccountModel: 'claude-sonnet-latest',
     codexAccountModel: 'codex-recommended',
     ollamaModel: 'llama3.2',
@@ -65,7 +65,7 @@ test('Claude catalog parsing includes aliases and capability metadata', { concur
       refreshToken: 'refresh-cat-1',
       expiresAt: Date.now() + 60_000,
       tokenType: 'Bearer',
-      scope: 'user:inference',
+      scope: 'user:inference user:sessions:claude_code',
       obtainedAt: Date.now(),
     });
 
@@ -114,6 +114,43 @@ test('Claude catalog parsing includes aliases and capability metadata', { concur
   });
 });
 
+test('Claude account legacy latest aliases resolve to concrete Messages API model IDs', { concurrency: false }, async () => {
+  await withAuthSnapshot(async () => {
+    await saveTokens({
+      accessToken: 'token-cat-resolve',
+      refreshToken: 'refresh-cat-resolve',
+      expiresAt: Date.now() + 60_000,
+      tokenType: 'Bearer',
+      scope: 'user:inference user:sessions:claude_code',
+      obtainedAt: Date.now(),
+    });
+
+    resetCatalogCacheForTests();
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      if (String(input).includes('/v1/models')) {
+        return new Response(JSON.stringify({
+          data: [
+            { id: 'claude-3-7-sonnet-20250219', display_name: 'Claude Sonnet 3.7' },
+            { id: 'claude-sonnet-4-6', display_name: 'Claude Sonnet 4.6' },
+          ],
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      throw new Error(`Unexpected URL: ${String(input)}`);
+    }) as typeof fetch;
+
+    try {
+      assert.equal(await resolveClaudeAccountModel('claude-sonnet-latest'), 'claude-sonnet-4-6');
+      assert.equal(await resolveClaudeAccountModel('sonnet'), 'claude-sonnet-4-6');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+});
+
 test('Claude catalog serves stale cached data when live refresh fails', { concurrency: false }, async () => {
   await withAuthSnapshot(async () => {
     await saveTokens({
@@ -121,7 +158,7 @@ test('Claude catalog serves stale cached data when live refresh fails', { concur
       refreshToken: 'refresh-cat-2',
       expiresAt: Date.now() + 60_000,
       tokenType: 'Bearer',
-      scope: 'user:inference',
+      scope: 'user:inference user:sessions:claude_code',
       obtainedAt: Date.now(),
     });
 
@@ -157,7 +194,7 @@ test('Claude catalog surfaces refresh failures when no cache exists', { concurre
       refreshToken: 'refresh-expired',
       expiresAt: Date.now() - 1_000,
       tokenType: 'Bearer',
-      scope: 'user:inference',
+      scope: 'user:inference user:sessions:claude_code',
       obtainedAt: Date.now() - 60_000,
     });
 
@@ -183,7 +220,7 @@ test('Claude provider listModels maps catalog capabilities into model metadata',
       refreshToken: 'refresh-cat-3',
       expiresAt: Date.now() + 60_000,
       tokenType: 'Bearer',
-      scope: 'user:inference',
+      scope: 'user:inference user:sessions:claude_code',
       obtainedAt: Date.now(),
     });
 

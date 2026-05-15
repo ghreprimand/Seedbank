@@ -12,6 +12,7 @@ const REFRESH_INTERVAL_MS = 60 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 15_000;
 const CLAUDE_ACCOUNT_BETA_HEADER = 'claude-code-20250219,oauth-2025-04-20';
 const CLAUDE_ACCOUNT_USER_AGENT = 'claude-cli/2.1.75';
+export const DEFAULT_CLAUDE_ACCOUNT_MODEL = 'claude-sonnet-4-6';
 
 export interface ClaudeCatalogModel {
   id: string;
@@ -37,12 +38,14 @@ export interface ClaudeCatalogSnapshot {
 
 // Known models for offline/unauthenticated fallback.
 const BUNDLED_MODELS: ClaudeCatalogModel[] = [
+  { id: DEFAULT_CLAUDE_ACCOUNT_MODEL, displayName: 'Claude Sonnet 4.6', friendlyAlias: 'Sonnet 4.6', aliases: ['sonnet-4.6', 'sonnet-latest', 'sonnet', 'claude-sonnet-latest'], supportsThinking: true, supportsVision: true, supportsContextManagement: true, supportsCompact: true, supportsPromptCaching: true, supportedReasoningEfforts: ['low', 'medium', 'high'], maxInputTokens: 1_000_000, maxOutputTokens: 64_000 },
   { id: 'claude-sonnet-4-20250514', displayName: 'Claude Sonnet 4', friendlyAlias: 'Sonnet 4', aliases: ['sonnet-4'], supportsThinking: true, supportsVision: true, supportedReasoningEfforts: ['low', 'medium', 'high'] },
-  { id: 'claude-sonnet-latest', displayName: 'Claude Sonnet (latest)', friendlyAlias: 'Sonnet (latest)', aliases: ['sonnet-latest', 'sonnet'], supportsThinking: true, supportsVision: true, supportedReasoningEfforts: ['low', 'medium', 'high'] },
-  { id: 'claude-haiku-3-5-20241022', displayName: 'Claude 3.5 Haiku', friendlyAlias: 'Haiku 3.5', aliases: ['haiku-3.5'], supportsThinking: false, supportsVision: true },
-  { id: 'claude-haiku-latest', displayName: 'Claude Haiku (latest)', friendlyAlias: 'Haiku (latest)', aliases: ['haiku-latest', 'haiku'], supportsThinking: false, supportsVision: true },
+  { id: 'claude-3-7-sonnet-20250219', displayName: 'Claude Sonnet 3.7', friendlyAlias: 'Sonnet 3.7', aliases: ['claude-3-7-sonnet-latest', '3-7-sonnet-latest'], supportsThinking: true, supportsVision: true, supportedReasoningEfforts: ['low', 'medium', 'high'] },
+  { id: 'claude-haiku-4-5-20251001', displayName: 'Claude Haiku 4.5', friendlyAlias: 'Haiku 4.5', aliases: ['claude-haiku-4-5', 'haiku-4.5', 'haiku-latest', 'haiku'], supportsThinking: true, supportsVision: true, supportedReasoningEfforts: ['low', 'medium', 'high'] },
+  { id: 'claude-3-5-haiku-20241022', displayName: 'Claude 3.5 Haiku', friendlyAlias: 'Haiku 3.5', aliases: ['claude-3-5-haiku-latest', 'haiku-3.5'], supportsThinking: false, supportsVision: true },
+  { id: 'claude-opus-4-7', displayName: 'Claude Opus 4.7', friendlyAlias: 'Opus 4.7', aliases: ['opus-4.7', 'opus-latest', 'opus', 'claude-opus-latest'], supportsThinking: true, supportsVision: true, supportedReasoningEfforts: ['low', 'medium', 'high'] },
+  { id: 'claude-opus-4-1-20250805', displayName: 'Claude Opus 4.1', friendlyAlias: 'Opus 4.1', aliases: ['opus-4.1', 'opus-latest', 'opus', 'claude-opus-latest'], supportsThinking: true, supportsVision: true, supportedReasoningEfforts: ['low', 'medium', 'high'] },
   { id: 'claude-opus-4-20250514', displayName: 'Claude Opus 4', friendlyAlias: 'Opus 4', aliases: ['opus-4'], supportsThinking: true, supportsVision: true, supportedReasoningEfforts: ['low', 'medium', 'high'] },
-  { id: 'claude-opus-latest', displayName: 'Claude Opus (latest)', friendlyAlias: 'Opus (latest)', aliases: ['opus-latest', 'opus'], supportsThinking: true, supportsVision: true, supportedReasoningEfforts: ['low', 'medium', 'high'] },
 ];
 
 // Friendly alias derivation from model ID patterns
@@ -64,10 +67,65 @@ function deriveAliases(id: string, friendlyAlias?: string): string[] {
   const aliases: string[] = [];
   if (friendlyAlias) aliases.push(friendlyAlias.toLowerCase().replace(/[()]/g, '').replace(/\s+/g, '-'));
   if (id.startsWith('claude-')) aliases.push(id.replace(/^claude-/, ''));
-  if (id.includes('sonnet-latest')) aliases.push('sonnet-latest', 'sonnet');
-  if (id.includes('opus-latest')) aliases.push('opus-latest', 'opus');
-  if (id.includes('haiku-latest')) aliases.push('haiku-latest', 'haiku');
+  if (id.includes('sonnet')) aliases.push('sonnet');
+  if (id.includes('opus')) aliases.push('opus');
+  if (id.includes('haiku')) aliases.push('haiku');
   return [...new Set(aliases.map((item) => item.trim()).filter(Boolean))];
+}
+
+function modelDateScore(id: string): number {
+  const match = /(\d{8})(?!.*\d{8})/.exec(id);
+  return match ? Number.parseInt(match[1], 10) : 0;
+}
+
+function modelFamilyScore(id: string): number {
+  const version = /-(\d+)-(\d+)(?:-\d{8})?$/.exec(id);
+  if (version) {
+    return Number.parseInt(version[1] ?? '0', 10) * 100 + Number.parseInt(version[2] ?? '0', 10);
+  }
+  if (/-4-\d{8}$/.test(id)) return 400;
+  return 0;
+}
+
+function pickLatestFamilyModel(models: ClaudeCatalogModel[], family: 'sonnet' | 'opus' | 'haiku'): ClaudeCatalogModel | undefined {
+  return [...models]
+    .filter((model) => model.id.toLowerCase().includes(family))
+    .filter((model) => !model.id.toLowerCase().endsWith('-latest'))
+    .sort((a, b) => {
+      const familyDiff = modelFamilyScore(b.id) - modelFamilyScore(a.id);
+      if (familyDiff !== 0) return familyDiff;
+      return modelDateScore(b.id) - modelDateScore(a.id);
+    })[0];
+}
+
+function normalizedAlias(value: string | undefined): string {
+  return value?.trim().toLowerCase() ?? '';
+}
+
+/**
+ * Resolves user-facing Claude account aliases to concrete model IDs accepted by
+ * the Messages API. Seedbank historically defaulted to `claude-sonnet-latest`,
+ * which is not a stable public Messages API alias, so treat it as a virtual
+ * convenience name and route it to the best Sonnet snapshot in the live catalog.
+ */
+export async function resolveClaudeAccountModel(requested: string | undefined): Promise<string> {
+  const raw = requested?.trim() || DEFAULT_CLAUDE_ACCOUNT_MODEL;
+  const normalized = normalizedAlias(raw);
+  const catalog = await getCatalog();
+  if (normalized === 'claude-sonnet-latest' || normalized === 'sonnet-latest' || normalized === 'sonnet') {
+    return pickLatestFamilyModel(catalog.models, 'sonnet')?.id ?? DEFAULT_CLAUDE_ACCOUNT_MODEL;
+  }
+  if (normalized === 'claude-opus-latest' || normalized === 'opus-latest' || normalized === 'opus') {
+    return pickLatestFamilyModel(catalog.models, 'opus')?.id ?? 'claude-opus-4-7';
+  }
+  if (normalized === 'claude-haiku-latest' || normalized === 'haiku-latest' || normalized === 'haiku') {
+    return pickLatestFamilyModel(catalog.models, 'haiku')?.id ?? 'claude-3-5-haiku-20241022';
+  }
+  return catalog.models.find((model) => (
+    normalizedAlias(model.id) === normalized
+    || normalizedAlias(model.friendlyAlias) === normalized
+    || model.aliases?.some((alias) => normalizedAlias(alias) === normalized)
+  ))?.id ?? raw;
 }
 
 function normalizeEfforts(value: unknown): Array<'low' | 'medium' | 'high'> | undefined {

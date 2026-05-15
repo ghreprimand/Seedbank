@@ -526,7 +526,7 @@ export default function AiAgentsTab() {
                 icon="🟣"
                 isDefault={ai.provider === 'claude-account'}
                 status={claudeAccountStatus}
-                modelLabel={ai.claudeAccountModel || 'claude-sonnet-latest'}
+                modelLabel={ai.claudeAccountModel || 'claude-sonnet-4-6'}
                 discoveredModelCount={ai.providerInstances['claude-account']?.discoveredModels?.length}
                 discoveredModels={ai.providerInstances['claude-account']?.discoveredModels}
                 onSetDefault={() => void setDefaultProvider('claude-account')}
@@ -539,7 +539,7 @@ export default function AiAgentsTab() {
                 )}
               >
                 <ClaudeAccountDetail
-                  model={ai.claudeAccountModel || 'claude-sonnet-latest'}
+                  model={ai.claudeAccountModel || 'claude-sonnet-4-6'}
                   compactEnabled={ai.claudeAccountCompact !== false}
                   onSave={saveClaudeAccount}
                   authenticated={ai.claudeAccountAuthenticated}

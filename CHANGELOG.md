@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- No changes yet.
+- Fixed Claude account routing so Seedbank uses the same Claude Code-compatible OAuth scopes and request shape as the working native Claude path: concrete Sonnet 4.6 model IDs, block-form system prompts, adaptive thinking, interleaved-thinking/context-management beta headers, high default effort for adaptive Claude models, transient retry handling, and a longer account request timeout.
+- Claude account status now detects older narrow-scope OAuth grants and asks for re-login instead of showing the provider as healthy until inference fails.
 
 ## 1.0.1 — macOS App Launcher Fix
 
