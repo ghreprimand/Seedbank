@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Project drafting
+
+- Hardened project-draft response parsing so Codex-style JSON-like output with unquoted keys or trailing commas no longer fails before files can be shown.
+- Added regression coverage proving project drafting works with sparse ideas and still filters unsafe file paths.
+
 ### Claude account reauth
 
 - Improved Claude account reauth UX so Seedbank watches for the local OAuth callback after opening the Claude sign-in tab and refreshes account status automatically.
