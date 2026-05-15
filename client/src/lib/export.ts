@@ -5,7 +5,7 @@
  * to both Markdown and JSON formats.
  */
 
-import type { Idea, IdeaVersion, IdeaLink } from '@/lib/types';
+import type { Idea, IdeaVersion, IdeaLink, LandscapeReport, StageTransition } from '@/lib/types';
 import { CATEGORY_LABELS, STAGE_LABELS, STAGE_ICONS } from '@/lib/types';
 import { exportArchive, getAllIdeas } from '@/api/client';
 import { db } from '@/db';
@@ -82,7 +82,7 @@ export function ideaToMarkdown(idea: Idea): string {
     lines.push(`> **Mood:** ${idea.moodLabels.join(', ')}  `);
   }
   lines.push(`> **Excitement:** ${renderScore(idea.excitementScore)}  `);
-  lines.push(`> **Jam Suitability:** ${renderScore(idea.jamScore)}  `);
+  lines.push(`> **Feasibility:** ${renderScore(idea.jamScore)}  `);
   lines.push(`> **Planted:** ${formatDate(idea.createdAt)}  `);
   lines.push(`> **Last tended:** ${formatDate(idea.updatedAt)}`);
   lines.push('');
@@ -135,6 +135,22 @@ export function ideaToMarkdown(idea: Idea): string {
     lines.push('');
   }
 
+  // Aesthetic
+  if (idea.aesthetic.trim()) {
+    lines.push('## Aesthetic & Style');
+    lines.push('');
+    lines.push(idea.aesthetic.trim());
+    lines.push('');
+  }
+
+  // Retrospective
+  if (idea.retrospective.trim()) {
+    lines.push('## Retrospective');
+    lines.push('');
+    lines.push(idea.retrospective.trim());
+    lines.push('');
+  }
+
   // Links
   if (idea.links.length) {
     lines.push(`## Links & References`);
@@ -179,6 +195,8 @@ export interface SeedbankArchive {
   exportedAt: string;
   ideas: Idea[];
   versions: IdeaVersion[];
+  stageTransitions?: StageTransition[];
+  landscapeReports?: LandscapeReport[];
 }
 
 /**

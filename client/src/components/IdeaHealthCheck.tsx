@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
 import { Activity, CheckCircle2, RefreshCw, AlertCircle } from 'lucide-react';
-import type { Idea } from '@/lib/types';
+import type { Idea, Stage } from '@/lib/types';
+import { STAGE_LABELS } from '@/lib/types';
 import { aiSuggest } from '@/api/client';
+import { assessReadiness } from '@/lib/stageReadiness';
 
 interface FieldAssessment {
   label: string;
@@ -13,19 +15,19 @@ interface FieldAssessment {
 function assessIdea(idea: Idea): FieldAssessment[] {
   return [
     {
-      label: 'Pitch',
+      label: 'Elevator Pitch',
       value: idea.pitch,
       status: idea.pitch.trim().length >= 40 ? 'strong' : 'needs-attention',
       note: idea.pitch.trim() ? 'Present, but it may need sharper stakes.' : 'Missing a one-line explanation.',
     },
     {
-      label: 'Hook',
+      label: 'Concept',
       value: idea.hook,
       status: idea.hook.trim().length >= 30 ? 'strong' : 'needs-attention',
-      note: idea.hook.trim() ? 'There is a demo angle to test.' : 'Needs a concrete 30-second demo concept.',
+      note: idea.hook.trim() ? 'There is a clear concept to build around.' : 'Needs a plain-language explanation of what this is.',
     },
     {
-      label: 'Why It Might Work',
+      label: 'The Case',
       value: idea.whyItMightWork,
       status: idea.whyItMightWork.trim().length >= 40 ? 'strong' : 'needs-attention',
       note: idea.whyItMightWork.trim() ? 'Has supporting reasoning.' : 'Needs the case for why this is worth building.',
@@ -37,7 +39,7 @@ function assessIdea(idea: Idea): FieldAssessment[] {
       note: idea.risks.trim() ? 'Risks are visible enough to discuss.' : 'Missing failure modes or blockers.',
     },
     {
-      label: 'Tech Stack',
+      label: 'Build Notes',
       value: idea.techStack,
       status: idea.techStack.trim().length >= 15 ? 'strong' : 'needs-attention',
       note: idea.techStack.trim() ? 'Implementation direction exists.' : 'Needs likely tools or constraints.',
@@ -60,8 +62,9 @@ function fallbackSummary(idea: Idea, fields: FieldAssessment[]): string {
   return `${idea.title || 'This idea'} has strength in ${strong.join(', ') || 'its core spark'}, but needs attention in ${weak.join(', ')}. Start with the weakest field that would make the idea easier to judge.`;
 }
 
-export default function IdeaHealthCheck({ idea }: { idea: Idea }) {
+export default function IdeaHealthCheck({ idea, onPromote }: { idea: Idea; onPromote?: (nextStage: Stage) => void }) {
   const fields = useMemo(() => assessIdea(idea), [idea]);
+  const readiness = useMemo(() => assessReadiness(idea), [idea]);
   const [summary, setSummary] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -71,7 +74,8 @@ export default function IdeaHealthCheck({ idea }: { idea: Idea }) {
       const result = await aiSuggest('health-check', {
         idea,
         fields,
-        instruction: 'Return a holistic assessment of strong fields and fields needing attention.',
+        readiness,
+        instruction: 'Return a stage-aware assessment: prioritize what matters for the current stage and next-stage readiness.',
       });
       setSummary(result.text);
     } catch {
@@ -103,6 +107,36 @@ export default function IdeaHealthCheck({ idea }: { idea: Idea }) {
           Check
         </button>
       </div>
+
+      {readiness.nextStage !== idea.stage && (
+        readiness.ready ? (
+          <div className="mb-4 px-3 py-2.5 bg-sage-50 border border-sage-200 rounded-card flex items-center justify-between gap-3">
+            <p className="text-xs text-sage-800">
+              Ready for <strong>{STAGE_LABELS[readiness.nextStage]}</strong>.
+            </p>
+            {onPromote && (
+              <button
+                type="button"
+                onClick={() => onPromote(readiness.nextStage)}
+                className="px-2.5 py-1 text-[11px] font-medium bg-sage-600 hover:bg-sage-700 text-white rounded-badge transition-colors"
+              >
+                Promote
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="mb-4 px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-card">
+            <p className="text-xs text-amber-900 mb-1.5">
+              Not ready for <strong>{STAGE_LABELS[readiness.nextStage]}</strong> yet.
+            </p>
+            <ul className="space-y-1">
+              {readiness.missing.map((item) => (
+                <li key={item} className="text-xs text-amber-800">• {item}</li>
+              ))}
+            </ul>
+          </div>
+        )
+      )}
 
       {summary && (
         <div className="mb-4 px-3 py-2.5 bg-amber-50 border border-amber-100 rounded-card text-sm text-amber-900 leading-relaxed">

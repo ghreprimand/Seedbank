@@ -10,6 +10,7 @@ import type {
   AiMethodCapability,
   AiPreflightRequest,
   AiProjectDraftRequest,
+  AiLandscapeAnalysisRequest,
   AiProviderInstanceId,
   AiReasoningEffort,
   AiSuggestionField,
@@ -33,9 +34,18 @@ function clientKey(req: Request): string {
   return req.ip || req.socket.remoteAddress || 'local';
 }
 
-const AI_SUGGESTION_FIELDS: readonly AiSuggestionField[] = ['pitch', 'fullNotes', 'risks', 'techStack', 'hook', 'whyItMightWork'];
-const AI_SUGGESTION_FIELD_ERROR = 'field must be one of pitch, fullNotes, risks, techStack, hook, or whyItMightWork.';
-const AI_FEATURE_IDS: readonly AiFeatureId[] = ['thinking-partner', 'field-suggestions', 'health-check', 'discover-insights', 'project-drafting', 'default'];
+const AI_SUGGESTION_FIELDS: readonly AiSuggestionField[] = [
+  'pitch',
+  'fullNotes',
+  'risks',
+  'techStack',
+  'hook',
+  'whyItMightWork',
+  'aesthetic',
+  'retrospective',
+];
+const AI_SUGGESTION_FIELD_ERROR = 'field must be one of pitch, fullNotes, risks, techStack, hook, whyItMightWork, aesthetic, or retrospective.';
+const AI_FEATURE_IDS: readonly AiFeatureId[] = ['thinking-partner', 'field-suggestions', 'health-check', 'discover-insights', 'landscape-analysis', 'project-drafting', 'default'];
 const AI_REASONING_EFFORTS: readonly AiReasoningEffort[] = ['minimal', 'low', 'medium', 'high'];
 const AI_TEXT_VERBOSITIES: readonly AiTextVerbosity[] = ['low', 'medium', 'high'];
 
@@ -545,6 +555,43 @@ export function registerAiRoutes(
     }
 
     res.json(await aiService.draftProject(
+      {
+        ideaId: ideaId.value,
+        ...(prompt.value?.trim() ? { prompt: prompt.value.trim() } : {}),
+        providerInstanceId: parseProviderInstanceId(body.providerInstanceId),
+        ...(model.value?.trim() ? { model: model.value.trim() } : {}),
+        effort: parseAiReasoningEffort(body.effort),
+        verbosity: parseAiTextVerbosity(body.verbosity),
+      },
+      clientKey(req),
+      aiConfirmationToken.value,
+    ));
+  }));
+
+  app.post('/api/ai/landscape-analysis', requireScope('ai:suggest'), asyncRoute(async (req, res) => {
+    const body = (req.body ?? {}) as Partial<AiLandscapeAnalysisRequest>;
+    const ideaId = requiredString(body.ideaId, 'ideaId');
+    const prompt = optionalString(body.prompt, 'prompt');
+    const aiConfirmationToken = optionalString(body.aiConfirmationToken, 'aiConfirmationToken');
+    const model = optionalString(body.model, 'model');
+    if (!ideaId.ok) {
+      res.status(400).json({ error: ideaId.error });
+      return;
+    }
+    if (!prompt.ok) {
+      res.status(400).json({ error: prompt.error });
+      return;
+    }
+    if (!aiConfirmationToken.ok) {
+      res.status(400).json({ error: aiConfirmationToken.error });
+      return;
+    }
+    if (!model.ok) {
+      res.status(400).json({ error: model.error });
+      return;
+    }
+
+    res.json(await aiService.landscapeAnalysis(
       {
         ideaId: ideaId.value,
         ...(prompt.value?.trim() ? { prompt: prompt.value.trim() } : {}),

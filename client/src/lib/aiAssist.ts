@@ -21,6 +21,8 @@ export const FIELD_LABELS: Record<string, string> = {
   whyItMightWork: 'Why It Might Work',
   risks: 'Risks & Blockers',
   techStack: 'Tech Stack Notes',
+  aesthetic: 'Aesthetic & Style',
+  retrospective: 'Retrospective',
 };
 
 // ── Intent types ──────────────────────────────────────────────────────────────
@@ -83,10 +85,10 @@ export const BUILTIN_PLAYBOOKS: AiPlaybook[] = [
     fields: ['pitch', 'hook'],
   },
   {
-    id: 'jam',
-    label: 'Jam / hackathon',
-    description: 'Smallest version that ships in a weekend.',
-    promptPrefix: 'Rewrite this with a hackathon lens. What is the smallest, most concrete version that could ship in 48 hours?',
+    id: 'scope-down',
+    label: 'Scope down',
+    description: 'Smallest feasible version you could build.',
+    promptPrefix: 'Rewrite this with a feasibility lens. What is the smallest, most concrete version that could realistically be built?',
     fields: ['pitch', 'hook', 'techStack'],
   },
   {

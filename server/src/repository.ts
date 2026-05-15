@@ -1,15 +1,19 @@
 import type Database from 'better-sqlite3';
 import { v4 as uuid } from 'uuid';
 import type {
+  AiLandscapeAnalysisSections,
   Category,
   Idea,
   IdeaFilters,
   IdeaSnapshot,
+  StageTransition,
   IdeaVersion,
+  LandscapeReport,
   SortDirection,
   SortField,
   Stage,
 } from '../../shared/types.js';
+import { STAGES } from '../../shared/types.js';
 import {
   autoVersionLabel,
   hasContentChanged,
@@ -20,6 +24,7 @@ import {
   type IdeaInput,
   type VersionInput,
 } from './domain.js';
+import { parseLandscapeAnalysis } from './ai/prompts.js';
 
 interface IdeaRow {
   id: string;
@@ -34,6 +39,8 @@ interface IdeaRow {
   why_it_might_work: string;
   risks: string;
   tech_stack: string;
+  aesthetic: string;
+  retrospective: string;
   jam_score: number;
   excitement_score: number;
   related_idea_ids: string;
@@ -54,6 +61,24 @@ interface VersionRow {
   snapshot: string;
 }
 
+interface StageTransitionRow {
+  id: string;
+  idea_id: string;
+  from_stage: Stage;
+  to_stage: Stage;
+  transitioned_at: string;
+  auto: number;
+}
+
+interface LandscapeReportRow {
+  id: string;
+  idea_id: string;
+  sections: string;
+  provider: string;
+  model: string;
+  created_at: string;
+}
+
 export interface ListIdeasOptions extends IdeaFilters {
   includeDeleted?: boolean;
   page?: number;
@@ -70,6 +95,8 @@ export interface ListIdeasResult {
 export interface ImportArchive {
   ideas?: IdeaInput[];
   versions?: VersionInput[];
+  stageTransitions?: StageTransitionInput[];
+  landscapeReports?: LandscapeReportInput[];
 }
 
 export interface ImportResult {
@@ -84,6 +111,15 @@ interface SettingRow {
   value_json: string;
   updated_at: string;
 }
+
+export type StageTransitionInput = Partial<Omit<StageTransition, 'transitionedAt' | 'auto'>> & {
+  transitionedAt?: Date | string;
+  auto?: boolean | number;
+};
+
+export type LandscapeReportInput = Partial<Omit<LandscapeReport, 'createdAt'>> & {
+  createdAt?: Date | string;
+};
 
 function parseJson<T>(value: string, fallback: T): T {
   try {
@@ -111,6 +147,8 @@ function ideaFromRow(row: IdeaRow): Idea {
     whyItMightWork: row.why_it_might_work,
     risks: row.risks,
     techStack: row.tech_stack,
+    aesthetic: row.aesthetic,
+    retrospective: row.retrospective,
     jamScore: row.jam_score,
     excitementScore: row.excitement_score,
     relatedIdeaIds: parseJson<string[]>(row.related_idea_ids, []),
@@ -134,6 +172,42 @@ function versionFromRow(row: VersionRow): IdeaVersion {
   };
 }
 
+function stageTransitionFromRow(row: StageTransitionRow): StageTransition {
+  return {
+    id: row.id,
+    ideaId: row.idea_id,
+    fromStage: row.from_stage,
+    toStage: row.to_stage,
+    transitionedAt: new Date(row.transitioned_at),
+    auto: row.auto === 1,
+  };
+}
+
+function landscapeSectionsFromJson(value: string): AiLandscapeAnalysisSections {
+  const sections = parseLandscapeAnalysis(value);
+  if (
+    !sections.existingAlternatives &&
+    !sections.gapsAndPainPoints &&
+    !sections.demandSignals &&
+    !sections.positioningAngle &&
+    sections.overallViability.trim().startsWith('{')
+  ) {
+    return parseLandscapeAnalysis(sections.overallViability);
+  }
+  return sections;
+}
+
+function landscapeReportFromRow(row: LandscapeReportRow): LandscapeReport {
+  return {
+    id: row.id,
+    ideaId: row.idea_id,
+    sections: landscapeSectionsFromJson(row.sections),
+    provider: row.provider,
+    model: row.model,
+    createdAt: new Date(row.created_at),
+  };
+}
+
 function ideaParams(idea: Idea) {
   return {
     id: idea.id,
@@ -148,6 +222,8 @@ function ideaParams(idea: Idea) {
     whyItMightWork: idea.whyItMightWork,
     risks: idea.risks,
     techStack: idea.techStack,
+    aesthetic: idea.aesthetic,
+    retrospective: idea.retrospective,
     jamScore: idea.jamScore,
     excitementScore: idea.excitementScore,
     relatedIdeaIds: JSON.stringify(idea.relatedIdeaIds),
@@ -171,10 +247,99 @@ function versionParams(version: IdeaVersion) {
   };
 }
 
+function stageTransitionParams(transition: StageTransition) {
+  return {
+    id: transition.id,
+    ideaId: transition.ideaId,
+    fromStage: transition.fromStage,
+    toStage: transition.toStage,
+    transitionedAt: transition.transitionedAt.toISOString(),
+    auto: transition.auto ? 1 : 0,
+  };
+}
+
+function landscapeReportParams(report: LandscapeReport) {
+  return {
+    id: report.id,
+    ideaId: report.ideaId,
+    sections: JSON.stringify(report.sections),
+    provider: report.provider,
+    model: report.model,
+    createdAt: report.createdAt.toISOString(),
+  };
+}
+
 function splitParam(value: unknown): string[] | undefined {
   if (Array.isArray(value)) return value.flatMap((item) => splitParam(item) ?? []);
   if (typeof value !== 'string' || !value.trim()) return undefined;
   return value.split(',').map((item) => item.trim()).filter(Boolean);
+}
+
+function stageFrom(value: unknown): Stage | undefined {
+  return typeof value === 'string' && STAGES.includes(value as Stage)
+    ? value as Stage
+    : undefined;
+}
+
+function normalizeStageTransition(input: StageTransitionInput, fallbackIdeaId: string): StageTransition {
+  const fromStage = stageFrom(input.fromStage);
+  const toStage = stageFrom(input.toStage);
+  if (!fromStage || !toStage) {
+    throw new Error(`Invalid stage transition for idea ${fallbackIdeaId}: from=${String(input.fromStage)} to=${String(input.toStage)}.`);
+  }
+
+  const at = input.transitionedAt instanceof Date
+    ? input.transitionedAt
+    : new Date(input.transitionedAt ?? new Date());
+  if (Number.isNaN(at.getTime())) {
+    throw new Error(`Invalid stage transition timestamp for idea ${fallbackIdeaId}.`);
+  }
+
+  return {
+    id: typeof input.id === 'string' && input.id.trim() ? input.id.trim() : uuid(),
+    ideaId: typeof input.ideaId === 'string' && input.ideaId.trim() ? input.ideaId.trim() : fallbackIdeaId,
+    fromStage,
+    toStage,
+    transitionedAt: at,
+    auto: input.auto === true || input.auto === 1,
+  };
+}
+
+function normalizeLandscapeReport(input: LandscapeReportInput, fallbackIdeaId: string): LandscapeReport {
+  const ideaId = typeof input.ideaId === 'string' && input.ideaId.trim()
+    ? input.ideaId.trim()
+    : fallbackIdeaId;
+  if (!ideaId) throw new Error('Invalid landscape report: missing ideaId.');
+
+  const at = input.createdAt instanceof Date
+    ? input.createdAt
+    : new Date(input.createdAt ?? new Date());
+  if (Number.isNaN(at.getTime())) {
+    throw new Error(`Invalid landscape report timestamp for idea ${ideaId}.`);
+  }
+
+  const sections = input.sections ?? {
+    existingAlternatives: '',
+    gapsAndPainPoints: '',
+    demandSignals: '',
+    positioningAngle: '',
+    overallViability: '',
+  };
+
+  return {
+    id: typeof input.id === 'string' && input.id.trim() ? input.id.trim() : uuid(),
+    ideaId,
+    sections: {
+      existingAlternatives: typeof sections.existingAlternatives === 'string' ? sections.existingAlternatives : '',
+      gapsAndPainPoints: typeof sections.gapsAndPainPoints === 'string' ? sections.gapsAndPainPoints : '',
+      demandSignals: typeof sections.demandSignals === 'string' ? sections.demandSignals : '',
+      positioningAngle: typeof sections.positioningAngle === 'string' ? sections.positioningAngle : '',
+      overallViability: typeof sections.overallViability === 'string' ? sections.overallViability : '',
+    },
+    provider: typeof input.provider === 'string' ? input.provider : '',
+    model: typeof input.model === 'string' ? input.model : '',
+    createdAt: at,
+  };
 }
 
 function sortIdeas(ideas: Idea[], sortBy: SortField, sortDirection: SortDirection): Idea[] {
@@ -211,11 +376,11 @@ export class SeedbankRepository {
     this.db.prepare(`
       INSERT INTO ideas (
         id, title, pitch, category, stage, tags, mood_labels, full_notes, hook,
-        why_it_might_work, risks, tech_stack, jam_score, excitement_score,
+        why_it_might_work, risks, tech_stack, aesthetic, retrospective, jam_score, excitement_score,
         related_idea_ids, links, images, created_at, updated_at, deleted_at, graduated_to
       ) VALUES (
         @id, @title, @pitch, @category, @stage, @tags, @moodLabels, @fullNotes, @hook,
-        @whyItMightWork, @risks, @techStack, @jamScore, @excitementScore,
+        @whyItMightWork, @risks, @techStack, @aesthetic, @retrospective, @jamScore, @excitementScore,
         @relatedIdeaIds, @links, @images, @createdAt, @updatedAt, @deletedAt, @graduatedTo
       )
       ON CONFLICT(id) DO UPDATE SET
@@ -230,6 +395,8 @@ export class SeedbankRepository {
         why_it_might_work = excluded.why_it_might_work,
         risks = excluded.risks,
         tech_stack = excluded.tech_stack,
+        aesthetic = excluded.aesthetic,
+        retrospective = excluded.retrospective,
         jam_score = excluded.jam_score,
         excitement_score = excluded.excitement_score,
         related_idea_ids = excluded.related_idea_ids,
@@ -249,10 +416,43 @@ export class SeedbankRepository {
     `).run(versionParams(version));
   }
 
+  private insertStageTransition(transition: StageTransition) {
+    this.db.prepare(`
+      INSERT OR REPLACE INTO stage_transitions (id, idea_id, from_stage, to_stage, transitioned_at, auto)
+      VALUES (@id, @ideaId, @fromStage, @toStage, @transitionedAt, @auto)
+    `).run(stageTransitionParams(transition));
+  }
+
+  private insertLandscapeReport(report: LandscapeReport) {
+    this.db.prepare(`
+      INSERT OR REPLACE INTO landscape_reports (id, idea_id, sections, provider, model, created_at)
+      VALUES (@id, @ideaId, @sections, @provider, @model, @createdAt)
+    `).run(landscapeReportParams(report));
+  }
+
   createIdea(input: IdeaInput = {}): Idea {
     const idea = newIdea(input);
     this.insertOrReplaceIdea(idea);
     return idea;
+  }
+
+  recordStageTransition(
+    ideaId: string,
+    fromStage: Stage,
+    toStage: Stage,
+    auto = false,
+    transitionedAt = new Date(),
+  ): StageTransition {
+    const transition: StageTransition = {
+      id: uuid(),
+      ideaId,
+      fromStage,
+      toStage,
+      transitionedAt,
+      auto,
+    };
+    this.insertStageTransition(transition);
+    return transition;
   }
 
   getIdea(id: string, includeDeleted = false): Idea | undefined {
@@ -267,6 +467,54 @@ export class SeedbankRepository {
     const row = this.db.prepare('SELECT COUNT(*) AS count FROM versions WHERE idea_id = ?')
       .get(ideaId) as { count: number };
     return row.count;
+  }
+
+  getStageTransitions(ideaId: string): StageTransition[] {
+    return (
+      this.db.prepare('SELECT * FROM stage_transitions WHERE idea_id = ? ORDER BY transitioned_at ASC')
+        .all(ideaId) as StageTransitionRow[]
+    ).map(stageTransitionFromRow);
+  }
+
+  getStageTimeline(ideaId: string): StageTransition[] {
+    return this.getStageTransitions(ideaId);
+  }
+
+  saveLandscapeReport(
+    ideaId: string,
+    sections: AiLandscapeAnalysisSections,
+    provider: string,
+    model: string,
+  ): LandscapeReport {
+    const report: LandscapeReport = {
+      id: uuid(),
+      ideaId,
+      sections,
+      provider,
+      model,
+      createdAt: new Date(),
+    };
+    this.insertLandscapeReport(report);
+    return report;
+  }
+
+  getLatestLandscapeReport(ideaId: string): LandscapeReport | null {
+    const row = this.db.prepare(`
+      SELECT * FROM landscape_reports
+      WHERE idea_id = ?
+      ORDER BY created_at DESC
+      LIMIT 1
+    `).get(ideaId) as LandscapeReportRow | undefined;
+    return row ? landscapeReportFromRow(row) : null;
+  }
+
+  getLandscapeReportHistory(ideaId: string): LandscapeReport[] {
+    const rows = this.db.prepare(`
+      SELECT * FROM landscape_reports
+      WHERE idea_id = ?
+      ORDER BY created_at DESC
+    `).all(ideaId) as LandscapeReportRow[];
+    return rows.map(landscapeReportFromRow);
   }
 
   listIdeas(options: ListIdeasOptions = {}): ListIdeasResult {
@@ -347,6 +595,9 @@ export class SeedbankRepository {
       }
 
       this.insertOrReplaceIdea(updated);
+      if (existing.stage !== updated.stage) {
+        this.recordStageTransition(id, existing.stage, updated.stage, false, updated.updatedAt);
+      }
       return updated;
     });
 
@@ -363,6 +614,8 @@ export class SeedbankRepository {
 
   purgeIdea(id: string): boolean {
     const purge = this.db.transaction(() => {
+      this.db.prepare('DELETE FROM landscape_reports WHERE idea_id = ?').run(id);
+      this.db.prepare('DELETE FROM stage_transitions WHERE idea_id = ?').run(id);
       this.db.prepare('DELETE FROM versions WHERE idea_id = ?').run(id);
       const result = this.db.prepare('DELETE FROM ideas WHERE id = ?').run(id);
       return result.changes > 0;
@@ -491,12 +744,33 @@ export class SeedbankRepository {
     };
   }
 
+  private getStageTransitionsForIdeas(ideaIds: string[]): StageTransition[] {
+    if (ideaIds.length === 0) return [];
+    const placeholders = ideaIds.map(() => '?').join(', ');
+    const rows = this.db.prepare(
+      `SELECT * FROM stage_transitions WHERE idea_id IN (${placeholders}) ORDER BY idea_id, transitioned_at ASC`,
+    ).all(...ideaIds) as StageTransitionRow[];
+    return rows.map(stageTransitionFromRow);
+  }
+
+  private getLandscapeReportsForIdeas(ideaIds: string[]): LandscapeReport[] {
+    if (ideaIds.length === 0) return [];
+    const placeholders = ideaIds.map(() => '?').join(', ');
+    const rows = this.db.prepare(
+      `SELECT * FROM landscape_reports WHERE idea_id IN (${placeholders}) ORDER BY idea_id, created_at DESC`,
+    ).all(...ideaIds) as LandscapeReportRow[];
+    return rows.map(landscapeReportFromRow);
+  }
+
   exportArchive(includeDeleted = false) {
+    const ideas = this.listIdeas({ includeDeleted, limit: 500 }).items;
     return {
       seedbankVersion: 1,
       exportedAt: new Date().toISOString(),
-      ideas: this.listIdeas({ includeDeleted, limit: 500 }).items,
+      ideas,
       versions: (this.db.prepare('SELECT * FROM versions ORDER BY timestamp DESC').all() as VersionRow[]).map(versionFromRow),
+      stageTransitions: this.getStageTransitionsForIdeas(ideas.map((idea) => idea.id)),
+      landscapeReports: this.getLandscapeReportsForIdeas(ideas.map((idea) => idea.id)),
     };
   }
 
@@ -510,6 +784,8 @@ export class SeedbankRepository {
 
     const runImport = this.db.transaction(() => {
       if (mode === 'replace') {
+        this.db.prepare('DELETE FROM landscape_reports').run();
+        this.db.prepare('DELETE FROM stage_transitions').run();
         this.db.prepare('DELETE FROM versions').run();
         this.db.prepare('DELETE FROM ideas').run();
       }
@@ -545,6 +821,44 @@ export class SeedbankRepository {
           }
           this.insertVersion(normalizeVersion(rawVersion, idea));
           result.versionsImported += 1;
+        } catch (err) {
+          result.warnings.push(err instanceof Error ? err.message : String(err));
+        }
+      }
+
+      for (const rawTransition of archive.stageTransitions ?? []) {
+        try {
+          const fallbackIdeaId = typeof rawTransition.ideaId === 'string' ? rawTransition.ideaId : '';
+          const transition = normalizeStageTransition(rawTransition, fallbackIdeaId);
+          const idea = this.getIdea(transition.ideaId, true);
+          if (!idea) {
+            result.warnings.push(
+              `Skipped stage transition ${transition.id} for missing idea ${transition.ideaId}.`,
+            );
+            continue;
+          }
+          this.insertStageTransition(transition);
+        } catch (err) {
+          result.warnings.push(err instanceof Error ? err.message : String(err));
+        }
+      }
+
+      for (const rawReport of archive.landscapeReports ?? []) {
+        try {
+          const fallbackIdeaId = typeof rawReport.ideaId === 'string' ? rawReport.ideaId : '';
+          const report = normalizeLandscapeReport(rawReport, fallbackIdeaId);
+          const idea = this.getIdea(report.ideaId, true);
+          if (!idea) {
+            result.warnings.push(
+              `Skipped landscape report ${report.id} for missing idea ${report.ideaId}.`,
+            );
+            continue;
+          }
+          if (mode === 'merge') {
+            const existing = this.db.prepare('SELECT id FROM landscape_reports WHERE id = ?').get(report.id);
+            if (existing) continue;
+          }
+          this.insertLandscapeReport(report);
         } catch (err) {
           result.warnings.push(err instanceof Error ? err.message : String(err));
         }

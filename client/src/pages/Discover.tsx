@@ -57,7 +57,7 @@ const STORAGE_PROMPTS = [
   'Has anything changed that makes this more viable now?',
   'Could this idea be simpler than you originally imagined?',
   'Is there a smaller version hiding inside this?',
-  'Would this make a good jam project?',
+  'How feasible is this to build right now?',
 ];
 
 function pickRandom<T>(arr: T[]): T {

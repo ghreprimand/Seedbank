@@ -81,6 +81,7 @@ export const AI_FEATURE_ROWS: Array<{
   { id: 'field-suggestions', label: 'Field suggestions', detail: 'Ask AI on idea fields' },
   { id: 'health-check',      label: 'Health Check',      detail: 'AI summary on idea readiness' },
   { id: 'discover-insights', label: 'Discover insights', detail: 'Pattern analysis and cross-pollination' },
+  { id: 'landscape-analysis', label: 'Landscape analysis', detail: 'Idea viability and market landscape assessment' },
   { id: 'project-drafting',  label: 'Project drafting',  detail: 'Reviewable project files from an idea' },
   // 'default' only applies to unnamed/future AI features — does NOT cascade to known features.
   {
@@ -98,6 +99,7 @@ export const FEATURE_LABELS: Record<AiFeatureId, string> = {
   'field-suggestions': 'Field suggestions',
   'health-check':      'Health Check',
   'discover-insights': 'Discover insights',
+  'landscape-analysis': 'Landscape analysis',
   'project-drafting':  'Project drafting',
   'default':           'Other / default',
 };
@@ -123,6 +125,7 @@ export const FEATURE_IDS: AiFeatureId[] = [
   'field-suggestions',
   'health-check',
   'discover-insights',
+  'landscape-analysis',
   'project-drafting',
 ];
 
@@ -150,5 +153,6 @@ export const ROUTE_LABELS: Record<string, string> = {
   'field-suggestions:conversation': 'Field suggestions (chat)',
   'health-check':                   'Health Check',
   'discover-insights':              'Discover insights',
+  'landscape-analysis':             'Landscape analysis',
   'project-drafting':               'Project drafting',
 };

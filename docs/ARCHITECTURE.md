@@ -43,6 +43,8 @@ npm run lint
 Primary DB tables:
 - `ideas`
 - `versions`
+- `stage_transitions`
+- `landscape_reports`
 - `settings`
 - `ai_*` usage/conversation tables
 - `api_tokens` (`server/migrations/003_api_tokens.sql`)
@@ -53,6 +55,72 @@ Primary DB tables:
 - `api.webhooks`
 - `integration:<adapter-id>` (one namespaced key per registered adapter; for example `integration:generic-project`)
 - backup keys (`backup.config`, `backup.lastRun`)
+
+## Stage Lifecycle Architecture
+
+Stage lifecycle behavior is now a first-class architecture layer, not only a UI label:
+
+- Stage DB keys stay stable (`seed`, `sprout`, `pitch`, `prototype`, `plot`, `shelved`, `cold-storage`, `shipped`) while display labels are garden-themed:
+  - `pitch` displays as **Bloom**
+  - `prototype` displays as **Greenhouse**
+  - `shelved` displays as **Dormant**
+  - `shipped` displays as **Market**
+
+- `stage_transitions` table (`server/migrations/008_stage_transitions.sql`) stores append-only stage-change history:
+  - `id` (PK)
+  - `idea_id` (FK)
+  - `from_stage`
+  - `to_stage`
+  - `transitioned_at`
+  - `auto` (boolean)
+- Repository layer writes transition records on stage changes and exposes timeline queries (`recordStageTransition`, `getStageTransitions`, `getStageTimeline`).
+- API route `GET /api/ideas/:id/stage-transitions` returns chronological transition history for Idea Detail timeline UI.
+- Shared readiness module `shared/stageReadiness.ts` centralizes promotion criteria and powers:
+  - Idea health-check readiness checklist
+  - promotion nudges
+  - stage-aware health-check prompt context
+- Progressive disclosure field map (`shared/types.ts`) now includes lifecycle-only fields:
+  - `aesthetic` (introduced at Plot)
+  - `retrospective` (introduced for Market retrospectives and available in all-fields lifecycle stages)
+- Progressive disclosure now follows an additive maturity map:
+  - Seed: title, The Spark, tags, mood, excitement, landscape analysis
+  - Sprout: + Concept
+  - Bloom: + The Case, Elevator Pitch
+  - Greenhouse: + Risks, Build Notes
+  - Plot: + Aesthetic & Style, Feasibility, links, images, related ideas
+  - Dormant/Cold Storage/Market: all fields
+- Readiness criteria currently enforce:
+  - Seed → Sprout: The Spark >= 40 chars + at least one tag
+  - Sprout → Bloom: Concept filled
+  - Bloom → Greenhouse: The Case + Elevator Pitch filled
+  - Greenhouse → Plot: Risks + Build Notes filled
+- Board architecture now supports two views over the same filtered dataset:
+  - Grid cards (`client/src/pages/Board.tsx`)
+  - Stages swim lanes (`client/src/pages/StagesView.tsx`) with native HTML5 drag/drop stage updates
+
+## Image Gallery Storage
+
+- Migration `009_aesthetic_retrospective.sql` adds `ideas.aesthetic` and `ideas.retrospective`.
+- Idea images are uploaded through:
+  - `POST /api/ideas/:id/images`
+  - `GET /api/images/:ideaId/:filename`
+  - `DELETE /api/ideas/:id/images/:filename`
+- Files are stored under `<seedbank-data-dir>/images/<idea-id>/`.
+- The canonical reference stored in `idea.images` is the API path (`/api/images/:ideaId/:filename`).
+
+## Stage-Aware AI + Landscape Analysis
+
+Two AI architecture additions are stage/lifecycle-aware:
+
+- Stage-aware prompt assembly in `server/src/ai/prompts.ts`:
+  - `stagePersonality(stage)` injects stage-specific guidance into Thinking Partner and field-assist prompts.
+  - field-suggestion expectations adapt tone/rigor by stage (exploratory early, sharper at Bloom, practical later).
+- Landscape analysis feature route:
+  - endpoint: `POST /api/ai/landscape-analysis`
+  - feature id: `landscape-analysis`
+  - uses normal Feature Defaults routing + guardrails + confirmation + budget enforcement
+  - returns structured viability sections (`existingAlternatives`, `gapsAndPainPoints`, `demandSignals`, `positioningAngle`, `overallViability`)
+  - persists reports into `landscape_reports` for recall/review on subsequent idea-detail loads
 
 ## Settings Architecture
 
@@ -161,7 +229,7 @@ Data directory:
 ├── seedbank.db
 ├── backups/
 ├── exports/
-└── attachments/
+└── images/
 ```
 
 Backup flow supports:

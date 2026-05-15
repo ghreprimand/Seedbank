@@ -7,7 +7,7 @@ Seedbank is a **local-first, single-user app** you run on your own computer. It 
 
 Ideas are stored in a local SQLite database (`<seedbank-data-dir>/seedbank.db`). SQLite is the durable source of truth. Browser storage (IndexedDB) is used as a read-through cache for fast loads, an offline fallback when the server is unreachable, and a migration path for any ideas created before the backend was available. If you clear browser storage, your ideas are safe in the database.
 
-The app is built around the way ideas actually mature. A seed can start as a title and a messy paragraph, then gain a pitch, hook, risks, tech-stack notes, links, related ideas, scores, and version history. When an idea is ready, Seedbank can graduate it into a project scaffold via an adapter plugin.
+The app is built around the way ideas actually mature. A seed can start as a title and a messy spark, then gain Concept, The Case, Elevator Pitch, Risks, Build Notes, Aesthetic direction, links, images, related ideas, scores, and version history. When an idea is ready, Seedbank can graduate it into a project scaffold via an adapter plugin.
 
 Seedbank also includes AI-assisted development. The AI is deliberately framed as a thinking partner: it asks questions, reflects patterns, runs health checks, and helps scope ideas down. It does not try to replace your taste or generate a pile of generic ideas.
 
@@ -68,7 +68,14 @@ On Linux/macOS (bash launcher), if port `5173` is occupied the launcher will pic
 
 - **Persistent SQLite storage** — ideas live in `<seedbank-data-dir>/seedbank.db`, not only in browser storage.
 - **Version history** — meaningful edits create snapshots that can be inspected and restored.
+- **Lifecycle intelligence** — stage transitions are timestamped and shown as a per-idea timeline (Seed → Sprout, etc.) so promotion timing is visible.
+- **Progressive disclosure + readiness nudges** — early-stage ideas stay lightweight, later-stage fields unlock as ideas mature, and stage-aware readiness checklists show exactly what to complete next.
+- **Stages board view** — switch between Grid and Stages in the Garden; drag cards across stage swim lanes (with touch-friendly tap-to-move fallback).
 - **AI thinking partner** — chat, field suggestions, organic prompt modes, health checks, and archive insights.
+- **Stage-aware AI prompts** — Thinking Partner and field-assist tone adapts to the idea stage (exploratory early, sharpening at Bloom, practical at build stages, reflective for Dormant/Market states).
+- **Landscape analysis** — structured AI viability scan (alternatives, gaps, demand signals, positioning, overall viability) available from Seed stage onward.
+- **Landscape report persistence** — analyses are stored and reloaded per idea, so viability research becomes durable reference material.
+- **Image gallery at Plot stage** — upload, browse, lightbox, and delete image references as ideas move into concrete visual identity work.
 - **Ten runtime themes** — Paper, Chalk, Meadow, Dusk (light), Hearth, Rainwash (mid-depth), and Woad, Moss, Peat, Canopy (dark); switchable live from Settings → Theme, with system dark/light auto-pairing (Paper ↔ Peat).
 - **Settings page** — a permanent `/settings` home for every configuration option: AI providers, feature routing, theme, API tokens, webhooks, backups, project graduation, and app info.
 - **Contextual help mode** — bottom-right help control toggles click-anywhere contextual guidance across pages, settings, and modals, with deep links into the in-app manual.

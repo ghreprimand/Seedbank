@@ -31,6 +31,8 @@ export default function QuickCapture({ onClose, onSuccess }: QuickCaptureProps) 
         whyItMightWork: '',
         risks: '',
         techStack: '',
+        aesthetic: '',
+        retrospective: '',
         jamScore: 0,
         excitementScore: 0,
         relatedIdeaIds: [],
@@ -84,12 +86,12 @@ export default function QuickCapture({ onClose, onSuccess }: QuickCaptureProps) 
 
           <div>
             <label className="block text-[11px] font-medium text-ink-400 uppercase tracking-wider mb-1.5 font-mono">
-              Rough Notes
+              The Spark
             </label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="A few thoughts, a hook, or why it's interesting…"
+              placeholder="Brain dump your idea - rough thoughts, a scenario, whatever comes to mind..."
               className="w-full px-3 py-2.5 bg-paper-warm border border-ink-100 rounded-card
                          focus:outline-none focus:ring-2 focus:ring-sage-400 focus:border-sage-300
                          transition-all text-ink-800 text-sm min-h-[120px] resize-none

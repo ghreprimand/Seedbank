@@ -32,6 +32,8 @@ function snapshotFrom(idea: Idea): IdeaSnapshot {
     whyItMightWork: idea.whyItMightWork,
     risks: idea.risks,
     techStack: idea.techStack,
+    aesthetic: idea.aesthetic,
+    retrospective: idea.retrospective,
     jamScore: idea.jamScore,
     excitementScore: idea.excitementScore,
     links: idea.links.map((l) => ({ ...l })),
@@ -63,7 +65,9 @@ function hasContentChanged(a: IdeaSnapshot, b: IdeaSnapshot): boolean {
     a.hook.trim() !== b.hook.trim() ||
     a.whyItMightWork.trim() !== b.whyItMightWork.trim() ||
     a.risks.trim() !== b.risks.trim() ||
-    a.techStack.trim() !== b.techStack.trim()
+    a.techStack.trim() !== b.techStack.trim() ||
+    a.aesthetic.trim() !== b.aesthetic.trim() ||
+    a.retrospective.trim() !== b.retrospective.trim()
   ) {
     return true;
   }
@@ -109,6 +113,8 @@ export function newIdea(partial: Partial<Idea> = {}): Idea {
     whyItMightWork: '',
     risks: '',
     techStack: '',
+    aesthetic: '',
+    retrospective: '',
     jamScore: 0,
     excitementScore: 0,
     relatedIdeaIds: [],

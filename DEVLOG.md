@@ -4,6 +4,113 @@ Newest entries at the top.
 
 ---
 
+## 2026-05-15 — Lifecycle Release Checkpoint, Parser Hardening, and Neutral Project Context
+
+Closed the stage-lifecycle work as a committable release checkpoint and captured the late polish that happened after the main Phase 6 sweep.
+
+Final implementation notes:
+- Landscape Analysis parsing was hardened for real provider output:
+  - exact JSON string sections still map directly
+  - snake_case / alternate section keys are normalized
+  - nested objects and arrays are flattened into readable labels and bullets
+  - markdown section headers are parsed when JSON is not returned
+  - raw text falls back to Overall Viability instead of disappearing
+- Saved landscape reports are normalized on read as well, so earlier reports that were persisted as nested/raw JSON render cleanly without requiring a new AI run.
+- Project graduation now creates `AGENTS.md` instead of `CLAUDE.md`. The content is still agent-facing project context, but the file name is provider-neutral for Codex, Claude, Gemini, or any other coding assistant.
+- Project graduation copy in Settings, docs, and the in-app manual now consistently describes `README.md` + `AGENTS.md`.
+- Added a scaffold regression test that verifies `AGENTS.md` is created and `CLAUDE.md` is not.
+
+Validation at checkpoint:
+- `npm run typecheck`
+- `npm run lint -w client`
+- `npm test -w server` (110 passing)
+- `npm run build`
+
+Repository practice going forward:
+- Keep devlog updates attached to each substantial feature/fix batch.
+- Commit and push after validation rather than letting large completed work sit only in the working tree.
+- Use smaller follow-up commits for GitHub/project-folder integration work so feature review stays tractable.
+
+## 2026-05-15 — Terminology, Lifecycle UX Redistribution, and Docs Truth Sweep
+
+Completed a full docs/devlog truth sweep after the final lifecycle refinements landed. This pass reconciles naming, stage semantics, progressive disclosure behavior, and persisted AI outputs with the current implementation.
+
+What changed in-product (and is now documented consistently):
+- Stage display names were finalized to garden-native language while keeping DB stage keys unchanged:
+  - `pitch` → **Bloom**
+  - `prototype` → **Greenhouse**
+  - `shelved` → **Dormant**
+  - `shipped` → **Market**
+- Field labels now follow a deliberate cognitive arc:
+  - `fullNotes` → **The Spark** / **Raw Notes** (stage-contextual)
+  - `hook` → **Concept**
+  - `whyItMightWork` → **The Case**
+  - `pitch` → **Elevator Pitch**
+  - `techStack` → **Build Notes**
+  - `jamScore` display → **Feasibility**
+- The board language and layout are now **Stages View** (swim lanes), with a persisted `Grid | Stages` toggle.
+- Progressive disclosure was redistributed so each stage introduces meaningful new responsibilities:
+  - Seed: title, The Spark, tags, mood, excitement, landscape analysis
+  - Sprout: + Concept
+  - Bloom: + The Case, Elevator Pitch
+  - Greenhouse: + Risks, Build Notes
+  - Plot: + Aesthetic & Style, Feasibility, links, images, related ideas
+  - Dormant/Cold Storage: all core fields
+  - Market: all fields including Retrospective
+- New fields shipped:
+  - `aesthetic` (Aesthetic & Style)
+  - `retrospective` (Retrospective)
+- Image Gallery shipped as a Plot-stage capability with upload/browse/delete and lightbox flow.
+- Landscape analysis now persists to DB (`landscape_reports`) and reloads on mount, so analysis is reference material, not ephemeral output.
+- Progressive teaser behavior now includes direct stage-advance actions and stage-only reset controls.
+- AI assist language uses **Scope Down** instead of the prior jam/hackathon framing.
+- Graduated project scaffolds now create `AGENTS.md` instead of `CLAUDE.md`, keeping the starter context useful for Codex, Claude, Gemini, or any other coding assistant.
+
+Design rationale captured:
+- **Garden-themed stages:** improves conceptual consistency and makes lifecycle movement feel coherent across UI, help text, and AI stage personalities.
+- **Field relabeling:** aligns with how ideas mature mentally: spark → concept → case → pitch → build, reducing terminology friction.
+- **Swim lanes over kanban columns:** better vertical scanning for many stages, less horizontal compression, and more natural scrolling on mixed desktop/mobile usage.
+- **Disclosure redistribution:** each stage should unlock genuinely new work, not just more text boxes; this keeps early capture lightweight and later planning intentional.
+- **Landscape persistence:** viability analyses often become decision artifacts; persisting them prevents rework and supports longitudinal comparison as ideas evolve.
+- **Feasibility label:** broadens usefulness beyond hackathons and better matches long-form product or art-project evaluation.
+- **Image gallery at Plot stage:** visual identity and reference curation become most valuable once the idea enters concrete execution.
+- **AGENTS.md over CLAUDE.md:** Seedbank should not assume a specific assistant. The generated project context is agent-facing, but the file name and copy should stay provider-neutral.
+
+Documentation surfaces updated in this sweep:
+- `DEVLOG.md` (this entry), `CHANGELOG.md`, `README.md`
+- `docs/ARCHITECTURE.md`, `docs/API.md`, `docs/SETTINGS.md`, `docs/AI_GUIDE.md`
+- In-app manual and contextual help copy alignment (stage/field terminology and workflow guidance)
+
+Validation rerun after documentation updates:
+- `npm run typecheck`
+- `npm run lint -w client`
+- `npm test -w server`
+- `npm run build`
+
+## 2026-05-15 — Stage Lifecycle Enhancement Final Sweep (Phase 6)
+
+Completed the final documentation and repo-hygiene pass for the stage lifecycle rollout. This closes the loop on Phases 1-5 by making the product and architecture intent explicit everywhere users and contributors look first (manual, contextual help, docs, README, changelog, and devlog).
+
+Design rationale captured in this pass:
+- **Why stage matters:** stages now represent timeline and readiness state, not just labels. Transition timestamps and timelines make idea momentum visible over time.
+- **Progressive disclosure philosophy:** early capture should stay low-friction; users can still override and expose all fields when they need full control.
+- **Stages view choice:** native HTML5 drag/drop kept bundle weight low while making stage promotion tactile and immediately legible.
+- **AI personality tuning:** stage-aware prompt personalities keep assistance context-appropriate (exploratory at Seed, sharpening at Bloom, practical at build stages, reflective for dormant/market).
+- **Landscape analysis as early research:** viability scanning is now available from Seed stage to help users decide whether to deepen, pivot, or shelve before over-investing.
+
+Documentation updates completed:
+- In-app manual sections verified/updated for Lifecycle Stages, Health Check, Stages View, Landscape Analysis, and Stage-Aware AI notes.
+- Contextual help entries verified/updated for `idea-header`, `stage`, `health-check`, `promotion-nudge`, `stage-timeline`, `progressive-disclosure-teaser`, `stages-view`, and `landscape-analysis`.
+- `docs/ARCHITECTURE.md` now documents stage transition persistence, readiness module usage, Stages view architecture, and landscape-analysis routing.
+- `docs/SETTINGS.md` now notes the Garden `Grid | Stages` local preference (`seedbank:garden-view-mode`).
+- `docs/API.md` now includes explicit stage-transition endpoint behavior notes in addition to landscape-analysis endpoint coverage.
+- `README.md` feature list now calls out lifecycle intelligence, progressive disclosure/readiness nudges, Stages view, stage-aware AI, and landscape analysis.
+- `CHANGELOG.md` now includes a consolidated "Stage lifecycle enhancement (Phases 1-6)" release summary.
+
+Privacy/safety audit:
+- Scanned for obvious leak patterns (tokens/keys/private-key markers and machine-specific absolute paths).
+- No real credentials or machine-specific sensitive values were introduced in this documentation sweep.
+
 ## 2026-05-14 — Account Reauth Notice and Documentation Audit
 
 Implemented a non-obtrusive account reauth notice for Claude and Codex account transports. The client now remembers, per browser, whether Claude account or Codex account auth has previously succeeded. If the aggregate settings/status later show that the same account transport is available but unauthenticated, the app shell shows a persistent bottom-right notice with a direct link to Settings → AI & Agents (`/settings/ai-agents`) and a refresh action. Intentional logout from the account cards clears the remembered flag so the notice does not nag after deliberate sign-out. The reminder stores only a local boolean marker, not provider credentials.
@@ -123,11 +230,11 @@ The help system was rebuilt around a global mode instead of scattered inline pop
 Coverage expanded from sparse marker buttons to broad surface tagging across layout navigation, Garden, Discover, Compost, Idea Detail major sections, Settings shell/tabs, and key modals (quick capture, import/export, ask-AI, version history). Legacy `HelpButton` calls were kept as a compatibility bridge into the new global popover path.
 
 Documentation/manual accuracy fixes were applied directly from implementation checks (server routes + client behavior), including:
-- manual score model corrected to the two live fields (Personal Excitement + Jam Suitability),
+- manual score model corrected to the two live fields (Personal Excitement + Feasibility),
 - version-history snapshot behavior corrected (score edits are included),
 - compost purge behavior corrected (purge on Compost load path),
 - MCP docs/manual corrected to paginated `GET /api/mcp/ideas` response shape,
-- graduation manual text corrected to adapter-defined stage updates (not hard-coded Shipped),
+- graduation manual text corrected to adapter-defined stage updates (not hard-coded Market),
 - API docs expanded for current AI/account/testing/settings integration routes and settings sections,
 - settings docs corrected to runtime database filename/path conventions,
 - agents docs corrected for current AI settings navigation and removed stale Detect-only wording.

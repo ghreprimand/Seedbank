@@ -5,10 +5,15 @@ import { searchIdeas, getAllIdeas } from '@/api/client';
 import { useFilterStore } from '@/stores/filters';
 import type { Idea } from '@/lib/types';
 import IdeaCard from '@/components/IdeaCard';
+import StagesView from '@/pages/StagesView';
 import FilterBar from '@/components/FilterBar';
 import { collectTags } from '@/lib/collectTags';
 import EmptyState from '@/components/EmptyState';
 import { seedDatabase } from '@/lib/import';
+
+type GardenViewMode = 'grid' | 'stages';
+
+const GARDEN_VIEW_STORAGE_KEY = 'seedbank:garden-view-mode';
 
 export default function Board() {
   const navigate = useNavigate();
@@ -18,6 +23,10 @@ export default function Board() {
   const [filteredIdeas, setFilteredIdeas] = useState<Idea[]>([]);
   const [loading, setLoading] = useState(true);
   const [reloadKey, setReloadKey] = useState(0);
+  const [viewMode, setViewMode] = useState<GardenViewMode>(() => {
+    if (typeof window === 'undefined') return 'grid';
+    return window.localStorage.getItem(GARDEN_VIEW_STORAGE_KEY) === 'stages' ? 'stages' : 'grid';
+  });
 
   const { query, categories, stages, tags, sortBy, sortDirection } = filters;
 
@@ -49,6 +58,11 @@ export default function Board() {
       cancelled = true;
     };
   }, [query, categories, stages, tags, sortBy, sortDirection, reloadKey]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(GARDEN_VIEW_STORAGE_KEY, viewMode);
+  }, [viewMode]);
 
   const reload = () => setReloadKey((k) => k + 1);
 
@@ -92,12 +106,43 @@ export default function Board() {
     <div className="space-y-5" data-help="garden-page">
       {/* Page header */}
       <div className="animate-fade-in">
-        <h1 className="text-3xl font-serif font-semibold text-ink-900 tracking-tight">
-          The Garden
-        </h1>
-        <p className="text-ink-400 text-sm mt-0.5 font-mono">
-          {allIdeas.length} seed{allIdeas.length !== 1 ? 's' : ''} planted
-        </p>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className="text-3xl font-serif font-semibold text-ink-900 tracking-tight">
+              The Garden
+            </h1>
+            <p className="text-ink-400 text-sm mt-0.5 font-mono">
+              {allIdeas.length} seed{allIdeas.length !== 1 ? 's' : ''} planted
+            </p>
+          </div>
+          <div
+            className="inline-flex items-center rounded-pill border border-ink-100 bg-paper p-1"
+            data-help="stages-view"
+          >
+            <button
+              type="button"
+              onClick={() => setViewMode('grid')}
+              className={`px-3 py-1 text-xs rounded-pill transition-colors ${
+                viewMode === 'grid'
+                  ? 'bg-sage-600 text-paper'
+                  : 'text-ink-500 hover:bg-ink-50'
+              }`}
+            >
+              Grid
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('stages')}
+              className={`px-3 py-1 text-xs rounded-pill transition-colors ${
+                viewMode === 'stages'
+                  ? 'bg-sage-600 text-paper'
+                  : 'text-ink-500 hover:bg-ink-50'
+              }`}
+            >
+              Stages
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Filter bar */}
@@ -111,11 +156,17 @@ export default function Board() {
 
       {/* Cards grid */}
       {filteredIdeas.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" data-help="garden-grid">
-          {filteredIdeas.map((idea, i) => (
-            <IdeaCard key={idea.id} idea={idea} index={i} />
-          ))}
-        </div>
+        viewMode === 'grid'
+          ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" data-help="garden-grid">
+                {filteredIdeas.map((idea, i) => (
+                  <IdeaCard key={idea.id} idea={idea} index={i} />
+                ))}
+              </div>
+            )
+          : (
+              <StagesView ideas={filteredIdeas} onIdeasChanged={reload} />
+            )
       ) : (
         <EmptyState
           isFiltered

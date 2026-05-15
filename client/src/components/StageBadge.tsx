@@ -5,9 +5,9 @@ import { STAGE_LABELS, STAGE_ICONS } from '@/lib/types';
 /**
  * Per-stage colour classes. Gardening-themed palette:
  *  - Growth stages: sage greens (progressively deeper)
- *  - Pitch/prototype: amber & clay (active energy)
- *  - Shelved/cold-storage: frost blues (dormancy)
- *  - Shipped: amber/gold (celebration)
+ *  - Bloom/greenhouse: amber & clay (active energy)
+ *  - Dormant/cold-storage: frost blues (dormancy)
+ *  - Market: amber/gold (celebration)
  */
 const STAGE_COLORS: Record<Stage, string> = {
   'seed':         'bg-sage-50 text-sage-700 border-sage-200',

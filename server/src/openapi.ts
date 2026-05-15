@@ -25,7 +25,10 @@ export const openApiSpec: OpenAPIObject = {
           title: { type: 'string' },
           pitch: { type: 'string' },
           category: { type: 'string' },
-          stage: { type: 'string' },
+          stage: {
+            type: 'string',
+            description: 'Lifecycle stage key. Display labels: seed (Seed), sprout (Sprout), pitch (Bloom), prototype (Greenhouse), plot (Plot), shelved (Dormant), cold-storage (Cold Storage), shipped (Market).',
+          },
           tags: { type: 'array', items: { type: 'string' } },
           moodLabels: { type: 'array', items: { type: 'string' } },
           fullNotes: { type: 'string' },
@@ -33,6 +36,8 @@ export const openApiSpec: OpenAPIObject = {
           whyItMightWork: { type: 'string' },
           risks: { type: 'string' },
           techStack: { type: 'string' },
+          aesthetic: { type: 'string' },
+          retrospective: { type: 'string' },
           jamScore: { type: 'number' },
           excitementScore: { type: 'number' },
           relatedIdeaIds: { type: 'array', items: { type: 'string' } },
@@ -42,6 +47,38 @@ export const openApiSpec: OpenAPIObject = {
           updatedAt: { type: 'string', format: 'date-time' },
           deletedAt: { type: ['string', 'null'], format: 'date-time' },
           graduatedTo: { type: ['string', 'null'] },
+        },
+      },
+      StageTransition: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          ideaId: { type: 'string' },
+          fromStage: { type: 'string' },
+          toStage: { type: 'string' },
+          transitionedAt: { type: 'string', format: 'date-time' },
+          auto: { type: 'boolean' },
+        },
+      },
+      AiLandscapeAnalysisSections: {
+        type: 'object',
+        properties: {
+          existingAlternatives: { type: 'string' },
+          gapsAndPainPoints: { type: 'string' },
+          demandSignals: { type: 'string' },
+          positioningAngle: { type: 'string' },
+          overallViability: { type: 'string' },
+        },
+      },
+      LandscapeReport: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          ideaId: { type: 'string' },
+          sections: { $ref: '#/components/schemas/AiLandscapeAnalysisSections' },
+          provider: { type: 'string' },
+          model: { type: 'string' },
+          createdAt: { type: 'string', format: 'date-time' },
         },
       },
       Attachment: {
@@ -125,13 +162,46 @@ export const openApiSpec: OpenAPIObject = {
       get: { summary: 'List idea versions', security: [{ bearerAuth: [] }] },
       post: { summary: 'Create idea version', security: [{ bearerAuth: [] }] },
     },
+    '/api/ideas/{id}/stage-transitions': {
+      get: { summary: 'List stage transitions for an idea', security: [{ bearerAuth: [] }] },
+    },
+    '/api/ideas/{id}/landscape-report': {
+      get: {
+        summary: 'Get the latest saved landscape analysis report for an idea',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: {
+            description: 'Latest report, or null if none exists',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    report: {
+                      oneOf: [
+                        { $ref: '#/components/schemas/LandscapeReport' },
+                        { type: 'null' },
+                      ],
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
     '/api/ideas/{id}/versions/restore/{versionId}': {
       post: { summary: 'Restore idea version', security: [{ bearerAuth: [] }] },
     },
-    '/api/ideas/{id}/attachments': {
-      get: { summary: 'List idea attachments', 'x-stub': true },
-      post: { summary: 'Upload idea attachment', 'x-stub': true },
-      delete: { summary: 'Delete idea attachment', 'x-stub': true },
+    '/api/ideas/{id}/images': {
+      post: { summary: 'Upload an image and attach it to an idea', security: [{ bearerAuth: [] }] },
+    },
+    '/api/ideas/{id}/images/{filename}': {
+      delete: { summary: 'Delete an attached image from an idea', security: [{ bearerAuth: [] }] },
+    },
+    '/api/images/{ideaId}/{filename}': {
+      get: { summary: 'Fetch an attached image by idea and filename', security: [{ bearerAuth: [] }] },
     },
     '/api/search': {
       get: { summary: 'Search ideas', 'x-stub': true },
@@ -160,6 +230,31 @@ export const openApiSpec: OpenAPIObject = {
     },
     '/api/ai/project-draft': {
       post: { summary: 'Generate reviewable project files from an idea using the configured Project drafting AI route', security: [{ bearerAuth: [] }] },
+    },
+    '/api/ai/landscape-analysis': {
+      post: {
+        summary: 'Generate a structured AI landscape and viability analysis for an idea',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: {
+            description: 'Structured sections plus persisted report metadata',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    sections: { $ref: '#/components/schemas/AiLandscapeAnalysisSections' },
+                    provider: { type: 'string' },
+                    providerInstanceId: { type: 'string' },
+                    model: { type: 'string' },
+                    report: { $ref: '#/components/schemas/LandscapeReport' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     },
     '/api/ai/project-draft/apply': {
       post: { summary: 'Write selected reviewed project draft files into the idea graduated project path', security: [{ bearerAuth: [] }] },

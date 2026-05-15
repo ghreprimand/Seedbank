@@ -26,7 +26,7 @@ export function ideaToMarkdown(idea: Idea): string {
   if (idea.tags.length) lines.push(`> **Tags:** ${idea.tags.join(', ')}`);
   if (idea.moodLabels.length) lines.push(`> **Mood:** ${idea.moodLabels.join(', ')}`);
   lines.push(`> **Excitement:** ${idea.excitementScore}`);
-  lines.push(`> **Jam Suitability:** ${idea.jamScore}`);
+  lines.push(`> **Feasibility:** ${idea.jamScore}`);
   lines.push(`> **Planted:** ${formatDate(idea.createdAt)}`);
   lines.push(`> **Last tended:** ${formatDate(idea.updatedAt)}`);
   lines.push('');
@@ -38,6 +38,8 @@ export function ideaToMarkdown(idea: Idea): string {
     ['Why It Might Work', idea.whyItMightWork],
     ['Risks & Blockers', idea.risks],
     ['Tech Stack', idea.techStack],
+    ['Aesthetic & Style', idea.aesthetic],
+    ['Retrospective', idea.retrospective],
     ['Links & References', linksToMarkdown(idea.links)],
   ];
 
@@ -130,6 +132,8 @@ export function parseMarkdownIdea(markdown: string): IdeaInput {
   idea.whyItMightWork = sections['why it might work']?.join('\n').trim() ?? idea.whyItMightWork;
   idea.risks = sections['risks & blockers']?.join('\n').trim() ?? idea.risks;
   idea.techStack = sections['tech stack']?.join('\n').trim() ?? idea.techStack;
+  idea.aesthetic = (sections['aesthetic & style'] ?? sections.aesthetic)?.join('\n').trim() ?? idea.aesthetic;
+  idea.retrospective = sections.retrospective?.join('\n').trim() ?? idea.retrospective;
 
   const linkLines = sections['links & references'] ?? [];
   idea.links = linkLines.flatMap((line) => {

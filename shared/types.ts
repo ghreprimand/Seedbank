@@ -61,12 +61,12 @@ export const DEFAULT_CATEGORY_DEFINITIONS: CategoryDefinition[] = CATEGORIES.map
  *
  * seed        → rough / new / just captured
  * sprout      → stronger concept, some structure
- * pitch       → developed enough to explain clearly
- * prototype   → actively being built / experimented with
+ * pitch       → bloom — developed enough to explain clearly
+ * prototype   → greenhouse — actively being built / experimented with
  * plot        → full active project
- * shelved     → paused but preserved ("cold storage lite")
+ * shelved     → dormant — paused but preserved
  * cold-storage → deep archive, still searchable
- * shipped     → done, released, or completed
+ * shipped     → market — done, released, or completed
  */
 export const STAGES = [
   'seed',
@@ -85,24 +85,134 @@ export type Stage = (typeof STAGES)[number];
 export const STAGE_LABELS: Record<Stage, string> = {
   'seed': 'Seed',
   'sprout': 'Sprout',
-  'pitch': 'Pitch',
-  'prototype': 'Prototype',
+  'pitch': 'Bloom',
+  'prototype': 'Greenhouse',
   'plot': 'Plot',
-  'shelved': 'Shelved',
+  'shelved': 'Dormant',
   'cold-storage': 'Cold Storage',
-  'shipped': 'Shipped',
+  'shipped': 'Market',
 };
 
 /** Emoji/icon hints for stages (used in badges) */
 export const STAGE_ICONS: Record<Stage, string> = {
   'seed': '🌱',
   'sprout': '🌿',
-  'pitch': '📋',
-  'prototype': '🔧',
+  'pitch': '🌸',
+  'prototype': '🏡',
   'plot': '🌳',
-  'shelved': '📦',
+  'shelved': '💤',
   'cold-storage': '❄️',
-  'shipped': '🚀',
+  'shipped': '🧑‍🌾',
+};
+
+export type IdeaFieldVisibilityKey =
+  | 'title'
+  | 'pitch'
+  | 'tags'
+  | 'moodLabels'
+  | 'excitementScore'
+  | 'hook'
+  | 'whyItMightWork'
+  | 'fullNotes'
+  | 'risks'
+  | 'techStack'
+  | 'aesthetic'
+  | 'retrospective'
+  | 'jamScore'
+  | 'links'
+  | 'images'
+  | 'relatedIdeaIds'
+  | 'landscapeAnalysis';
+
+const ALL_IDEA_FIELDS: readonly IdeaFieldVisibilityKey[] = [
+  'title',
+  'fullNotes',
+  'hook',
+  'whyItMightWork',
+  'pitch',
+  'risks',
+  'techStack',
+  'aesthetic',
+  'retrospective',
+  'tags',
+  'moodLabels',
+  'excitementScore',
+  'jamScore',
+  'links',
+  'images',
+  'relatedIdeaIds',
+  'landscapeAnalysis',
+];
+
+export const IDEA_FIELD_VISIBILITY_KEYS = ALL_IDEA_FIELDS;
+
+/**
+ * Progressive disclosure field visibility by stage.
+ * The detail editor can still expose all fields via an explicit user override.
+ */
+export const STAGE_FIELD_VISIBILITY: Record<Stage, readonly IdeaFieldVisibilityKey[]> = {
+  seed: [
+    'title',
+    'fullNotes',
+    'tags',
+    'moodLabels',
+    'excitementScore',
+    'landscapeAnalysis',
+  ],
+  sprout: [
+    'title',
+    'fullNotes',
+    'hook',
+    'tags',
+    'moodLabels',
+    'excitementScore',
+    'landscapeAnalysis',
+  ],
+  pitch: [
+    'title',
+    'fullNotes',
+    'hook',
+    'whyItMightWork',
+    'pitch',
+    'tags',
+    'moodLabels',
+    'excitementScore',
+    'landscapeAnalysis',
+  ],
+  prototype: [
+    'title',
+    'fullNotes',
+    'hook',
+    'whyItMightWork',
+    'pitch',
+    'risks',
+    'techStack',
+    'tags',
+    'moodLabels',
+    'excitementScore',
+    'landscapeAnalysis',
+  ],
+  plot: [
+    'title',
+    'fullNotes',
+    'hook',
+    'whyItMightWork',
+    'pitch',
+    'risks',
+    'techStack',
+    'aesthetic',
+    'tags',
+    'moodLabels',
+    'excitementScore',
+    'jamScore',
+    'links',
+    'images',
+    'relatedIdeaIds',
+    'landscapeAnalysis',
+  ],
+  shelved: ALL_IDEA_FIELDS,
+  'cold-storage': ALL_IDEA_FIELDS,
+  shipped: ALL_IDEA_FIELDS,
 };
 
 // ── Link type ───────────────────────────────────────────────────────
@@ -151,9 +261,13 @@ export interface Idea {
   risks: string;
   /** Tech stack notes */
   techStack: string;
+  /** Visual tone, style direction, or aesthetic references */
+  aesthetic: string;
+  /** What happened after execution: lessons, outcomes, follow-ups */
+  retrospective: string;
 
   // ── Scores ──────────────────────────────────────────
-  /** Jam suitability 1–5 (0 = unscored) */
+  /** Feasibility 1–5 (0 = unscored) */
   jamScore: number;
   /** Personal excitement 1–5 (0 = unscored) */
   excitementScore: number;
@@ -173,6 +287,24 @@ export interface Idea {
   deletedAt?: Date | null;
   /** External graduation target added by integrations in later phases. */
   graduatedTo?: string | null;
+}
+
+export interface StageTransition {
+  id: string;
+  ideaId: string;
+  fromStage: Stage;
+  toStage: Stage;
+  transitionedAt: Date;
+  auto: boolean;
+}
+
+export interface LandscapeReport {
+  id: string;
+  ideaId: string;
+  sections: AiLandscapeAnalysisSections;
+  provider: string;
+  model: string;
+  createdAt: Date;
 }
 
 // ── Version snapshot ────────────────────────────────────────────────
@@ -215,6 +347,8 @@ export interface IdeaSnapshot {
   whyItMightWork: string;
   risks: string;
   techStack: string;
+  aesthetic: string;
+  retrospective: string;
   jamScore: number;
   excitementScore: number;
   links: IdeaLink[];
@@ -646,6 +780,7 @@ export type AiFeatureId =
   | 'field-suggestions'
   | 'health-check'
   | 'discover-insights'
+  | 'landscape-analysis'
   | 'project-drafting'
   | 'default';
 
@@ -754,6 +889,32 @@ export interface AiProjectDraftApplyRequest {
 export interface AiProjectDraftApplyResult {
   targetPath: string;
   filesWritten: string[];
+}
+
+export interface AiLandscapeAnalysisRequest {
+  ideaId: string;
+  prompt?: string;
+  aiConfirmationToken?: string;
+  providerInstanceId?: AiProviderInstanceId;
+  model?: string;
+  effort?: AiReasoningEffort;
+  verbosity?: AiTextVerbosity;
+}
+
+export interface AiLandscapeAnalysisSections {
+  existingAlternatives: string;
+  gapsAndPainPoints: string;
+  demandSignals: string;
+  positioningAngle: string;
+  overallViability: string;
+}
+
+export interface AiLandscapeAnalysisResult {
+  sections: AiLandscapeAnalysisSections;
+  provider: AiProviderId;
+  providerInstanceId: AiProviderInstanceId;
+  model: string;
+  report: LandscapeReport;
 }
 
 export interface AiUsageBucket {
@@ -1057,7 +1218,9 @@ export type AiSuggestionField =
   | 'risks'
   | 'techStack'
   | 'hook'
-  | 'whyItMightWork';
+  | 'whyItMightWork'
+  | 'aesthetic'
+  | 'retrospective';
 
 export interface AiSuggestion {
   field: AiSuggestionField;

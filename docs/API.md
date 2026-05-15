@@ -304,6 +304,39 @@ Scope expectations (bearer mode):
 - `POST /api/ideas/:id/versions`
 - `POST /api/ideas/:id/versions/restore/:versionId`
 
+### Stage transitions
+- `GET /api/ideas/:id/stage-transitions`
+  - Returns chronological stage-change entries for one idea (`fromStage`, `toStage`, `transitionedAt`, `auto`)
+  - Stage values remain DB keys (`pitch`, `prototype`, `shelved`, `shipped`) even when UI labels render as Bloom, Greenhouse, Dormant, and Market
+  - Used by the Idea Detail "Stage Timeline" UI
+
+### Field naming notes (API keys vs UI labels)
+
+Idea JSON uses stable API keys while the UI/manual may show friendlier labels:
+- `fullNotes` → "The Spark" / "Raw Notes"
+- `hook` → "Concept"
+- `whyItMightWork` → "The Case"
+- `pitch` → "Elevator Pitch"
+- `techStack` → "Build Notes"
+- `jamScore` → "Feasibility"
+- `aesthetic` → "Aesthetic & Style"
+- `retrospective` → "Retrospective"
+
+### Landscape reports
+- `GET /api/ideas/:id/landscape-report`
+  - Returns the latest persisted landscape report for one idea as `{ report: LandscapeReport | null }`
+  - `report` includes `id`, `ideaId`, `sections`, `provider`, `model`, and `createdAt`
+
+### Image gallery
+- `POST /api/ideas/:id/images`
+  - Uploads one image via multipart form-data field `image`
+  - Accepts `image/jpeg`, `image/png`, `image/gif`, `image/webp` up to 10MB
+  - Stores image under Seedbank data dir and appends `/api/images/:ideaId/:filename` into `idea.images`
+- `GET /api/images/:ideaId/:filename`
+  - Serves uploaded image content
+- `DELETE /api/ideas/:id/images/:filename`
+  - Removes image file and detaches it from `idea.images`
+
 ### Compost
 - `GET /api/compost`
 - `POST /api/compost/:id/restore`
@@ -336,6 +369,7 @@ Scope expectations (bearer mode):
 - `GET /api/ai/conversations/:ideaId` (`read:ideas`)
 - `POST /api/ai/suggest` (`ai:suggest`) - field suggestions accept optional `prompt`, `omitCurrentValue`, `aiConfirmationToken`, `providerInstanceId`, `model`, `effort`, and `verbosity`
 - `POST /api/ai/field-chat` (`ai:suggest`, SSE) - modal-local field assistance using the `field-suggestions` route; accepts `aiConfirmationToken` plus the same optional provider/model override fields as `POST /api/ai/suggest`
+- `POST /api/ai/landscape-analysis` (`ai:suggest`) - generates and persists a landscape report. Response includes structured `sections`, routing metadata (`provider`, `providerInstanceId`, `model`), and a saved `report` object with `id` and `createdAt`; accepts `ideaId`, optional `prompt`, `aiConfirmationToken`, `providerInstanceId`, `model`, `effort`, and `verbosity`
 - `POST /api/ai/project-draft` (`ai:suggest`) - generates reviewable project files using the `project-drafting` Feature Defaults route; accepts `ideaId`, optional `prompt`, `aiConfirmationToken`, `providerInstanceId`, `model`, `effort`, and `verbosity`
 - `POST /api/ai/project-draft/apply` (`ai:suggest`) - writes selected reviewed draft files into the idea's graduated project path when it is inside a configured project root; rejects unsafe paths and existing files
 - `POST /api/ai/chat` (`ai:suggest`, SSE) - Thinking Partner chat; accepts `aiConfirmationToken`
@@ -364,7 +398,6 @@ The provider/model override fields are request-scoped. They let a single AI requ
 ## Known Stubs in OpenAPI
 
 `server/src/openapi.ts` still marks these as stubs:
-- `/api/ideas/{id}/attachments`
 - `/api/search`
 
 These are included for planned surface compatibility but are not currently implemented as full REST routes in `server/src/index.ts`.

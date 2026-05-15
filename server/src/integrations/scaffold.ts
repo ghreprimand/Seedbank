@@ -103,9 +103,9 @@ export function readmeFor(idea: Idea, integrationName: string): string {
   ].join('\n');
 }
 
-export function claudeFor(idea: Idea, integrationName: string, extraContext = ''): string {
+export function agentGuideFor(idea: Idea, integrationName: string, extraContext = ''): string {
   return [
-    `# ${idea.title || 'Untitled Project'} - Project Context`,
+    `# ${idea.title || 'Untitled Project'} - Agent Guide`,
     '',
     `This project was graduated from Seedbank using ${integrationName}.`,
     '',
@@ -175,7 +175,7 @@ export function packageJsonFor(idea: Idea, packageName: string): string | null {
   }, null, 2) + '\n';
 }
 
-export function writeBaseScaffold(projectDir: string, idea: Idea, integrationName: string, extraClaudeContext = ''): string[] {
+export function writeBaseScaffold(projectDir: string, idea: Idea, integrationName: string, extraAgentContext = ''): string[] {
   const files: string[] = [];
   const projectName = path.basename(projectDir);
   fs.mkdirSync(projectDir, { recursive: true });
@@ -188,7 +188,7 @@ export function writeBaseScaffold(projectDir: string, idea: Idea, integrationNam
   };
 
   write('README.md', readmeFor(idea, integrationName));
-  write('CLAUDE.md', claudeFor(idea, integrationName, extraClaudeContext));
+  write('AGENTS.md', agentGuideFor(idea, integrationName, extraAgentContext));
 
   const packageJson = packageJsonFor(idea, projectName);
   if (packageJson) {
