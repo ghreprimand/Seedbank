@@ -17,10 +17,14 @@ What changed:
 - The section shows the current/new project path and links to Settings → Project Graduation when the preferred project folder has not been explicitly configured.
 - GitHub publishing now sits in the same section, so the intended flow is: generate local project files first, then create/push the GitHub repo.
 - The file generation brief field is tall enough for the default prompt, and the GitHub repo button stays disabled with a setup link until the local `gh` session is linked.
+- The section now checks the idea's GitHub link or local `origin` remote against GitHub before showing repo actions.
+- When GitHub confirms the repo already exists, Seedbank shows the repo link and an Update GitHub repo action instead of another create button.
+- Update GitHub repo stages the local project folder, commits changed files when present, configures `origin`, and pushes `main`.
 
 Safety and permissions:
 - Existing project files are not overwritten.
 - File paths still reject absolute paths, parent traversal, hidden directories, and empty files.
+- GitHub repo status and update calls still rely on `gh` CLI auth; Seedbank does not store GitHub tokens.
 - The generate endpoint requires both `ai:suggest` and `write:ideas` for bearer-token callers because it sends content to AI and updates the idea's local project path.
 
 ## 2026-05-15 — Project Draft Parser Hardening

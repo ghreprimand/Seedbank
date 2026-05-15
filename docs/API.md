@@ -393,6 +393,8 @@ The provider/model override fields are request-scoped. They let a single AI requ
 - `POST /api/integrations/:id/graduate/:ideaId` (`write:ideas`)
 - `GET /api/integrations/github/status` (`read:ideas`) - reads GitHub auth/account status via local `gh` CLI; returns linked account details when authenticated
 - `POST /api/integrations/github/publish/:ideaId` (`write:ideas`) - explicitly creates/publishes a GitHub repository from a graduated local project path; accepts `repoName`, optional `owner`, `visibility`, and `pushInitial`; returns granular publish state (`repoCreated`, `pushed`, `repoUrl`, `projectPath`)
+- `GET /api/integrations/github/repo-status/:ideaId` (`read:ideas`) - verifies the idea's saved GitHub link or local `origin` remote against GitHub and returns whether the repository currently exists
+- `POST /api/integrations/github/update/:ideaId` (`write:ideas`) - for an existing linked repository, stages local project files, commits changes when present, configures `origin`, and pushes `main`
 
 ### Import/Export
 - `POST /api/export` (`read:ideas`)

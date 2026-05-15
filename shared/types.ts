@@ -471,6 +471,33 @@ export interface GitHubPublishResult {
   idea?: Idea;
 }
 
+export interface GitHubRepoStatusResult {
+  available: boolean;
+  authenticated: boolean;
+  projectPath?: string;
+  repoKnown: boolean;
+  exists: boolean;
+  source: 'idea-link' | 'git-remote' | 'none';
+  repoUrl?: string;
+  remoteUrl?: string;
+  owner?: string;
+  name?: string;
+  private?: boolean;
+  defaultBranch?: string;
+  message: string;
+}
+
+export interface GitHubRepoUpdateResult {
+  pushed: boolean;
+  committed: boolean;
+  repoUrl: string;
+  remoteUrl?: string;
+  projectPath: string;
+  message: string;
+  error?: string;
+  idea?: Idea;
+}
+
 // ── AI assistance types ────────────────────────────────────────────
 
 export type AiProviderId =

@@ -785,6 +785,7 @@ export default function IdeaDetail() {
       <ProjectGenerationSection
         idea={idea}
         onGenerated={handleProjectGenerated}
+        onIdeaUpdated={setIdea}
         onPublishClick={() => setGitHubPublishOpen(true)}
       />
 

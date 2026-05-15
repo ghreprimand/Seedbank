@@ -6,6 +6,8 @@ import type {
   GitHubAuthStatusResult,
   GitHubPublishRequest,
   GitHubPublishResult,
+  GitHubRepoStatusResult,
+  GitHubRepoUpdateResult,
   Idea,
 } from '../../../shared/types.js';
 
@@ -56,6 +58,28 @@ interface GitHubUserProfile {
 interface CreatedRepo {
   html_url: string;
   clone_url: string;
+  default_branch?: string;
+  private?: boolean;
+}
+
+interface RepoLookup {
+  html_url: string;
+  clone_url?: string;
+  ssh_url?: string;
+  default_branch?: string;
+  private?: boolean;
+  owner?: {
+    login?: string;
+  };
+  name?: string;
+}
+
+interface GitHubRepoReference {
+  owner: string;
+  name: string;
+  repoUrl: string;
+  remoteUrl?: string;
+  source: 'idea-link' | 'git-remote';
 }
 
 interface GhErrorWithCode {
@@ -216,7 +240,8 @@ async function ghFetch<T>(token: string, endpoint: string, init: RequestInit = {
   if (!response.ok) {
     const text = await response.text().catch(() => '');
     const message = text.slice(0, 400) || response.statusText;
-    throw new GitHubPublishError(`GitHub API ${response.status} ${response.statusText}: ${message}`, response.status === 401 ? 401 : 502);
+    const statusCode = [401, 403, 404, 409, 422].includes(response.status) ? response.status : 502;
+    throw new GitHubPublishError(`GitHub API ${response.status} ${response.statusText}: ${message}`, statusCode);
   }
 
   return response.json() as Promise<T>;
@@ -318,6 +343,12 @@ async function hasStagedChanges(projectPath: string): Promise<boolean> {
   }
 }
 
+async function getOriginUrl(projectPath: string): Promise<string | undefined> {
+  const remoteProbe = await runGit(['remote', 'get-url', 'origin'], projectPath, true);
+  const current = remoteProbe.stdout.trim();
+  return current || undefined;
+}
+
 async function configureOrigin(projectPath: string, remoteUrl: string): Promise<void> {
   const remoteProbe = await runGit(['remote', 'get-url', 'origin'], projectPath, true);
   const current = remoteProbe.stdout.trim();
@@ -350,6 +381,170 @@ async function pushInitialProject(projectPath: string, remoteUrl: string): Promi
   await runGit(['branch', '-M', 'main'], projectPath);
   await configureOrigin(projectPath, remoteUrl);
   await runGit(['push', '-u', 'origin', 'main'], projectPath);
+}
+
+async function commitAndPushProject(projectPath: string, remoteUrl: string): Promise<{ committed: boolean; pushed: boolean }> {
+  await ensureGitInitialized(projectPath);
+  await runGit(['add', '-A'], projectPath);
+
+  const hasCommits = await repositoryHasCommits(projectPath);
+  const staged = await hasStagedChanges(projectPath);
+  let committed = false;
+
+  if (!hasCommits) {
+    if (staged) {
+      await runGit(['commit', '-m', INITIAL_COMMIT_MESSAGE], projectPath);
+    } else {
+      await runGit(['commit', '--allow-empty', '-m', INITIAL_COMMIT_MESSAGE], projectPath);
+    }
+    committed = true;
+  } else if (staged) {
+    await runGit(['commit', '-m', 'Update project files from Seedbank'], projectPath);
+    committed = true;
+  }
+
+  await runGit(['branch', '-M', 'main'], projectPath);
+  await configureOrigin(projectPath, remoteUrl);
+  await runGit(['push', '-u', 'origin', 'main'], projectPath);
+  return { committed, pushed: true };
+}
+
+export function parseGitHubRepositoryReference(input: string): { owner: string; name: string; repoUrl: string; remoteUrl?: string } | null {
+  const value = input.trim();
+  if (!value) return null;
+
+  const sshMatch = value.match(/^git@github\.com:([^/\s]+)\/([^/\s]+?)(?:\.git)?$/i);
+  if (sshMatch?.[1] && sshMatch[2]) {
+    const owner = sshMatch[1];
+    const name = sshMatch[2].replace(/\.git$/i, '');
+    return {
+      owner,
+      name,
+      repoUrl: `https://github.com/${owner}/${name}`,
+      remoteUrl: value,
+    };
+  }
+
+  try {
+    const url = new URL(value);
+    if (url.hostname.toLowerCase() !== 'github.com') return null;
+    const [owner, rawName] = url.pathname.split('/').filter(Boolean);
+    if (!owner || !rawName) return null;
+    const name = rawName.replace(/\.git$/i, '');
+    const parsed = {
+      owner,
+      name,
+      repoUrl: `https://github.com/${owner}/${name}`,
+    };
+    return value.endsWith('.git') ? { ...parsed, remoteUrl: value } : parsed;
+  } catch {
+    return null;
+  }
+}
+
+async function findRepoReference(idea: Idea, projectPath: string): Promise<GitHubRepoReference | null> {
+  const githubLink = idea.links.find((link) => link.label.trim().toLowerCase() === 'github')
+    ?? idea.links.find((link) => link.url.toLowerCase().includes('github.com/'));
+  if (githubLink) {
+    const parsed = parseGitHubRepositoryReference(githubLink.url);
+    if (parsed) return { ...parsed, source: 'idea-link' };
+  }
+
+  const originUrl = await getOriginUrl(projectPath);
+  if (originUrl) {
+    const parsed = parseGitHubRepositoryReference(originUrl);
+    if (parsed) return { ...parsed, source: 'git-remote' };
+  }
+
+  return null;
+}
+
+function repoStatusFromAuth(status: GitHubAuthStatusResult, projectPath: string): GitHubRepoStatusResult | null {
+  if (!status.available) {
+    return {
+      available: false,
+      authenticated: false,
+      projectPath,
+      repoKnown: false,
+      exists: false,
+      source: 'none',
+      message: status.message,
+    };
+  }
+  if (!status.authenticated) {
+    return {
+      available: true,
+      authenticated: false,
+      projectPath,
+      repoKnown: false,
+      exists: false,
+      source: 'none',
+      message: status.message,
+    };
+  }
+  return null;
+}
+
+export async function getIdeaGitHubRepoStatus(idea: Idea, options?: { enforceDirectory?: boolean }): Promise<GitHubRepoStatusResult> {
+  const { projectPath } = ensurePublishableIdea(idea);
+  if (options?.enforceDirectory !== false) ensureDirectory(projectPath);
+
+  const authStatus = await getGitHubAuthStatus();
+  const authBlock = repoStatusFromAuth(authStatus, projectPath);
+  if (authBlock) return authBlock;
+
+  const reference = await findRepoReference(idea, projectPath);
+  if (!reference) {
+    return {
+      available: true,
+      authenticated: true,
+      projectPath,
+      repoKnown: false,
+      exists: false,
+      source: 'none',
+      message: 'No GitHub repository link or origin remote has been recorded for this project yet.',
+    };
+  }
+
+  const token = await readGhToken();
+  try {
+    const repo = await ghFetch<RepoLookup>(
+      token,
+      `/repos/${encodeURIComponent(reference.owner)}/${encodeURIComponent(reference.name)}`,
+    );
+    return {
+      available: true,
+      authenticated: true,
+      projectPath,
+      repoKnown: true,
+      exists: true,
+      source: reference.source,
+      repoUrl: repo.html_url || reference.repoUrl,
+      remoteUrl: repo.clone_url || reference.remoteUrl,
+      owner: repo.owner?.login ?? reference.owner,
+      name: repo.name ?? reference.name,
+      ...(typeof repo.private === 'boolean' ? { private: repo.private } : {}),
+      ...(repo.default_branch ? { defaultBranch: repo.default_branch } : {}),
+      message: 'GitHub repository found.',
+    };
+  } catch (err) {
+    if (err instanceof GitHubPublishError && err.statusCode === 404) {
+      return {
+        available: true,
+        authenticated: true,
+        projectPath,
+        repoKnown: true,
+        exists: false,
+        source: reference.source,
+        repoUrl: reference.repoUrl,
+        ...(reference.remoteUrl ? { remoteUrl: reference.remoteUrl } : {}),
+        owner: reference.owner,
+        name: reference.name,
+        message: 'A GitHub repository link or remote exists locally, but GitHub did not find that repository.',
+      };
+    }
+    throw err;
+  }
 }
 
 export async function getGitHubAuthStatus(): Promise<GitHubAuthStatusResult> {
@@ -505,6 +700,48 @@ export async function publishIdeaProject(
       ...result,
       pushed: false,
       message: `Repository created, but initial push failed: ${message}`,
+      error: message,
+    };
+  }
+}
+
+export async function updateIdeaProjectOnGitHub(
+  idea: Idea,
+  options?: { enforceDirectory?: boolean },
+): Promise<GitHubRepoUpdateResult> {
+  const status = await getIdeaGitHubRepoStatus(idea, options);
+  if (!status.authenticated) {
+    throw new GitHubPublishError(status.message, status.available ? 401 : 503);
+  }
+  if (!status.repoKnown) {
+    throw new GitHubPublishError('No GitHub repository link or origin remote has been recorded for this project yet.', 400);
+  }
+  if (!status.exists || !status.repoUrl) {
+    throw new GitHubPublishError(status.message, 404);
+  }
+
+  const remoteUrl = status.remoteUrl ?? `${status.repoUrl}.git`;
+  try {
+    const gitResult = await commitAndPushProject(status.projectPath ?? ensurePublishableIdea(idea).projectPath, remoteUrl);
+    return {
+      pushed: gitResult.pushed,
+      committed: gitResult.committed,
+      repoUrl: status.repoUrl,
+      remoteUrl,
+      projectPath: status.projectPath ?? ensurePublishableIdea(idea).projectPath,
+      message: gitResult.committed
+        ? 'Committed local project changes and pushed them to GitHub.'
+        : 'No local file changes to commit. GitHub remote is configured and push completed.',
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      pushed: false,
+      committed: false,
+      repoUrl: status.repoUrl,
+      remoteUrl,
+      projectPath: status.projectPath ?? ensurePublishableIdea(idea).projectPath,
+      message: `GitHub repository found, but update push failed: ${message}`,
       error: message,
     };
   }

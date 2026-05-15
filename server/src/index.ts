@@ -24,10 +24,12 @@ import {
 import {
   ensurePublishableIdea,
   getGitHubAuthStatus,
+  getIdeaGitHubRepoStatus,
   GitHubPublishError,
   parseGitHubPublishRequest,
   publishIdeaProject,
   repoNameFromIdeaTitle,
+  updateIdeaProjectOnGitHub,
 } from './integrations/githubClient.js';
 import { authMiddleware, requireImplicitLocal, requireScope } from './middleware/auth.js';
 import { archiveToMarkdown, ideaToMarkdown, parseMarkdownArchive } from './markdown.js';
@@ -611,6 +613,11 @@ function upsertGitHubIdeaLink(ideaId: string, repoUrl: string) {
   });
   nextLinks.push({ label: 'GitHub', url: normalizedUrl });
   return repository.updateIdea(ideaId, { links: nextLinks });
+}
+
+function projectPathInsideConfiguredRoots(projectPath: string): boolean {
+  const allowedRoots = integrations.configuredRoots().map((root) => path.resolve(root));
+  return allowedRoots.length === 0 || allowedRoots.some((root) => isInsidePath(projectPath, root));
 }
 
 function listOptionsFromQuery(query: Request['query']): ListIdeasOptions {
@@ -1297,13 +1304,25 @@ app.get('/api/integrations/github/status', requireScope('read:ideas'), asyncRout
   res.json(status);
 }));
 
+app.get('/api/integrations/github/repo-status/:ideaId', requireScope('read:ideas'), asyncRoute(async (req, res) => {
+  const ideaId = routeParam(req, 'ideaId');
+  const idea = repository.getIdea(ideaId);
+  const { projectPath } = ensurePublishableIdea(idea);
+  if (!projectPathInsideConfiguredRoots(projectPath)) {
+    res.status(403).json({ error: 'Graduated project path is outside configured project roots.' });
+    return;
+  }
+
+  const status = await getIdeaGitHubRepoStatus(idea!);
+  res.json(status);
+}));
+
 app.post('/api/integrations/github/publish/:ideaId', requireScope('write:ideas'), asyncRoute(async (req, res) => {
   const ideaId = routeParam(req, 'ideaId');
   const idea = repository.getIdea(ideaId);
   const { projectPath } = ensurePublishableIdea(idea);
   const publishIdea = idea!;
-  const allowedRoots = integrations.configuredRoots().map((root) => path.resolve(root));
-  if (allowedRoots.length > 0 && !allowedRoots.some((root) => isInsidePath(projectPath, root))) {
+  if (!projectPathInsideConfiguredRoots(projectPath)) {
     res.status(403).json({ error: 'Graduated project path is outside configured project roots.' });
     return;
   }
@@ -1314,6 +1333,24 @@ app.post('/api/integrations/github/publish/:ideaId', requireScope('write:ideas')
   let updatedIdea = publishIdea;
   if (result.repoUrl) {
     updatedIdea = upsertGitHubIdeaLink(ideaId, result.repoUrl) ?? publishIdea;
+  }
+  res.json({ ...result, idea: updatedIdea });
+}));
+
+app.post('/api/integrations/github/update/:ideaId', requireScope('write:ideas'), asyncRoute(async (req, res) => {
+  const ideaId = routeParam(req, 'ideaId');
+  const idea = repository.getIdea(ideaId);
+  const { projectPath } = ensurePublishableIdea(idea);
+  const updateIdea = idea!;
+  if (!projectPathInsideConfiguredRoots(projectPath)) {
+    res.status(403).json({ error: 'Graduated project path is outside configured project roots.' });
+    return;
+  }
+
+  const result = await updateIdeaProjectOnGitHub(updateIdea);
+  let updatedIdea = updateIdea;
+  if (result.repoUrl) {
+    updatedIdea = upsertGitHubIdeaLink(ideaId, result.repoUrl) ?? updateIdea;
   }
   res.json({ ...result, idea: updatedIdea });
 }));
