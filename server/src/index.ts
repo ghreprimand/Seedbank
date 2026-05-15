@@ -36,6 +36,7 @@ import { authMiddleware, requireImplicitLocal, requireScope } from './middleware
 import { archiveToMarkdown, ideaToMarkdown, parseMarkdownArchive } from './markdown.js';
 import { openApiSpec } from './openapi.js';
 import { SeedbankRepository, type ImportArchive, type ListIdeasOptions } from './repository.js';
+import { folderOpenCommand } from './systemOpen.js';
 import { ApiTokenStore, TOKEN_SCOPES, type TokenScope } from './tokens.js';
 import { WebhookEmitter, normalizeWebhookUrl, toWebhookEventList } from './webhooks.js';
 import type { AiConfigPatch } from './ai/types.js';
@@ -483,12 +484,6 @@ function safeDraftRelativePath(value: unknown): string | undefined {
 function isInsidePath(childPath: string, parentPath: string): boolean {
   const relative = path.relative(path.resolve(parentPath), path.resolve(childPath));
   return relative === '' || (!!relative && !relative.startsWith('..') && !path.isAbsolute(relative));
-}
-
-function folderOpenCommand(folderPath: string, platform = process.platform): { command: string; args: string[] } {
-  if (platform === 'darwin') return { command: 'open', args: [folderPath] };
-  if (platform === 'win32') return { command: 'explorer.exe', args: [folderPath] };
-  return { command: 'xdg-open', args: [folderPath] };
 }
 
 function openFolderInFileManager(folderPath: string): Promise<void> {
