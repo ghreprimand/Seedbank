@@ -106,6 +106,11 @@ export class AiStore {
     }));
   }
 
+  clearMessages(ideaId: string): void {
+    this.db.prepare('DELETE FROM conversation_messages WHERE idea_id = ?').run(ideaId);
+    this.db.prepare('DELETE FROM conversations WHERE idea_id = ?').run(ideaId);
+  }
+
   addMessage(ideaId: string, role: 'user' | 'assistant', content: string, provider?: string, model?: string): AiChatMessage {
     const conversationId = this.ensureConversation(ideaId);
     const id = uuid();

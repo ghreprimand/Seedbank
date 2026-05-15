@@ -36,6 +36,8 @@ test('messagesForChat includes stage-aware system guidance', () => {
     assert.match(messages[0]?.content ?? '', /Ground every question in the supplied idea context/);
     assert.match(messages[0]?.content ?? '', /Treat empty fields as unknown/);
     assert.match(messages[0]?.content ?? '', /first anchor your thinking/);
+    assert.match(messages[0]?.content ?? '', /personal daily-driver or learning project/);
+    assert.match(messages[0]?.content ?? '', /Do not use markdown bold/);
     assert.ok(messages[1]?.content.includes(`Stage personality: ${promptStageLabel[stage]}.`));
   }
 });
@@ -59,6 +61,42 @@ test('messagesForChat labels and includes the core idea context fields', () => {
   assert.match(context, /The Case \(whyItMightWork\):\nGardeners need reminders even when offline\./);
   assert.match(context, /Build Notes \(techStack\):\nSQLite, React, and a local notification scheduler\./);
   assert.match(context, /Filled fields: .*The Spark \/ Raw Notes.*Concept.*The Case.*Build Notes/);
+});
+
+test('messagesForChat adds a current-context reminder after persisted history', () => {
+  const idea = newIdea({
+    fullNotes: 'This is a personal daily-driver terminal project for repeated git/test/debug loops.',
+  });
+  const messages = messagesForChat(
+    idea,
+    [{ id: 'old', ideaId: idea.id, role: 'assistant', content: 'Old generic launch advice.', createdAt: new Date() }],
+    'Ask a sharper question.',
+  );
+
+  assert.equal(messages.at(-2)?.role, 'system');
+  assert.match(messages.at(-2)?.content ?? '', /prioritize the current Seedbank idea context/);
+});
+
+test('fresh field assist writes standalone field text without current value', () => {
+  const idea = newIdea({
+    title: 'Adaptive terminal',
+    fullNotes: 'Personal daily-driver terminal with semantic output, workspace memory, and faster git/test/debug loops.',
+    techStack: 'Rust, GPU text rendering, cross-platform PTY handling.',
+    whyItMightWork: 'Old value that should not be reused.',
+  });
+  const prompt = promptForFieldAssist(
+    idea,
+    'whyItMightWork',
+    idea.whyItMightWork,
+    'Write a new The Case from scratch.',
+    true,
+  ).map((message) => message.content).join('\n');
+
+  assert.match(prompt, /write-from-scratch request/);
+  assert.match(prompt, /complete standalone value for the target field/);
+  assert.match(prompt, /Personal daily-driver terminal/);
+  assert.doesNotMatch(prompt, /Current value:/);
+  assert.doesNotMatch(prompt, /Old value that should not be reused/);
 });
 
 test('field suggestion prompts adapt expectations by stage', () => {

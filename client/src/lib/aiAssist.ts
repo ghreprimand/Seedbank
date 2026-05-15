@@ -15,12 +15,12 @@ import type { Idea } from '@/lib/types';
 // ── Suggestion field labels (client display only) ─────────────────────────────
 
 export const FIELD_LABELS: Record<string, string> = {
-  pitch: 'Pitch',
-  fullNotes: 'Full Notes',
-  hook: 'Hook / 30-second demo',
-  whyItMightWork: 'Why It Might Work',
+  pitch: 'Elevator Pitch',
+  fullNotes: 'The Spark / Raw Notes',
+  hook: 'Concept',
+  whyItMightWork: 'The Case',
   risks: 'Risks & Blockers',
-  techStack: 'Tech Stack Notes',
+  techStack: 'Build Notes',
   aesthetic: 'Aesthetic & Style',
   retrospective: 'Retrospective',
 };
@@ -172,7 +172,12 @@ export function buildAssistPrompt(req: AiAssistRequest): string {
   } else if (intent === 'improve') {
     base = `Improve the "${label}" field for "${ideaTitle}". Keep the author's intent but make it clearer and more compelling.`;
   } else if (intent === 'fresh') {
-    base = `Write a new "${label}" for "${ideaTitle}" from scratch. Do not use the current value as a reference.`;
+    base = [
+      `Write a new "${label}" for "${ideaTitle}" from scratch.`,
+      'Use the rest of the idea context as source material, especially Raw Notes, Concept, Build Notes, risks, and validation criteria when present.',
+      'Return only clean field text that could be applied directly. Do not review the field, explain the task, or use markdown formatting.',
+      'Do not use the current value as a reference.',
+    ].join(' ');
   } else if (intent === 'explain') {
     base = `Expand and add depth to the "${label}" for "${ideaTitle}". Keep the core idea and add useful specificity.`;
   }
