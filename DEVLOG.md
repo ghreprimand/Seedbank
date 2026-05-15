@@ -12,8 +12,10 @@ What changed:
 - Thinking Partner's base system prompt now explicitly grounds questions in the current idea context: title, pitch, stage, notes, risks, build notes, tags, and scores.
 - Thinking Partner context now includes field-label metadata so providers know that `fullNotes` means The Spark / Raw Notes, `hook` means Concept, `whyItMightWork` means The Case, and `techStack` means Build Notes.
 - The context payload also lists which idea fields are actually filled in, so sparse ideas should get missing-detail questions instead of invented critique.
+- The idea context is now sent as labeled, readable sections instead of primarily as JSON. This makes long Raw Notes text more visible to the provider and keeps multiline notes from being buried in escaped string syntax.
 - Organic prompt buttons now ask for project-specific questions instead of broad generic prompts.
 - Devil's Advocate now challenges an assumption that is actually present in the idea context; when the context is too sparse, it asks for the missing detail needed to critique accurately.
+- Organic modes now require the assistant to name its concrete context anchors before asking, so a terminal-emulator project should produce questions about emulator-vs-shell boundaries, semantic output reliability, MVP scope, or daily-driver validation rather than generic project coaching.
 - Seed/Sprout stage guidance no longer blocks critique outright; it keeps critique lightweight unless the user explicitly asks for it.
 - Thinking Partner messages now display newest-first in the panel while the stored history remains chronological for prompt construction.
 - Thinking Partner's header now reads the effective Thinking Partner feature route and then the preflight result after opening, so it matches the provider/model that will actually receive the request.
