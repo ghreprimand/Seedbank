@@ -16,6 +16,7 @@ What changed:
 - If the AI omits one of those required repo docs, the server adds a conservative fallback before writing files.
 - The section shows the current/new project path and links to Settings → Project Graduation when the preferred project folder has not been explicitly configured.
 - GitHub publishing now sits in the same section, so the intended flow is: generate local project files first, then create/push the GitHub repo.
+- The file generation brief field is tall enough for the default prompt, and the GitHub repo button stays disabled with a setup link until the local `gh` session is linked.
 
 Safety and permissions:
 - Existing project files are not overwritten.
