@@ -36,7 +36,7 @@ import { authMiddleware, requireImplicitLocal, requireScope } from './middleware
 import { archiveToMarkdown, ideaToMarkdown, parseMarkdownArchive } from './markdown.js';
 import { openApiSpec } from './openapi.js';
 import { SeedbankRepository, type ImportArchive, type ListIdeasOptions } from './repository.js';
-import { folderOpenCommand } from './systemOpen.js';
+import { folderOpenCommand, selectDirectory } from './systemOpen.js';
 import { ApiTokenStore, TOKEN_SCOPES, type TokenScope } from './tokens.js';
 import { WebhookEmitter, normalizeWebhookUrl, toWebhookEventList } from './webhooks.js';
 import type { AiConfigPatch } from './ai/types.js';
@@ -1378,6 +1378,88 @@ app.post('/api/ideas/:id/open-project-folder', requireScope('read:ideas'), requi
     return;
   }
   res.json({ ok: true, path: projectPath, message: `Opened project folder: ${projectPath}` });
+}));
+
+app.post('/api/system/select-directory', requireScope('write:ideas'), requireImplicitLocal, asyncRoute(async (req, res) => {
+  const initialPath = typeof req.body?.initialPath === 'string' && req.body.initialPath.trim()
+    ? expandHome(req.body.initialPath.trim())
+    : undefined;
+  const selectedPath = await selectDirectory({
+    title: 'Choose Seedbank project directory',
+    initialPath,
+  });
+  res.json({ path: selectedPath });
+}));
+
+app.get('/api/system/directories', requireScope('write:ideas'), requireImplicitLocal, asyncRoute((req, res) => {
+  const requested = typeof req.query.path === 'string' && req.query.path.trim()
+    ? expandHome(req.query.path.trim())
+    : (process.env.HOME ?? process.env.USERPROFILE ?? process.cwd());
+  const currentPath = path.resolve(requested);
+
+  let stat: fs.Stats;
+  try {
+    stat = fs.statSync(currentPath);
+  } catch {
+    res.status(404).json({ error: `Folder does not exist: ${currentPath}` });
+    return;
+  }
+  if (!stat.isDirectory()) {
+    res.status(400).json({ error: `Path is not a folder: ${currentPath}` });
+    return;
+  }
+
+  let entries: { name: string; path: string }[];
+  try {
+    entries = fs.readdirSync(currentPath, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() && !entry.name.startsWith('.'))
+      .map((entry) => {
+        const entryPath = path.join(currentPath, entry.name);
+        return { name: entry.name, path: entryPath };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+  } catch {
+    res.status(403).json({ error: `Seedbank cannot read this folder: ${currentPath}` });
+    return;
+  }
+
+  const parentPath = path.dirname(currentPath);
+  res.json({
+    path: currentPath,
+    parentPath: parentPath === currentPath ? null : parentPath,
+    homePath: process.env.HOME ?? process.env.USERPROFILE ?? null,
+    separator: path.sep,
+    entries,
+  });
+}));
+
+app.post('/api/system/directories', requireScope('write:ideas'), requireImplicitLocal, asyncRoute((req, res) => {
+  const parent = typeof req.body?.parentPath === 'string' && req.body.parentPath.trim()
+    ? path.resolve(expandHome(req.body.parentPath.trim()))
+    : null;
+  const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+
+  if (!parent) {
+    res.status(400).json({ error: 'Parent folder is required.' });
+    return;
+  }
+  if (!name || name.includes('/') || name.includes('\\') || name === '.' || name === '..') {
+    res.status(400).json({ error: 'Enter a folder name without slashes.' });
+    return;
+  }
+
+  const target = path.join(parent, name);
+  if (fs.existsSync(target)) {
+    const stat = fs.statSync(target);
+    if (!stat.isDirectory()) {
+      res.status(400).json({ error: `A non-folder already exists at: ${target}` });
+      return;
+    }
+    res.json({ path: target });
+    return;
+  }
+  fs.mkdirSync(target, { recursive: false });
+  res.status(201).json({ path: target });
 }));
 
 app.get('/api/stats', requireScope('read:ideas'), asyncRoute((_req, res) => {

@@ -265,6 +265,13 @@ export const openApiSpec: OpenAPIObject = {
     '/api/ideas/{id}/open-project-folder': {
       post: { summary: 'Open an idea graduated project folder in the local system file explorer', security: [{ bearerAuth: [] }] },
     },
+    '/api/system/select-directory': {
+      post: { summary: 'Open a native system directory picker and return the selected absolute path', security: [{ bearerAuth: [] }] },
+    },
+    '/api/system/directories': {
+      get: { summary: 'List local child directories for the in-app folder browser', security: [{ bearerAuth: [] }] },
+      post: { summary: 'Create a local child directory for the in-app folder browser', security: [{ bearerAuth: [] }] },
+    },
     '/api/ai/chat': {
       post: { summary: 'Streaming AI chat', security: [{ bearerAuth: [] }] },
     },

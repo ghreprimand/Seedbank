@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { folderOpenCommand, linuxFileManagerCandidates } from '../src/systemOpen.js';
+import {
+  DirectoryPickerUnavailableError,
+  folderOpenCommand,
+  linuxFileManagerCandidates,
+  selectDirectory,
+} from '../src/systemOpen.js';
 
 test('folderOpenCommand uses the standard macOS opener', () => {
   assert.deepEqual(folderOpenCommand('/tmp/project', { platform: 'darwin' }), {
@@ -59,4 +64,28 @@ test('linuxFileManagerCandidates orders desktop-native file managers first', () 
   assert.equal(linuxFileManagerCandidates({ XDG_CURRENT_DESKTOP: 'KDE' })[0], 'dolphin');
   assert.equal(linuxFileManagerCandidates({ XDG_CURRENT_DESKTOP: 'GNOME' })[0], 'nautilus');
   assert.equal(linuxFileManagerCandidates({ XDG_CURRENT_DESKTOP: 'XFCE' })[0], 'thunar');
+});
+
+test('selectDirectory surfaces a clear Linux unsupported error when no GUI picker is installed', async () => {
+  await assert.rejects(
+    selectDirectory({
+      platform: 'linux',
+      executableExists: () => false,
+    }),
+    (err: unknown) =>
+      err instanceof DirectoryPickerUnavailableError
+      && err.message.includes('Install zenity, kdialog, yad, or xdg-desktop-portal with gdbus/dbus-monitor'),
+  );
+});
+
+test('selectDirectory surfaces a clear Windows unsupported error when no PowerShell runtime exists', async () => {
+  await assert.rejects(
+    selectDirectory({
+      platform: 'win32',
+      executableExists: () => false,
+    }),
+    (err: unknown) =>
+      err instanceof DirectoryPickerUnavailableError
+      && err.message.includes('Install PowerShell'),
+  );
 });

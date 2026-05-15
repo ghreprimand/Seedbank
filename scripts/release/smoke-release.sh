@@ -14,6 +14,15 @@ check_contains() {
   fi
 }
 
+check_absent() {
+  local listing="$1"
+  local pattern="$2"
+  if grep -Eq "$pattern" <<<"$listing"; then
+    echo "Unexpected entry: $pattern" >&2
+    exit 1
+  fi
+}
+
 verify_manifest_entry() {
   local artifact="$1"
   local file_name
@@ -129,16 +138,60 @@ inspect_archive() {
   local artifact="$1"
   local listing
   listing="$(list_archive "$artifact")"
+  local target=""
+  case "$artifact" in
+    *-linux-x64.tar.gz) target="linux-x64" ;;
+    *-macos.tar.gz) target="macos" ;;
+    *-windows-x64.zip) target="windows-x64" ;;
+  esac
+  if [[ -z "$target" ]]; then
+    echo "Unable to infer target from artifact: $artifact" >&2
+    exit 1
+  fi
 
   check_contains "$listing" '^seedbank-v[^/]+/$'
   check_contains "$listing" 'README\.md$'
   check_contains "$listing" 'INSTALL\.md$'
   check_contains "$listing" 'package\.json$'
-  check_contains "$listing" 'scripts/seedbank$'
-  check_contains "$listing" 'scripts/seedbank\.ps1$'
-  check_contains "$listing" 'scripts/seedbank\.bat$'
   check_contains "$listing" 'client/dist/index\.html$'
   check_contains "$listing" 'server/dist/server/src/index\.js$'
+  check_absent "$listing" 'scripts/release/'
+  check_absent "$listing" 'scripts/capture-readme-screenshots\.mjs$'
+  check_absent "$listing" 'server/tests/'
+
+  case "$target" in
+    linux-x64)
+      check_contains "$listing" '^[^/]+/Install-Seedbank\.sh$'
+      check_contains "$listing" 'scripts/seedbank$'
+      check_contains "$listing" 'scripts/install-desktop\.sh$'
+      check_absent "$listing" '^[^/]+/Install-Seedbank\.command$'
+      check_absent "$listing" '^[^/]+/Install-Seedbank\.ps1$'
+      check_absent "$listing" '^[^/]+/Install-Seedbank\.bat$'
+      check_absent "$listing" 'scripts/seedbank\.ps1$'
+      check_absent "$listing" 'scripts/seedbank\.bat$'
+      ;;
+    macos)
+      check_contains "$listing" '^[^/]+/Install-Seedbank\.command$'
+      check_contains "$listing" 'scripts/seedbank$'
+      check_absent "$listing" '^[^/]+/Install-Seedbank\.sh$'
+      check_absent "$listing" '^[^/]+/Install-Seedbank\.ps1$'
+      check_absent "$listing" '^[^/]+/Install-Seedbank\.bat$'
+      check_absent "$listing" 'scripts/install-desktop\.sh$'
+      check_absent "$listing" 'scripts/seedbank\.ps1$'
+      check_absent "$listing" 'scripts/seedbank\.bat$'
+      ;;
+    windows-x64)
+      check_contains "$listing" '^[^/]+/Install-Seedbank\.bat$'
+      check_contains "$listing" 'scripts/Install-Seedbank\.ps1$'
+      check_contains "$listing" 'scripts/seedbank\.ps1$'
+      check_absent "$listing" '^[^/]+/Install-Seedbank\.sh$'
+      check_absent "$listing" '^[^/]+/Install-Seedbank\.command$'
+      check_absent "$listing" '^[^/]+/Install-Seedbank\.ps1$'
+      check_absent "$listing" 'scripts/seedbank$'
+      check_absent "$listing" 'scripts/seedbank\.bat$'
+      check_absent "$listing" 'scripts/install-desktop\.sh$'
+      ;;
+  esac
 
   local tmp_dir
   tmp_dir="$(mktemp -d)"
@@ -154,22 +207,42 @@ inspect_archive() {
 
   [[ -f "$root_dir/README.md" ]] || { echo "Missing README.md after extract" >&2; exit 1; }
   [[ -f "$root_dir/INSTALL.md" ]] || { echo "Missing INSTALL.md after extract" >&2; exit 1; }
-  [[ -f "$root_dir/scripts/seedbank" ]] || { echo "Missing scripts/seedbank after extract" >&2; exit 1; }
 
-  grep -Fq "npm run start -w server" "$root_dir/scripts/seedbank" || {
-    echo "Launcher regression: scripts/seedbank should run built server runtime." >&2
-    exit 1
-  }
-  grep -Fq "npm run preview -w client" "$root_dir/scripts/seedbank" || {
-    echo "Launcher regression: scripts/seedbank should run built client preview runtime." >&2
-    exit 1
-  }
-
-  if [[ "$artifact" == *"-linux-"* || "$artifact" == *"-macos."* || "$artifact" == *"-macos-"* ]]; then
+  if [[ "$target" == "linux-x64" || "$target" == "macos" ]]; then
+    [[ -f "$root_dir/scripts/seedbank" ]] || { echo "Missing scripts/seedbank after extract" >&2; exit 1; }
+    grep -Fq "npm run start -w server" "$root_dir/scripts/seedbank" || {
+      echo "Launcher regression: scripts/seedbank should run built server runtime." >&2
+      exit 1
+    }
+    grep -Fq "npm run preview -w client" "$root_dir/scripts/seedbank" || {
+      echo "Launcher regression: scripts/seedbank should run built client preview runtime." >&2
+      exit 1
+    }
     if [[ ! -x "$root_dir/scripts/seedbank" ]]; then
       echo "Expected executable bit on scripts/seedbank for $artifact" >&2
       exit 1
     fi
+  fi
+  if [[ "$target" == "linux-x64" ]]; then
+    [[ -f "$root_dir/Install-Seedbank.sh" ]] || { echo "Missing Install-Seedbank.sh after extract" >&2; exit 1; }
+    if [[ ! -x "$root_dir/Install-Seedbank.sh" ]]; then
+      echo "Expected executable bit on Install-Seedbank.sh for $artifact" >&2
+      exit 1
+    fi
+  elif [[ "$target" == "macos" ]]; then
+    [[ -f "$root_dir/Install-Seedbank.command" ]] || { echo "Missing Install-Seedbank.command after extract" >&2; exit 1; }
+    if [[ ! -x "$root_dir/Install-Seedbank.command" ]]; then
+      echo "Expected executable bit on Install-Seedbank.command for $artifact" >&2
+      exit 1
+    fi
+  else
+    [[ -f "$root_dir/Install-Seedbank.bat" ]] || { echo "Missing Install-Seedbank.bat after extract" >&2; exit 1; }
+    [[ -f "$root_dir/scripts/Install-Seedbank.ps1" ]] || { echo "Missing scripts/Install-Seedbank.ps1 after extract" >&2; exit 1; }
+    [[ -f "$root_dir/scripts/seedbank.ps1" ]] || { echo "Missing scripts/seedbank.ps1 after extract" >&2; exit 1; }
+    grep -Fq 'scripts\Install-Seedbank.ps1' "$root_dir/Install-Seedbank.bat" || {
+      echo "Windows installer should call the packaged PowerShell helper under scripts." >&2
+      exit 1
+    }
   fi
 
   trap - RETURN

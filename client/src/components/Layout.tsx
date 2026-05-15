@@ -1,18 +1,20 @@
 /** App shell — sticky header with search, nav, and CTA. Hosts modals and global keyboard shortcuts. */
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Search, Compass, Trash2, X, Settings, BookOpen } from 'lucide-react';
 import QuickCapture from './QuickCapture';
 import ConnectionStatus from './ConnectionStatus';
 import DataMigrationDialog from './DataMigrationDialog';
 import BackupStatus from './BackupStatus';
 import AccountReauthNotice from './AccountReauthNotice';
+import OnboardingModal from './OnboardingModal';
 import ManualModal from '@/help/ManualModal';
-import { HelpProvider } from '@/help/HelpContext';
+import { HelpProvider } from '@/help/HelpProvider';
 import HelpExperience from '@/help/HelpExperience';
 import { useFilterStore } from '@/stores/filters';
 import { useSettingsStore } from '@/stores/settings';
 import { DEFAULT_SHORTCUTS, hasShortcutModifier, matchBinding } from '@/lib/shortcuts';
+import { hasDismissedOnboarding, ONBOARDING_OPEN_EVENT } from '@/lib/onboarding';
 import type { ShortcutConfig } from '@/lib/types';
 
 // ── Stable selector fallbacks ─────────────────────────────────────────────────
@@ -24,6 +26,9 @@ export default function Layout() {
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [manualSection, setManualSection] = useState<string | undefined>();
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const [onboardingClosedThisSession, setOnboardingClosedThisSession] = useState(false);
+  const [migrationBlockingOnboarding, setMigrationBlockingOnboarding] = useState(true);
 
   const openManual = (sectionId?: string) => {
     setManualSection(sectionId);
@@ -39,6 +44,7 @@ export default function Layout() {
 
   // Resolve effective bindings — stored overrides merged with defaults
   const storedShortcuts = useSettingsStore((s) => s.data?.ui?.shortcuts ?? EMPTY_SHORTCUTS);
+  const settingsLoaded = useSettingsStore((s) => s.loaded);
   const shortcuts = useMemo(() => ({
     focusSearch: storedShortcuts.focusSearch ?? DEFAULT_SHORTCUTS.focusSearch,
     openQuickCapture: storedShortcuts.openQuickCapture ?? DEFAULT_SHORTCUTS.openQuickCapture,
@@ -57,6 +63,32 @@ export default function Layout() {
     }
   };
 
+  const handleMigrationPromptChange = useCallback((open: boolean) => {
+    setMigrationBlockingOnboarding(open);
+  }, []);
+
+  useEffect(() => {
+    const openOnboarding = () => {
+      setOnboardingClosedThisSession(false);
+      setOnboardingOpen(true);
+    };
+    window.addEventListener(ONBOARDING_OPEN_EVENT, openOnboarding);
+    return () => window.removeEventListener(ONBOARDING_OPEN_EVENT, openOnboarding);
+  }, []);
+
+  const shouldShowOnboarding = onboardingOpen ||
+    (
+      settingsLoaded &&
+      !migrationBlockingOnboarding &&
+      !onboardingClosedThisSession &&
+      !hasDismissedOnboarding()
+    );
+
+  const closeOnboarding = () => {
+    setOnboardingOpen(false);
+    setOnboardingClosedThisSession(true);
+  };
+
   // Global keyboard shortcuts — driven by user-configured bindings
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -66,6 +98,7 @@ export default function Layout() {
       // Esc — always reserved: close any open modal or blur search
       if (e.key === 'Escape') {
         if (manualOpen) { setManualOpen(false); return; }
+        if (shouldShowOnboarding) { closeOnboarding(); return; }
         if (isCaptureOpen) { setIsCaptureOpen(false); return; }
         if (mobileSearchOpen) { setMobileSearchOpen(false); return; }
         if (document.activeElement === searchRef.current) {
@@ -101,7 +134,7 @@ export default function Layout() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [isCaptureOpen, mobileSearchOpen, manualOpen, shortcuts]);
+  }, [isCaptureOpen, mobileSearchOpen, manualOpen, shortcuts, shouldShowOnboarding]);
 
   return (
     <HelpProvider onOpenManual={openManual}>
@@ -284,10 +317,17 @@ export default function Layout() {
         />
       )}
 
-      <DataMigrationDialog />
+      <DataMigrationDialog onPromptChange={handleMigrationPromptChange} />
       <AccountReauthNotice />
 
       <HelpExperience />
+
+      {shouldShowOnboarding && (
+        <OnboardingModal
+          onClose={closeOnboarding}
+          onOpenSettings={(path) => navigate(path)}
+        />
+      )}
 
       {/* Manual modal */}
       {manualOpen && (

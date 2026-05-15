@@ -4,12 +4,13 @@ Seedbank release v1 ships installable **archives** around the current launcher m
 
 ## Scope Of This Flow
 - Build `client/dist` and `server/dist`.
-- Package the runtime source + launch scripts into per-platform archives.
+- Package the runtime source, one-click installers, and launch scripts into per-platform archives.
 - Attach archives and checksum manifest to a GitHub Release.
 - Include `INSTALL.md` in each archive for post-extract quick start.
 
 Runtime note:
 - Launchers start the built runtime (`npm run start -w server` + `npm run preview -w client`), not hot-reload dev mode.
+- End-user installers (`Install-Seedbank.*`) check Node.js/npm, install dependencies, prepare runtime output, install an OS launcher shortcut, and start Seedbank.
 
 Current archive targets:
 - `seedbank-vX.Y.Z-linux-x64.tar.gz`
@@ -76,6 +77,9 @@ You can also pass multiple artifact paths.
 Smoke checks now validate:
 - required files and top-level layout
 - extractability
+- target-specific one-click installer entrypoints only
+- no release-helper scripts or wrong-platform launchers in end-user archives
+- no server test tree in end-user archives
 - Unix executable bit on `scripts/seedbank` for Linux/macOS artifacts
 - checksum/bytes against aggregate `manifest-vX.Y.Z.json` when available
 
@@ -144,6 +148,6 @@ If/when signing/notarization is introduced:
 - No MSI/MSIX/DMG/PKG/AppImage installers.
 - No auto-update mechanism.
 - No notarization/signing pipeline.
-- No automatic Windows shortcut creation (manual shortcut only).
+- No native signed installer or system-wide service registration.
 
 Those remain a subsequent release phase after packaging approach is finalized.

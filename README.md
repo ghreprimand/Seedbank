@@ -24,7 +24,15 @@ Real app surfaces captured with deterministic demo data:
 
 ## Quick Start
 
-Prerequisites:
+For release archives, use the installer in the extracted Seedbank folder:
+
+- Linux: `bash Install-Seedbank.sh`
+- macOS: double-click `Install-Seedbank.command`
+- Windows: double-click `Install-Seedbank.bat`
+
+The installer checks Node.js/npm, offers an automatic install path when the OS has a supported package manager, installs Seedbank dependencies, creates an application launcher, and starts Seedbank.
+
+For a development checkout, prerequisites are:
 
 - Node.js 18+
 - npm
@@ -32,14 +40,13 @@ Prerequisites:
 ```bash
 git clone https://github.com/ghreprimand/Seedbank.git
 cd Seedbank
-npm install
-npm start
+bash Install-Seedbank.sh
 ```
 
 On Windows PowerShell, use:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/seedbank.ps1 start
+.\Install-Seedbank.bat
 ```
 
 Open `http://localhost:5173`.
@@ -94,13 +101,13 @@ On Linux/macOS (bash launcher), if port `5173` is occupied the launcher will pic
 
 ### Linux
 
-Run from a terminal:
+From a release archive or checkout:
 
 ```bash
-npm start
+bash Install-Seedbank.sh
 ```
 
-For a desktop launcher, install `scripts/seedbank.desktop`:
+This installs dependencies, prepares the runtime, installs a desktop launcher, and starts Seedbank. To install only the desktop launcher after setup:
 
 ```bash
 bash scripts/install-desktop.sh
@@ -126,20 +133,19 @@ Restart=on-failure
 
 ### macOS
 
-Run from Terminal:
+From a release archive or checkout, double-click `Install-Seedbank.command` or run:
 
 ```bash
-npm start
+bash Install-Seedbank.command
 ```
 
-For an app-like launcher, create an Automator Application or Shortcuts workflow that runs a shell script:
+This installs dependencies, prepares the runtime, creates `~/Applications/Seedbank.app`, and starts Seedbank. To start manually later:
 
 ```bash
-cd /path/to/Seedbank
 bash scripts/seedbank start
 ```
 
-You can then pin that wrapper to the Dock. Use `bash scripts/seedbank stop` to stop background processes.
+Use `bash scripts/seedbank stop` to stop background processes.
 
 If macOS blocks the launcher because the archive is unsigned, run this inside the extracted folder:
 
@@ -149,15 +155,14 @@ xattr -rc .
 
 ### Windows
 
-Use one of the native launcher scripts from PowerShell or Command Prompt:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/seedbank.ps1 start
-```
+From a release archive, double-click `Install-Seedbank.bat`, or run:
 
 ```bat
-scripts\seedbank.bat start
+Install-Seedbank.bat
 ```
+
+This installs dependencies, prepares the runtime, creates a Start Menu shortcut, and starts Seedbank.
+If Seedbank was already running from another extracted folder, the installer stops the old local Seedbank processes before starting the new copy.
 
 Status and stop:
 
@@ -166,25 +171,15 @@ powershell -ExecutionPolicy Bypass -File scripts/seedbank.ps1 status
 powershell -ExecutionPolicy Bypass -File scripts/seedbank.ps1 stop
 ```
 
-```bat
-scripts\seedbank.bat status
-scripts\seedbank.bat stop
-```
-
-For a launcher shortcut, point Start Menu/Desktop shortcuts at either script with `start`.
-
-Windows shortcut automation is currently deferred; use a manual shortcut for now.
-
 ## Packaging Roadmap
 
-Seedbank is currently distributed as a local source checkout with launcher scripts (`npm start` or `scripts/seedbank*`).
-Launchers run the built runtime (`server/dist` + `vite preview`) rather than hot-reload dev mode.
+Seedbank release archives are local web-app bundles with one user-facing installer for the target OS: `Install-Seedbank.sh` on Linux, `Install-Seedbank.command` on macOS, and `Install-Seedbank.bat` on Windows. Launchers run the built runtime (`server/dist` + `vite preview`) rather than hot-reload dev mode.
 
 Near-term deliverables:
 
 - `npx`/global CLI wrapper for `start|stop|status|logs` around the same local runtime model.
 - Container image for trusted local/LAN self-hosting, with explicit storage volume mapping for `<seedbank-data-dir>`.
-- Installable release archives that bundle launcher scripts and setup guidance per platform.
+- More polished install helpers for uncommon Linux distributions and signed macOS/Windows launcher metadata.
 
 Current release scaffolding:
 - `npm run release:package` (build all archive targets)

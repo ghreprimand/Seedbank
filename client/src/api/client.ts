@@ -68,6 +68,19 @@ export interface MigrationProgress {
   label: string;
 }
 
+export interface DirectoryEntry {
+  name: string;
+  path: string;
+}
+
+export interface DirectoryListing {
+  path: string;
+  parentPath: string | null;
+  homePath: string | null;
+  separator: string;
+  entries: DirectoryEntry[];
+}
+
 export interface AiSuggestResponse {
   mode?: string;
   text: string;
@@ -1135,6 +1148,26 @@ export async function configureIntegration(
 
 export async function checkIntegrationHealth(integrationId: string): Promise<IntegrationHealthResult> {
   return request<IntegrationHealthResult>(`/api/integrations/${encodeURIComponent(integrationId)}/health`);
+}
+
+export async function selectProjectDirectory(initialPath?: string): Promise<string | null> {
+  const res = await request<{ path: string | null }>('/api/system/select-directory', {
+    method: 'POST',
+    body: JSON.stringify({ initialPath: initialPath?.trim() ?? '' }),
+  });
+  return res.path;
+}
+
+export async function listProjectDirectories(pathValue?: string): Promise<DirectoryListing> {
+  const query = pathValue?.trim() ? `?path=${encodeURIComponent(pathValue.trim())}` : '';
+  return request<DirectoryListing>(`/api/system/directories${query}`);
+}
+
+export async function createProjectDirectory(parentPath: string, name: string): Promise<{ path: string }> {
+  return request<{ path: string }>('/api/system/directories', {
+    method: 'POST',
+    body: JSON.stringify({ parentPath, name }),
+  });
 }
 
 export async function graduateIdea(

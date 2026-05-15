@@ -9,9 +9,10 @@ import {
 
 interface DataMigrationDialogProps {
   onMigrated?: () => void;
+  onPromptChange?: (open: boolean) => void;
 }
 
-export default function DataMigrationDialog({ onMigrated }: DataMigrationDialogProps) {
+export default function DataMigrationDialog({ onMigrated, onPromptChange }: DataMigrationDialogProps) {
   const [inspection, setInspection] = useState<MigrationInspection | null>(null);
   const [dismissed, setDismissed] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
@@ -23,15 +24,21 @@ export default function DataMigrationDialog({ onMigrated }: DataMigrationDialogP
     let cancelled = false;
     inspectBrowserMigration()
       .then((result) => {
-        if (!cancelled) setInspection(result);
+        if (!cancelled) {
+          setInspection(result);
+          onPromptChange?.(result.shouldPrompt);
+        }
       })
       .catch((err) => {
-        if (!cancelled) console.error('Migration inspection failed:', err);
+        if (!cancelled) {
+          console.error('Migration inspection failed:', err);
+          onPromptChange?.(false);
+        }
       });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [onPromptChange]);
 
   if (!inspection?.shouldPrompt || dismissed) return null;
 
@@ -51,6 +58,11 @@ export default function DataMigrationDialog({ onMigrated }: DataMigrationDialogP
     } finally {
       setIsMigrating(false);
     }
+  };
+
+  const handleDismiss = () => {
+    setDismissed(true);
+    onPromptChange?.(false);
   };
 
   return (
@@ -78,7 +90,7 @@ export default function DataMigrationDialog({ onMigrated }: DataMigrationDialogP
           </div>
           <button
             type="button"
-            onClick={() => setDismissed(true)}
+            onClick={handleDismiss}
             className="p-1 text-ink-300 hover:text-ink-500 transition-colors rounded-card hover:bg-ink-50"
             disabled={isMigrating}
           >
@@ -119,7 +131,7 @@ export default function DataMigrationDialog({ onMigrated }: DataMigrationDialogP
           {complete ? (
             <button
               type="button"
-              onClick={() => setDismissed(true)}
+              onClick={handleDismiss}
               className="flex-1 px-4 py-2.5 text-sm font-medium bg-sage-600 hover:bg-sage-700 text-paper rounded-card transition-all active:scale-[0.98]"
             >
               Done
@@ -128,7 +140,7 @@ export default function DataMigrationDialog({ onMigrated }: DataMigrationDialogP
             <>
               <button
                 type="button"
-                onClick={() => setDismissed(true)}
+                onClick={handleDismiss}
                 disabled={isMigrating}
                 className="flex-1 px-4 py-2.5 text-sm font-medium text-ink-500 hover:bg-ink-50 rounded-card transition-colors disabled:opacity-50"
               >
