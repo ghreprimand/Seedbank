@@ -4,6 +4,19 @@ Newest entries at the top.
 
 ---
 
+## 2026-05-15 — Claude Reauth Callback UX
+
+Polished the Claude account reauth flow after a confusing manual test. The OAuth tab is expected to redirect to Seedbank's local callback page and replace the long Claude URL with a simple "linked" page, but the Settings card was not actively watching for that callback to finish.
+
+What changed:
+- After opening the Claude sign-in tab, Seedbank now polls Claude account status briefly and refreshes the Settings state as soon as the callback exchange succeeds.
+- The manual callback input is now labeled as a fallback path instead of implying the normal flow should leave a URL for the user to paste.
+- The login status copy now distinguishes between "waiting for browser sign-in" and manual callback mode.
+
+Validation:
+- `npm run typecheck`
+- `npm run lint -w client`
+
 ## 2026-05-15 — GitHub Publishing V1
 
 Added optional GitHub publishing as a post-graduation workflow. The design stays deliberately local-first: Seedbank creates or uses a local project folder first, then the user explicitly publishes that folder to GitHub.

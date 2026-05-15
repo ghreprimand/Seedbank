@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Claude account reauth
+
+- Improved Claude account reauth UX so Seedbank watches for the local OAuth callback after opening the Claude sign-in tab and refreshes account status automatically.
+- Clarified that the callback URL field is only for manual fallback cases where the local callback tab cannot reach Seedbank.
+
 ### GitHub Publishing
 
 - Added optional post-graduation GitHub publishing for ideas that already have a local project folder.
