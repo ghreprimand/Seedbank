@@ -76,25 +76,8 @@ interface RepoLookup {
   name?: string;
 }
 
-interface GitHubBlob {
+interface GitHubContentFile {
   sha: string;
-}
-
-interface GitHubTree {
-  sha: string;
-}
-
-interface GitHubCommit {
-  sha: string;
-  tree: {
-    sha: string;
-  };
-}
-
-interface GitHubRef {
-  object: {
-    sha: string;
-  };
 }
 
 interface GitHubRepoReference {
@@ -686,7 +669,7 @@ async function pushInitialProject(projectPath: string, remoteUrl: string, token:
   await runGitPush(['push', '-u', 'origin', 'main'], projectPath, token);
 }
 
-async function uploadProjectFilesViaGitHubApi(
+export async function uploadProjectFilesViaGitHubApi(
   token: string,
   input: {
     owner: string;
@@ -707,67 +690,43 @@ async function uploadProjectFilesViaGitHubApi(
 
   const repoPath = `/repos/${encodeURIComponent(input.owner)}/${encodeURIComponent(input.name)}`;
   const branch = input.branch?.trim() || 'main';
-  let currentRef: GitHubRef | null = null;
-  try {
-    currentRef = await ghFetch<GitHubRef>(token, `${repoPath}/git/ref/heads/${encodeURIComponent(branch)}`);
-  } catch (err) {
-    if (!(err instanceof GitHubPublishError && err.statusCode === 404)) throw err;
-  }
-
-  let parentCommit: GitHubCommit | null = null;
-  if (currentRef) {
-    parentCommit = await ghFetch<GitHubCommit>(token, `${repoPath}/git/commits/${encodeURIComponent(currentRef.object.sha)}`);
-  }
-
-  const tree = [];
   for (const file of files) {
-    const blob = await ghFetch<GitHubBlob>(token, `${repoPath}/git/blobs`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        content: file.contentBase64,
-        encoding: 'base64',
-      }),
-    });
-    tree.push({
-      path: file.path,
-      mode: '100644',
-      type: 'blob',
-      sha: blob.sha,
-    });
-  }
+    const contentPath = file.path.split('/').map(encodeURIComponent).join('/');
+    let existingSha: string | undefined;
+    try {
+      const existing = await ghFetch<GitHubContentFile>(
+        token,
+        `${repoPath}/contents/${contentPath}?ref=${encodeURIComponent(branch)}`,
+      );
+      existingSha = existing.sha;
+    } catch (err) {
+      if (!(err instanceof GitHubPublishError && err.statusCode === 404)) throw err;
+    }
 
-  const newTree = await ghFetch<GitHubTree>(token, `${repoPath}/git/trees`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      ...(parentCommit ? { base_tree: parentCommit.tree.sha } : {}),
-      tree,
-    }),
-  });
+    const body = {
+      message: `${input.message}: ${file.path}`,
+      content: file.contentBase64,
+      branch,
+      ...(existingSha ? { sha: existingSha } : {}),
+    };
 
-  const commit = await ghFetch<GitHubCommit>(token, `${repoPath}/git/commits`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      message: input.message,
-      tree: newTree.sha,
-      parents: parentCommit ? [parentCommit.sha] : [],
-    }),
-  });
-
-  if (currentRef) {
-    await ghFetch<GitHubRef>(token, `${repoPath}/git/refs/heads/${encodeURIComponent(branch)}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sha: commit.sha, force: false }),
-    });
-  } else {
-    await ghFetch<GitHubRef>(token, `${repoPath}/git/refs`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ref: `refs/heads/${branch}`, sha: commit.sha }),
-    });
+    try {
+      await ghFetch<GitHubContentFile>(token, `${repoPath}/contents/${contentPath}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    } catch (err) {
+      if (existingSha || !(err instanceof GitHubPublishError && err.statusCode === 404)) throw err;
+      await ghFetch<GitHubContentFile>(token, `${repoPath}/contents/${contentPath}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: `${input.message}: ${file.path}`,
+          content: file.contentBase64,
+        }),
+      });
+    }
   }
 
   return {

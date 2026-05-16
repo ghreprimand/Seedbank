@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 1.1.6 — Empty Repository API Upload Fix
+
+- Fixed the no-local-Git GitHub publishing fallback so empty repositories receive files through the GitHub Contents API instead of the Git database refs API.
+- Added regression coverage proving the fallback uses `/contents/...` uploads and does not attempt to create refs directly in an empty repository.
+
 ## 1.1.5 — No-Local-Git Publishing Fallback
 
 - Added a GitHub API upload fallback for Create repository and Update GitHub repo when `gh` is authenticated but local `git` is unavailable.

@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { newIdea } from '../src/domain.js';
 import {
@@ -15,6 +17,7 @@ import {
   resolveGitExecutable,
   resolveGitHubCliExecutable,
   sanitizeGitHubRepoName,
+  uploadProjectFilesViaGitHubApi,
 } from '../src/integrations/githubClient.js';
 
 test('parseGhAuthStatusOutput extracts login and scopes', () => {
@@ -137,6 +140,57 @@ test('resolveGitExecutable falls back to git.exe on Windows', () => {
   });
 
   assert.equal(resolved, 'git.exe');
+});
+
+test('uploadProjectFilesViaGitHubApi creates files with the contents API for empty repositories', async () => {
+  const projectPath = fs.mkdtempSync(path.join(os.tmpdir(), 'seedbank-github-api-upload-'));
+  fs.writeFileSync(path.join(projectPath, 'README.md'), '# Test project\n');
+  fs.mkdirSync(path.join(projectPath, 'docs'));
+  fs.writeFileSync(path.join(projectPath, 'docs', 'SPEC.md'), 'Spec\n');
+
+  const originalFetch = globalThis.fetch;
+  const calls: { url: string; method: string; body?: unknown }[] = [];
+  globalThis.fetch = (async (input: URL | RequestInfo, init?: RequestInit) => {
+    const url = input instanceof URL ? input.toString() : String(input);
+    const method = init?.method ?? 'GET';
+    calls.push({
+      url,
+      method,
+      ...(init?.body ? { body: JSON.parse(String(init.body)) } : {}),
+    });
+
+    if (method === 'GET') {
+      return new Response(JSON.stringify({ message: 'Not Found' }), { status: 404, statusText: 'Not Found' });
+    }
+    return new Response(JSON.stringify({ sha: `sha-${calls.length}` }), {
+      status: 201,
+      statusText: 'Created',
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }) as typeof fetch;
+
+  try {
+    const result = await uploadProjectFilesViaGitHubApi('token', {
+      owner: 'octocat',
+      name: 'empty-repo',
+      projectPath,
+      message: 'Initial commit from Seedbank',
+      branch: 'main',
+    });
+
+    assert.equal(result.filesUploaded, 2);
+    assert.equal(result.branch, 'main');
+    assert.equal(calls.filter((call) => call.method === 'GET').length, 2);
+    const putCalls = calls.filter((call) => call.method === 'PUT');
+    assert.equal(putCalls.length, 2);
+    assert.ok(putCalls.every((call) => call.url.includes('/contents/')));
+    assert.ok(putCalls.some((call) => call.url.endsWith('/contents/README.md')));
+    assert.ok(putCalls.some((call) => call.url.endsWith('/contents/docs/SPEC.md')));
+    assert.ok(!calls.some((call) => call.url.includes('/git/refs')));
+  } finally {
+    globalThis.fetch = originalFetch;
+    fs.rmSync(projectPath, { recursive: true, force: true });
+  }
 });
 
 test('gitHubTokenGitEnv injects one-shot HTTPS auth without changing remote URLs', () => {
