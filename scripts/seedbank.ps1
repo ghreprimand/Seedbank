@@ -49,23 +49,43 @@ if (${env:ProgramFiles(x86)}) { $commonCliDirs += (Join-Path ${env:ProgramFiles(
 if ($env:ProgramW6432) {
   $commonCliDirs += (Join-Path $env:ProgramW6432 'Git\cmd')
   $commonCliDirs += (Join-Path $env:ProgramW6432 'Git\bin')
+  $commonCliDirs += (Join-Path $env:ProgramW6432 'PortableGit\cmd')
+  $commonCliDirs += (Join-Path $env:ProgramW6432 'PortableGit\bin')
 }
 if ($env:ProgramFiles) {
   $commonCliDirs += (Join-Path $env:ProgramFiles 'Git\cmd')
   $commonCliDirs += (Join-Path $env:ProgramFiles 'Git\bin')
+  $commonCliDirs += (Join-Path $env:ProgramFiles 'PortableGit\cmd')
+  $commonCliDirs += (Join-Path $env:ProgramFiles 'PortableGit\bin')
 }
 if (${env:ProgramFiles(x86)}) {
   $commonCliDirs += (Join-Path ${env:ProgramFiles(x86)} 'Git\cmd')
   $commonCliDirs += (Join-Path ${env:ProgramFiles(x86)} 'Git\bin')
+  $commonCliDirs += (Join-Path ${env:ProgramFiles(x86)} 'PortableGit\cmd')
+  $commonCliDirs += (Join-Path ${env:ProgramFiles(x86)} 'PortableGit\bin')
 }
 if ($env:LOCALAPPDATA) {
   $commonCliDirs += (Join-Path $env:LOCALAPPDATA 'Programs\GitHub CLI')
   $commonCliDirs += (Join-Path $env:LOCALAPPDATA 'GitHub CLI')
   $commonCliDirs += (Join-Path $env:LOCALAPPDATA 'Programs\Git\cmd')
   $commonCliDirs += (Join-Path $env:LOCALAPPDATA 'Programs\Git\bin')
+  $commonCliDirs += (Join-Path $env:LOCALAPPDATA 'Programs\PortableGit\cmd')
+  $commonCliDirs += (Join-Path $env:LOCALAPPDATA 'Programs\PortableGit\bin')
+  $commonCliDirs += (Join-Path $env:LOCALAPPDATA 'GitHubDesktop\bin')
   $commonCliDirs += (Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Links')
   $commonCliDirs += (Join-Path $env:LOCALAPPDATA 'Microsoft\WindowsApps')
 }
+if ($env:USERPROFILE) {
+  $commonCliDirs += (Join-Path $env:USERPROFILE 'Git\cmd')
+  $commonCliDirs += (Join-Path $env:USERPROFILE 'Git\bin')
+  $commonCliDirs += (Join-Path $env:USERPROFILE 'PortableGit\cmd')
+  $commonCliDirs += (Join-Path $env:USERPROFILE 'PortableGit\bin')
+  $commonCliDirs += (Join-Path $env:USERPROFILE 'scoop\shims')
+  $commonCliDirs += (Join-Path $env:USERPROFILE 'scoop\apps\git\current\cmd')
+  $commonCliDirs += (Join-Path $env:USERPROFILE 'scoop\apps\git\current\bin')
+}
+if ($env:ProgramData) { $commonCliDirs += (Join-Path $env:ProgramData 'chocolatey\bin') }
+if ($env:ChocolateyInstall) { $commonCliDirs += (Join-Path $env:ChocolateyInstall 'bin') }
 foreach ($dir in $commonCliDirs) {
   Add-ProcessPathEntry $dir
 }

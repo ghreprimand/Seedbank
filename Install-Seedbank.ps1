@@ -72,18 +72,30 @@ function Update-ProcessPath {
     if (Test-Path $machineGitCmdDir) { $paths += $machineGitCmdDir }
     $machineGitBinDir = Join-Path $env:ProgramW6432 'Git\bin'
     if (Test-Path $machineGitBinDir) { $paths += $machineGitBinDir }
+    $machinePortableGitCmdDir = Join-Path $env:ProgramW6432 'PortableGit\cmd'
+    if (Test-Path $machinePortableGitCmdDir) { $paths += $machinePortableGitCmdDir }
+    $machinePortableGitBinDir = Join-Path $env:ProgramW6432 'PortableGit\bin'
+    if (Test-Path $machinePortableGitBinDir) { $paths += $machinePortableGitBinDir }
   }
   if ($env:ProgramFiles) {
     $machineGitCmdDir = Join-Path $env:ProgramFiles 'Git\cmd'
     if (Test-Path $machineGitCmdDir) { $paths += $machineGitCmdDir }
     $machineGitBinDir = Join-Path $env:ProgramFiles 'Git\bin'
     if (Test-Path $machineGitBinDir) { $paths += $machineGitBinDir }
+    $machinePortableGitCmdDir = Join-Path $env:ProgramFiles 'PortableGit\cmd'
+    if (Test-Path $machinePortableGitCmdDir) { $paths += $machinePortableGitCmdDir }
+    $machinePortableGitBinDir = Join-Path $env:ProgramFiles 'PortableGit\bin'
+    if (Test-Path $machinePortableGitBinDir) { $paths += $machinePortableGitBinDir }
   }
   if (${env:ProgramFiles(x86)}) {
     $machineGitX86CmdDir = Join-Path ${env:ProgramFiles(x86)} 'Git\cmd'
     if (Test-Path $machineGitX86CmdDir) { $paths += $machineGitX86CmdDir }
     $machineGitX86BinDir = Join-Path ${env:ProgramFiles(x86)} 'Git\bin'
     if (Test-Path $machineGitX86BinDir) { $paths += $machineGitX86BinDir }
+    $machinePortableGitX86CmdDir = Join-Path ${env:ProgramFiles(x86)} 'PortableGit\cmd'
+    if (Test-Path $machinePortableGitX86CmdDir) { $paths += $machinePortableGitX86CmdDir }
+    $machinePortableGitX86BinDir = Join-Path ${env:ProgramFiles(x86)} 'PortableGit\bin'
+    if (Test-Path $machinePortableGitX86BinDir) { $paths += $machinePortableGitX86BinDir }
   }
   if ($env:LOCALAPPDATA) {
     $userGhProgramDir = Join-Path $env:LOCALAPPDATA 'Programs\GitHub CLI'
@@ -94,10 +106,40 @@ function Update-ProcessPath {
     if (Test-Path $userGitCmdDir) { $paths += $userGitCmdDir }
     $userGitBinDir = Join-Path $env:LOCALAPPDATA 'Programs\Git\bin'
     if (Test-Path $userGitBinDir) { $paths += $userGitBinDir }
+    $userPortableGitCmdDir = Join-Path $env:LOCALAPPDATA 'Programs\PortableGit\cmd'
+    if (Test-Path $userPortableGitCmdDir) { $paths += $userPortableGitCmdDir }
+    $userPortableGitBinDir = Join-Path $env:LOCALAPPDATA 'Programs\PortableGit\bin'
+    if (Test-Path $userPortableGitBinDir) { $paths += $userPortableGitBinDir }
+    $githubDesktopBinDir = Join-Path $env:LOCALAPPDATA 'GitHubDesktop\bin'
+    if (Test-Path $githubDesktopBinDir) { $paths += $githubDesktopBinDir }
     $wingetLinksDir = Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Links'
     if (Test-Path $wingetLinksDir) { $paths += $wingetLinksDir }
     $windowsAppsDir = Join-Path $env:LOCALAPPDATA 'Microsoft\WindowsApps'
     if (Test-Path $windowsAppsDir) { $paths += $windowsAppsDir }
+  }
+  if ($env:USERPROFILE) {
+    $profileGitCmdDir = Join-Path $env:USERPROFILE 'Git\cmd'
+    if (Test-Path $profileGitCmdDir) { $paths += $profileGitCmdDir }
+    $profileGitBinDir = Join-Path $env:USERPROFILE 'Git\bin'
+    if (Test-Path $profileGitBinDir) { $paths += $profileGitBinDir }
+    $profilePortableGitCmdDir = Join-Path $env:USERPROFILE 'PortableGit\cmd'
+    if (Test-Path $profilePortableGitCmdDir) { $paths += $profilePortableGitCmdDir }
+    $profilePortableGitBinDir = Join-Path $env:USERPROFILE 'PortableGit\bin'
+    if (Test-Path $profilePortableGitBinDir) { $paths += $profilePortableGitBinDir }
+    $scoopShimsDir = Join-Path $env:USERPROFILE 'scoop\shims'
+    if (Test-Path $scoopShimsDir) { $paths += $scoopShimsDir }
+    $scoopGitCmdDir = Join-Path $env:USERPROFILE 'scoop\apps\git\current\cmd'
+    if (Test-Path $scoopGitCmdDir) { $paths += $scoopGitCmdDir }
+    $scoopGitBinDir = Join-Path $env:USERPROFILE 'scoop\apps\git\current\bin'
+    if (Test-Path $scoopGitBinDir) { $paths += $scoopGitBinDir }
+  }
+  if ($env:ProgramData) {
+    $chocoBinDir = Join-Path $env:ProgramData 'chocolatey\bin'
+    if (Test-Path $chocoBinDir) { $paths += $chocoBinDir }
+  }
+  if ($env:ChocolateyInstall) {
+    $chocoInstallBinDir = Join-Path $env:ChocolateyInstall 'bin'
+    if (Test-Path $chocoInstallBinDir) { $paths += $chocoInstallBinDir }
   }
   $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
   $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
