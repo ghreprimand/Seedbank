@@ -1,8 +1,8 @@
 /**
  * ProviderCard and StatusPill components for the AI & Agents settings page.
  */
-import { useState } from 'react';
-import { ChevronDown, Radio } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ChevronDown, MoreHorizontal } from 'lucide-react';
 import type { AiModelInfo } from '@/lib/types';
 import type { ProviderCardStatus } from './types';
 
@@ -26,6 +26,113 @@ export function StatusPill({ status }: { status: ProviderCardStatus }) {
   );
 }
 
+// ── StatusDot ─────────────────────────────────────────────────────────────────
+
+const STATUS_DOT_CLASSES: Record<ProviderCardStatus, string> = {
+  connected: 'bg-sage-500',
+  local: 'bg-sage-500',
+  'key-needed': 'bg-amber-500',
+  unreachable: 'bg-red-500',
+  'not-tested': 'bg-ink-300',
+};
+
+const STATUS_LABEL: Record<ProviderCardStatus, string> = {
+  connected: 'Connected',
+  local: 'Local',
+  'key-needed': 'Key needed',
+  unreachable: 'Unreachable',
+  'not-tested': 'Not tested',
+};
+
+function StatusIndicator({ status }: { status: ProviderCardStatus }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 text-[11px] text-ink-600">
+      <span className={`inline-block w-1.5 h-1.5 rounded-full ${STATUS_DOT_CLASSES[status]}`} />
+      {STATUS_LABEL[status]}
+    </span>
+  );
+}
+
+// ── KebabMenu ─────────────────────────────────────────────────────────────────
+
+export interface KebabMenuItem {
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  tone?: 'default' | 'danger';
+}
+
+function KebabMenu({ items, ariaLabel }: { items: KebabMenuItem[]; ariaLabel: string }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDocClick = (event: MouseEvent) => {
+      if (!ref.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const onEsc = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onDocClick);
+    document.addEventListener('keydown', onEsc);
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      document.removeEventListener('keydown', onEsc);
+    };
+  }, [open]);
+
+  if (items.length === 0) return null;
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={ariaLabel}
+        className="p-1 rounded text-ink-400 hover:text-ink-700 hover:bg-ink-50 transition-colors"
+      >
+        <MoreHorizontal className="w-4 h-4" />
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="absolute right-0 top-full z-20 mt-1 w-48 rounded-card border border-ink-200 bg-paper shadow-lg py-1"
+        >
+          {items.map((item, idx) => (
+            <button
+              key={idx}
+              type="button"
+              role="menuitem"
+              disabled={item.disabled}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (item.disabled) return;
+                setOpen(false);
+                item.onClick();
+              }}
+              className={`block w-full text-left px-3 py-1.5 text-[12px] transition-colors ${
+                item.disabled
+                  ? 'text-ink-300 cursor-not-allowed'
+                  : item.tone === 'danger'
+                    ? 'text-red-600 hover:bg-red-50'
+                    : 'text-ink-700 hover:bg-sage-50 hover:text-sage-800'
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── ProviderCard ──────────────────────────────────────────────────────────────
 
 export interface ProviderCardProps {
@@ -39,8 +146,15 @@ export interface ProviderCardProps {
   /** Discovered models to show inside the expanded card. */
   discoveredModels?: AiModelInfo[];
   onSetDefault: () => void;
-  /** When false, the "Set default" button is hidden. Default true. */
+  /** When false, "Set as default" menu item is hidden. Default true. */
   canSetDefault?: boolean;
+  /**
+   * Connection mode hint shown above the model label as a small tag,
+   * e.g. "Subscription" or "API key". Optional.
+   */
+  modeTag?: string;
+  /** Extra menu items (e.g. mode switch, sign out) appended after Set-as-default. */
+  menuItems?: KebabMenuItem[];
   actions?: React.ReactNode;
   /** Expandable detail row. */
   children?: React.ReactNode;
@@ -63,6 +177,8 @@ export function ProviderCard({
   discoveredModels = [],
   onSetDefault,
   canSetDefault = true,
+  modeTag,
+  menuItems = [],
   actions,
   children,
   defaultExpanded = false,
@@ -83,6 +199,20 @@ export function ProviderCard({
     if (defaultExpanded) setExpanded(true);
   }
 
+  const setDefaultItem: KebabMenuItem | null =
+    !isDefault && canSetDefault === true
+      ? { label: 'Set as default', onClick: onSetDefault }
+      : null;
+  const allMenuItems: KebabMenuItem[] = [
+    ...(setDefaultItem ? [setDefaultItem] : []),
+    ...menuItems,
+  ];
+
+  const subtitleParts = [
+    modeTag,
+    modelLabel,
+  ].filter(Boolean);
+
   return (
     <div
       className={`rounded-card border transition-colors ${
@@ -94,43 +224,41 @@ export function ProviderCard({
       data-help-details={helpDetails}
       data-help-manual={helpManualSection}
     >
-      {/* Header row */}
+      {/* Header row — left area toggles expansion; right cluster has its own controls. */}
       <div className="flex items-center gap-3 px-4 py-3">
-        <span className="text-xl">{icon}</span>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-semibold text-ink-800">{label}</span>
-            <StatusPill status={status} />
-            {isDefault && (
-              <span className="text-[10px] font-mono text-sage-600 uppercase tracking-wide">
-                default
-              </span>
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          aria-label={`${expanded ? 'Collapse' : 'Expand'} ${label} details`}
+          className="flex-1 min-w-0 flex items-center gap-3 text-left hover:opacity-90 transition-opacity"
+        >
+          <span className="text-xl shrink-0">{icon}</span>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm font-semibold text-ink-800">{label}</span>
+              <StatusIndicator status={status} />
+              {isDefault && (
+                <span className="text-[10px] font-mono text-sage-600 uppercase tracking-wide">
+                  · default
+                </span>
+              )}
+            </div>
+            {subtitleParts.length > 0 && (
+              <div className="text-xs text-ink-400 font-mono mt-0.5 truncate">
+                {subtitleParts.join(' · ')}
+                {typeof discoveredModelCount === 'number' && discoveredModelCount > 0
+                  ? ` · ${discoveredModelCount} models`
+                  : ''}
+              </div>
             )}
           </div>
-          <div className="text-xs text-ink-400 font-mono mt-0.5 truncate">
-            {modelLabel}
-            {typeof discoveredModelCount === 'number' && discoveredModelCount > 0
-              ? ` · ${discoveredModelCount} models available`
-              : ''}
-          </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {!isDefault && canSetDefault === true && (
-            <button
-              type="button"
-              onClick={onSetDefault}
-              className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium rounded-badge
-                         border border-ink-200 text-ink-600 hover:border-sage-300 hover:text-sage-700
-                         hover:bg-sage-50 transition-colors"
-            >
-              <Radio className="w-3 h-3" />
-              Set default
-            </button>
-          )}
+        </button>
+        <div className="flex items-center gap-1 shrink-0">
+          <KebabMenu items={allMenuItems} ariaLabel={`${label} options`} />
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}
-            aria-expanded={expanded}
             aria-label={`${expanded ? 'Collapse' : 'Expand'} ${label} details`}
             className="p-1 rounded text-ink-400 hover:text-ink-700 hover:bg-ink-50 transition-colors"
           >
@@ -141,7 +269,7 @@ export function ProviderCard({
         </div>
       </div>
 
-      {actions && (
+      {actions && expanded && (
         <div className="border-t border-ink-100 px-4 py-3 bg-paper">{actions}</div>
       )}
 

@@ -18,9 +18,6 @@ export type { ProviderProbeProps } from './ProviderProbe';
 export { ModelPicker } from './ModelPicker';
 export type { ModelPickerProps } from './ModelPicker';
 
-export { ServiceMethodSwitch } from './ServiceMethodSwitch';
-export type { ServiceMethodOption } from './ServiceMethodSwitch';
-
 export { OpenAICompatibleDetail } from './OpenAICompatibleDetail';
 export type { OpenAICompatibleDetailProps } from './OpenAICompatibleDetail';
 

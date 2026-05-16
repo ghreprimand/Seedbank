@@ -5,7 +5,6 @@
 import { aiProviderLabel, isAiProviderId } from '@/lib/types';
 import type {
   AiFeatureRoute,
-  AiMethodCapability,
   AiModelInfo,
   AiOllamaDiagnostics,
   AiOllamaModelResidency,
@@ -27,7 +26,7 @@ import {
   OPENAI_COMPATIBLE_PRESETS,
   ROUTE_LABELS,
 } from './constants';
-import type { DataResidency, LocalServerType, OpenAICompatibleMode, ServiceMethodOption } from './types';
+import type { DataResidency, LocalServerType, OpenAICompatibleMode } from './types';
 
 // ── Token formatting ──────────────────────────────────────────────────────────
 
@@ -311,23 +310,6 @@ export function providerInstanceBadge(
     return `${providerLabel(ai.provider)} · ${model || 'choose a model'}`;
   }
   return `${instance.label} · ${model || instance.configuredModel || 'choose a model'}`;
-}
-
-// ── Service method helpers ────────────────────────────────────────────────────
-
-export function methodCapabilityLabel(capability: ServiceMethodOption['capability']): string {
-  if (capability === 'chat')  return 'chat/model routing';
-  return 'chat/model routing';
-}
-
-export function optionFromMethodCapability(method: AiMethodCapability): ServiceMethodOption {
-  return {
-    id: method.id,
-    label: method.label,
-    capability: 'chat',
-    availability: method.availability,
-    availabilityReason: method.availabilityReason,
-  };
 }
 
 // ── Usage audit helpers ───────────────────────────────────────────────────────
