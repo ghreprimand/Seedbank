@@ -30,6 +30,13 @@ For release archives, use the installer in the extracted Seedbank folder:
 - macOS: double-click `Install-Seedbank.command`
 - Windows: double-click `Install-Seedbank.bat`
 
+macOS note: Seedbank release archives are currently unsigned/not notarized. If macOS shows “Apple could not verify `Install-Seedbank.command` is free of malware,” open Terminal in the extracted Seedbank folder and run:
+
+```bash
+xattr -dr com.apple.quarantine .
+./Install-Seedbank.command
+```
+
 The installer checks Node.js/npm, offers an automatic install path when the OS has a supported package manager, installs Seedbank dependencies, creates an application launcher, and starts Seedbank.
 
 For a development checkout, prerequisites are:
@@ -148,10 +155,11 @@ bash scripts/seedbank start
 
 Use `bash scripts/seedbank stop` to stop background processes.
 
-If macOS blocks the launcher because the archive is unsigned, run this inside the extracted folder:
+If macOS blocks the launcher because the archive is unsigned/not notarized, it may show: “Apple could not verify `Install-Seedbank.command` is free of malware.” Run this inside the extracted folder:
 
 ```bash
-xattr -rc .
+xattr -dr com.apple.quarantine .
+./Install-Seedbank.command
 ```
 
 ### Windows
