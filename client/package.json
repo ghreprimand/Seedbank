@@ -1,7 +1,7 @@
 {
   "name": "client",
   "private": true,
-  "version": "1.1.6",
+  "version": "1.1.7",
   "description": "A local-first project idea manager — capture, grow, and rediscover ideas for games, apps, tools, and experiments.",
   "author": "Joel",
   "license": "MIT",

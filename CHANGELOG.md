@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.1.7 — Windows Project File and Folder Hotfix
+
+- Fixed Windows project-folder opening by launching File Explorer through the Windows shell instead of waiting on `explorer.exe` directly.
+- Normalized escaped generated project file content so sequences like `\n`, `\r\n`, `\t`, and `\'` are written as readable text.
+- Added focused regression coverage for Windows folder-open command generation and escaped draft file content.
+
 ## 1.1.6 — Empty Repository API Upload Fix
 
 - Fixed the no-local-Git GitHub publishing fallback so empty repositories receive files through the GitHub Contents API instead of the Git database refs API.

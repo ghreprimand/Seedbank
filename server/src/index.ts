@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { AiService } from './ai/service.js';
+import { normalizeProjectFileContent } from './ai/prompts.js';
 import { registerAiRoutes } from './ai/routes.js';
 import { AiStore } from './ai/store.js';
 import {
@@ -548,7 +549,7 @@ function parseProjectDraftApplyFiles(value: unknown): AiProjectDraftFile[] | nul
     if (!safePath || typeof file.content !== 'string' || !file.content.trim()) return null;
     files.push({
       path: safePath,
-      content: file.content.slice(0, 80000),
+      content: normalizeProjectFileContent(file.content.slice(0, 80000)),
       ...(typeof file.description === 'string' ? { description: file.description.slice(0, 500) } : {}),
     });
   }

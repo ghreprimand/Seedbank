@@ -61,7 +61,7 @@ export function linuxFileManagerCandidates(env: NodeJS.ProcessEnv = process.env)
 export function folderOpenCommand(folderPath: string, options: FolderOpenCommandOptions = {}): FolderOpenCommand {
   const platform = options.platform ?? process.platform;
   if (platform === 'darwin') return { command: 'open', args: [folderPath] };
-  if (platform === 'win32') return { command: 'explorer.exe', args: [folderPath] };
+  if (platform === 'win32') return { command: 'cmd.exe', args: ['/d', '/c', 'start', '', folderPath] };
 
   const commandExists = options.executableExists
     ?? ((command: string) => executableExists(command, options.pathValue ?? process.env.PATH ?? ''));

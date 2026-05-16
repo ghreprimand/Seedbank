@@ -913,6 +913,16 @@ function sanitizeDraftPath(value: unknown): string | undefined {
   return parts.join('/');
 }
 
+export function normalizeProjectFileContent(content: string): string {
+  if (!/[\\][nr't]/.test(content)) return content;
+  return content
+    .replace(/\\r\\n/g, '\n')
+    .replace(/\\n/g, '\n')
+    .replace(/\\r/g, '\n')
+    .replace(/\\t/g, '\t')
+    .replace(/\\'/g, "'");
+}
+
 export function parseProjectDraft(text: string): { summary: string; files: AiProjectDraftFile[] } {
   const parsed = extractJsonObject(text, 'AI project draft response was not valid JSON.') as { summary?: unknown; files?: unknown };
   if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.files)) {
@@ -926,7 +936,7 @@ export function parseProjectDraft(text: string): { summary: string; files: AiPro
     if (!safePath || typeof file.content !== 'string' || !file.content.trim()) continue;
     files.push({
       path: safePath,
-      content: file.content.slice(0, 80000),
+      content: normalizeProjectFileContent(file.content.slice(0, 80000)),
       ...(typeof file.description === 'string' && file.description.trim()
         ? { description: file.description.trim().slice(0, 500) }
         : {}),
