@@ -44,6 +44,14 @@ if ($env:APPDATA) { $commonCliDirs += (Join-Path $env:APPDATA 'npm') }
 if ($env:LOCALAPPDATA) { $commonCliDirs += (Join-Path $env:LOCALAPPDATA 'Programs\nodejs') }
 if ($env:ProgramFiles) { $commonCliDirs += (Join-Path $env:ProgramFiles 'nodejs') }
 if (${env:ProgramFiles(x86)}) { $commonCliDirs += (Join-Path ${env:ProgramFiles(x86)} 'nodejs') }
+if ($env:ProgramFiles) { $commonCliDirs += (Join-Path $env:ProgramFiles 'GitHub CLI') }
+if (${env:ProgramFiles(x86)}) { $commonCliDirs += (Join-Path ${env:ProgramFiles(x86)} 'GitHub CLI') }
+if ($env:LOCALAPPDATA) {
+  $commonCliDirs += (Join-Path $env:LOCALAPPDATA 'Programs\GitHub CLI')
+  $commonCliDirs += (Join-Path $env:LOCALAPPDATA 'GitHub CLI')
+  $commonCliDirs += (Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Links')
+  $commonCliDirs += (Join-Path $env:LOCALAPPDATA 'Microsoft\WindowsApps')
+}
 foreach ($dir in $commonCliDirs) {
   Add-ProcessPathEntry $dir
 }

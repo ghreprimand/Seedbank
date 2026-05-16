@@ -59,6 +59,24 @@ function Update-ProcessPath {
     $machineNodeX86Dir = Join-Path ${env:ProgramFiles(x86)} 'nodejs'
     if (Test-Path $machineNodeX86Dir) { $paths += $machineNodeX86Dir }
   }
+  if ($env:ProgramFiles) {
+    $machineGhDir = Join-Path $env:ProgramFiles 'GitHub CLI'
+    if (Test-Path $machineGhDir) { $paths += $machineGhDir }
+  }
+  if (${env:ProgramFiles(x86)}) {
+    $machineGhX86Dir = Join-Path ${env:ProgramFiles(x86)} 'GitHub CLI'
+    if (Test-Path $machineGhX86Dir) { $paths += $machineGhX86Dir }
+  }
+  if ($env:LOCALAPPDATA) {
+    $userGhProgramDir = Join-Path $env:LOCALAPPDATA 'Programs\GitHub CLI'
+    if (Test-Path $userGhProgramDir) { $paths += $userGhProgramDir }
+    $userGhDir = Join-Path $env:LOCALAPPDATA 'GitHub CLI'
+    if (Test-Path $userGhDir) { $paths += $userGhDir }
+    $wingetLinksDir = Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Links'
+    if (Test-Path $wingetLinksDir) { $paths += $wingetLinksDir }
+    $windowsAppsDir = Join-Path $env:LOCALAPPDATA 'Microsoft\WindowsApps'
+    if (Test-Path $windowsAppsDir) { $paths += $windowsAppsDir }
+  }
   $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
   $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
   if ($machinePath) { $paths += $machinePath }

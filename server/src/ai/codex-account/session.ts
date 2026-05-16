@@ -285,7 +285,7 @@ class CodexAppServerSession extends EventEmitter {
         requiresOpenaiAuth: false,
       };
     }
-    const response = await this.request<AccountResponse>('account/read', {}, REQUEST_TIMEOUT_MS);
+    const response = await this.request<AccountResponse>('account/read', { refreshToken: true }, REQUEST_TIMEOUT_MS);
     const account = response.account;
     return {
       authenticated: Boolean(account),
@@ -307,7 +307,7 @@ class CodexAppServerSession extends EventEmitter {
     }
     await this.ensureStarted();
     try {
-      const current = await this.request<AccountResponse>('account/read', {}, REQUEST_TIMEOUT_MS);
+      const current = await this.request<AccountResponse>('account/read', { refreshToken: true }, REQUEST_TIMEOUT_MS);
       if (current.account) {
         return {
           ok: true,
@@ -320,7 +320,11 @@ class CodexAppServerSession extends EventEmitter {
 
     let response: LoginResponse;
     try {
-      response = await this.request<LoginResponse>('account/login/start', { type: 'chatgpt' }, REQUEST_TIMEOUT_MS);
+      response = await this.request<LoginResponse>(
+        'account/login/start',
+        { type: 'chatgpt', codexStreamlinedLogin: true },
+        REQUEST_TIMEOUT_MS,
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (/timed out/i.test(message)) {

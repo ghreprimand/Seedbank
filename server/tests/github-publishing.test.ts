@@ -1,14 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import path from 'node:path';
 import { newIdea } from '../src/domain.js';
 import {
   ensurePublishableIdea,
   GitHubPublishError,
+  githubCliSearchPaths,
   gitHubTokenGitEnv,
   parseGhAuthStatusOutput,
   parseGitHubPublishRequest,
   parseGitHubRepositoryReference,
   repoNameFromIdeaTitle,
+  resolveGitHubCliExecutable,
   sanitizeGitHubRepoName,
 } from '../src/integrations/githubClient.js';
 
@@ -23,6 +26,50 @@ test('parseGhAuthStatusOutput extracts login and scopes', () => {
   assert.equal(parsed.authenticated, true);
   assert.equal(parsed.login, 'octocat');
   assert.deepEqual(parsed.scopes, ['repo', 'read:org', 'gist']);
+});
+
+test('githubCliSearchPaths includes standard Windows GitHub CLI install directories before Path', () => {
+  const env = {
+    ProgramFiles: 'C:\\Program Files',
+    LOCALAPPDATA: 'C:\\Users\\octo\\AppData\\Local',
+    Path: '"C:\\Tools";C:\\Windows\\System32',
+  };
+
+  assert.deepEqual(githubCliSearchPaths(env, 'win32'), [
+    path.join('C:\\Program Files', 'GitHub CLI'),
+    path.join('C:\\Users\\octo\\AppData\\Local', 'Programs', 'GitHub CLI'),
+    path.join('C:\\Users\\octo\\AppData\\Local', 'GitHub CLI'),
+    path.join('C:\\Users\\octo\\AppData\\Local', 'Microsoft', 'WinGet', 'Links'),
+    path.join('C:\\Users\\octo\\AppData\\Local', 'Microsoft', 'WindowsApps'),
+    'C:\\Tools',
+    'C:\\Windows\\System32',
+  ]);
+});
+
+test('resolveGitHubCliExecutable returns a discovered Windows gh executable', () => {
+  const env = {
+    ProgramFiles: 'C:\\Program Files',
+    Path: 'C:\\Tools',
+  };
+  const expected = path.join('C:\\Program Files', 'GitHub CLI', 'gh.exe');
+
+  const resolved = resolveGitHubCliExecutable({
+    env,
+    platform: 'win32',
+    fileExists: (candidate) => candidate === expected,
+  });
+
+  assert.equal(resolved, expected);
+});
+
+test('resolveGitHubCliExecutable falls back to gh.exe on Windows', () => {
+  const resolved = resolveGitHubCliExecutable({
+    env: { Path: 'C:\\Tools' },
+    platform: 'win32',
+    fileExists: () => false,
+  });
+
+  assert.equal(resolved, 'gh.exe');
 });
 
 test('gitHubTokenGitEnv injects one-shot HTTPS auth without changing remote URLs', () => {

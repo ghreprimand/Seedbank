@@ -19,6 +19,7 @@ const GH_MAX_BUFFER = 256 * 1024;
 const GIT_TIMEOUT_MS = 15_000;
 const GIT_MAX_BUFFER = 256 * 1024;
 const INITIAL_COMMIT_MESSAGE = 'Initial commit from Seedbank';
+const WINDOWS_GH_EXECUTABLE_NAMES = ['gh.exe', 'gh.cmd', 'gh.bat', 'gh'];
 
 export class GitHubPublishError extends Error {
   readonly statusCode: number;
@@ -102,6 +103,79 @@ interface RunGitOptions {
 const FALLBACK_GIT_AUTHOR_NAME = 'Seedbank';
 const FALLBACK_GIT_AUTHOR_EMAIL = 'seedbank@local';
 
+function windowsEnvValue(env: NodeJS.ProcessEnv, key: string): string | undefined {
+  const match = Object.keys(env).find((envKey) => envKey.toLowerCase() === key.toLowerCase());
+  return match ? env[match] : undefined;
+}
+
+function cleanPathEntry(value: string): string {
+  return value.trim().replace(/^"|"$/g, '');
+}
+
+function uniqueValues(values: string[]): string[] {
+  return [...new Set(values.filter(Boolean))];
+}
+
+function pathValueForEnv(env: NodeJS.ProcessEnv, platform: NodeJS.Platform): string {
+  if (platform === 'win32') return windowsEnvValue(env, 'Path') ?? '';
+  return env.PATH ?? '';
+}
+
+function pathDelimiterForPlatform(platform: NodeJS.Platform): string {
+  return platform === 'win32' ? ';' : path.delimiter;
+}
+
+function windowsGitHubCliInstallDirs(env: NodeJS.ProcessEnv): string[] {
+  const programFiles = windowsEnvValue(env, 'ProgramFiles');
+  const programFilesX86 = windowsEnvValue(env, 'ProgramFiles(x86)');
+  const localAppData = windowsEnvValue(env, 'LOCALAPPDATA');
+  return uniqueValues([
+    ...(programFiles ? [path.join(programFiles, 'GitHub CLI')] : []),
+    ...(programFilesX86 ? [path.join(programFilesX86, 'GitHub CLI')] : []),
+    ...(localAppData
+      ? [
+          path.join(localAppData, 'Programs', 'GitHub CLI'),
+          path.join(localAppData, 'GitHub CLI'),
+          path.join(localAppData, 'Microsoft', 'WinGet', 'Links'),
+          path.join(localAppData, 'Microsoft', 'WindowsApps'),
+        ]
+      : []),
+  ]);
+}
+
+export function githubCliSearchPaths(
+  env: NodeJS.ProcessEnv = process.env,
+  platform: NodeJS.Platform = process.platform,
+): string[] {
+  const pathEntries = pathValueForEnv(env, platform)
+    .split(pathDelimiterForPlatform(platform))
+    .map(cleanPathEntry)
+    .filter(Boolean);
+  if (platform !== 'win32') return uniqueValues(pathEntries);
+  return uniqueValues([...windowsGitHubCliInstallDirs(env), ...pathEntries]);
+}
+
+export function resolveGitHubCliExecutable(
+  options: {
+    env?: NodeJS.ProcessEnv;
+    platform?: NodeJS.Platform;
+    fileExists?: (filePath: string) => boolean;
+  } = {},
+): string {
+  const platform = options.platform ?? process.platform;
+  if (platform !== 'win32') return 'gh';
+
+  const env = options.env ?? process.env;
+  const fileExists = options.fileExists ?? fs.existsSync;
+  for (const searchPath of githubCliSearchPaths(env, platform)) {
+    for (const executableName of WINDOWS_GH_EXECUTABLE_NAMES) {
+      const candidate = path.join(searchPath, executableName);
+      if (fileExists(candidate)) return candidate;
+    }
+  }
+  return 'gh.exe';
+}
+
 function isNotLoggedInMessage(text: string): boolean {
   const normalized = text.toLowerCase();
   return normalized.includes('not logged into any github hosts')
@@ -169,7 +243,7 @@ function gitMissing(err: unknown): boolean {
 
 async function runGh(args: string[]): Promise<RunResult> {
   try {
-    const result = await execFileAsync('gh', args, {
+    const result = await execFileAsync(resolveGitHubCliExecutable(), args, {
       timeout: GH_TIMEOUT_MS,
       maxBuffer: GH_MAX_BUFFER,
     });
