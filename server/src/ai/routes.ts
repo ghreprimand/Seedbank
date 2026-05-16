@@ -394,6 +394,7 @@ export function registerAiRoutes(
       model?: unknown;
       effort?: unknown;
       verbosity?: unknown;
+      provider?: unknown;
       mode?: unknown;
       context?: unknown;
     };
@@ -471,10 +472,27 @@ export function registerAiRoutes(
     }
 
     const mode = typeof body.mode === 'string' ? body.mode : 'suggest';
+    const model = optionalString(body.model, 'model');
+    if (!model.ok) {
+      res.status(400).json({ error: model.error });
+      return;
+    }
     try {
       res.json({
         mode,
-        text: await aiService.assistMode(mode, body.context ?? {}, prompt.value, clientKey(req), aiConfirmationToken.value),
+        text: await aiService.assistMode(
+          mode,
+          body.context ?? {},
+          prompt.value,
+          clientKey(req),
+          aiConfirmationToken.value,
+          {
+            providerInstanceId: parseProviderInstanceId(body.providerInstanceId),
+            ...(model.value?.trim() ? { model: model.value.trim() } : {}),
+            effort: parseAiReasoningEffort(body.effort),
+            verbosity: parseAiTextVerbosity(body.verbosity),
+          },
+        ),
       });
     } catch (error) {
       if (typeof (error as { statusCode?: unknown })?.statusCode === 'number') throw error;
