@@ -265,6 +265,13 @@ async function captureSet(config) {
     viewport: { width: 1520, height: 940 },
     colorScheme: 'light',
   });
+  // Pre-dismiss the first-run onboarding modal so it does not intercept clicks.
+  // Key matches `ONBOARDING_STORAGE_KEY` in client/src/lib/onboarding.ts.
+  await context.addInitScript(() => {
+    try {
+      window.localStorage.setItem('seedbank.onboarding.v1.dismissed', 'true');
+    } catch {}
+  });
   const page = await context.newPage();
 
   try {
@@ -284,7 +291,7 @@ async function captureSet(config) {
     await screenshot(page, outDir, 'settings-theme.jpg');
 
     await openRoute(page, baseUrl, '/settings/ai-agents');
-    await page.waitForSelector('text=Thinking Partner · Providers', { timeout: 10000 });
+    await page.waitForSelector('text=AI Services', { timeout: 10000 });
     await screenshot(page, outDir, 'settings-ai-agents.jpg');
 
     await openRoute(page, baseUrl, '/settings/api');
