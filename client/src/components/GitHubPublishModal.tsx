@@ -138,11 +138,20 @@ export default function GitHubPublishModal({ idea, onClose, onPublished }: GitHu
           )}
 
           {result && (
-            <div className="px-3 py-2 rounded-card border border-sage-200 bg-sage-50 text-xs text-sage-800 space-y-1">
+            <div className={`px-3 py-2 rounded-card border text-xs space-y-1 ${
+              result.error || (pushInitial && !result.pushed)
+                ? 'border-amber-200 bg-amber-50 text-amber-900'
+                : 'border-sage-200 bg-sage-50 text-sage-800'
+            }`}>
               <p>{result.message ?? 'Publish request completed.'}</p>
               <p>
                 Repo created: <strong>{result.repoCreated ? 'yes' : 'no'}</strong> · Initial push: <strong>{result.pushed ? 'yes' : 'no'}</strong>
               </p>
+              {result.error && (
+                <p>
+                  Fix the local Git/GitHub issue, then use <strong>Update GitHub repo</strong> from Project generation to retry the commit and push.
+                </p>
+              )}
               {result.repoUrl && (
                 <a href={result.repoUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sage-800 hover:text-sage-900 underline">
                   Open repository <ExternalLink className="w-3 h-3" />

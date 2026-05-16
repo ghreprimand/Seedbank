@@ -10,6 +10,12 @@
 - Changed the GitHub release workflow to manual dispatch only so tags can be created deliberately without automatically starting package jobs or self-hosted runner work.
 - Reworked idea stage progression so tags are optional, the next-stage checklist is visible in a Stage Progress panel, users can move stages manually at any time, and ideas auto-advance when an edit completes the current stage checklist.
 
+## 1.1.2 — GitHub Publishing Hotfix
+
+- Fixed GitHub publishing so initial project pushes use the authenticated local `gh` CLI token directly instead of depending on OS-specific Git credential helpers.
+- Added fallback commit identity for generated project commits when a machine does not have global Git `user.name` / `user.email` configured.
+- Improved publish feedback when GitHub creates the repository but local commit/push fails, including a clearer retry path through **Update GitHub repo**.
+
 ## 1.0.1 — macOS App Launcher Fix
 
 - Fixed the generated macOS `Seedbank.app` launcher so Finder/Dock launches get a usable Homebrew/system PATH and write troubleshooting output to `~/Library/Logs/Seedbank/launcher.log`.

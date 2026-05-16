@@ -94,6 +94,14 @@ interface RunResult {
   stderr: string;
 }
 
+interface RunGitOptions {
+  allowFailure?: boolean;
+  env?: NodeJS.ProcessEnv;
+}
+
+const FALLBACK_GIT_AUTHOR_NAME = 'Seedbank';
+const FALLBACK_GIT_AUTHOR_EMAIL = 'seedbank@local';
+
 function isNotLoggedInMessage(text: string): boolean {
   const normalized = text.toLowerCase();
   return normalized.includes('not logged into any github hosts')
@@ -180,12 +188,32 @@ async function runGh(args: string[]): Promise<RunResult> {
   }
 }
 
-async function runGit(args: string[], cwd: string, allowFailure = false): Promise<RunResult> {
+function redactSensitiveText(value: string): string {
+  return value.replace(/(AUTHORIZATION:\s*basic\s+)[A-Za-z0-9+/=]+/gi, '$1[redacted]');
+}
+
+export function gitHubTokenGitEnv(token: string, baseEnv: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const header = `AUTHORIZATION: basic ${Buffer.from(`x-access-token:${token}`, 'utf8').toString('base64')}`;
+  return {
+    ...baseEnv,
+    GIT_TERMINAL_PROMPT: '0',
+    GIT_CONFIG_COUNT: '1',
+    GIT_CONFIG_KEY_0: 'http.https://github.com/.extraheader',
+    GIT_CONFIG_VALUE_0: header,
+  };
+}
+
+async function runGit(args: string[], cwd: string, options: RunGitOptions = {}): Promise<RunResult> {
   try {
     const result = await execFileAsync('git', args, {
       cwd,
       timeout: GIT_TIMEOUT_MS,
       maxBuffer: GIT_MAX_BUFFER,
+      env: {
+        ...process.env,
+        GIT_TERMINAL_PROMPT: '0',
+        ...options.env,
+      },
     });
     return {
       stdout: result.stdout,
@@ -195,15 +223,54 @@ async function runGit(args: string[], cwd: string, allowFailure = false): Promis
     if (gitMissing(err)) {
       throw new GitHubPublishError('git is not installed or not available in PATH.', 503);
     }
-    if (allowFailure) {
+    if (options.allowFailure) {
       const cast = err as { stdout?: string; stderr?: string };
       return {
         stdout: cast.stdout ?? '',
         stderr: cast.stderr ?? '',
       };
     }
+    if (err instanceof Error) {
+      err.message = redactSensitiveText(err.message);
+    }
     throw err;
   }
+}
+
+async function fallbackCommitIdentityEnv(cwd: string, baseEnv: NodeJS.ProcessEnv = process.env): Promise<NodeJS.ProcessEnv> {
+  const [nameResult, emailResult] = await Promise.all([
+    runGit(['config', '--get', 'user.name'], cwd, { allowFailure: true }),
+    runGit(['config', '--get', 'user.email'], cwd, { allowFailure: true }),
+  ]);
+  const env: NodeJS.ProcessEnv = {};
+  const hasName = Boolean(baseEnv.GIT_AUTHOR_NAME || baseEnv.GIT_COMMITTER_NAME || nameResult.stdout.trim());
+  const hasEmail = Boolean(baseEnv.GIT_AUTHOR_EMAIL || baseEnv.GIT_COMMITTER_EMAIL || emailResult.stdout.trim());
+
+  if (!hasName) {
+    env.GIT_AUTHOR_NAME = FALLBACK_GIT_AUTHOR_NAME;
+    env.GIT_COMMITTER_NAME = FALLBACK_GIT_AUTHOR_NAME;
+  }
+  if (!hasEmail) {
+    env.GIT_AUTHOR_EMAIL = FALLBACK_GIT_AUTHOR_EMAIL;
+    env.GIT_COMMITTER_EMAIL = FALLBACK_GIT_AUTHOR_EMAIL;
+  }
+  return env;
+}
+
+async function runGitCommit(args: string[], cwd: string): Promise<RunResult> {
+  return runGit(args, cwd, {
+    env: await fallbackCommitIdentityEnv(cwd),
+  });
+}
+
+async function runGitPush(args: string[], cwd: string, token: string): Promise<RunResult> {
+  return runGit(args, cwd, {
+    env: gitHubTokenGitEnv(token),
+  });
+}
+
+async function preflightGitForPush(projectPath: string): Promise<void> {
+  await runGit(['--version'], projectPath);
 }
 
 async function readGhToken(): Promise<string> {
@@ -323,14 +390,14 @@ function ensureDirectory(pathValue: string): void {
 }
 
 async function ensureGitInitialized(projectPath: string): Promise<void> {
-  const probe = await runGit(['rev-parse', '--is-inside-work-tree'], projectPath, true);
+  const probe = await runGit(['rev-parse', '--is-inside-work-tree'], projectPath, { allowFailure: true });
   if (!probe.stdout.trim().toLowerCase().includes('true')) {
     await runGit(['init'], projectPath);
   }
 }
 
 async function repositoryHasCommits(projectPath: string): Promise<boolean> {
-  const probe = await runGit(['rev-parse', '--verify', 'HEAD'], projectPath, true);
+  const probe = await runGit(['rev-parse', '--verify', 'HEAD'], projectPath, { allowFailure: true });
   return probe.stdout.trim().length > 0;
 }
 
@@ -344,13 +411,13 @@ async function hasStagedChanges(projectPath: string): Promise<boolean> {
 }
 
 async function getOriginUrl(projectPath: string): Promise<string | undefined> {
-  const remoteProbe = await runGit(['remote', 'get-url', 'origin'], projectPath, true);
+  const remoteProbe = await runGit(['remote', 'get-url', 'origin'], projectPath, { allowFailure: true });
   const current = remoteProbe.stdout.trim();
   return current || undefined;
 }
 
 async function configureOrigin(projectPath: string, remoteUrl: string): Promise<void> {
-  const remoteProbe = await runGit(['remote', 'get-url', 'origin'], projectPath, true);
+  const remoteProbe = await runGit(['remote', 'get-url', 'origin'], projectPath, { allowFailure: true });
   const current = remoteProbe.stdout.trim();
   if (!current) {
     await runGit(['remote', 'add', 'origin', remoteUrl], projectPath);
@@ -361,7 +428,7 @@ async function configureOrigin(projectPath: string, remoteUrl: string): Promise<
   }
 }
 
-async function pushInitialProject(projectPath: string, remoteUrl: string): Promise<void> {
+async function pushInitialProject(projectPath: string, remoteUrl: string, token: string): Promise<void> {
   await ensureGitInitialized(projectPath);
   await runGit(['add', '-A'], projectPath);
 
@@ -370,20 +437,20 @@ async function pushInitialProject(projectPath: string, remoteUrl: string): Promi
 
   if (!hasCommits) {
     if (staged) {
-      await runGit(['commit', '-m', INITIAL_COMMIT_MESSAGE], projectPath);
+      await runGitCommit(['commit', '-m', INITIAL_COMMIT_MESSAGE], projectPath);
     } else {
-      await runGit(['commit', '--allow-empty', '-m', INITIAL_COMMIT_MESSAGE], projectPath);
+      await runGitCommit(['commit', '--allow-empty', '-m', INITIAL_COMMIT_MESSAGE], projectPath);
     }
   } else if (staged) {
-    await runGit(['commit', '-m', INITIAL_COMMIT_MESSAGE], projectPath);
+    await runGitCommit(['commit', '-m', INITIAL_COMMIT_MESSAGE], projectPath);
   }
 
   await runGit(['branch', '-M', 'main'], projectPath);
   await configureOrigin(projectPath, remoteUrl);
-  await runGit(['push', '-u', 'origin', 'main'], projectPath);
+  await runGitPush(['push', '-u', 'origin', 'main'], projectPath, token);
 }
 
-async function commitAndPushProject(projectPath: string, remoteUrl: string): Promise<{ committed: boolean; pushed: boolean }> {
+async function commitAndPushProject(projectPath: string, remoteUrl: string, token: string): Promise<{ committed: boolean; pushed: boolean }> {
   await ensureGitInitialized(projectPath);
   await runGit(['add', '-A'], projectPath);
 
@@ -393,19 +460,19 @@ async function commitAndPushProject(projectPath: string, remoteUrl: string): Pro
 
   if (!hasCommits) {
     if (staged) {
-      await runGit(['commit', '-m', INITIAL_COMMIT_MESSAGE], projectPath);
+      await runGitCommit(['commit', '-m', INITIAL_COMMIT_MESSAGE], projectPath);
     } else {
-      await runGit(['commit', '--allow-empty', '-m', INITIAL_COMMIT_MESSAGE], projectPath);
+      await runGitCommit(['commit', '--allow-empty', '-m', INITIAL_COMMIT_MESSAGE], projectPath);
     }
     committed = true;
   } else if (staged) {
-    await runGit(['commit', '-m', 'Update project files from Seedbank'], projectPath);
+    await runGitCommit(['commit', '-m', 'Update project files from Seedbank'], projectPath);
     committed = true;
   }
 
   await runGit(['branch', '-M', 'main'], projectPath);
   await configureOrigin(projectPath, remoteUrl);
-  await runGit(['push', '-u', 'origin', 'main'], projectPath);
+  await runGitPush(['push', '-u', 'origin', 'main'], projectPath, token);
   return { committed, pushed: true };
 }
 
@@ -664,6 +731,8 @@ export async function publishIdeaProject(
 ): Promise<GitHubPublishResult> {
   const { projectPath } = ensurePublishableIdea(idea);
   if (options?.enforceDirectory !== false) ensureDirectory(projectPath);
+  const pushToken = input.pushInitial ? await readGhToken() : undefined;
+  if (input.pushInitial) await preflightGitForPush(projectPath);
 
   const createdRepo = await createRepository({
     name: input.repoName,
@@ -686,9 +755,12 @@ export async function publishIdeaProject(
   if (!input.pushInitial) {
     return result;
   }
+  if (!pushToken) {
+    throw new GitHubPublishError('GitHub CLI returned an empty auth token. Run `gh auth login` and try again.', 401);
+  }
 
   try {
-    await pushInitialProject(projectPath, createdRepo.clone_url);
+    await pushInitialProject(projectPath, createdRepo.clone_url, pushToken);
     return {
       ...result,
       pushed: true,
@@ -722,7 +794,8 @@ export async function updateIdeaProjectOnGitHub(
 
   const remoteUrl = status.remoteUrl ?? `${status.repoUrl}.git`;
   try {
-    const gitResult = await commitAndPushProject(status.projectPath ?? ensurePublishableIdea(idea).projectPath, remoteUrl);
+    const token = await readGhToken();
+    const gitResult = await commitAndPushProject(status.projectPath ?? ensurePublishableIdea(idea).projectPath, remoteUrl, token);
     return {
       pushed: gitResult.pushed,
       committed: gitResult.committed,
