@@ -721,6 +721,7 @@ function applyProviderInstance(config: AiStoredConfig, providerInstanceId: AiPro
       openaiCompatiblePreset: config.localOpenaiCompatiblePreset,
       openaiCompatibleModel: config.localOpenaiCompatibleModel,
       openaiCompatibleBaseUrl: config.localOpenaiCompatibleBaseUrl,
+      openaiCompatibleApiKeyEncrypted: config.localOpenaiCompatibleApiKeyEncrypted,
     };
   }
   return {
@@ -730,6 +731,7 @@ function applyProviderInstance(config: AiStoredConfig, providerInstanceId: AiPro
     openaiCompatiblePreset: config.cloudOpenaiCompatiblePreset,
     openaiCompatibleModel: config.cloudOpenaiCompatibleModel,
     openaiCompatibleBaseUrl: config.cloudOpenaiCompatibleBaseUrl,
+    openaiCompatibleApiKeyEncrypted: config.cloudOpenaiCompatibleApiKeyEncrypted ?? config.openaiCompatibleApiKeyEncrypted,
   };
 }
 
@@ -1685,21 +1687,25 @@ export class AiService {
         : current.cloudOpenaiCompatibleApiKeyEncrypted ?? current.openaiCompatibleApiKeyEncrypted;
 
     const nextDefaultInstanceId = requestedDefaultInstanceId;
+    // Legacy openaiCompatibleXxx fields are read by OpenAICompatibleProvider.endpoint().
+    // Routing priority: (1) the user's default if it's the local/cloud OpenAI-compat
+    // instance, (2) any explicit legacy values from the input (probe paths send the
+    // draft form values via these fields), (3) the previously stored legacy values.
     const legacyOpenAICompatiblePreset = nextDefaultInstanceId === 'local-openai-compatible'
       ? nextLocalPreset
       : nextDefaultInstanceId === 'cloud-openai-compatible'
         ? nextCloudPreset
-        : current.openaiCompatiblePreset;
+        : legacyPreset ?? current.openaiCompatiblePreset;
     const legacyOpenAICompatibleModel = nextDefaultInstanceId === 'local-openai-compatible'
       ? nextLocalModel
       : nextDefaultInstanceId === 'cloud-openai-compatible'
         ? nextCloudModel
-        : current.openaiCompatibleModel;
+        : legacyModel ?? current.openaiCompatibleModel;
     const legacyOpenAICompatibleBaseUrl = nextDefaultInstanceId === 'local-openai-compatible'
       ? nextLocalBaseUrl
       : nextDefaultInstanceId === 'cloud-openai-compatible'
         ? nextCloudBaseUrl
-        : current.openaiCompatibleBaseUrl;
+        : legacyBaseUrl ?? current.openaiCompatibleBaseUrl;
     const hasOpenaiEffortPatch = Object.prototype.hasOwnProperty.call(input, 'openaiReasoningEffort');
     const hasOpenaiVerbosityPatch = Object.prototype.hasOwnProperty.call(input, 'openaiTextVerbosity');
     const hasCodexEffortPatch = Object.prototype.hasOwnProperty.call(input, 'codexReasoningEffort');
@@ -1888,8 +1894,18 @@ export class AiService {
   }
 
   async testProvider(input: AiConfigPatch = {}): Promise<AiProviderHealth> {
-    const config = this.mergeConfig(input);
-    const providerInstanceId = config.defaultProviderInstanceId;
+    const merged = this.mergeConfig(input);
+    // When the request explicitly targets a provider instance (e.g. probing the
+    // cloud-openai-compatible card while a different provider is the global
+    // default), route the config through that instance so the legacy fields
+    // the provider reads point at the targeted endpoint, not the global default.
+    const targetedInstanceId = isProviderInstanceId(input.providerInstanceId)
+      ? input.providerInstanceId
+      : undefined;
+    const config = targetedInstanceId
+      ? applyProviderInstance(merged, targetedInstanceId)
+      : merged;
+    const providerInstanceId = targetedInstanceId ?? config.defaultProviderInstanceId;
     const instance = config.providerInstances[providerInstanceId];
     const health = await this.provider(config).health(config);
     const metadata = metadataForConfig(config, health.model ?? modelFor(config));
@@ -1912,7 +1928,13 @@ export class AiService {
   }
 
   async listModels(input: AiConfigPatch = {}): Promise<AiModelListResult> {
-    const config = this.mergeConfig(input);
+    const merged = this.mergeConfig(input);
+    const targetedInstanceId = isProviderInstanceId(input.providerInstanceId)
+      ? input.providerInstanceId
+      : undefined;
+    const config = targetedInstanceId
+      ? applyProviderInstance(merged, targetedInstanceId)
+      : merged;
     return this.provider(config).listModels(config);
   }
 
@@ -2341,9 +2363,10 @@ export class AiService {
     prompt: string | undefined,
     key: string,
     confirmationToken?: string,
+    override: AiRequestRouteOverride = {},
   ): Promise<string> {
     const feature = featureForMode(mode);
-    const config = resolveFeatureConfig(this.getConfig(), feature);
+    const config = resolveFeatureConfig(this.getConfig(), feature, override);
     this.checkGuardrails(config, feature, key, { confirmationToken });
 
     try {
