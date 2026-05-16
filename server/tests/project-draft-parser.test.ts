@@ -51,7 +51,7 @@ test('project draft parser repairs common Codex JSON-like object output', () => 
 
   assert.equal(parsed.summary, 'Starter docs for the idea.');
   assert.deepEqual(parsed.files.map((file) => file.path), ['SPEC.md', 'TODO.md']);
-  assert.match(parsed.files[0]?.content ?? '', /Smallest useful version/);
+  assert.equal(parsed.files[0]?.content, '# Spec\n\nSmallest useful version.');
 });
 
 test('project draft repair preserves code-like content inside strings', () => {
@@ -68,6 +68,23 @@ test('project draft repair preserves code-like content inside strings', () => {
   assert.match(parsed.files[0]?.content ?? '', /https:\/\/example.com\/api/);
   assert.match(parsed.files[0]?.content ?? '', /\{ foo: bar \}/);
   assert.match(parsed.files[0]?.content ?? '', /sample code text/);
+});
+
+test('project draft parser normalizes escaped prose content before writing files', () => {
+  const parsed = parseProjectDraft(JSON.stringify({
+    summary: 'Starter docs.',
+    files: [
+      {
+        path: 'README.md',
+        content: "# Point-and-Click Adventure Game\\n\\nA solo-built game inspired by King\\'s Quest.\\n\\tIndented note.",
+      },
+    ],
+  }));
+
+  assert.equal(
+    parsed.files[0]?.content,
+    "# Point-and-Click Adventure Game\n\nA solo-built game inspired by King's Quest.\n\tIndented note.",
+  );
 });
 
 test('project draft parser still filters unsafe paths after repairing output', () => {

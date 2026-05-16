@@ -16,8 +16,8 @@ test('folderOpenCommand uses the standard macOS opener', () => {
 
 test('folderOpenCommand uses the standard Windows file explorer', () => {
   assert.deepEqual(folderOpenCommand('C:\\Projects\\demo', { platform: 'win32' }), {
-    command: 'explorer.exe',
-    args: ['C:\\Projects\\demo'],
+    command: 'cmd.exe',
+    args: ['/d', '/c', 'start', '', 'C:\\Projects\\demo'],
   });
 });
 
