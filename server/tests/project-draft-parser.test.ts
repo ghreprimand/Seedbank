@@ -11,7 +11,8 @@ test('project draft prompt works with sparse ideas', () => {
 
   const text = promptForProjectDraft(idea).map((message) => message.content).join('\n');
   assert.match(text, /Lantern Garden Journal/);
-  assert.match(text, /Return only JSON/);
+  assert.match(text, /Return only a single JSON object/);
+  assert.match(text, /CRITICAL JSON FORMATTING/);
   assert.match(text, /files/);
 });
 
@@ -80,4 +81,59 @@ test('project draft parser still filters unsafe paths after repairing output', (
   }`);
 
   assert.deepEqual(parsed.files.map((file) => file.path), ['SAFE.md']);
+});
+
+test('project draft parser repairs literal newlines inside content strings', () => {
+  // Reproduces the Opus 4.7 failure mode: model emits literal newlines (not \n
+  // escapes) inside file content strings. Pre-repair this raises
+  // "Unexpected token '\\', '\\n/ '... is not valid JSON".
+  const parsed = parseProjectDraft(`{
+    "summary": "Starter docs.",
+    "files": [
+      {"path": "README.md", "content": "# Title
+/ note line
+hello"}
+    ]
+  }`);
+
+  assert.equal(parsed.files.length, 1);
+  assert.equal(parsed.files[0]?.path, 'README.md');
+  assert.match(parsed.files[0]?.content ?? '', /\/ note line/);
+  assert.match(parsed.files[0]?.content ?? '', /hello$/);
+});
+
+test('project draft parser ignores triple-backticks embedded inside string content', () => {
+  // Reproduces the failure where Opus emits bare JSON whose file content
+  // contains markdown code fences. The old fence-stripping regex matched the
+  // first inner ``` and parsed gibberish; the trimmed JSON must win instead.
+  const payload = JSON.stringify({
+    summary: 'Starter docs.',
+    files: [
+      {
+        path: 'SPEC.md',
+        content: '# Spec\n\n```\nScene {\n  background: image\n  hotspots: [Hotspot]\n}\n```\n',
+      },
+    ],
+  });
+
+  const parsed = parseProjectDraft(payload);
+  assert.equal(parsed.files.length, 1);
+  assert.equal(parsed.files[0]?.path, 'SPEC.md');
+  assert.match(parsed.files[0]?.content ?? '', /Scene \{/);
+});
+
+test('project draft parser still strips an outer fenced wrapper', () => {
+  const inner = JSON.stringify({
+    summary: 'Starter docs.',
+    files: [{ path: 'README.md', content: '# Title' }],
+  });
+  const parsed = parseProjectDraft('```json\n' + inner + '\n```');
+  assert.equal(parsed.files[0]?.path, 'README.md');
+});
+
+test('project draft parser includes a response preview when the payload is unparseable', () => {
+  assert.throws(
+    () => parseProjectDraft('Sorry, I can only respond in plain text. Here is what you asked for: ...'),
+    /Response preview: "Sorry, I can only respond/,
+  );
 });

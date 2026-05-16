@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import { extractSuggestion } from './utils/suggestion-parser.js';
 import type {
   AiChatMessage,
@@ -43,6 +44,8 @@ const FIELD_ASSIST_PROMPT = [
   'When asked to write or rewrite text, provide a concrete answer immediately without asking for permission first.',
   'Focus only on the specified field — do not comment on or modify other parts of the idea.',
   'Use the supplied idea context as source material and avoid generic product-coaching language.',
+  'Do not add audiences, markets, users, deadlines, technologies, or claims that are not supported by the supplied idea context.',
+  'Treat empty fields as unknown — never invent details to fill the gap.',
   'If the notes frame the idea as a personal daily-driver or learning project, write for the user\'s own workflow unless external users are explicitly mentioned.',
   'Write in plain text for an app UI. Do not use markdown bold, markdown headings, or decorative labels.',
   'Do not return meta-commentary about the request. Return directly usable field text.',
@@ -228,6 +231,7 @@ function fieldOutputContract(field: AiSuggestionField): string {
   const contracts: Record<AiSuggestionField, string[]> = {
     pitch: [
       'Output contract for Elevator Pitch:',
+      'If Concept (hook) is filled, the pitch must distill that exact concept — do not invent a different framing. If Concept is empty, fall back to Raw Notes, then The Case, then the title.',
       'Write one crisp sentence, or two short sentences only if needed.',
       'Say what the project is and the main value it creates.',
       'For personal tools, frame the payoff around the user\'s own workflow instead of a market claim.',
@@ -240,18 +244,21 @@ function fieldOutputContract(field: AiSuggestionField): string {
     ],
     hook: [
       'Output contract for Concept:',
+      'Build the explanation from what the user wrote in Raw Notes (fullNotes); fall back to the title and Elevator Pitch if Raw Notes are empty.',
       'Write a concise plain-language explanation of what this thing is.',
       'Name the core mechanism, workflow, or experience when the context supports it.',
       'Do not turn the concept into a marketing pitch.',
     ],
     whyItMightWork: [
       'Output contract for The Case:',
+      'Treat the Concept (hook) field as the source of truth for what this project is. If Concept is filled, your case must argue why building that specific thing is worth the effort — do not redescribe or redefine it. If Concept is empty, fall back to the Raw Notes and Elevator Pitch, in that order.',
       'Write one or two plain paragraphs that answer why this is worth building from the captured idea context.',
       'For a personal daily-driver or learning project, center the user\'s own friction, learning goals, workflow payoff, and validation criteria.',
       'Do not turn it into a launch, market, growth, or external-user argument unless those are explicitly present in the notes.',
     ],
     risks: [
       'Output contract for Risks & Blockers:',
+      'Ground risks in the project as defined by Concept and (if filled) Build Notes — risks should attach to the actual mechanism, scope, and stack, not generic project risk.',
       'List concrete risks, blockers, tradeoffs, and failure modes grounded in the supplied idea context.',
       'Prefer specific implementation, scope, validation, usability, or maintenance risks over generic startup risk language.',
       'Simple hyphen bullets are appropriate for this field.',
@@ -313,6 +320,7 @@ function fieldAssistIntentContract(intent: AiFieldAssistIntent | undefined, omit
     return [
       'Mode contract: Apply the selected playbook only where it fits the target field and idea context.',
       'If the playbook wording conflicts with the field output contract or the idea context, obey the field output contract.',
+      'If multiple playbooks are active and they conflict, prioritize playbooks in this order: 1) Honest & Direct, 2) Devil\'s Advocate, 3) Scope Down, 4) Technical, 5) Marketing. Lower-priority playbooks contribute only where they do not contradict higher-priority ones.',
       'For personal daily-driver projects, do not force external-user or market framing unless the notes explicitly call for it.',
     ].join(' ');
   }
@@ -524,10 +532,12 @@ export function promptForProjectDraft(idea: Idea, prompt?: string): AiProviderMe
       role: 'system',
       content: [
         'You draft reviewable project files from a Seedbank idea.',
-        'Return only JSON with keys "summary" and "files".',
+        'Return only a single JSON object with keys "summary" and "files". No prose, no markdown fences, no commentary before or after.',
         '"files" must be an array of objects with "path", "content", and optional "description".',
         'Use relative paths only. Do not use absolute paths, parent traversal, hidden directories, or generated binaries.',
         'Prefer concise Markdown and plain text files unless the user asks for code.',
+        'CRITICAL JSON FORMATTING: every "content" value is a JSON string. All newlines inside file content MUST be escaped as \\n. All tabs as \\t. All literal backslashes as \\\\. All double quotes as \\". Never emit a raw newline, tab, or unescaped backslash inside a string value — that produces invalid JSON and the response will be rejected.',
+        'If you would normally wrap your answer in a markdown code fence, do not — return the raw JSON object only.',
       ].join(' '),
     },
     { role: 'system', content: ideaContext(idea) },
@@ -603,17 +613,40 @@ export function featureForMode(mode: string): AiFeatureId {
 
 function extractJsonObject(text: string, errorMessage = 'AI response was not valid JSON.'): unknown {
   const trimmed = text.trim();
-  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const candidate = fenced?.[1]?.trim() ?? trimmed;
 
-  const parseCandidates = [candidate];
-  const start = candidate.indexOf('{');
-  const end = candidate.lastIndexOf('}');
-  if (start >= 0 && end > start) parseCandidates.push(candidate.slice(start, end + 1));
+  // Always try the raw trimmed text first. Only fall through to fence-stripping
+  // when the response actually starts with a code fence — otherwise the regex
+  // greedily matches the *first* pair of triple-backticks anywhere in the text,
+  // which for project-draft responses lands inside a generated markdown file's
+  // own code fence and discards the surrounding JSON.
+  const parseCandidates: string[] = [trimmed];
+  if (trimmed.startsWith('```')) {
+    const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    const fencedInner = fenced?.[1]?.trim();
+    if (fencedInner) parseCandidates.push(fencedInner);
+  }
+
+  const start = trimmed.indexOf('{');
+  const end = trimmed.lastIndexOf('}');
+  if (start >= 0 && end > start) parseCandidates.push(trimmed.slice(start, end + 1));
 
   let lastError: unknown;
   for (const item of parseCandidates) {
-    for (const attempt of [item, repairJsonLikeObject(item)]) {
+    // Order matters: try the raw item, then progressively more aggressive repairs.
+    // stripStructuralInvisibles removes zero-width / control chars that V8 rejects
+    // as unexpected tokens; sanitizeJsonStringContents handles the common Opus
+    // failure where file content strings contain literal newlines or stray
+    // backslashes; repairJsonLikeObject handles unquoted keys and trailing commas.
+    const stripped = stripStructuralInvisibles(item);
+    const sanitized = sanitizeJsonStringContents(stripped);
+    const attempts = [
+      item,
+      stripped,
+      sanitized,
+      repairJsonLikeObject(stripped),
+      repairJsonLikeObject(sanitized),
+    ];
+    for (const attempt of attempts) {
       try {
         return JSON.parse(attempt);
       } catch (err) {
@@ -622,12 +655,144 @@ function extractJsonObject(text: string, errorMessage = 'AI response was not val
     }
   }
 
+  // Emit the failing payload + diagnostics. The character-code dump near the
+  // failure position is the difference between guessing and knowing for the
+  // invisible-character class of failures.
   const detail = lastError instanceof Error ? ` ${lastError.message}` : '';
-  throw new Error(`${errorMessage}${detail}`);
+  const preview = text.trim().slice(0, 240).replace(/\s+/g, ' ');
+  const previewSuffix = preview ? ` Response preview: "${preview}${text.length > 240 ? '\u2026' : ''}"` : '';
+  const charCodes = text.trim().slice(0, 16).split('').map((c) => `U+${c.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')}`).join(' ');
+  const codesSuffix = charCodes ? ` First chars: [${charCodes}]` : '';
+  // Persist the full raw response to a debug log so the bytes can be inspected
+  // offline. Truncated at 200KB to keep things bounded. Best-effort only \u2014 never
+  // throw from the diagnostics path.
+  try {
+    const debugDir = '/tmp/seedbank-ai-debug';
+    fs.mkdirSync(debugDir, { recursive: true });
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const file = `${debugDir}/json-parse-fail-${stamp}.txt`;
+    fs.writeFileSync(file, text.slice(0, 200_000), 'utf8');
+    console.error(`[ai] parse-failure raw response written to ${file}`);
+  } catch {
+    // ignore \u2014 diagnostics are best-effort
+  }
+  throw new Error(`${errorMessage}${detail}${previewSuffix}${codesSuffix}`);
+}
+
+/**
+ * Strip zero-width, BOM, and structural control characters that appear OUTSIDE
+ * JSON string values. These don't match \s in JS regex but V8's JSON.parse
+ * rejects them as unexpected tokens. Characters preserved inside string values
+ * because the model may legitimately have included them in content.
+ */
+function stripStructuralInvisibles(value: string): string {
+  // Characters to nuke when not inside a string: BOM (U+FEFF), zero-width space
+  // (U+200B), zero-width non-joiner (U+200C), zero-width joiner (U+200D),
+  // word joiner (U+2060), left-to-right mark (U+200E), right-to-left mark (U+200F),
+  // and other C0/C1 control chars that aren't valid JSON whitespace.
+  // JSON's allowed whitespace is just space, tab, newline, CR.
+  let output = '';
+  let inString = false;
+  let quote = '';
+  let escaped = false;
+
+  for (let index = 0; index < value.length; index += 1) {
+    const char = value[index] ?? '';
+    const code = char.charCodeAt(0);
+
+    if (inString) {
+      output += char;
+      if (escaped) {
+        escaped = false;
+      } else if (char === '\\') {
+        escaped = true;
+      } else if (char === quote) {
+        inString = false;
+        quote = '';
+      }
+      continue;
+    }
+
+    if (char === '"' || char === "'") {
+      inString = true;
+      quote = char;
+      output += char;
+      continue;
+    }
+
+    // Outside a string: drop BOM, zero-width family, bidi marks, and any C0
+    // control char that isn't \t (0x09), \n (0x0A), or \r (0x0D).
+    if (code === 0xFEFF || code === 0x200B || code === 0x200C || code === 0x200D
+        || code === 0x200E || code === 0x200F || code === 0x2060
+        || code === 0x00A0 // non-breaking space \u2192 drop
+        || (code < 0x20 && code !== 0x09 && code !== 0x0A && code !== 0x0D)
+        || (code >= 0x7F && code <= 0x9F) // C1 controls
+    ) {
+      // skip
+      continue;
+    }
+    output += char;
+  }
+  return output;
 }
 
 function repairJsonLikeObject(value: string): string {
   return removeTrailingCommasOutsideStrings(quoteObjectKeysOutsideStrings(value.replace(/^\uFEFF/, '')));
+}
+
+/**
+ * Repair a JSON-ish payload where the model emitted literal control characters
+ * (newlines, tabs, carriage returns) inside string values, or bare backslashes
+ * not followed by a valid JSON escape character. Walks the text tracking string
+ * state with the same approach as quoteObjectKeysOutsideStrings.
+ */
+function sanitizeJsonStringContents(value: string): string {
+  let output = '';
+  let inString = false;
+  let quote = '';
+
+  for (let index = 0; index < value.length; index += 1) {
+    const char = value[index] ?? '';
+
+    if (!inString) {
+      if (char === '"' || char === "'") {
+        inString = true;
+        quote = char;
+      }
+      output += char;
+      continue;
+    }
+
+    if (char === '\\') {
+      const next = value[index + 1];
+      // Valid JSON escape characters per the spec, plus single-quote which some models emit.
+      if (next !== undefined && /["\\/bfnrtu']/.test(next)) {
+        output += char + next;
+        index += 1;
+      } else {
+        // Bare backslash with no valid escape continuation \u2014 double it.
+        output += '\\\\';
+      }
+      continue;
+    }
+
+    if (char === quote) {
+      inString = false;
+      quote = '';
+      output += char;
+      continue;
+    }
+
+    // Inside a string: replace literal control characters with their JSON escapes.
+    if (char === '\n') output += '\\n';
+    else if (char === '\r') output += '\\r';
+    else if (char === '\t') output += '\\t';
+    else if (char === '\b') output += '\\b';
+    else if (char === '\f') output += '\\f';
+    else output += char;
+  }
+
+  return output;
 }
 
 function quoteObjectKeysOutsideStrings(value: string): string {

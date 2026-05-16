@@ -944,9 +944,11 @@ export interface AiProjectDraftRequest {
 export interface AiProjectDraftResult {
   summary: string;
   files: AiProjectDraftFile[];
-  provider: AiProviderId;
-  providerInstanceId: AiProviderInstanceId;
-  model: string;
+  provider?: AiProviderId;
+  providerInstanceId?: AiProviderInstanceId;
+  model?: string;
+  source?: 'ai' | 'template';
+  fallbackReason?: string;
 }
 
 export interface AiProjectDraftApplyRequest {

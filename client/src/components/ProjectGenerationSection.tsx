@@ -6,6 +6,7 @@ import {
   generateProjectFiles,
   getGitHubPublishStatus,
   getIdeaGitHubRepoStatus,
+  getIdeaProjectFolderStatus,
   getIntegrations,
   openIdeaProjectFolder,
   preflightAiRequest,
@@ -36,9 +37,19 @@ export default function ProjectGenerationSection({
 }: ProjectGenerationSectionProps) {
   const [prompt, setPrompt] = useState(DEFAULT_PROMPT);
   const [loading, setLoading] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [routeLabel, setRouteLabel] = useState('');
   const [warnings, setWarnings] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // Source-attribution state for the file-source banner. Three shapes:
+  //   { kind: 'ai-failed', reason } — AI was configured, preflight passed, server fell back to templates.
+  //   { kind: 'no-ai', reason }      — AI is not configured / preflight failed; templates are the only option.
+  //   null                            — AI succeeded, no fallback used.
+  const [fallbackSource, setFallbackSource] = useState<
+    | { kind: 'ai-failed'; reason: string }
+    | { kind: 'no-ai'; reason: string }
+    | null
+  >(null);
   const [result, setResult] = useState<AiProjectGenerateResult | null>(null);
   const [projectRootConfigured, setProjectRootConfigured] = useState<boolean | null>(null);
   const [projectRootValue, setProjectRootValue] = useState('');
@@ -49,9 +60,10 @@ export default function ProjectGenerationSection({
   const [repoActionLoading, setRepoActionLoading] = useState(false);
   const [folderOpenLoading, setFolderOpenLoading] = useState(false);
   const [repoMessage, setRepoMessage] = useState<string | null>(null);
+  const [projectFolderExists, setProjectFolderExists] = useState<true | false | null>(null);
 
   const projectPath = result?.idea.graduatedTo ?? idea.graduatedTo;
-  const hasProjectPath = Boolean(projectPath);
+  const hasProjectPath = Boolean(projectPath) && projectFolderExists !== false;
   const canPublishToGitHub = hasProjectPath && githubAvailable === true && githubAuthenticated === true;
   const repoStatus = repoStatusRecord?.ideaId === idea.id && repoStatusRecord.projectPath === projectPath ? repoStatusRecord.status : null;
   const repoStatusLoading = canPublishToGitHub && repoStatus === null;
@@ -130,33 +142,98 @@ export default function ProjectGenerationSection({
     };
   }, [githubAuthenticated, githubAvailable, hasProjectPath, idea.id, idea.links, projectPath]);
 
+  useEffect(() => {
+    let cancelled = false;
+    if (!idea.graduatedTo?.trim()) {
+      setProjectFolderExists(null);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    getIdeaProjectFolderStatus(idea.id)
+      .then((status) => {
+        if (cancelled) return;
+        setProjectFolderExists(status.exists && status.isDirectory);
+      })
+      .catch(() => {
+        // Keep the previous truth value on uncertainty. Only an authoritative
+        // status response can mark the project folder missing.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [idea.id, idea.graduatedTo]);
+
+  useEffect(() => {
+    if (!loading) return undefined;
+    setElapsedSeconds(0);
+    const startedAt = Date.now();
+    const timer = window.setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [loading]);
+
   const generate = async () => {
     setLoading(true);
+    setElapsedSeconds(0);
     setWarnings([]);
     setError(null);
+    setFallbackSource(null);
     try {
-      const preflight = await preflightAiRequest({ feature: 'project-drafting' });
-      setWarnings(preflight.warnings);
-      setRouteLabel(`${preflight.provider} / ${preflight.resolvedModelId ?? preflight.model}`);
-      if (!preflight.allowed) {
-        setError(preflight.blockers.join(' '));
-        return;
+      let confirmationToken: string | undefined;
+      // aiPreflightOk distinguishes "AI was supposed to work but the server fell
+      // back" from "AI is not configured at all". The first is alert-worthy; the
+      // second is informational.
+      let aiPreflightOk = false;
+      try {
+        const preflight = await preflightAiRequest({ feature: 'project-drafting' });
+        setWarnings([...preflight.warnings, ...preflight.blockers]);
+        setRouteLabel(`${preflight.provider} / ${preflight.resolvedModelId ?? preflight.model}`);
+        confirmationToken = preflight.confirmationToken;
+        aiPreflightOk = preflight.blockers.length === 0;
+      } catch {
+        setWarnings(['AI preflight was unavailable. Seedbank will still try generation and fall back to idea-field templates if needed.']);
       }
 
       const response = await generateProjectFiles({
         ideaId: idea.id,
         prompt: prompt.trim() || DEFAULT_PROMPT,
-        ...(preflight.confirmationToken ? { aiConfirmationToken: preflight.confirmationToken } : {}),
+        ...(confirmationToken ? { aiConfirmationToken: confirmationToken } : {}),
       });
       setResult(response);
       setRepoMessage(null);
       setRepoStatusRecord(null);
-      setRouteLabel(`${response.provider} / ${response.model}`);
+      setProjectFolderExists(true);
+      if (response.source === 'template') {
+        const reason = response.fallbackReason?.trim() || 'AI was unavailable.';
+        setRouteLabel('Template fallback');
+        setFallbackSource(
+          aiPreflightOk
+            ? { kind: 'ai-failed', reason }
+            : { kind: 'no-ai', reason },
+        );
+      } else {
+        setRouteLabel(`${response.provider ?? 'AI'} / ${response.model ?? 'generated files'}`);
+      }
       onGenerated(response);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const confirmMissingProjectFolder = async (message: string) => {
+    const normalized = message.toLowerCase();
+    if (!normalized.includes('seedbank api 404:') || !normalized.includes('does not exist')) return;
+    try {
+      const status = await getIdeaProjectFolderStatus(idea.id);
+      if (!status.exists) setProjectFolderExists(false);
+      else if (status.isDirectory) setProjectFolderExists(true);
+    } catch {
+      // Failed confirmation is uncertainty, not proof of a missing folder.
     }
   };
 
@@ -171,7 +248,9 @@ export default function ProjectGenerationSection({
       const status = await getIdeaGitHubRepoStatus(idea.id);
       if (projectPath) setRepoStatusRecord({ ideaId: idea.id, projectPath, status });
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
+      void confirmMissingProjectFolder(message);
     } finally {
       setRepoActionLoading(false);
     }
@@ -185,8 +264,11 @@ export default function ProjectGenerationSection({
     try {
       const response = await openIdeaProjectFolder(idea.id);
       setRepoMessage(response.message);
+      setProjectFolderExists(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
+      void confirmMissingProjectFolder(message);
     } finally {
       setFolderOpenLoading(false);
     }
@@ -221,7 +303,7 @@ export default function ProjectGenerationSection({
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-sage-600 hover:bg-sage-700 disabled:bg-ink-300 text-white rounded-card transition-colors"
           >
             {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FolderPlus className="w-3.5 h-3.5" />}
-            {hasProjectPath ? 'Generate files' : 'Create project files'}
+            {loading ? `Generating... ${elapsedSeconds}s` : projectPath ? 'Generate files' : 'Create project files'}
           </button>
           {githubRepoExists ? (
             <button
@@ -255,6 +337,16 @@ export default function ProjectGenerationSection({
         </div>
       </div>
 
+      <div className={`px-3 py-2 rounded-card border text-xs ${
+        loading
+          ? 'border-sage-200 bg-sage-50 text-sage-800'
+          : 'border-ink-100 bg-paper-warm text-ink-500'
+      }`}>
+        {loading
+          ? `Generation is running (${elapsedSeconds}s elapsed). Long model calls can take 30s-2min; the page will update when complete.`
+          : 'Generation can take 30s-2min depending on the model; the page will update when complete.'}
+      </div>
+
       <label className="block text-xs text-ink-500">
         File generation brief
         <textarea
@@ -286,6 +378,12 @@ export default function ProjectGenerationSection({
       {projectRootConfigured === true && projectRootValue && !projectPath && (
         <div className="px-3 py-2 rounded-card border border-ink-100 bg-paper-warm text-xs text-ink-600">
           New project folders will be created under <span className="font-mono text-ink-700">{projectRootValue}</span>.
+        </div>
+      )}
+
+      {projectFolderExists === false && idea.graduatedTo?.trim() && (
+        <div className="px-3 py-2 rounded-card border border-amber-200 bg-amber-50 text-xs text-amber-900">
+          Project folder at <span className="font-mono">{idea.graduatedTo}</span> is missing. Click Generate files to recreate it, or update the idea&apos;s project path in another tool.
         </div>
       )}
 
@@ -324,7 +422,7 @@ export default function ProjectGenerationSection({
         </div>
       )}
 
-      {projectPath && (
+      {hasProjectPath && (
         <div className="flex flex-wrap items-center gap-2 text-xs text-ink-500">
           <span className="font-mono text-ink-600 truncate max-w-full">{projectPath}</span>
           <button
@@ -344,15 +442,65 @@ export default function ProjectGenerationSection({
         </div>
       )}
 
+      {fallbackSource?.kind === 'ai-failed' && (
+        <div className="px-3 py-2 rounded-card border border-red-200 bg-red-50 text-xs text-red-800 space-y-2">
+          <p className="flex items-start gap-1.5 font-semibold">
+            <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+            AI did not generate these files.
+          </p>
+          <p>
+            Seedbank fell back to a template built from your idea fields because AI generation failed. Template files are usually lower quality than AI output; you probably want to retry.
+          </p>
+          <p className="font-mono text-[11px] text-red-700 break-words">
+            Reason: {fallbackSource.reason}
+          </p>
+          <button
+            type="button"
+            onClick={() => { void generate(); }}
+            disabled={loading}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold border border-red-300 text-red-800 hover:bg-red-100 disabled:opacity-50 rounded-card transition-colors"
+          >
+            <RefreshCw className="w-3 h-3" />
+            Retry with AI
+          </button>
+        </div>
+      )}
+
+      {fallbackSource?.kind === 'no-ai' && (
+        <div className="px-3 py-2 rounded-card border border-amber-200 bg-amber-50 text-xs text-amber-900 space-y-1">
+          <p className="flex items-start gap-1.5">
+            <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+            <span>
+              AI is not configured — files were generated from your idea fields. Edit them before publishing, or{' '}
+              <Link to="/settings/ai-agents" className="font-semibold underline hover:text-amber-950">configure an AI provider</Link>
+              {' '}and retry for a richer draft.
+            </span>
+          </p>
+        </div>
+      )}
+
       {result && (
-        <div className="px-3 py-2 rounded-card border border-sage-100 bg-sage-50 text-xs text-sage-800 space-y-2">
+        <div className={`px-3 py-2 rounded-card border text-xs space-y-2 ${
+          result.source === 'template'
+            ? 'border-ink-100 bg-paper-warm text-ink-700'
+            : 'border-sage-100 bg-sage-50 text-sage-800'
+        }`}>
           <p className="flex items-center gap-1.5">
-            <Check className="w-3.5 h-3.5" />
-            {result.createdProject ? 'Created project folder and wrote files.' : 'Wrote files to the existing project folder.'}
+            {result.source === 'template'
+              ? <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
+              : <Check className="w-3.5 h-3.5" />}
+            <span>
+              {result.createdProject ? 'Created project folder and wrote files' : 'Wrote files to the existing project folder'}
+              {result.source === 'template'
+                ? ' from idea-field templates.'
+                : ` using ${result.provider ?? 'AI'}${result.model ? ` (${result.model})` : ''}.`}
+            </span>
           </p>
           <div className="flex flex-wrap gap-1.5">
             {result.filesWritten.map((file) => (
-              <span key={file} className="px-2 py-0.5 rounded-badge bg-paper border border-sage-100 font-mono text-[10px]">
+              <span key={file} className={`px-2 py-0.5 rounded-badge bg-paper font-mono text-[10px] border ${
+                result.source === 'template' ? 'border-ink-100' : 'border-sage-100'
+              }`}>
                 {file}
               </span>
             ))}
