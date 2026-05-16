@@ -76,6 +76,27 @@ interface RepoLookup {
   name?: string;
 }
 
+interface GitHubBlob {
+  sha: string;
+}
+
+interface GitHubTree {
+  sha: string;
+}
+
+interface GitHubCommit {
+  sha: string;
+  tree: {
+    sha: string;
+  };
+}
+
+interface GitHubRef {
+  object: {
+    sha: string;
+  };
+}
+
 interface GitHubRepoReference {
   owner: string;
   name: string;
@@ -103,6 +124,10 @@ interface RunGitOptions {
 
 const FALLBACK_GIT_AUTHOR_NAME = 'Seedbank';
 const FALLBACK_GIT_AUTHOR_EMAIL = 'seedbank@local';
+const API_UPLOAD_MAX_FILES = 200;
+const API_UPLOAD_MAX_FILE_BYTES = 1024 * 1024;
+const API_UPLOAD_MAX_TOTAL_BYTES = 5 * 1024 * 1024;
+const API_UPLOAD_SKIP_DIRS = new Set(['.git', 'node_modules', '.release', 'dist', 'build']);
 
 function windowsEnvValue(env: NodeJS.ProcessEnv, key: string): string | undefined {
   const match = Object.keys(env).find((envKey) => envKey.toLowerCase() === key.toLowerCase());
@@ -149,23 +174,43 @@ function windowsGitInstallDirs(env: NodeJS.ProcessEnv): string[] {
   const programFiles = windowsEnvValue(env, 'ProgramFiles');
   const programFilesX86 = windowsEnvValue(env, 'ProgramFiles(x86)');
   const localAppData = windowsEnvValue(env, 'LOCALAPPDATA');
+  const appData = windowsEnvValue(env, 'APPDATA');
+  const userProfile = windowsEnvValue(env, 'USERPROFILE');
+  const programData = windowsEnvValue(env, 'ProgramData');
+  const chocolateyInstall = windowsEnvValue(env, 'ChocolateyInstall');
   const roots = uniqueValues([
     ...(programW6432 ? [programW6432] : []),
     ...(programFiles ? [programFiles] : []),
     ...(programFilesX86 ? [programFilesX86] : []),
     ...(localAppData ? [path.join(localAppData, 'Programs')] : []),
+    ...(userProfile ? [userProfile] : []),
   ]);
   return uniqueValues([
     ...roots.flatMap((root) => [
       path.join(root, 'Git', 'cmd'),
       path.join(root, 'Git', 'bin'),
+      path.join(root, 'PortableGit', 'cmd'),
+      path.join(root, 'PortableGit', 'bin'),
     ]),
+    ...(userProfile
+      ? [
+          path.join(userProfile, 'scoop', 'shims'),
+          path.join(userProfile, 'scoop', 'apps', 'git', 'current', 'cmd'),
+          path.join(userProfile, 'scoop', 'apps', 'git', 'current', 'bin'),
+        ]
+      : []),
+    ...(programData ? [path.join(programData, 'chocolatey', 'bin')] : []),
+    ...(chocolateyInstall ? [path.join(chocolateyInstall, 'bin')] : []),
     ...(localAppData
       ? [
+          path.join(localAppData, 'GitHubDesktop', 'bin'),
+          path.join(localAppData, 'Programs', 'PortableGit', 'cmd'),
+          path.join(localAppData, 'Programs', 'PortableGit', 'bin'),
           path.join(localAppData, 'Microsoft', 'WinGet', 'Links'),
           path.join(localAppData, 'Microsoft', 'WindowsApps'),
         ]
       : []),
+    ...(appData ? [path.join(appData, 'npm')] : []),
   ]);
 }
 
@@ -412,6 +457,10 @@ async function preflightGitForPush(projectPath: string): Promise<void> {
   await runGit(['--version'], projectPath);
 }
 
+function isMissingGitError(err: unknown): boolean {
+  return err instanceof GitHubPublishError && err.statusCode === 503 && /git is not installed|git for windows/i.test(err.message);
+}
+
 async function readGhToken(): Promise<string> {
   try {
     const { stdout } = await runGh(['auth', 'token']);
@@ -528,6 +577,54 @@ function ensureDirectory(pathValue: string): void {
   }
 }
 
+interface ApiUploadFile {
+  path: string;
+  contentBase64: string;
+  size: number;
+}
+
+function collectProjectFilesForGitHubApi(projectPath: string): ApiUploadFile[] {
+  const files: ApiUploadFile[] = [];
+  let totalBytes = 0;
+
+  const walk = (dirPath: string, relDir = '') => {
+    const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        if (API_UPLOAD_SKIP_DIRS.has(entry.name)) continue;
+        walk(path.join(dirPath, entry.name), relDir ? `${relDir}/${entry.name}` : entry.name);
+        continue;
+      }
+      if (!entry.isFile()) continue;
+
+      const relPath = relDir ? `${relDir}/${entry.name}` : entry.name;
+      const filePath = path.join(dirPath, entry.name);
+      const stat = fs.statSync(filePath);
+      if (stat.size > API_UPLOAD_MAX_FILE_BYTES) {
+        throw new GitHubPublishError(
+          `Cannot upload "${relPath}" without local Git because it is larger than 1 MB. Install Git for Windows and retry.`,
+          413,
+        );
+      }
+      totalBytes += stat.size;
+      if (files.length >= API_UPLOAD_MAX_FILES || totalBytes > API_UPLOAD_MAX_TOTAL_BYTES) {
+        throw new GitHubPublishError(
+          'This project is too large to upload without local Git. Install Git for Windows and retry.',
+          413,
+        );
+      }
+      files.push({
+        path: relPath,
+        contentBase64: fs.readFileSync(filePath).toString('base64'),
+        size: stat.size,
+      });
+    }
+  };
+
+  walk(projectPath);
+  return files;
+}
+
 async function ensureGitInitialized(projectPath: string): Promise<void> {
   const probe = await runGit(['rev-parse', '--is-inside-work-tree'], projectPath, { allowFailure: true });
   if (!probe.stdout.trim().toLowerCase().includes('true')) {
@@ -587,6 +684,97 @@ async function pushInitialProject(projectPath: string, remoteUrl: string, token:
   await runGit(['branch', '-M', 'main'], projectPath);
   await configureOrigin(projectPath, remoteUrl);
   await runGitPush(['push', '-u', 'origin', 'main'], projectPath, token);
+}
+
+async function uploadProjectFilesViaGitHubApi(
+  token: string,
+  input: {
+    owner: string;
+    name: string;
+    projectPath: string;
+    message: string;
+    branch?: string;
+  },
+): Promise<{ filesUploaded: number; bytesUploaded: number; branch: string }> {
+  const files = collectProjectFilesForGitHubApi(input.projectPath);
+  if (files.length === 0) {
+    files.push({
+      path: '.gitkeep',
+      contentBase64: Buffer.from('', 'utf8').toString('base64'),
+      size: 0,
+    });
+  }
+
+  const repoPath = `/repos/${encodeURIComponent(input.owner)}/${encodeURIComponent(input.name)}`;
+  const branch = input.branch?.trim() || 'main';
+  let currentRef: GitHubRef | null = null;
+  try {
+    currentRef = await ghFetch<GitHubRef>(token, `${repoPath}/git/ref/heads/${encodeURIComponent(branch)}`);
+  } catch (err) {
+    if (!(err instanceof GitHubPublishError && err.statusCode === 404)) throw err;
+  }
+
+  let parentCommit: GitHubCommit | null = null;
+  if (currentRef) {
+    parentCommit = await ghFetch<GitHubCommit>(token, `${repoPath}/git/commits/${encodeURIComponent(currentRef.object.sha)}`);
+  }
+
+  const tree = [];
+  for (const file of files) {
+    const blob = await ghFetch<GitHubBlob>(token, `${repoPath}/git/blobs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        content: file.contentBase64,
+        encoding: 'base64',
+      }),
+    });
+    tree.push({
+      path: file.path,
+      mode: '100644',
+      type: 'blob',
+      sha: blob.sha,
+    });
+  }
+
+  const newTree = await ghFetch<GitHubTree>(token, `${repoPath}/git/trees`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      ...(parentCommit ? { base_tree: parentCommit.tree.sha } : {}),
+      tree,
+    }),
+  });
+
+  const commit = await ghFetch<GitHubCommit>(token, `${repoPath}/git/commits`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      message: input.message,
+      tree: newTree.sha,
+      parents: parentCommit ? [parentCommit.sha] : [],
+    }),
+  });
+
+  if (currentRef) {
+    await ghFetch<GitHubRef>(token, `${repoPath}/git/refs/heads/${encodeURIComponent(branch)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sha: commit.sha, force: false }),
+    });
+  } else {
+    await ghFetch<GitHubRef>(token, `${repoPath}/git/refs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ref: `refs/heads/${branch}`, sha: commit.sha }),
+    });
+  }
+
+  return {
+    filesUploaded: files.length,
+    bytesUploaded: files.reduce((sum, file) => sum + file.size, 0),
+    branch,
+  };
 }
 
 async function commitAndPushProject(projectPath: string, remoteUrl: string, token: string): Promise<{ committed: boolean; pushed: boolean }> {
@@ -871,7 +1059,15 @@ export async function publishIdeaProject(
   const { projectPath } = ensurePublishableIdea(idea);
   if (options?.enforceDirectory !== false) ensureDirectory(projectPath);
   const pushToken = input.pushInitial ? await readGhToken() : undefined;
-  if (input.pushInitial) await preflightGitForPush(projectPath);
+  let gitAvailableForPush = false;
+  if (input.pushInitial) {
+    try {
+      await preflightGitForPush(projectPath);
+      gitAvailableForPush = true;
+    } catch (err) {
+      if (!isMissingGitError(err)) throw err;
+    }
+  }
 
   const createdRepo = await createRepository({
     name: input.repoName,
@@ -899,11 +1095,27 @@ export async function publishIdeaProject(
   }
 
   try {
-    await pushInitialProject(projectPath, createdRepo.clone_url, pushToken);
+    if (gitAvailableForPush) {
+      await pushInitialProject(projectPath, createdRepo.clone_url, pushToken);
+    } else {
+      const reference = parseGitHubRepositoryReference(createdRepo.html_url);
+      if (!reference) {
+        throw new GitHubPublishError('GitHub repository created, but Seedbank could not parse its repository URL.', 502);
+      }
+      await uploadProjectFilesViaGitHubApi(pushToken, {
+        owner: reference.owner,
+        name: reference.name,
+        projectPath,
+        message: INITIAL_COMMIT_MESSAGE,
+        branch: createdRepo.default_branch || 'main',
+      });
+    }
     return {
       ...result,
       pushed: true,
-      message: 'GitHub repository created and initial files pushed to main.',
+      message: gitAvailableForPush
+        ? 'GitHub repository created and initial files pushed to main.'
+        : 'GitHub repository created and initial files uploaded to main through the GitHub API.',
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -946,6 +1158,37 @@ export async function updateIdeaProjectOnGitHub(
         : 'No local file changes to commit. GitHub remote is configured and push completed.',
     };
   } catch (err) {
+    if (isMissingGitError(err) && status.owner && status.name) {
+      try {
+        const token = await readGhToken();
+        await uploadProjectFilesViaGitHubApi(token, {
+          owner: status.owner,
+          name: status.name,
+          projectPath: status.projectPath ?? ensurePublishableIdea(idea).projectPath,
+          message: 'Update project files from Seedbank',
+          branch: status.defaultBranch || 'main',
+        });
+        return {
+          pushed: true,
+          committed: true,
+          repoUrl: status.repoUrl,
+          remoteUrl,
+          projectPath: status.projectPath ?? ensurePublishableIdea(idea).projectPath,
+          message: 'Uploaded local project files to GitHub through the GitHub API because local Git was unavailable.',
+        };
+      } catch (fallbackErr) {
+        const fallbackMessage = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
+        return {
+          pushed: false,
+          committed: false,
+          repoUrl: status.repoUrl,
+          remoteUrl,
+          projectPath: status.projectPath ?? ensurePublishableIdea(idea).projectPath,
+          message: `GitHub repository found, but API upload failed: ${fallbackMessage}`,
+          error: fallbackMessage,
+        };
+      }
+    }
     const message = err instanceof Error ? err.message : String(err);
     return {
       pushed: false,

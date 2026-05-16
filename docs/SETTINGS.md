@@ -276,7 +276,7 @@ Configure where Seedbank creates project folders when you graduate an idea. (Thi
 GitHub publishing is local-first and explicit:
 
 1. Graduate an idea first to create/use a local project folder.
-2. Install Git and GitHub CLI, then authenticate once on this machine: `gh auth login`.
+2. Install GitHub CLI and authenticate once on this machine: `gh auth login`. Git is recommended for full local commit/push behavior, but Seedbank can upload small generated project folders through GitHub's API if local Git is unavailable.
 3. Use the GitHub Publishing card in this tab to verify status (linked account details, profile link, repo/follower counts, and optional private-repo/plan fields when available from GitHub).
 4. Open the idea detail page and click **Create GitHub repo** in Project generation.
 5. Choose repository name, visibility (`public`/`private`), and whether to push initial files now.

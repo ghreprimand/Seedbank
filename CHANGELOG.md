@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.1.5 — No-Local-Git Publishing Fallback
+
+- Added a GitHub API upload fallback for Create repository and Update GitHub repo when `gh` is authenticated but local `git` is unavailable.
+- Kept the existing local Git commit/push path as the preferred path whenever Git is available, preserving existing Linux/macOS behavior.
+- Expanded Windows Git detection to cover additional common install layouts, including GitHub Desktop, Scoop, Chocolatey, and portable Git folders.
+
 ## 1.1.4 — Windows Git for Publishing Hotfix
 
 - Fixed Windows GitHub publishing pushes when Git for Windows is installed in standard Git folders but the running Seedbank process has not picked up the refreshed user `Path`.

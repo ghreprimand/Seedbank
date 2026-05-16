@@ -736,7 +736,8 @@ export const MANUAL_GROUPS: ManualGroup[] = [
           { type: 'h3', text: 'GitHub publishing (optional)' },
           { type: 'p', text: 'GitHub publishing is a separate post-graduation step. It never replaces local project creation and is never required to graduate an idea.' },
           { type: 'ul', items: [
-            'Install Git and GitHub CLI (`gh`) on this machine, then run `gh auth login`.',
+            'Install GitHub CLI (`gh`) on this machine, then run `gh auth login`.',
+            'Install Git when you want normal local commit/push behavior; Seedbank can use a GitHub API upload fallback for small generated project folders if Git is unavailable.',
             'Use the GitHub Publishing card in this tab to verify linked account status.',
             'Seedbank displays profile/account details returned by GitHub via gh for confirmation.',
             'Seedbank does not store GitHub tokens; gh CLI owns authentication state.',
@@ -823,7 +824,8 @@ export const MANUAL_GROUPS: ManualGroup[] = [
           { type: 'p', text: 'GitHub publishing is optional and local-first. Seedbank creates/uses your local project folder first, then you explicitly choose whether to publish that folder to GitHub.' },
           { type: 'h3', text: 'Setup' },
           { type: 'ul', items: [
-            'Install Git and GitHub CLI (`gh`), then run `gh auth login`.',
+            'Install GitHub CLI (`gh`), then run `gh auth login`.',
+            'Install Git when you want normal local commit/push behavior; Seedbank can use a GitHub API upload fallback for small generated project folders if Git is unavailable.',
             'Choose GitHub.com and your preferred git protocol (HTTPS or SSH).',
             'Authorize repository access if you plan to publish private repos.',
             'Open Settings → Project Graduation and refresh the GitHub status card.',

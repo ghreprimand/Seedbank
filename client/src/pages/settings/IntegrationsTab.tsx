@@ -467,12 +467,15 @@ function GitHubPublishingCard({ offline }: { offline: boolean }) {
                 Link GitHub CLI on this machine to enable publishing:
               </p>
               <ol className="list-decimal pl-4 space-y-1">
-                <li>Install Git and GitHub CLI (`gh`).</li>
+                <li>Install GitHub CLI (`gh`).</li>
                 <li>Run `gh auth login`.</li>
                 <li>Choose `GitHub.com` and your preferred git protocol (HTTPS or SSH).</li>
                 <li>Allow repo access so private repository publishing works when selected.</li>
                 <li>Return here and click Refresh status.</li>
               </ol>
+              <p>
+                Git is recommended for normal local commit/push behavior; Seedbank can upload small generated projects through the GitHub API if local Git is unavailable.
+              </p>
               {status?.message && (
                 <p className="text-[11px] text-ink-500 font-mono">{status.message}</p>
               )}
