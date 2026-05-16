@@ -7,7 +7,6 @@
 import { useState, useEffect } from 'react';
 import { useAiSettings, useSettingsOffline, useSettingsStore } from '@/stores/settings';
 import { getAiMethodCapabilities } from '@/api/client';
-import { aiProviderLabel } from '@/lib/types';
 import type {
   AiMethodCapability,
   AiOpenAICompatiblePresetId,
@@ -21,7 +20,6 @@ import { HelpButton } from '@/help/HelpPopover';
 import {
   ProviderCard,
   ProviderProbe,
-  ServiceMethodSwitch,
   OpenAICompatibleDetail,
   ClaudeAccountDetail,
   CodexAccountDetail,
@@ -29,12 +27,12 @@ import {
   GuardrailsSection,
   ProviderDetailForm,
 } from './';
+import type { KebabMenuItem } from './ProviderCard';
 import {
   presetFor,
   openAICompatiblePresetMatchesMode,
   isLikelyLocalUrl,
   initialLocalServerType,
-  optionFromMethodCapability,
 } from './helpers';
 import { LOCAL_SERVER_OPTIONS, CLOUD_COMPATIBLE_DEFAULT_PRESET } from './constants';
 import type { ProviderCardStatus, LocalServerType } from './types';
@@ -144,18 +142,6 @@ export default function AiAgentsTab() {
   );
 
   // ── Method options ─────────────────────────────────────────────────────────
-  const claudeMethodOptions = methodCapabilities.filter((m) => m.serviceFamily === 'claude');
-  const visibleClaudeMethodOptions = claudeMethodOptions.filter((m) => {
-    if (m.id === 'anthropic-api-key') return instanceEnabled('claude-api');
-    if (m.id === 'claude-account-native') return instanceEnabled('claude-account');
-    return true;
-  });
-  const openaiMethodOptions = methodCapabilities.filter((m) => m.serviceFamily === 'codex-openai');
-  const visibleOpenaiMethodOptions = openaiMethodOptions.filter((m) => {
-    if (m.id === 'openai-api-key') return instanceEnabled('openai-api');
-    if (m.id === 'codex-account-app-server') return instanceEnabled('codex-account');
-    return true;
-  });
   const cloudMethods = methodCapabilities.filter((m) => m.serviceFamily === 'external-router' && m.providerId === 'openai-compatible');
   const cloudPresetMethodIds: AiOpenAICompatiblePresetId[] = (
     methodCapabilities.length > 0
@@ -450,17 +436,12 @@ export default function AiAgentsTab() {
           <HelpButton
             helpId="ai-providers"
             title="Choosing an AI Provider"
-            summary="Settings are grouped by service family (Claude, Codex/OpenAI, Local Models, External/Cloud). Choose API key for direct provider access or Account login to use your subscription."
-            details="Feature Defaults routes only chat/model-capable methods. Connection type — API key or Account login — is set per service family in the cards above."
+            summary="Each card is one provider. By default Claude and Codex use your subscription — switch to API billing from the card's ⋯ menu. Add local servers or cloud endpoints below."
+            details="Feature Defaults routes only chat/model-capable methods. Connection type — API key or Account login — lives in the ⋯ menu of the Claude / Codex cards."
             manualSection="provider-chooser"
             alwaysShow
           />
         </div>
-        <p className="text-xs text-ink-400">
-          Configure each service family. <strong>API key</strong> methods use provider API billing.
-          <strong> Account login</strong> methods use an already-signed-in local account or CLI runtime
-          where supported. Global default and Feature Defaults apply to chat/model-capable methods only.
-        </p>
         {hasDisabledProviderMethods && disabledProviderNote}
         {providerDiagnostics.length > 0 && (
           <div className="rounded-card border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900 font-mono space-y-1">
@@ -469,195 +450,210 @@ export default function AiAgentsTab() {
           </div>
         )}
 
-        <div className="space-y-4">
+        <div className="space-y-3">
           {/* ── Claude Service ─────────────────────────────────────────────── */}
-          <div className="rounded-card border border-ink-100 bg-paper p-3 space-y-3" data-help="settings-ai-claude-service">
-            <p className="text-[10px] font-mono uppercase tracking-wider text-ink-400">Claude Service</p>
-            <p className="text-[11px] text-ink-500">
-              Choose <span className="font-semibold text-ink-700">API key</span> for Anthropic API billing,
-              or <span className="font-semibold text-ink-700">Account login</span> to use your Claude account
-              subscription through Seedbank&apos;s local Claude account flow.
-            </p>
-            <ServiceMethodSwitch
-              title="Method"
-              value={claudeMethod}
-              onChange={saveClaudeMethod}
-              options={(visibleClaudeMethodOptions.length > 0
-                ? visibleClaudeMethodOptions
-                : [
-                    ...(instanceEnabled('claude-api') ? [{ id: 'anthropic-api-key', label: 'API key', channel: 'chat-model', availability: 'available' as const }] : []),
-                    ...(instanceEnabled('claude-account') ? [{ id: 'claude-account-native', label: 'Account login', channel: 'chat-model', availability: (ai.claudeAccountAuthenticated ? 'available' : 'auth-required') as AiMethodCapability['availability'] }] : []),
-                  ] as AiMethodCapability[]
-              ).map(optionFromMethodCapability)}
-            />
-            {claudeMethod === 'anthropic-api-key' && instanceEnabled('claude-api') && (
-              <ProviderCard
-                label={aiProviderLabel('anthropic')}
-                icon="🧠"
-                isDefault={ai.provider === 'anthropic'}
-                status={anthropicStatus}
-                modelLabel={ai.anthropicModel}
-                discoveredModelCount={ai.providerInstances['claude-api']?.discoveredModels?.length}
-                discoveredModels={ai.providerInstances['claude-api']?.discoveredModels}
-                onSetDefault={() => void setDefaultProvider('anthropic')}
-                actions={
-                  <ProviderProbe
-                    buildConfig={() => ({ provider: 'anthropic', anthropicModel: ai.anthropicModel })}
-                    onStatusChange={(status) => persistProbeStatus('claude-api', 'anthropic', status)}
-                    testLabel="Test saved"
-                    listLabel="List saved models"
+          {(() => {
+            const apiAvailable = instanceEnabled('claude-api');
+            const accountAvailable = instanceEnabled('claude-account');
+            const inApiMode = claudeMethod === 'anthropic-api-key' && apiAvailable;
+            const switchModeItems: KebabMenuItem[] = [];
+            if (inApiMode && accountAvailable) {
+              switchModeItems.push({
+                label: 'Use subscription instead',
+                onClick: () => saveClaudeMethod('claude-account-native'),
+              });
+            } else if (!inApiMode && apiAvailable) {
+              switchModeItems.push({
+                label: 'Use API key instead',
+                onClick: () => saveClaudeMethod('anthropic-api-key'),
+              });
+            }
+
+            if (inApiMode) {
+              return (
+                <ProviderCard
+                  label="Claude"
+                  icon="🧠"
+                  modeTag="API key"
+                  isDefault={ai.provider === 'anthropic'}
+                  status={anthropicStatus}
+                  modelLabel={ai.anthropicModel}
+                  discoveredModelCount={ai.providerInstances['claude-api']?.discoveredModels?.length}
+                  discoveredModels={ai.providerInstances['claude-api']?.discoveredModels}
+                  onSetDefault={() => void setDefaultProvider('anthropic')}
+                  menuItems={switchModeItems}
+                  actions={
+                    <ProviderProbe
+                      buildConfig={() => ({ provider: 'anthropic', anthropicModel: ai.anthropicModel })}
+                      onStatusChange={(status) => persistProbeStatus('claude-api', 'anthropic', status)}
+                      testLabel="Test saved"
+                      listLabel="List saved models"
+                    />
+                  }
+                  {...helpForProviderCard(
+                    'Anthropic API Method',
+                    'Direct API-key method for Claude models from Anthropic. Use this when you manage usage through Anthropic API billing.',
+                    'This provider method is available to Feature Defaults and Ask AI.',
+                  )}
+                >
+                  <ProviderDetailForm
+                    fields={[
+                      { key: 'model', label: 'Model', initialValue: ai.anthropicModel, placeholder: 'List models, then choose one' },
+                      { key: 'apiKey', label: 'API key', secret: true, placeholder: ai.hasAnthropicKey ? '(stored — enter new value to update)' : 'sk-ant-…' },
+                    ]}
+                    onSave={async (v) => saveAnthropic(v.model, v.apiKey || undefined)}
+                    buildProbeConfig={(v) => ({ provider: 'anthropic', anthropicModel: v.model, ...(v.apiKey ? { anthropicApiKey: v.apiKey } : {}) })}
+                    emptyModelHint="This endpoint needs a model ID before chat requests can run. Use List models when the service is available."
                   />
-                }
-                {...helpForProviderCard(
-                  'Anthropic API Method',
-                  'Direct API-key method for Claude models from Anthropic. Use this when you manage usage through Anthropic API billing.',
-                  'This provider method is available to Feature Defaults and Ask AI.',
-                )}
-              >
-                <ProviderDetailForm
-                  fields={[
-                    { key: 'model', label: 'Model', initialValue: ai.anthropicModel, placeholder: 'List models, then choose one' },
-                    { key: 'apiKey', label: 'API key', secret: true, placeholder: ai.hasAnthropicKey ? '(stored — enter new value to update)' : 'sk-ant-…' },
-                  ]}
-                  onSave={async (v) => saveAnthropic(v.model, v.apiKey || undefined)}
-                  buildProbeConfig={(v) => ({ provider: 'anthropic', anthropicModel: v.model, ...(v.apiKey ? { anthropicApiKey: v.apiKey } : {}) })}
-                  emptyModelHint="This endpoint needs a model ID before chat requests can run. Use List models when the service is available."
-                />
-              </ProviderCard>
-            )}
-            {claudeMethod === 'claude-account-native' && instanceEnabled('claude-account') && (
-              <ProviderCard
-                label={aiProviderLabel('claude-account')}
-                icon="🟣"
-                isDefault={ai.provider === 'claude-account'}
-                status={claudeAccountStatus}
-                modelLabel={ai.claudeAccountModel || 'claude-sonnet-4-6'}
-                discoveredModelCount={ai.providerInstances['claude-account']?.discoveredModels?.length}
-                discoveredModels={ai.providerInstances['claude-account']?.discoveredModels}
-                onSetDefault={() => void setDefaultProvider('claude-account')}
-                canSetDefault={claudeAccountStatus === 'connected'}
-                defaultExpanded={!ai.claudeAccountAuthenticated}
-                {...helpForProviderCard(
-                  'Claude Account Login Method',
-                  'Account-login method that routes AI features through your Claude account session instead of an Anthropic API key.',
-                  'Use login/logout in this card to manage account auth. This method is routable in Feature Defaults and Ask AI.',
-                )}
-              >
-                <ClaudeAccountDetail
-                  model={ai.claudeAccountModel || 'claude-sonnet-4-6'}
-                  compactEnabled={ai.claudeAccountCompact !== false}
-                  onSave={saveClaudeAccount}
-                  authenticated={ai.claudeAccountAuthenticated}
-                  available={ai.claudeAccountAvailable}
+                </ProviderCard>
+              );
+            }
+
+            if (accountAvailable) {
+              return (
+                <ProviderCard
+                  label="Claude"
+                  icon="🟣"
+                  modeTag="Subscription"
+                  isDefault={ai.provider === 'claude-account'}
+                  status={claudeAccountStatus}
+                  modelLabel={ai.claudeAccountModel || 'claude-sonnet-4-6'}
+                  discoveredModelCount={ai.providerInstances['claude-account']?.discoveredModels?.length}
                   discoveredModels={ai.providerInstances['claude-account']?.discoveredModels}
-                  onStatusChange={(status) => persistProbeStatus('claude-account', 'claude-account', status)}
-                />
-              </ProviderCard>
-            )}
-          </div>
+                  onSetDefault={() => void setDefaultProvider('claude-account')}
+                  canSetDefault={claudeAccountStatus === 'connected'}
+                  menuItems={switchModeItems}
+                  defaultExpanded={!ai.claudeAccountAuthenticated}
+                  {...helpForProviderCard(
+                    'Claude Account Login Method',
+                    'Account-login method that routes AI features through your Claude account session instead of an Anthropic API key.',
+                    'Use login/logout in this card to manage account auth. This method is routable in Feature Defaults and Ask AI.',
+                  )}
+                >
+                  <ClaudeAccountDetail
+                    model={ai.claudeAccountModel || 'claude-sonnet-4-6'}
+                    compactEnabled={ai.claudeAccountCompact !== false}
+                    onSave={saveClaudeAccount}
+                    authenticated={ai.claudeAccountAuthenticated}
+                    available={ai.claudeAccountAvailable}
+                    discoveredModels={ai.providerInstances['claude-account']?.discoveredModels}
+                    onStatusChange={(status) => persistProbeStatus('claude-account', 'claude-account', status)}
+                  />
+                </ProviderCard>
+              );
+            }
+            return null;
+          })()}
 
           {/* ── Codex / OpenAI Service ─────────────────────────────────────── */}
-          <div className="rounded-card border border-ink-100 bg-paper p-3 space-y-3" data-help="settings-ai-codex-service">
-            <p className="text-[10px] font-mono uppercase tracking-wider text-ink-400">Codex / OpenAI Service</p>
-            <p className="text-[11px] text-ink-500">
-              Choose <span className="font-semibold text-ink-700">API key</span> for OpenAI API billing,
-              or <span className="font-semibold text-ink-700">Account login</span> to use a local Codex CLI
-              session. Codex account login requires the Codex CLI to be installed and visible to Seedbank.
-            </p>
-            <ServiceMethodSwitch
-              title="Method"
-              value={openaiMethod}
-              onChange={saveOpenaiMethod}
-              options={(visibleOpenaiMethodOptions.length > 0
-                ? visibleOpenaiMethodOptions
-                : [
-                    ...(instanceEnabled('openai-api') ? [{ id: 'openai-api-key', label: 'API key', channel: 'chat-model', availability: 'available' as const }] : []),
-                    ...(instanceEnabled('codex-account') ? [{ id: 'codex-account-app-server', label: 'Account login', channel: 'chat-model', availability: (ai.codexAccountAuthenticated ? 'available' : 'auth-required') as AiMethodCapability['availability'] }] : []),
-                  ] as AiMethodCapability[]
-              ).map(optionFromMethodCapability)}
-            />
-            {openaiMethod === 'openai-api-key' && instanceEnabled('openai-api') && (
-              <ProviderCard
-                label={aiProviderLabel('openai')}
-                icon="🤖"
-                isDefault={ai.provider === 'openai'}
-                status={openaiStatus}
-                modelLabel={ai.openaiModel}
-                discoveredModelCount={ai.providerInstances['openai-api']?.discoveredModels?.length}
-                discoveredModels={ai.providerInstances['openai-api']?.discoveredModels}
-                onSetDefault={() => void setDefaultProvider('openai')}
-                actions={
-                  <ProviderProbe
-                    buildConfig={() => ({ provider: 'openai', openaiModel: ai.openaiModel })}
-                    onStatusChange={(status) => persistProbeStatus('openai-api', 'openai', status)}
-                    testLabel="Test saved"
-                    listLabel="List saved models"
+          {(() => {
+            const apiAvailable = instanceEnabled('openai-api');
+            const accountAvailable = instanceEnabled('codex-account');
+            const inApiMode = openaiMethod === 'openai-api-key' && apiAvailable;
+            const switchModeItems: KebabMenuItem[] = [];
+            if (inApiMode && accountAvailable) {
+              switchModeItems.push({
+                label: 'Use Codex login instead',
+                onClick: () => saveOpenaiMethod('codex-account-app-server'),
+              });
+            } else if (!inApiMode && apiAvailable) {
+              switchModeItems.push({
+                label: 'Use OpenAI API key instead',
+                onClick: () => saveOpenaiMethod('openai-api-key'),
+              });
+            }
+
+            if (inApiMode) {
+              return (
+                <ProviderCard
+                  label="OpenAI"
+                  icon="🤖"
+                  modeTag="API key"
+                  isDefault={ai.provider === 'openai'}
+                  status={openaiStatus}
+                  modelLabel={ai.openaiModel}
+                  discoveredModelCount={ai.providerInstances['openai-api']?.discoveredModels?.length}
+                  discoveredModels={ai.providerInstances['openai-api']?.discoveredModels}
+                  onSetDefault={() => void setDefaultProvider('openai')}
+                  menuItems={switchModeItems}
+                  actions={
+                    <ProviderProbe
+                      buildConfig={() => ({ provider: 'openai', openaiModel: ai.openaiModel })}
+                      onStatusChange={(status) => persistProbeStatus('openai-api', 'openai', status)}
+                      testLabel="Test saved"
+                      listLabel="List saved models"
+                    />
+                  }
+                  {...helpForProviderCard(
+                    'OpenAI API Method',
+                    'Direct API-key method for OpenAI models. Use this path when you want explicit model/API control through OpenAI API billing.',
+                    'This method participates in Feature Defaults and Ask AI model routing. It is separate from Codex account login.',
+                  )}
+                >
+                  <ProviderDetailForm
+                    fields={[
+                      { key: 'model', label: 'Model', initialValue: ai.openaiModel },
+                      { key: 'apiKey', label: 'API key', secret: true, placeholder: ai.hasOpenAIKey ? '(stored — enter new value to update)' : 'sk-…' },
+                    ]}
+                    onSave={async (v) => saveOpenAI(v.model, v.apiKey || undefined)}
+                    buildProbeConfig={(v) => ({ provider: 'openai', openaiModel: v.model, ...(v.apiKey ? { openaiApiKey: v.apiKey } : {}) })}
                   />
-                }
-                {...helpForProviderCard(
-                  'OpenAI API Method',
-                  'Direct API-key method for OpenAI models. Use this path when you want explicit model/API control through OpenAI API billing.',
-                  'This method participates in Feature Defaults and Ask AI model routing. It is separate from Codex account login.',
-                )}
-              >
-                <ProviderDetailForm
-                  fields={[
-                    { key: 'model', label: 'Model', initialValue: ai.openaiModel },
-                    { key: 'apiKey', label: 'API key', secret: true, placeholder: ai.hasOpenAIKey ? '(stored — enter new value to update)' : 'sk-…' },
-                  ]}
-                  onSave={async (v) => saveOpenAI(v.model, v.apiKey || undefined)}
-                  buildProbeConfig={(v) => ({ provider: 'openai', openaiModel: v.model, ...(v.apiKey ? { openaiApiKey: v.apiKey } : {}) })}
-                />
-              </ProviderCard>
-            )}
-            {openaiMethod === 'codex-account-app-server' && instanceEnabled('codex-account') && (
-              <ProviderCard
-                label={aiProviderLabel('codex-account')}
-                icon="⌁"
-                isDefault={ai.provider === 'codex-account'}
-                status={codexAccountStatus}
-                modelLabel={ai.codexAccountModel || 'codex-recommended'}
-                discoveredModelCount={ai.providerInstances['codex-account']?.discoveredModels?.length}
-                discoveredModels={ai.providerInstances['codex-account']?.discoveredModels}
-                onSetDefault={() => void setDefaultProvider('codex-account')}
-                canSetDefault={ai.codexAccountAvailable === true && ai.codexAccountAuthenticated === true && codexAccountStatus === 'connected'}
-                defaultExpanded={!ai.codexAccountAuthenticated}
-                {...helpForProviderCard(
-                  'Codex Account Login Method',
-                  'Account-login method via local Codex app-server. This is a chat/model provider route, not an external cloud-router card.',
-                  'Feature Defaults and Ask AI can route to this method when account auth is available. Model options come from the discovered Codex account catalog.',
-                )}
-              >
-                <CodexAccountDetail
-                  model={ai.codexAccountModel || 'codex-recommended'}
-                  onSave={saveCodexAccount}
-                  authenticated={ai.codexAccountAuthenticated}
-                  available={ai.codexAccountAvailable}
+                </ProviderCard>
+              );
+            }
+
+            if (accountAvailable) {
+              return (
+                <ProviderCard
+                  label="Codex"
+                  icon="⌁"
+                  modeTag="Codex login"
+                  isDefault={ai.provider === 'codex-account'}
+                  status={codexAccountStatus}
+                  modelLabel={ai.codexAccountModel || 'codex-recommended'}
+                  discoveredModelCount={ai.providerInstances['codex-account']?.discoveredModels?.length}
                   discoveredModels={ai.providerInstances['codex-account']?.discoveredModels}
-                  onStatusChange={(status) => persistProbeStatus('codex-account', 'codex-account', status)}
-                />
-              </ProviderCard>
-            )}
-          </div>
+                  onSetDefault={() => void setDefaultProvider('codex-account')}
+                  canSetDefault={ai.codexAccountAvailable === true && ai.codexAccountAuthenticated === true && codexAccountStatus === 'connected'}
+                  menuItems={switchModeItems}
+                  defaultExpanded={!ai.codexAccountAuthenticated}
+                  {...helpForProviderCard(
+                    'Codex Account Login Method',
+                    'Account-login method via local Codex app-server. This is a chat/model provider route, not an external cloud-router card.',
+                    'Feature Defaults and Ask AI can route to this method when account auth is available. Model options come from the discovered Codex account catalog.',
+                  )}
+                >
+                  <CodexAccountDetail
+                    model={ai.codexAccountModel || 'codex-recommended'}
+                    onSave={saveCodexAccount}
+                    authenticated={ai.codexAccountAuthenticated}
+                    available={ai.codexAccountAvailable}
+                    discoveredModels={ai.providerInstances['codex-account']?.discoveredModels}
+                    onStatusChange={(status) => persistProbeStatus('codex-account', 'codex-account', status)}
+                  />
+                </ProviderCard>
+              );
+            }
+            return null;
+          })()}
 
           {/* ── Local Models ───────────────────────────────────────────────── */}
-          <div className="rounded-card border border-ink-100 bg-paper p-3 space-y-3" data-help="settings-ai-local-models">
-            <p className="text-[10px] font-mono uppercase tracking-wider text-ink-400">Local Models</p>
-            <label className="block text-xs text-ink-500">
-              Server type
-              <select
-                value={localServerType}
-                onChange={(e) => saveLocalServerType(e.target.value as LocalServerType)}
-                className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800"
-              >
-                {LOCAL_SERVER_OPTIONS.map((opt) => (
-                  <option key={opt.id} value={opt.id}>{opt.label}</option>
-                ))}
-              </select>
-              <span className="mt-1 block text-[11px] text-sage-600 font-mono">
-                enabled: {localServerOpt.label}
-              </span>
-            </label>
+          <div className="space-y-3 pt-2" data-help="settings-ai-local-models">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[10px] font-mono uppercase tracking-wider text-ink-500">Local Models</p>
+              <label className="flex items-center gap-2 text-[11px] text-ink-500">
+                <span className="font-mono uppercase tracking-wide text-ink-400">Server</span>
+                <select
+                  value={localServerType}
+                  onChange={(e) => saveLocalServerType(e.target.value as LocalServerType)}
+                  className="px-2 py-1 bg-paper border border-ink-100 rounded-card text-xs text-ink-700"
+                >
+                  {LOCAL_SERVER_OPTIONS.map((opt) => (
+                    <option key={opt.id} value={opt.id}>{opt.label}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
             {localServerType === 'ollama' && instanceEnabled('ollama') && (
               <ProviderCard
                 label="Ollama"
@@ -817,41 +813,42 @@ export default function AiAgentsTab() {
                 </button>
               </ProviderCard>
             ))}
-            <div className="rounded-card border border-dashed border-ink-200 bg-paper-warm p-3 space-y-2" data-help="settings-ai-add-local-instance">
-              <p className="text-[11px] font-mono uppercase tracking-wider text-ink-400">Add local instance</p>
-              <div className="grid gap-2 md:grid-cols-[1fr_1fr_1.4fr_1fr_auto] md:items-end">
-                <label className="block text-xs text-ink-500">
-                  Type
-                  <select value={newLocalType} onChange={(e) => changeNewLocalType(e.target.value as LocalServerType)} className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800">
-                    {LOCAL_SERVER_OPTIONS.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
-                  </select>
-                </label>
-                <label className="block text-xs text-ink-500">
-                  Label
-                  <input value={newLocalLabel} onChange={(e) => setNewLocalLabel(e.target.value)} placeholder="LM Studio laptop" className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800" />
-                </label>
-                <label className="block text-xs text-ink-500">
-                  Base URL
-                  <input value={newLocalBaseUrl} onChange={(e) => setNewLocalBaseUrl(e.target.value)} className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800" />
-                </label>
-                <label className="block text-xs text-ink-500">
-                  Default model
-                  <input value={newLocalModel} onChange={(e) => setNewLocalModel(e.target.value)} placeholder="optional" className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800" />
-                </label>
-                <button type="button" onClick={() => void addLocalInstance()} className="px-3 py-1.5 text-xs font-semibold bg-sage-600 hover:bg-sage-700 text-white rounded-card transition-colors">
-                  Add
-                </button>
+            <details className="group" data-help="settings-ai-add-local-instance">
+              <summary className="list-none cursor-pointer inline-flex items-center gap-1.5 text-[11px] font-medium text-ink-500 hover:text-sage-700 transition-colors">
+                <span className="inline-block w-3.5 text-center group-open:rotate-45 transition-transform">+</span>
+                Add another local instance
+              </summary>
+              <div className="mt-2 rounded-card border border-dashed border-ink-200 bg-paper-warm p-3">
+                <div className="grid gap-2 md:grid-cols-[1fr_1fr_1.4fr_1fr_auto] md:items-end">
+                  <label className="block text-xs text-ink-500">
+                    Type
+                    <select value={newLocalType} onChange={(e) => changeNewLocalType(e.target.value as LocalServerType)} className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800">
+                      {LOCAL_SERVER_OPTIONS.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
+                    </select>
+                  </label>
+                  <label className="block text-xs text-ink-500">
+                    Label
+                    <input value={newLocalLabel} onChange={(e) => setNewLocalLabel(e.target.value)} placeholder="LM Studio laptop" className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800" />
+                  </label>
+                  <label className="block text-xs text-ink-500">
+                    Base URL
+                    <input value={newLocalBaseUrl} onChange={(e) => setNewLocalBaseUrl(e.target.value)} className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800" />
+                  </label>
+                  <label className="block text-xs text-ink-500">
+                    Default model
+                    <input value={newLocalModel} onChange={(e) => setNewLocalModel(e.target.value)} placeholder="optional" className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800" />
+                  </label>
+                  <button type="button" onClick={() => void addLocalInstance()} className="px-3 py-1.5 text-xs font-semibold bg-sage-600 hover:bg-sage-700 text-white rounded-card transition-colors">
+                    Add
+                  </button>
+                </div>
               </div>
-            </div>
+            </details>
           </div>
 
           {/* ── External / Cloud ───────────────────────────────────────────── */}
-          <div className="rounded-card border border-ink-100 bg-paper p-3 space-y-3" data-help="settings-ai-external-cloud">
-            <p className="text-[10px] font-mono uppercase tracking-wider text-ink-400">External / Cloud</p>
-            <p className="text-[11px] text-ink-400">
-              Connect to hosted services: OpenRouter, Groq, Mistral, Together, Fireworks, or a custom cloud endpoint.
-              Requests from this card leave your machine and are processed by the selected cloud provider.
-            </p>
+          <div className="space-y-3 pt-2" data-help="settings-ai-external-cloud">
+            <p className="text-[10px] font-mono uppercase tracking-wider text-ink-500">External / Cloud</p>
             {instanceEnabled('cloud-openai-compatible') && (
               <ProviderCard
                 label={cloudCompatibleActive ? cloudCompatiblePreset.label : 'Cloud provider'}
@@ -983,36 +980,41 @@ export default function AiAgentsTab() {
                 </button>
               </ProviderCard>
             ))}
-            <div className="rounded-card border border-dashed border-ink-200 bg-paper-warm p-3 space-y-2" data-help="settings-ai-add-external-instance">
-              <p className="text-[11px] font-mono uppercase tracking-wider text-ink-400">Add external instance</p>
-              <div className="grid gap-2 md:grid-cols-[1fr_1fr_1.4fr_1fr_1fr_auto] md:items-end">
-                <label className="block text-xs text-ink-500">
-                  Provider
-                  <select value={newCloudPreset} onChange={(e) => changeNewCloudPreset(e.target.value as AiOpenAICompatiblePresetId)} className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800">
-                    {cloudPresetMethodIds.map((presetId) => <option key={presetId} value={presetId}>{presetFor(presetId).label}</option>)}
-                  </select>
-                </label>
-                <label className="block text-xs text-ink-500">
-                  Label
-                  <input value={newCloudLabel} onChange={(e) => setNewCloudLabel(e.target.value)} placeholder="OpenRouter personal" className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800" />
-                </label>
-                <label className="block text-xs text-ink-500">
-                  Base URL
-                  <input value={newCloudBaseUrl} onChange={(e) => setNewCloudBaseUrl(e.target.value)} className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800" />
-                </label>
-                <label className="block text-xs text-ink-500">
-                  Default model
-                  <input value={newCloudModel} onChange={(e) => setNewCloudModel(e.target.value)} className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800" />
-                </label>
-                <label className="block text-xs text-ink-500">
-                  API key
-                  <input type="password" value={newCloudKey} onChange={(e) => setNewCloudKey(e.target.value)} placeholder="required" className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800" />
-                </label>
-                <button type="button" onClick={() => void addCloudInstance()} className="px-3 py-1.5 text-xs font-semibold bg-sage-600 hover:bg-sage-700 text-white rounded-card transition-colors">
-                  Add
-                </button>
+            <details className="group" data-help="settings-ai-add-external-instance">
+              <summary className="list-none cursor-pointer inline-flex items-center gap-1.5 text-[11px] font-medium text-ink-500 hover:text-sage-700 transition-colors">
+                <span className="inline-block w-3.5 text-center group-open:rotate-45 transition-transform">+</span>
+                Add another cloud provider
+              </summary>
+              <div className="mt-2 rounded-card border border-dashed border-ink-200 bg-paper-warm p-3">
+                <div className="grid gap-2 md:grid-cols-[1fr_1fr_1.4fr_1fr_1fr_auto] md:items-end">
+                  <label className="block text-xs text-ink-500">
+                    Provider
+                    <select value={newCloudPreset} onChange={(e) => changeNewCloudPreset(e.target.value as AiOpenAICompatiblePresetId)} className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800">
+                      {cloudPresetMethodIds.map((presetId) => <option key={presetId} value={presetId}>{presetFor(presetId).label}</option>)}
+                    </select>
+                  </label>
+                  <label className="block text-xs text-ink-500">
+                    Label
+                    <input value={newCloudLabel} onChange={(e) => setNewCloudLabel(e.target.value)} placeholder="OpenRouter personal" className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800" />
+                  </label>
+                  <label className="block text-xs text-ink-500">
+                    Base URL
+                    <input value={newCloudBaseUrl} onChange={(e) => setNewCloudBaseUrl(e.target.value)} className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800" />
+                  </label>
+                  <label className="block text-xs text-ink-500">
+                    Default model
+                    <input value={newCloudModel} onChange={(e) => setNewCloudModel(e.target.value)} className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800" />
+                  </label>
+                  <label className="block text-xs text-ink-500">
+                    API key
+                    <input type="password" value={newCloudKey} onChange={(e) => setNewCloudKey(e.target.value)} placeholder="required" className="mt-1 w-full px-2 py-1.5 bg-paper border border-ink-100 rounded-card text-sm text-ink-800" />
+                  </label>
+                  <button type="button" onClick={() => void addCloudInstance()} className="px-3 py-1.5 text-xs font-semibold bg-sage-600 hover:bg-sage-700 text-white rounded-card transition-colors">
+                    Add
+                  </button>
+                </div>
               </div>
-            </div>
+            </details>
           </div>
         </div>
       </section>
