@@ -25,6 +25,7 @@ $BrowserOpenLockDir = Join-Path $CacheDir 'browser-open.lock.d'
 $LastBrowserOpenFile = Join-Path $CacheDir 'last-browser-open'
 $BrowserOpenDebounceSeconds = if ($env:SEEDBANK_BROWSER_OPEN_DEBOUNCE_SECONDS) { [int]$env:SEEDBANK_BROWSER_OPEN_DEBOUNCE_SECONDS } else { 3 }
 $Url = "http://127.0.0.1:$ClientPort"
+$StartLockCleanupRegistered = $false
 
 New-Item -ItemType Directory -Force -Path $CacheDir | Out-Null
 
@@ -72,6 +73,62 @@ function Test-ProcessRunning([int]$ProcessId) {
   }
 }
 
+function Remove-StartLock {
+  Remove-Item -LiteralPath $StartLockDir -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+function Register-StartLockCleanup {
+  if ($script:StartLockCleanupRegistered) {
+    return
+  }
+
+  Register-EngineEvent -SourceIdentifier PowerShell.Exiting -MessageData $StartLockDir -Action {
+    Remove-Item -LiteralPath $Event.MessageData -Recurse -Force -ErrorAction SilentlyContinue
+  } -ErrorAction SilentlyContinue | Out-Null
+
+  try {
+    $script:StartLockCancelHandler = [System.ConsoleCancelEventHandler]{
+      param($sender, $eventArgs)
+      Remove-Item -LiteralPath $script:StartLockDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    [System.Console]::CancelKeyPress += $script:StartLockCancelHandler
+  } catch {
+  }
+
+  $script:StartLockCleanupRegistered = $true
+}
+
+function Acquire-StartLock {
+  $lock = New-Item -ItemType Directory -Path $StartLockDir -ErrorAction SilentlyContinue
+  if ($lock) {
+    Set-Content -Path (Join-Path $StartLockDir 'pid') -Value $PID
+    Register-StartLockCleanup
+    return $true
+  }
+
+  $lockPidFile = Join-Path $StartLockDir 'pid'
+  $ownerPidRaw = $null
+  if (Test-Path $lockPidFile) {
+    $ownerPidRaw = Get-Content $lockPidFile -ErrorAction SilentlyContinue | Select-Object -First 1
+  }
+  [int]$ownerPid = 0
+  $hasOwnerPid = [int]::TryParse(([string]$ownerPidRaw), [ref]$ownerPid)
+
+  if ((-not $hasOwnerPid) -or (-not (Test-ProcessRunning $ownerPid))) {
+    Write-Host "Removing stale Seedbank start lock (owner=$(if ($hasOwnerPid) { $ownerPid } else { 'unknown' }))..."
+    Remove-StartLock
+    $lock = New-Item -ItemType Directory -Path $StartLockDir -ErrorAction SilentlyContinue
+    if ($lock) {
+      Set-Content -Path (Join-Path $StartLockDir 'pid') -Value $PID
+      Register-StartLockCleanup
+      return $true
+    }
+  }
+
+  Write-Host 'Seedbank start already in progress.'
+  return $false
+}
+
 function Get-ProcessCommandLine([int]$ProcessId) {
   try {
     $processInfo = Get-CimInstance Win32_Process -Filter "ProcessId = $ProcessId" -ErrorAction SilentlyContinue
@@ -82,6 +139,28 @@ function Get-ProcessCommandLine([int]$ProcessId) {
     return ''
   }
   return ''
+}
+
+function Test-PidLooksSeedbank([int]$ProcessId) {
+  $commandLine = Get-ProcessCommandLine $ProcessId
+  if ($commandLine -match 'seedbank') {
+    return $true
+  }
+
+  try {
+    $process = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
+    if ($process) {
+      if ($process.ProcessName -match 'seedbank') {
+        return $true
+      }
+      if ($process.Path -and ($process.Path -match 'seedbank')) {
+        return $true
+      }
+    }
+  } catch {
+  }
+
+  return $false
 }
 
 function Stop-ProcessTree([int]$ProcessId) {
@@ -317,13 +396,14 @@ function Start-Seedbank {
     if (Test-ServerReady) {
       $serverAlreadyRunning = $true
       Write-Host "Seedbank server is already running on port $ServerPort."
+    } elseif (Test-PidLooksSeedbank $serverPid) {
+      throw "Server port $ServerPort is held by another Seedbank install (PID $serverPid). Stop it with Stop-Process -Id $serverPid and rerun."
     } else {
       throw "Server port $ServerPort is already in use by PID $serverPid, but it is not a healthy Seedbank server. Stop that process or set SEEDBANK_SERVER_PORT and rebuild the client for that API port."
     }
   }
 
-  if (-not (New-Item -ItemType Directory -Path $StartLockDir -ErrorAction SilentlyContinue)) {
-    Write-Host 'Seedbank start already in progress.'
+  if (-not (Acquire-StartLock)) {
     return
   }
 
@@ -394,7 +474,7 @@ function Start-Seedbank {
     Open-SeedbankBrowser
     Write-Host "Seedbank started at $Url"
   } finally {
-    Remove-Item $StartLockDir -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-StartLock
   }
 }
 
@@ -415,7 +495,7 @@ function Stop-Seedbank {
   Remove-Item $ClientPortFile -Force -ErrorAction SilentlyContinue
   Remove-Item $ServerPortFile -Force -ErrorAction SilentlyContinue
   Remove-Item $LastBrowserOpenFile -Force -ErrorAction SilentlyContinue
-  Remove-Item $StartLockDir -Recurse -Force -ErrorAction SilentlyContinue
+  Remove-StartLock
   Remove-Item $BrowserOpenLockDir -Recurse -Force -ErrorAction SilentlyContinue
   Write-Host 'Seedbank stopped.'
 }

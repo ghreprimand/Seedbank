@@ -4,6 +4,21 @@ Newest entries at the top.
 
 ---
 
+## 2026-05-16 — Launcher Hotfix: Start Lock Cleanup and Stale-Lock Recovery
+
+Fixed a Linux installer failure cascade where the launcher could leave `~/.cache/seedbank/start.lock.d` behind after exiting from a server-port conflict. The first install attempt correctly refused to reuse port `4800` when another process owned it, but the `RETURN` trap used for lock cleanup did not run on `exit 1`, so the next launch reported "Seedbank start already in progress" until the stale lock directory was removed manually.
+
+What changed:
+- The Linux launcher now records the lock owner PID, cleans the start lock from an `EXIT` trap, and reclaims stale locks whose owner process is gone.
+- The Windows launcher now records the lock owner PID, detects and removes stale locks, and registers process-exit/Ctrl-C cleanup hooks in addition to its normal `finally` cleanup.
+- Port-conflict errors now give a clearer hint when the holder appears to be another Seedbank install, without auto-killing that process.
+
+Validation:
+- `bash -n scripts/seedbank`
+- Local Linux launcher test: forced port `4800` busy with a non-Seedbank socket holder, confirmed `./scripts/seedbank start` exits on the port conflict without leaking `~/.cache/seedbank/start.lock.d`, then freed the port and confirmed a subsequent start/stop succeeds.
+
+---
+
 ## 2026-05-16 — Project Draft Parser: Embedded Code-Fence Fix
 
 Closed a follow-on Project Generation bug surfaced after the previous day's parser hardening shipped. Opus 4.7 was emitting perfectly valid JSON, yet `extractJsonObject` was throwing "Expected property name or '}' at position 1" — the new diagnostics dump (`/tmp/seedbank-ai-debug/json-parse-fail-*.txt`) revealed the response parsed cleanly with `JSON.parse` directly, so the bug had to be inside `extractJsonObject` itself.
