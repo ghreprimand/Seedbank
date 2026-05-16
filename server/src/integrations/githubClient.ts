@@ -20,6 +20,7 @@ const GIT_TIMEOUT_MS = 15_000;
 const GIT_MAX_BUFFER = 256 * 1024;
 const INITIAL_COMMIT_MESSAGE = 'Initial commit from Seedbank';
 const WINDOWS_GH_EXECUTABLE_NAMES = ['gh.exe', 'gh.cmd', 'gh.bat', 'gh'];
+const WINDOWS_GIT_EXECUTABLE_NAMES = ['git.exe', 'git.cmd', 'git.bat', 'git'];
 
 export class GitHubPublishError extends Error {
   readonly statusCode: number;
@@ -143,16 +144,56 @@ function windowsGitHubCliInstallDirs(env: NodeJS.ProcessEnv): string[] {
   ]);
 }
 
-export function githubCliSearchPaths(
-  env: NodeJS.ProcessEnv = process.env,
-  platform: NodeJS.Platform = process.platform,
+function windowsGitInstallDirs(env: NodeJS.ProcessEnv): string[] {
+  const programW6432 = windowsEnvValue(env, 'ProgramW6432');
+  const programFiles = windowsEnvValue(env, 'ProgramFiles');
+  const programFilesX86 = windowsEnvValue(env, 'ProgramFiles(x86)');
+  const localAppData = windowsEnvValue(env, 'LOCALAPPDATA');
+  const roots = uniqueValues([
+    ...(programW6432 ? [programW6432] : []),
+    ...(programFiles ? [programFiles] : []),
+    ...(programFilesX86 ? [programFilesX86] : []),
+    ...(localAppData ? [path.join(localAppData, 'Programs')] : []),
+  ]);
+  return uniqueValues([
+    ...roots.flatMap((root) => [
+      path.join(root, 'Git', 'cmd'),
+      path.join(root, 'Git', 'bin'),
+    ]),
+    ...(localAppData
+      ? [
+          path.join(localAppData, 'Microsoft', 'WinGet', 'Links'),
+          path.join(localAppData, 'Microsoft', 'WindowsApps'),
+        ]
+      : []),
+  ]);
+}
+
+function commandSearchPaths(
+  windowsInstallDirs: string[],
+  env: NodeJS.ProcessEnv,
+  platform: NodeJS.Platform,
 ): string[] {
   const pathEntries = pathValueForEnv(env, platform)
     .split(pathDelimiterForPlatform(platform))
     .map(cleanPathEntry)
     .filter(Boolean);
   if (platform !== 'win32') return uniqueValues(pathEntries);
-  return uniqueValues([...windowsGitHubCliInstallDirs(env), ...pathEntries]);
+  return uniqueValues([...windowsInstallDirs, ...pathEntries]);
+}
+
+export function githubCliSearchPaths(
+  env: NodeJS.ProcessEnv = process.env,
+  platform: NodeJS.Platform = process.platform,
+): string[] {
+  return commandSearchPaths(windowsGitHubCliInstallDirs(env), env, platform);
+}
+
+export function gitCliSearchPaths(
+  env: NodeJS.ProcessEnv = process.env,
+  platform: NodeJS.Platform = process.platform,
+): string[] {
+  return commandSearchPaths(windowsGitInstallDirs(env), env, platform);
 }
 
 export function resolveGitHubCliExecutable(
@@ -174,6 +215,27 @@ export function resolveGitHubCliExecutable(
     }
   }
   return 'gh.exe';
+}
+
+export function resolveGitExecutable(
+  options: {
+    env?: NodeJS.ProcessEnv;
+    platform?: NodeJS.Platform;
+    fileExists?: (filePath: string) => boolean;
+  } = {},
+): string {
+  const platform = options.platform ?? process.platform;
+  if (platform !== 'win32') return 'git';
+
+  const env = options.env ?? process.env;
+  const fileExists = options.fileExists ?? fs.existsSync;
+  for (const searchPath of gitCliSearchPaths(env, platform)) {
+    for (const executableName of WINDOWS_GIT_EXECUTABLE_NAMES) {
+      const candidate = path.join(searchPath, executableName);
+      if (fileExists(candidate)) return candidate;
+    }
+  }
+  return 'git.exe';
 }
 
 function isNotLoggedInMessage(text: string): boolean {
@@ -279,7 +341,7 @@ export function gitHubTokenGitEnv(token: string, baseEnv: NodeJS.ProcessEnv = pr
 
 async function runGit(args: string[], cwd: string, options: RunGitOptions = {}): Promise<RunResult> {
   try {
-    const result = await execFileAsync('git', args, {
+    const result = await execFileAsync(resolveGitExecutable(), args, {
       cwd,
       timeout: GIT_TIMEOUT_MS,
       maxBuffer: GIT_MAX_BUFFER,
@@ -295,7 +357,10 @@ async function runGit(args: string[], cwd: string, options: RunGitOptions = {}):
     };
   } catch (err) {
     if (gitMissing(err)) {
-      throw new GitHubPublishError('git is not installed or not available in PATH.', 503);
+      throw new GitHubPublishError(
+        'Git is not installed or not available in PATH. Install Git for Windows, then restart Seedbank.',
+        503,
+      );
     }
     if (options.allowFailure) {
       const cast = err as { stdout?: string; stderr?: string };

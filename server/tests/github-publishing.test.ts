@@ -5,12 +5,14 @@ import { newIdea } from '../src/domain.js';
 import {
   ensurePublishableIdea,
   GitHubPublishError,
+  gitCliSearchPaths,
   githubCliSearchPaths,
   gitHubTokenGitEnv,
   parseGhAuthStatusOutput,
   parseGitHubPublishRequest,
   parseGitHubRepositoryReference,
   repoNameFromIdeaTitle,
+  resolveGitExecutable,
   resolveGitHubCliExecutable,
   sanitizeGitHubRepoName,
 } from '../src/integrations/githubClient.js';
@@ -70,6 +72,52 @@ test('resolveGitHubCliExecutable falls back to gh.exe on Windows', () => {
   });
 
   assert.equal(resolved, 'gh.exe');
+});
+
+test('gitCliSearchPaths includes standard Windows Git install directories before Path', () => {
+  const env = {
+    ProgramW6432: 'C:\\Program Files',
+    ProgramFiles: 'C:\\Program Files',
+    LOCALAPPDATA: 'C:\\Users\\octo\\AppData\\Local',
+    Path: '"C:\\Tools";C:\\Windows\\System32',
+  };
+
+  assert.deepEqual(gitCliSearchPaths(env, 'win32'), [
+    path.join('C:\\Program Files', 'Git', 'cmd'),
+    path.join('C:\\Program Files', 'Git', 'bin'),
+    path.join('C:\\Users\\octo\\AppData\\Local', 'Programs', 'Git', 'cmd'),
+    path.join('C:\\Users\\octo\\AppData\\Local', 'Programs', 'Git', 'bin'),
+    path.join('C:\\Users\\octo\\AppData\\Local', 'Microsoft', 'WinGet', 'Links'),
+    path.join('C:\\Users\\octo\\AppData\\Local', 'Microsoft', 'WindowsApps'),
+    'C:\\Tools',
+    'C:\\Windows\\System32',
+  ]);
+});
+
+test('resolveGitExecutable returns a discovered Windows git executable', () => {
+  const env = {
+    ProgramFiles: 'C:\\Program Files',
+    Path: 'C:\\Tools',
+  };
+  const expected = path.join('C:\\Program Files', 'Git', 'cmd', 'git.exe');
+
+  const resolved = resolveGitExecutable({
+    env,
+    platform: 'win32',
+    fileExists: (candidate) => candidate === expected,
+  });
+
+  assert.equal(resolved, expected);
+});
+
+test('resolveGitExecutable falls back to git.exe on Windows', () => {
+  const resolved = resolveGitExecutable({
+    env: { Path: 'C:\\Tools' },
+    platform: 'win32',
+    fileExists: () => false,
+  });
+
+  assert.equal(resolved, 'git.exe');
 });
 
 test('gitHubTokenGitEnv injects one-shot HTTPS auth without changing remote URLs', () => {
