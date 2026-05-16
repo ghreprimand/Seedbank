@@ -244,6 +244,7 @@ export default function ProjectGenerationSection({
     try {
       const response = await updateIdeaGitHubRepo(idea.id);
       setRepoMessage(response.message);
+      if (response.error) setError(response.error);
       if (response.idea) onIdeaUpdated?.(response.idea);
       const status = await getIdeaGitHubRepoStatus(idea.id);
       if (projectPath) setRepoStatusRecord({ ideaId: idea.id, projectPath, status });

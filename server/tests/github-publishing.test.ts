@@ -4,6 +4,7 @@ import { newIdea } from '../src/domain.js';
 import {
   ensurePublishableIdea,
   GitHubPublishError,
+  gitHubTokenGitEnv,
   parseGhAuthStatusOutput,
   parseGitHubPublishRequest,
   parseGitHubRepositoryReference,
@@ -22,6 +23,20 @@ test('parseGhAuthStatusOutput extracts login and scopes', () => {
   assert.equal(parsed.authenticated, true);
   assert.equal(parsed.login, 'octocat');
   assert.deepEqual(parsed.scopes, ['repo', 'read:org', 'gist']);
+});
+
+test('gitHubTokenGitEnv injects one-shot HTTPS auth without changing remote URLs', () => {
+  const env = gitHubTokenGitEnv('gho_test-token', { PATH: '/usr/bin' });
+
+  assert.equal(env.PATH, '/usr/bin');
+  assert.equal(env.GIT_TERMINAL_PROMPT, '0');
+  assert.equal(env.GIT_CONFIG_COUNT, '1');
+  assert.equal(env.GIT_CONFIG_KEY_0, 'http.https://github.com/.extraheader');
+  assert.match(env.GIT_CONFIG_VALUE_0 ?? '', /^AUTHORIZATION: basic /);
+  assert.equal(
+    Buffer.from((env.GIT_CONFIG_VALUE_0 ?? '').replace(/^AUTHORIZATION: basic /, ''), 'base64').toString('utf8'),
+    'x-access-token:gho_test-token',
+  );
 });
 
 test('sanitizeGitHubRepoName strips unsafe characters and normalizes', () => {
