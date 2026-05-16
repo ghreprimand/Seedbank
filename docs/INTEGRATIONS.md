@@ -41,7 +41,7 @@ GitHub publishing is a separate action after graduation. It does not replace loc
 
 Flow:
 1. Idea is graduated and has a local `graduatedTo` project path.
-2. User authenticates locally with GitHub CLI (`gh auth login`).
+2. User has local Git installed and authenticates locally with GitHub CLI (`gh auth login`).
 3. Client checks account status via `GET /api/integrations/github/status`.
 4. User explicitly publishes via `POST /api/integrations/github/publish/:ideaId` with:
    - `repoName`

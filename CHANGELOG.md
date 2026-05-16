@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 1.1.4 — Windows Git for Publishing Hotfix
+
+- Fixed Windows GitHub publishing pushes when Git for Windows is installed in standard Git folders but the running Seedbank process has not picked up the refreshed user `Path`.
+- Updated the Windows installer and launcher to add common Git install locations to the process `Path` before Seedbank starts.
+- Clarified GitHub publishing setup copy so users install both Git and GitHub CLI before publishing local project files.
+- Added focused regression coverage for Windows `git.exe` resolution.
+
 ## 1.1.3 — Windows GitHub CLI and Codex Account Hotfix
 
 - Fixed Windows GitHub publishing status checks when GitHub CLI is installed in standard per-machine, per-user, WinGet, or WindowsApps locations but Seedbank's running process has not picked up the refreshed user `Path`.

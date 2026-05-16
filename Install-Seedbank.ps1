@@ -67,11 +67,33 @@ function Update-ProcessPath {
     $machineGhX86Dir = Join-Path ${env:ProgramFiles(x86)} 'GitHub CLI'
     if (Test-Path $machineGhX86Dir) { $paths += $machineGhX86Dir }
   }
+  if ($env:ProgramW6432) {
+    $machineGitCmdDir = Join-Path $env:ProgramW6432 'Git\cmd'
+    if (Test-Path $machineGitCmdDir) { $paths += $machineGitCmdDir }
+    $machineGitBinDir = Join-Path $env:ProgramW6432 'Git\bin'
+    if (Test-Path $machineGitBinDir) { $paths += $machineGitBinDir }
+  }
+  if ($env:ProgramFiles) {
+    $machineGitCmdDir = Join-Path $env:ProgramFiles 'Git\cmd'
+    if (Test-Path $machineGitCmdDir) { $paths += $machineGitCmdDir }
+    $machineGitBinDir = Join-Path $env:ProgramFiles 'Git\bin'
+    if (Test-Path $machineGitBinDir) { $paths += $machineGitBinDir }
+  }
+  if (${env:ProgramFiles(x86)}) {
+    $machineGitX86CmdDir = Join-Path ${env:ProgramFiles(x86)} 'Git\cmd'
+    if (Test-Path $machineGitX86CmdDir) { $paths += $machineGitX86CmdDir }
+    $machineGitX86BinDir = Join-Path ${env:ProgramFiles(x86)} 'Git\bin'
+    if (Test-Path $machineGitX86BinDir) { $paths += $machineGitX86BinDir }
+  }
   if ($env:LOCALAPPDATA) {
     $userGhProgramDir = Join-Path $env:LOCALAPPDATA 'Programs\GitHub CLI'
     if (Test-Path $userGhProgramDir) { $paths += $userGhProgramDir }
     $userGhDir = Join-Path $env:LOCALAPPDATA 'GitHub CLI'
     if (Test-Path $userGhDir) { $paths += $userGhDir }
+    $userGitCmdDir = Join-Path $env:LOCALAPPDATA 'Programs\Git\cmd'
+    if (Test-Path $userGitCmdDir) { $paths += $userGitCmdDir }
+    $userGitBinDir = Join-Path $env:LOCALAPPDATA 'Programs\Git\bin'
+    if (Test-Path $userGitBinDir) { $paths += $userGitBinDir }
     $wingetLinksDir = Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Links'
     if (Test-Path $wingetLinksDir) { $paths += $wingetLinksDir }
     $windowsAppsDir = Join-Path $env:LOCALAPPDATA 'Microsoft\WindowsApps'

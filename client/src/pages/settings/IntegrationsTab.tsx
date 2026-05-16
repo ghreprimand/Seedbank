@@ -467,7 +467,7 @@ function GitHubPublishingCard({ offline }: { offline: boolean }) {
                 Link GitHub CLI on this machine to enable publishing:
               </p>
               <ol className="list-decimal pl-4 space-y-1">
-                <li>Install GitHub CLI (`gh`).</li>
+                <li>Install Git and GitHub CLI (`gh`).</li>
                 <li>Run `gh auth login`.</li>
                 <li>Choose `GitHub.com` and your preferred git protocol (HTTPS or SSH).</li>
                 <li>Allow repo access so private repository publishing works when selected.</li>

@@ -46,9 +46,23 @@ if ($env:ProgramFiles) { $commonCliDirs += (Join-Path $env:ProgramFiles 'nodejs'
 if (${env:ProgramFiles(x86)}) { $commonCliDirs += (Join-Path ${env:ProgramFiles(x86)} 'nodejs') }
 if ($env:ProgramFiles) { $commonCliDirs += (Join-Path $env:ProgramFiles 'GitHub CLI') }
 if (${env:ProgramFiles(x86)}) { $commonCliDirs += (Join-Path ${env:ProgramFiles(x86)} 'GitHub CLI') }
+if ($env:ProgramW6432) {
+  $commonCliDirs += (Join-Path $env:ProgramW6432 'Git\cmd')
+  $commonCliDirs += (Join-Path $env:ProgramW6432 'Git\bin')
+}
+if ($env:ProgramFiles) {
+  $commonCliDirs += (Join-Path $env:ProgramFiles 'Git\cmd')
+  $commonCliDirs += (Join-Path $env:ProgramFiles 'Git\bin')
+}
+if (${env:ProgramFiles(x86)}) {
+  $commonCliDirs += (Join-Path ${env:ProgramFiles(x86)} 'Git\cmd')
+  $commonCliDirs += (Join-Path ${env:ProgramFiles(x86)} 'Git\bin')
+}
 if ($env:LOCALAPPDATA) {
   $commonCliDirs += (Join-Path $env:LOCALAPPDATA 'Programs\GitHub CLI')
   $commonCliDirs += (Join-Path $env:LOCALAPPDATA 'GitHub CLI')
+  $commonCliDirs += (Join-Path $env:LOCALAPPDATA 'Programs\Git\cmd')
+  $commonCliDirs += (Join-Path $env:LOCALAPPDATA 'Programs\Git\bin')
   $commonCliDirs += (Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Links')
   $commonCliDirs += (Join-Path $env:LOCALAPPDATA 'Microsoft\WindowsApps')
 }
