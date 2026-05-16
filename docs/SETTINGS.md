@@ -62,23 +62,16 @@ Bindings are stored server-side under the `ui.shortcuts` settings key as a `Shor
 
 Replaces the settings popover that used to live inside the inline AI chat panel.
 
-### Service areas and methods
+### One card per service family
 
-AI & Agents is now organized by **service family first**, then **connection method**:
+AI & Agents shows one card per service family. The card itself reflects the active connection method — there is no separate method-toggle row above it.
 
-- **Claude service**
-  - Anthropic API key method (chat/model routing)
-  - Claude account native OAuth method (chat/model routing; account login required)
-- **Codex/OpenAI service**
-  - OpenAI API key method (chat/model routing)
-  - Codex account app-server auth method (chat/model routing; account login required)
-- **Local inference**
-  - Ollama
-  - Local OpenAI-compatible servers: LM Studio, vLLM, llama.cpp, LocalAI, custom localhost URL
-- **External / cloud routers**
-  - OpenRouter, Groq, Mistral, Together, Fireworks, custom cloud endpoint
+- **Claude** — defaults to your Claude.ai subscription (account login). The Anthropic API key path is opt-in via the card's kebab (`⋯`) menu under *Use API key instead*.
+- **Codex / OpenAI** — defaults to local Codex CLI account login. The OpenAI API key path is opt-in via *Use OpenAI API key instead*.
+- **Local Models** — pick a server type from the inline dropdown (Ollama, LM Studio, vLLM, llama.cpp, LocalAI, custom localhost). Additional named instances accumulate behind `+ Add another local instance`.
+- **External / Cloud** — built-in OpenRouter, Groq, Mistral, Together, Fireworks, or custom HTTPS endpoint. Additional instances accumulate behind `+ Add another cloud provider`.
 
-Chat/model-capable method cards show status (`connected`, `key needed`, `unreachable`, `local`, `not tested`), model/base URL state, and setup/test/list actions.
+Each card header shows: icon · service name · status dot + word (`Connected`, `Key needed`, `Unreachable`, `Local`, `Not tested`) · default chip when applicable · `⋯` menu · expand chevron. Clicking the left half of the row or the chevron expands the card; the `⋯` menu surfaces *Set as default*, account sign-out controls, and *Use API key instead* / *Use subscription instead* mode switches.
 
 Global default routing is provider-instance based and stored server-side. A provider instance is a concrete configured method such as "Claude account", "Ollama", "LM Studio laptop", or "OpenRouter personal".
 

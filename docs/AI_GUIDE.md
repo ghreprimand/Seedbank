@@ -8,16 +8,29 @@ Seedbank's AI features are designed to help you develop your own ideas. The AI i
 
 Provider configuration lives in **Settings → AI & Agents**. Navigate there via the gear icon (⚙) in the header, or go directly to `/settings/ai-agents`.
 
-### Service-first setup
+### One card per service
 
-Settings → AI & Agents is organized by service family first, then connection method:
+Settings → AI & Agents shows a single card per service family. Each card is the section — there is no separate connection-method toggle row above it.
 
-- **Claude service**: Anthropic API key, Claude account native OAuth
-- **Codex/OpenAI service**: OpenAI API key, Codex account app-server auth
-- **Local inference**: Ollama plus as many local OpenAI-compatible servers as you configure (LM Studio, vLLM, llama.cpp, LocalAI, custom localhost URL)
-- **External/cloud routers**: OpenRouter, Groq, Mistral, Together, Fireworks, or other custom cloud endpoints
+- **Claude** — defaults to your Claude.ai subscription (account login). The API-key path is available via the card's kebab (`⋯`) menu under *Use API key instead*.
+- **Codex / OpenAI** — defaults to local Codex CLI account login. The API-key path is available via *Use OpenAI API key instead* in the same menu.
+- **Local Models** — pick a server type (Ollama, LM Studio, vLLM, llama.cpp, LocalAI, custom localhost) from the inline dropdown. Additional local instances accumulate behind `+ Add another local instance`.
+- **External / Cloud** — built-in OpenRouter, Groq, Mistral, Together, Fireworks, or any custom HTTPS endpoint. Additional cloud instances accumulate behind `+ Add another cloud provider`.
 
-Each provider method is stored as a provider instance. Built-in instances cover OpenAI API, Anthropic API, Claude account, Codex account, Ollama, local OpenAI-compatible, and cloud OpenAI-compatible. You can also add additional local or external instances, such as "LM Studio laptop", "Ollama server", "OpenRouter personal", or "Groq work". Each saved instance has its own label, URL, model list, enabled state, health/probe status, and routing identity.
+Each card header reads at a glance: icon · service name · status dot + word (`Connected`, `Key needed`, `Unreachable`, `Local`, `Not tested`) · default chip when applicable · `⋯` menu · expand chevron. Click anywhere on the left half of the row, or the chevron, to expand the card and edit the model, key, or run probes.
+
+Each saved provider method is stored as a provider instance. Built-in instances cover OpenAI API, Anthropic API, Claude account, Codex account, Ollama, local OpenAI-compatible, and cloud OpenAI-compatible. Additional instances ("LM Studio laptop", "OpenRouter personal", "Groq work") can be added as needed; each keeps its own label, URL, model list, enabled state, probe status, and routing identity.
+
+### Kebab menu actions
+
+Every card's `⋯` menu surfaces card-level actions that used to live on the surface:
+
+- **Set as default** — promotes this provider instance to the global default.
+- **Use API key instead** / **Use subscription instead** (Claude and Codex only) — switches the visible card between the account-login and API-key paths for this service family.
+- **Use Codex login instead** / **Use OpenAI API key instead** (Codex family equivalent).
+- Sign out controls when an account is connected.
+
+Switching the mode swaps which provider instance the card represents; the kebab item is named for the *other* path, so the action is always "go to the alternative."
 
 **OpenAI API** — enter your API key and model name (e.g. `gpt-4.1-mini`). Calls are made server-side to `api.openai.com`. Idea content is sent to OpenAI's servers.
 
@@ -47,7 +60,7 @@ The provider health badge is also stored per instance. If you test an Ollama ser
 
 ### Choosing a default provider
 
-A **Set default** radio button on each provider card sets the global default provider instance. Feature Defaults can inherit that global default or override it per feature. The global default also has a default model and effort selector in Feature Defaults.
+Each provider card's kebab (`⋯`) menu has a **Set as default** item. Selecting it promotes that provider instance to the global default; the card border picks up a sage accent and shows `· default` in its header. Feature Defaults can inherit the global default or override it per feature. The global default also has a default model and effort selector in Feature Defaults.
 
 ### Provider API keys vs. Seedbank tokens
 
@@ -173,6 +186,29 @@ Organic modes are available in the AI chat panel.
 **Scope Down** — returns one grounded insight about the core value, one actionable first-build scope cut, and one question that removes scope without removing that value.
 
 **User Story** — returns one concrete first-use or first-dogfood scenario, one actionable thing to prepare or observe in that scenario, and one follow-up question. For personal daily-driver projects, it focuses on the user's intended repeated workflow rather than inventing an external user.
+
+## Prompt Anchoring and Anti-Hallucination Rules
+
+Field-suggestion and Thinking Partner prompts are explicitly constrained to prevent invented detail and to keep generated text aligned with the user's actual notes.
+
+**Anchored field generation.** Several field suggestions name the upstream field they must use as their source of truth, so the model cannot quietly reframe the project:
+
+| Field | Source-of-truth chain |
+|---|---|
+| Elevator Pitch | Concept → Raw Notes → The Case → title |
+| Concept | Raw Notes → title → Elevator Pitch |
+| The Case | Concept → Raw Notes → Elevator Pitch |
+| Risks & Blockers | Concept + Build Notes |
+
+If the upstream field is empty, the prompt falls back down the chain rather than inventing a framing.
+
+**Shared anti-hallucination base.** Every per-field Ask AI call carries these rules in its base system prompt: *"do not add audiences, markets, users, deadlines, technologies, or claims that are not supported by the supplied idea context"* and *"treat empty fields as unknown — never invent details to fill the gap."* These apply across all four intent modes (`improve`, `fresh`, `explain`, `playbook`).
+
+**Personal-tool framing.** If the notes describe a personal daily-driver or learning project, prompts ask the model to focus on the user's own workflow, friction, and validation criteria rather than inventing external users, markets, or growth framing.
+
+**Playbook precedence.** When multiple playbooks are active and they would conflict, resolution order is: 1) Honest & Direct, 2) Devil's Advocate, 3) Scope Down, 4) Technical, 5) Marketing. Lower-priority playbooks contribute only where they do not contradict higher-priority ones. Marketing is intentionally last because it tends to invent claims; candor and challenge override it.
+
+---
 
 ## Stage-Aware AI Personality
 

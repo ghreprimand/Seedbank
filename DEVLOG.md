@@ -4,6 +4,92 @@ Newest entries at the top.
 
 ---
 
+## 2026-05-16 — Project Draft Parser: Embedded Code-Fence Fix
+
+Closed a follow-on Project Generation bug surfaced after the previous day's parser hardening shipped. Opus 4.7 was emitting perfectly valid JSON, yet `extractJsonObject` was throwing "Expected property name or '}' at position 1" — the new diagnostics dump (`/tmp/seedbank-ai-debug/json-parse-fail-*.txt`) revealed the response parsed cleanly with `JSON.parse` directly, so the bug had to be inside `extractJsonObject` itself.
+
+Root cause: the fence-stripping regex `/\`\`\`(?:json)?\s*([\s\S]*?)\`\`\`/i` was applied unconditionally to the trimmed text, and the response contained a generated `SPEC.md` file whose `content` string included a markdown code fence. The regex greedily matched the first inner pair of triple-backticks and returned an arbitrary slice of markdown — the surrounding JSON was discarded before any parse attempt.
+
+Fix:
+- `extractJsonObject` now always tries the raw trimmed text first. Fence extraction is only attempted when `trimmed.startsWith('\`\`\`')`, so an embedded markdown fence inside string content can never displace the outer JSON.
+- Two new regression tests in `server/tests/project-draft-parser.test.ts` lock this in: one with triple-backticks embedded inside a file's content string, and one verifying that a legitimately fence-wrapped response is still parsed.
+
+Validation:
+- `node --import tsx --test server/tests/project-draft-parser.test.ts` — 9 pass / 0 fail.
+- Re-parsed the captured failure payload (`json-parse-fail-2026-05-16T03-19-48-405Z.txt`, 13.7 KB) through the fixed code: 4 files extracted cleanly (`README.md`, `SPEC.md`, `IMPLEMENTATION_NOTES.md`, `TODO.md`).
+
+---
+
+## 2026-05-15 — Project Generation Hardening: Parser, No-AI Fallback, Source Attribution, Missing-Folder Detection
+
+Layered four resilience improvements onto the Project Generation surface after a real Opus 4.7 generation failure left the user without files. The work spans the JSON parsing path, the no-AI fallback, the UI source-attribution, and a missing-folder detection cycle.
+
+**JSON parser robustness (`server/src/ai/prompts.ts`).**
+- `extractJsonObject` was hardened with two new repair layers: `stripStructuralInvisibles` (drops BOM, zero-width chars, bidi marks, and C0/C1 controls between structural tokens — preserved inside strings) and `sanitizeJsonStringContents` (walks the text with string-state tracking; escapes literal newlines/tabs/CR/backspace/form-feed inside string values; doubles bare backslashes not followed by valid JSON escape characters). Repair pipeline is now: raw → stripped → string-content-sanitized → repair-quote-keys(stripped) → repair-quote-keys(sanitized).
+- The `promptForProjectDraft` prompt was tightened to demand a single JSON object with no prose, no markdown fences, no preamble, plus a CRITICAL JSON FORMATTING line spelling out the `\n`, `\t`, `\\`, `\"` escape requirements.
+- Error message now includes the first-16-character Unicode codepoint dump and a 240-char preview of the response. The full raw failing response is persisted to `/tmp/seedbank-ai-debug/json-parse-fail-<timestamp>.txt` for offline analysis.
+- New regression tests in `server/tests/project-draft-parser.test.ts` lock in the literal-newlines-in-content case and the response-preview-in-error behavior.
+
+**No-AI fallback for project file creation (`server/src/index.ts`, `shared/types.ts`).**
+- The `/api/ai/project-generate` route catches AI drafting failures and falls back to a deterministic template instead of returning 500. Templates use all manually-filled idea fields: title, pitch, hook, whyItMightWork, fullNotes, risks, techStack, aesthetic, tags, stage.
+- `repoDocFallbacks` was expanded to produce the four standard repo docs (`README.md`, `SPEC.md`, `IMPLEMENTATION_NOTES.md`, `TODO.md`) from idea-field content rather than a single canned template.
+- `AiProjectDraftResult` gained `source: 'ai' | 'template'` and `fallbackReason?` so the client can attribute the file source.
+
+**Source attribution UX (`client/src/components/ProjectGenerationSection.tsx`).**
+- Three distinct UI states for file source: AI succeeded (sage check with `using <provider> (<model>)`), AI was enabled but failed (red alert banner with the server-side `fallbackReason` plus a `Retry with AI` button), or AI is not configured (amber neutral banner with a settings link). The discriminator is whether the client-side AI preflight returned with zero blockers.
+- "Generation can take 30s–2min" timing note next to the Create/Generate button, plus an elapsed-seconds counter on the busy button label.
+- The result block (file-list section) explicitly labels which path generated the files, so the source remains visible after the banner is scrolled past.
+
+**Missing project folder detection.**
+- New `GET /api/ideas/:id/project-folder-status` endpoint (`server/src/index.ts:1430`) returns `{ exists, isDirectory, path }`. Always 200; graceful when `graduatedTo` is empty.
+- `ProjectGenerationSection` adds a three-state `projectFolderExists: true | false | null` flag. `hasProjectPath` is `Boolean(projectPath) && projectFolderExists !== false` so both `true` and `null` keep the GitHub UI visible — only an explicit `false` from an authoritative status check hides affordances. Status-fetch errors are no-ops; only a successful response can flip the flag.
+- Reactive cleanup: when `openFolder()` or `updateGitHubRepo()` returns a 404 with "does not exist", the component reconfirms via the status endpoint before flipping the flag, so a transient permission error cannot be mistaken for a missing folder.
+- `graduatedTo` is never auto-cleared from the database — the user may have moved the folder rather than deleted it.
+- A missing-folder banner renders only on explicit `false` and suggests clicking Generate to recreate the folder.
+
+Validation:
+- `npm run typecheck` (workspace) — exit 0.
+- `node --import tsx --test server/tests/project-draft-parser.test.ts` — 7 pass / 0 fail.
+- Dev server `tsx watch` hot-reloaded across all server edits.
+- Manual testing in progress on the operator's real Opus generation flow.
+
+---
+
+## 2026-05-15 — AI Settings Redesign, OpenRouter Probe Routing, and Prompt Anchoring
+
+Three connected work blocks landed against the AI surface: a UI redesign of `Settings → AI & Agents` to cut visual noise around connection methods, a family of fixes to the OpenAI-compatible probe path that was reporting "endpoint is unreachable" for valid configurations, and a set of prompt-engineering changes that tighten what the model is allowed to invent versus take from the supplied idea context.
+
+**UI redesign — `Settings → AI & Agents`.**
+- Deleted `ServiceMethodSwitch.tsx`. The "API key vs Account login" toggle row that appeared above the Claude and Codex service cards is gone.
+- Each service family is now a single provider card. The card itself reflects the active connection method. For Claude and Codex, "subscription / account login" is the default presentation; the API-key path is an opt-in revealed from a per-card kebab (`⋯`) menu (`Use API key instead` / `Use subscription instead`).
+- Card header collapses to: icon · name · status dot + word · default chip · `⋯` · expand chevron. Status pill removed in favor of a colored dot and label.
+- The always-visible "Set default" button on every card was replaced with a `Set as default` menu item.
+- "Add another local instance" and "Add another cloud provider" forms are now collapsible behind a small `+ Add another …` link, instead of always-rendered dashed-border blocks.
+- Section description paragraphs above each service family were removed; the redesigned cards convey the same information.
+- Help anchor IDs (`settings-ai-claude-service`, `settings-ai-codex-service`, `settings-ai-local-models`, `settings-ai-external-cloud`, `settings-ai-add-local-instance`, `settings-ai-add-external-instance`) are preserved so contextual help and external references continue to resolve.
+
+**OpenRouter / OpenAI-compatible probe routing.**
+- `testProvider` and `listModels` in `server/src/ai/service.ts` now route through `applyProviderInstance` when `input.providerInstanceId` is supplied. Previously they fell back to `current.openaiCompatibleXxx`, which produced "unreachable" errors when the user's global default was not the cloud-OpenAI-compatible instance (e.g. defaulting to Claude account while testing OpenRouter).
+- `mergeConfig` now honors the legacy `openaiCompatibleXxx` fields when the input itself provides them. The `OpenAICompatibleDetail` "Test draft" path supplies these without `providerInstanceId`, so it was hitting the same stale-legacy fallback before this change.
+- `applyProviderInstance` now also copies `openaiCompatibleApiKeyEncrypted` for the built-in `local-openai-compatible` and `cloud-openai-compatible` branches (the dynamic-instance branch already did). Without this, instance-targeted routing could surface the wrong API key on the legacy provider slot.
+- `assistMode` now accepts an optional `override: AiRequestRouteOverride` and threads it into `resolveFeatureConfig`. The legacy `/api/ai/suggest` mode branch was previously accepting `providerInstanceId` in its body type but discarding it.
+
+**Prompt anchoring (`server/src/ai/prompts.ts`).**
+- Promoted "do not invent audiences, markets, users, deadlines, technologies, or claims that are not supported by the supplied idea context" and "treat empty fields as unknown — never invent details to fill the gap" into the shared `FIELD_ASSIST_PROMPT` base. Previously these guardrails lived only inside the `improve` mode contract; `fresh`, `explain`, `playbook`, and field-assist conversations now inherit them.
+- Added explicit upstream-field anchors to four `fieldOutputContract` entries. The Case anchors on Concept (then Raw Notes, then Elevator Pitch). Elevator Pitch anchors on Concept (then Raw Notes, then The Case, then title). Concept anchors on Raw Notes (then title, then Elevator Pitch). Risks anchors on Concept and Build Notes. Each anchor states the source-of-truth chain explicitly so the model cannot silently reframe.
+- Added explicit playbook precedence to the `playbook` intent contract. When multiple playbooks are active, conflicts resolve in order: 1) Honest & Direct, 2) Devil's Advocate, 3) Scope Down, 4) Technical, 5) Marketing.
+
+**Cleanup.**
+- Removed unused `ServiceMethodOption`, `methodCapabilityLabel`, `optionFromMethodCapability`, and the unused `AiMethodCapability` type import from `client/src/pages/settings/ai/helpers.ts` and `types.ts`. These were the only remaining surface of the deleted `ServiceMethodSwitch`.
+
+Validation:
+- `npm run typecheck` (workspace) — exit 0 after each change.
+- `npm run typecheck -w client` and `-w server` independently — exit 0.
+- Manual OpenRouter probe: confirmed end-to-end (Save → Test draft / Test saved) against a real OpenRouter account after the routing + key fixes landed.
+- Dev server `tsx watch` hot-reloaded across all server edits without error.
+
+---
+
 ## 2026-05-15 — v1.0.2 Release Hardening: Account Auth, Launchers, and Stage Progress
 
 Closed the last public-release hardening pass around account-auth reliability, app-launcher update behavior, and idea-stage progression clarity. This entry intentionally avoids local machine paths, user names, account identifiers, credentials, and environment-specific private values.
