@@ -18,7 +18,6 @@ import { registerBackupRoutes } from './backups/routes.js';
 import { IntegrationRegistry } from './integrations/registry.js';
 import {
   expandHome,
-  readmeFor,
   targetStageFor,
   uniqueProjectDir,
 } from './integrations/scaffold.js';
@@ -62,7 +61,7 @@ import type {
   ShortcutConfig,
   WebhooksConfig,
 } from '../../shared/types.js';
-import { DEFAULT_CATEGORY_DEFINITIONS, STAGES } from '../../shared/types.js';
+import { DEFAULT_CATEGORY_DEFINITIONS, STAGE_LABELS, STAGES } from '../../shared/types.js';
 
 const PORT = Number(process.env.PORT ?? 4800);
 const app = express();
@@ -561,26 +560,86 @@ function projectRootForGeneration(): string {
   return expandHome(stored.projectRoot?.trim() || '~/Projects/Seedbank-Graduated');
 }
 
+function ideaText(value: string | undefined, fallback: string): string {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : fallback;
+}
+
+function ideaList(items: string[] | undefined, fallback: string): string {
+  const filtered = (items ?? []).map((item) => item.trim()).filter(Boolean);
+  return filtered.length > 0 ? filtered.map((item) => `- ${item}`).join('\n') : fallback;
+}
+
 function repoDocFallbacks(idea: Idea): AiProjectDraftFile[] {
+  const title = idea.title.trim() || 'Untitled Project';
+  const stageLabel = STAGE_LABELS[idea.stage] ?? idea.stage;
+  const tags = ideaList(idea.tags, '- Add tags as the project direction sharpens.');
+  const pitch = ideaText(idea.pitch, 'Define the one-line pitch before implementation starts.');
+  const hook = ideaText(idea.hook, 'Describe the first compelling user-facing hook or demo moment.');
+  const whyItMightWork = ideaText(idea.whyItMightWork, 'Capture the strongest evidence or intuition for why this might work.');
+  const fullNotes = ideaText(idea.fullNotes, 'Add raw context, constraints, and discovery notes here.');
+  const risks = ideaText(idea.risks, 'List technical, product, market, and scope risks before expanding the build.');
+  const techStack = ideaText(idea.techStack, 'Choose the simplest stack that can validate the core workflow.');
+  const aesthetic = ideaText(idea.aesthetic, 'Capture visual tone, interaction feel, and reference material as it emerges.');
+
   return [
     {
       path: 'README.md',
       description: 'GitHub-facing project overview',
-      content: readmeFor(idea, 'Seedbank project generation'),
+      content: [
+        `# ${title}`,
+        '',
+        pitch,
+        '',
+        '## Why it might work',
+        '',
+        whyItMightWork,
+        '',
+        '## Hook',
+        '',
+        hook,
+        '',
+        '## Current stage',
+        '',
+        `${stageLabel} (${idea.stage})`,
+        '',
+        '## Tags',
+        '',
+        tags,
+        '',
+        '## First milestone',
+        '',
+        '- Turn the idea fields into a small runnable proof of concept.',
+        '- Keep scope narrow enough to validate the hook quickly.',
+        '- Revisit risks before adding secondary features.',
+        '',
+      ].join('\n'),
     },
     {
       path: 'SPEC.md',
       description: 'Smallest useful version specification',
       content: [
-        `# ${idea.title || 'Untitled Project'} Spec`,
+        `# ${title} Spec`,
         '',
-        '## Problem',
+        '## Pitch',
         '',
-        idea.pitch || 'Define the core problem this project solves.',
+        pitch,
+        '',
+        '## Concept',
+        '',
+        hook,
         '',
         '## Smallest Useful Version',
         '',
-        idea.hook || 'Describe the smallest coherent product or prototype.',
+        fullNotes,
+        '',
+        '## The Case',
+        '',
+        whyItMightWork,
+        '',
+        '## Aesthetic Direction',
+        '',
+        aesthetic,
         '',
         '## Success Criteria',
         '',
@@ -594,19 +653,25 @@ function repoDocFallbacks(idea: Idea): AiProjectDraftFile[] {
       path: 'IMPLEMENTATION_NOTES.md',
       description: 'Build notes and constraints',
       content: [
-        `# ${idea.title || 'Untitled Project'} Implementation Notes`,
+        `# ${title} Implementation Notes`,
         '',
-        '## Suggested Approach',
+        '## Build Notes / Tech Stack',
         '',
-        idea.techStack || 'Choose the simplest stack that can validate the core workflow.',
+        techStack,
         '',
-        '## Context',
+        '## Raw Notes',
         '',
-        idea.fullNotes || 'Add project context as implementation decisions become clearer.',
+        fullNotes,
         '',
         '## Risks',
         '',
-        idea.risks || 'List technical, product, and scope risks here.',
+        risks,
+        '',
+        '## Stage and Tags',
+        '',
+        `Stage: ${stageLabel} (${idea.stage})`,
+        '',
+        tags,
         '',
       ].join('\n'),
     },
@@ -616,7 +681,9 @@ function repoDocFallbacks(idea: Idea): AiProjectDraftFile[] {
       content: [
         '# TODO',
         '',
+        '- [ ] Review and edit these template-generated files before publishing.',
         '- [ ] Confirm the smallest useful version.',
+        '- [ ] Validate the hook with one concrete user flow or demo.',
         '- [ ] Create a basic project skeleton.',
         '- [ ] Implement the first end-to-end workflow.',
         '- [ ] Add a README usage example.',
@@ -1240,18 +1307,32 @@ app.post('/api/ai/project-generate', requireScope('ai:suggest'), requireScope('w
   const prompt = typeof body.prompt === 'string' && body.prompt.trim()
     ? body.prompt.trim()
     : PROJECT_DRAFT_DEFAULT_PROMPT;
-  const draft = await aiService.draftProject(
-    {
-      ideaId,
-      prompt,
-      providerInstanceId: parseProviderInstanceId(body.providerInstanceId),
-      ...(typeof body.model === 'string' && body.model.trim() ? { model: body.model.trim() } : {}),
-      effort: parseAiReasoningEffort(body.effort),
-      verbosity: parseAiTextVerbosity(body.verbosity),
-    },
-    clientKey(req),
-    typeof body.aiConfirmationToken === 'string' ? body.aiConfirmationToken : undefined,
-  );
+  let draft;
+  try {
+    draft = {
+      ...await aiService.draftProject(
+        {
+          ideaId,
+          prompt,
+          providerInstanceId: parseProviderInstanceId(body.providerInstanceId),
+          ...(typeof body.model === 'string' && body.model.trim() ? { model: body.model.trim() } : {}),
+          effort: parseAiReasoningEffort(body.effort),
+          verbosity: parseAiTextVerbosity(body.verbosity),
+        },
+        clientKey(req),
+        typeof body.aiConfirmationToken === 'string' ? body.aiConfirmationToken : undefined,
+      ),
+      source: 'ai' as const,
+    };
+  } catch (err) {
+    const fallbackReason = err instanceof Error ? err.message : String(err);
+    draft = {
+      summary: 'AI was unavailable, so Seedbank generated starter files from the idea fields.',
+      files: repoDocFallbacks(idea),
+      source: 'template' as const,
+      fallbackReason,
+    };
+  }
 
   const existingProjectPath = idea.graduatedTo?.trim();
   const createdProject = !existingProjectPath;
@@ -1344,6 +1425,31 @@ app.post('/api/ai/project-draft/apply', requireScope('ai:suggest'), asyncRoute((
   }
 
   res.json({ targetPath: targetRoot, filesWritten: written });
+}));
+
+app.get('/api/ideas/:id/project-folder-status', requireScope('read:ideas'), asyncRoute((req, res) => {
+  const idea = repository.getIdea(routeParam(req, 'id'));
+  if (!idea) {
+    res.status(404).json({ error: 'Idea not found.' });
+    return;
+  }
+  if (!idea.graduatedTo?.trim()) {
+    res.json({ exists: false, isDirectory: false, path: null });
+    return;
+  }
+
+  const projectPath = path.resolve(idea.graduatedTo);
+  try {
+    const stat = fs.statSync(projectPath);
+    res.json({ exists: true, isDirectory: stat.isDirectory(), path: projectPath });
+  } catch (err) {
+    const code = (err as { code?: unknown })?.code;
+    if (code === 'ENOENT' || code === 'ENOTDIR') {
+      res.json({ exists: false, isDirectory: false, path: projectPath });
+      return;
+    }
+    res.status(500).json({ error: `Could not inspect project folder: ${projectPath}` });
+  }
 }));
 
 app.post('/api/ideas/:id/open-project-folder', requireScope('read:ideas'), requireImplicitLocal, asyncRoute(async (req, res) => {

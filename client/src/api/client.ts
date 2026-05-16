@@ -256,6 +256,12 @@ export interface ProjectFolderOpenResponse {
   message: string;
 }
 
+export interface ProjectFolderStatus {
+  exists: boolean;
+  isDirectory: boolean;
+  path: string | null;
+}
+
 export interface GitHubRepoStatus {
   available: boolean;
   authenticated: boolean;
@@ -1221,6 +1227,12 @@ export async function openIdeaProjectFolder(ideaId: string): Promise<ProjectFold
   return request<ProjectFolderOpenResponse>(
     `/api/ideas/${encodeURIComponent(ideaId)}/open-project-folder`,
     { method: 'POST' },
+  );
+}
+
+export async function getIdeaProjectFolderStatus(ideaId: string): Promise<ProjectFolderStatus> {
+  return request<ProjectFolderStatus>(
+    `/api/ideas/${encodeURIComponent(ideaId)}/project-folder-status`,
   );
 }
 
