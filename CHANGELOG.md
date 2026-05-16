@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.1.3 — Windows GitHub CLI and Codex Account Hotfix
+
+- Fixed Windows GitHub publishing status checks when GitHub CLI is installed in standard per-machine, per-user, WinGet, or WindowsApps locations but Seedbank's running process has not picked up the refreshed user `Path`.
+- Updated the Windows installer and launcher to add common GitHub CLI install locations to the process `Path` before Seedbank starts.
+- Restored Codex account app-server request payloads for refresh-token status reads and streamlined ChatGPT login start.
+- Added focused regression coverage for Windows GitHub CLI resolution and Codex account-login payloads.
 - Fixed Claude account routing so Seedbank uses the same Claude Code-compatible OAuth scopes and request shape as the working native Claude path: concrete Sonnet 4.6 model IDs, block-form system prompts, adaptive thinking, interleaved-thinking/context-management beta headers, high default effort for adaptive Claude models, transient retry handling, and a longer account request timeout.
 - Claude account status now detects older narrow-scope OAuth grants and asks for re-login instead of showing the provider as healthy until inference fails.
 - Hardened Codex account login/status on Windows by resolving npm-installed Codex CLI entrypoints through Node.js when needed, avoiding quoted `.cmd` launch failures, increasing account request timeout, and falling back to clear manual login instructions when the local Codex app-server cannot start interactively.
