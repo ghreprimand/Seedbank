@@ -91,9 +91,22 @@ find_free_port() {
   return 1
 }
 
+cmd_looks_like_seedbank_runtime() {
+  local cmd="$1"
+  [[ -n "$cmd" ]] && grep -Eiq '(^|[/[:space:]])(node|npm|npx|vite|tsx|seedbank)([[:space:]]|$)' <<< "$cmd"
+}
+
 pid_is_seedbank() {
   local pid="$1"
   [[ -z "$pid" ]] && return 1
+
+  local initial_cmd=""
+  if [[ -r "/proc/$pid/cmdline" ]]; then
+    initial_cmd=$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null || echo "")
+  else
+    initial_cmd=$(ps -p "$pid" -o command= 2>/dev/null || echo "")
+  fi
+  cmd_looks_like_seedbank_runtime "$initial_cmd" || return 1
 
   if [[ -d "/proc/$pid" ]]; then
     local p="$pid" hops=0
@@ -114,6 +127,46 @@ pid_is_seedbank() {
   fi
 
   ps -p "$pid" -o command= 2>/dev/null | grep -Fq "$SEEDBANK_DIR"
+}
+
+pid_looks_like_seedbank() {
+  local pid="$1"
+  [[ -z "$pid" ]] && return 1
+
+  if [[ -r "/proc/$pid/cmdline" ]]; then
+    tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | grep -iq 'seedbank'
+    return
+  fi
+
+  ps -p "$pid" -o command= 2>/dev/null | grep -iq 'seedbank'
+}
+
+cleanup_start_lock() {
+  rm -f "$START_LOCK_DIR/pid" 2>/dev/null || true
+  rmdir "$START_LOCK_DIR" 2>/dev/null || rm -rf "$START_LOCK_DIR" 2>/dev/null || true
+}
+
+acquire_start_lock() {
+  if mkdir "$START_LOCK_DIR" 2>/dev/null; then
+    echo "$$" > "$START_LOCK_DIR/pid"
+    trap cleanup_start_lock EXIT
+    return 0
+  fi
+
+  local owner_pid=""
+  [[ -f "$START_LOCK_DIR/pid" ]] && owner_pid=$(cat "$START_LOCK_DIR/pid" 2>/dev/null || echo "")
+  if [[ -z "$owner_pid" ]] || ! kill -0 "$owner_pid" 2>/dev/null; then
+    trace "start lock stale (owner=${owner_pid:-unknown}); reclaiming"
+    rm -rf "$START_LOCK_DIR" 2>/dev/null || true
+    if mkdir "$START_LOCK_DIR" 2>/dev/null; then
+      echo "$$" > "$START_LOCK_DIR/pid"
+      trap cleanup_start_lock EXIT
+      return 0
+    fi
+  fi
+
+  notify "Seedbank start already in progress"
+  return 1
 }
 
 kill_pid_file() {
@@ -200,10 +253,15 @@ ensure_port_available() {
     URL="http://localhost:${CLIENT_PORT}"
     return 0
   fi
-  notify "Seedbank: $name port busy" "Port $port is already in use${pid:+ by PID $pid}" "critical"
   local env_name="SEEDBANK_CLIENT_PORT"
   [[ "$name" == "server" ]] && env_name="SEEDBANK_SERVER_PORT"
-  echo "Port $port is already in use${pid:+ by PID $pid}. Stop that process or set $env_name." >&2
+  if [[ -n "$pid" ]] && pid_looks_like_seedbank "$pid"; then
+    notify "Seedbank: $name port held by another Seedbank install" "Port $port is held by another Seedbank install (PID $pid). Stop it with kill $pid and rerun." "critical"
+    echo "Port $port is held by another Seedbank install (PID $pid). Stop it with kill $pid and rerun." >&2
+  else
+    notify "Seedbank: $name port busy" "Port $port is already in use${pid:+ by PID $pid}" "critical"
+    echo "Port $port is already in use${pid:+ by PID $pid}. Stop that process or set $env_name." >&2
+  fi
   exit 1
 }
 
@@ -448,11 +506,9 @@ open_with_browser_command() {
 
 start() {
   trace "start ENTER dir=$SEEDBANK_DIR client=$CLIENT_PORT server=$SERVER_PORT"
-  if ! mkdir "$START_LOCK_DIR" 2>/dev/null; then
-    notify "Seedbank start already in progress"
+  if ! acquire_start_lock; then
     return 0
   fi
-  trap 'rmdir "$START_LOCK_DIR" 2>/dev/null || true' RETURN
 
   mkdir -p "$CACHE_DIR"
   {
